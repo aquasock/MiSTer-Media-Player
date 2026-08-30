@@ -137,7 +137,13 @@ wire [DESCRIPTOR_POINTER_WIDTH-1:0] descriptor_tail_next=
     {DESCRIPTOR_POINTER_WIDTH{1'b0}}:descriptor_tail+1'b1;
 
 wire lookup_do=PIPELINED_LOOKUP ? lookup_pending : lookup_request;
-wire pipelined_lookup_accept=lookup_request&&!lookup_pending;
+// Mode 1 preserves the original held-request handshake.  Mode 2 is used by
+// the B raster issue cursor: every asserted cycle is a distinct ordered
+// request, so the address and data registers may both stay in place while the
+// pipeline accepts one lookup per clock.
+wire streaming_lookup=(PIPELINED_LOOKUP==2);
+wire pipelined_lookup_accept=lookup_request&&
+    (streaming_lookup||!lookup_pending);
 wire [1:0] lookup_phase_selected=
     PIPELINED_LOOKUP ? lookup_phase_q : lookup_phase;
 wire [3:0] lookup_row_selected=
@@ -198,10 +204,11 @@ always @(posedge clk) begin
     end else begin
         lookup_ready<=1'b0;
         if(PIPELINED_LOOKUP) begin
-            // The consumer holds lookup_request until lookup_ready.  Accept
-            // it once, then suppress the held duplicate while this one-entry
-            // stage produces its response.
-            lookup_pending<=pipelined_lookup_accept;
+            // Mode 1 suppresses a held duplicate.  Mode 2 receives request
+            // pulses from an ordered cursor and shifts one valid address on
+            // every asserted cycle.
+            lookup_pending<=streaming_lookup?lookup_request:
+                pipelined_lookup_accept;
             if(pipelined_lookup_accept) begin
                 lookup_phase_q<=lookup_phase;
                 lookup_row_q<=lookup_row;

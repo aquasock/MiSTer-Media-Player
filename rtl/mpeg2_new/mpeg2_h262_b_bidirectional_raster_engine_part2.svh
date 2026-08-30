@@ -317,7 +317,7 @@ wire block_lookup_request1=block_lookup_request&&
     !(block_fetch_start&&block_fetch_start_bank);
 
 mpeg2_h262_prediction_block_fetcher #(
-    .PHASES(2),.PIPELINED_LOOKUP(1)
+    .PHASES(2),.PIPELINED_LOOKUP(2)
 ) block_fetcher(
     .clk(clk),.reset(reset),
     .start(block_fetch_start&&!block_fetch_start_bank),
@@ -353,7 +353,7 @@ mpeg2_h262_prediction_block_fetcher #(
     .outstanding_count(block_fetch_outstanding0));
 
 mpeg2_h262_prediction_block_fetcher #(
-    .PHASES(2),.PIPELINED_LOOKUP(1)
+    .PHASES(2),.PIPELINED_LOOKUP(2)
 ) block_fetcher1(
     .clk(clk),.reset(reset),
     .start(block_fetch_start&&block_fetch_start_bank),
@@ -707,16 +707,10 @@ wire [28:0] next_miss_prelaunch_addr=phase_base_addr+
     (next_tap_dy?{22'd0,phase_row_words}:29'd0)+
     {28'd0,next_miss_tap_byte_sum[3]};
 
-wire block_lookup_retry=lookup_wait&&block_lookup_ready&&
-    !block_lookup_valid;
-wire block_lookup_idle_request=lookup_wait&&!block_fetch_start&&
-    !block_lookup_ready;
 // Frame mode keeps forward/backward as phases zero/one in one fetcher.  Field
 // mode keeps destination parity as phases zero/one and selects the physical
 // forward/backward fetcher separately through block_lookup_bank.
-wire block_lookup_direction=bidir_lookup_candidate?1'b1:
-    next_pixel_lookup_candidate?1'b0:
-    ((exec_direction==2'd3)&&pred_direction);
+wire block_lookup_direction=lookup_issue_direction;
 assign block_lookup_target_bank=block_consumer_bank^
     ((exec_field||block_field_dct)&&
      (exec_direction==2'd3)&&block_lookup_direction);
@@ -724,11 +718,8 @@ assign block_lookup_phase=block_field_dct?
     {1'b0,(exec_field?1'b0:block_request_tap_dy)}:exec_field?
     {1'b0,block_request_ei[3]}:
     {1'b0,block_lookup_direction};
-wire [5:0] block_request_ei=next_pixel_lookup_candidate?
-    (ei+1'b1):ei;
-wire [1:0] block_request_tap=lookup_advance?
-    lookup_advance_tap_index:
-    (bidir_lookup_candidate||next_pixel_lookup_candidate)?2'd0:tap_index;
+wire [5:0] block_request_ei=lookup_issue_ei;
+wire [1:0] block_request_tap=lookup_issue_tap;
 // The vector belongs to the direction being looked up and, under field
 // prediction, to the slot matching the pixel's destination parity.
 wire block_request_backward=
@@ -767,9 +758,85 @@ assign block_lookup_row=block_field_dct?
     ({2'd0,block_request_ei[5:4]}+{3'd0,block_request_tap_dy}):
     ({1'b0,block_request_ei[5:3]}+block_request_tap_dy);
 assign block_lookup_column=block_request_byte[3];
-assign block_lookup_request=
-    (prediction_lookup&&!(pixel_setup&&(ei==0)))||
-    block_lookup_retry||block_lookup_idle_request;
+
+// Advance the issue cursor from geometry only.  Retained words are not
+// streamed until the selected footprint is complete, so the response-side
+// valid/next-row-valid decisions are guaranteed to take the same branch.
+// Field-DCT addressing selects a footprint by block parity, while the
+// established reconstruction sequencer selects interpolation taps by the
+// destination pixel parity.  Keep those two roles distinct here as they are
+// in the response-side phase_mvx/phase_mvy state.
+wire lookup_issue_group_backward=
+    (exec_direction==2'd2)||block_lookup_direction;
+wire signed [9:0] lookup_issue_group_mvx=exec_field?
+    field_mv_x(lookup_issue_group_backward,block_request_ei[3]):
+    (lookup_issue_group_backward?exec_bmvx:exec_fmvx);
+wire signed [9:0] lookup_issue_group_mvy=exec_field?
+    field_mv_y(lookup_issue_group_backward,block_request_ei[3]):
+    (lookup_issue_group_backward?exec_bmvy:exec_fmvy);
+wire lookup_issue_group_half_x=lookup_issue_group_mvx[0];
+wire lookup_issue_group_half_y=lookup_issue_group_mvy[0];
+wire lookup_issue_group_tap_dx=
+    (lookup_issue_group_half_x&&lookup_issue_group_half_y)?
+        block_request_tap[0]:
+    (lookup_issue_group_half_x?block_request_tap[0]:1'b0);
+wire lookup_issue_group_tap_dy=
+    (lookup_issue_group_half_x&&lookup_issue_group_half_y)?
+        block_request_tap[1]:
+    (lookup_issue_group_half_y?block_request_tap[0]:1'b0);
+wire lookup_issue_tap_last=
+    (lookup_issue_group_half_x&&lookup_issue_group_half_y)?
+        (block_request_tap==2'd3):
+    ((lookup_issue_group_half_x||lookup_issue_group_half_y)?
+        (block_request_tap==2'd1):(block_request_tap==2'd0));
+wire [1:0] lookup_issue_next_tap=block_request_tap+1'b1;
+wire lookup_issue_next_tap_dx=
+    (lookup_issue_group_half_x&&lookup_issue_group_half_y)?
+        lookup_issue_next_tap[0]:
+    (lookup_issue_group_half_x?lookup_issue_next_tap[0]:1'b0);
+wire lookup_issue_next_tap_dy=
+    (lookup_issue_group_half_x&&lookup_issue_group_half_y)?
+        lookup_issue_next_tap[1]:
+    (lookup_issue_group_half_y?lookup_issue_next_tap[0]:1'b0);
+wire lookup_issue_next_tap_last=
+    (lookup_issue_group_half_x&&lookup_issue_group_half_y)?
+        (lookup_issue_next_tap==2'd3):
+    ((lookup_issue_group_half_x||lookup_issue_group_half_y)?
+        (lookup_issue_next_tap==2'd1):(lookup_issue_next_tap==2'd0));
+wire [4:0] lookup_issue_group_byte=
+    {2'd0,block_request_base_byte}+{2'd0,block_request_ei[2:0]}+
+    {4'd0,lookup_issue_group_tap_dx};
+wire [4:0] lookup_issue_next_byte=
+    {2'd0,block_request_base_byte}+{2'd0,block_request_ei[2:0]}+
+    {4'd0,lookup_issue_next_tap_dx};
+wire lookup_issue_quad=!block_field_dct&&
+    (block_request_tap==2'd0)&&lookup_issue_group_half_x&&
+    lookup_issue_group_half_y&&
+    (lookup_issue_group_byte[3]==lookup_issue_next_byte[3]);
+wire lookup_issue_horizontal_pair=!lookup_issue_quad&&
+    !lookup_issue_tap_last&&
+    (lookup_issue_group_tap_dy==lookup_issue_next_tap_dy)&&
+    (lookup_issue_group_byte[3]==lookup_issue_next_byte[3]);
+wire lookup_issue_vertical_pair=!lookup_issue_quad&&
+    !lookup_issue_tap_last&&!block_field_dct&&
+    !lookup_issue_group_half_x&&lookup_issue_group_half_y&&
+    (lookup_issue_next_tap_dy==(lookup_issue_group_tap_dy+1'b1))&&
+    (lookup_issue_group_byte[3]==lookup_issue_next_byte[3]);
+wire lookup_issue_pair=lookup_issue_horizontal_pair||
+    lookup_issue_vertical_pair;
+wire lookup_issue_phase_complete=lookup_issue_tap_last||lookup_issue_quad||
+    (lookup_issue_pair&&lookup_issue_next_tap_last);
+wire [1:0] lookup_issue_advance_tap=block_request_tap+
+    (lookup_issue_pair?2'd2:2'd1);
+wire block_lookup_target_complete=block_lookup_target_bank?
+    block_fetch_complete1:block_fetch_complete0;
+wire block_lookup_field_target_ready=
+    !((exec_field||block_field_dct)&&(exec_direction==2'd3)&&
+      block_lookup_direction)||field_second_fetch_started;
+wire block_lookup_stream_request=active&&lookup_issue_active&&
+    block_lookup_target_complete&&block_lookup_field_target_ready&&
+    !block_fetch_start;
+assign block_lookup_request=block_lookup_stream_request;
 
 assign ddram_burstcnt=block_fetch_rd?8'd1:8'd0;
 assign ddram_addr=block_fetch_rd?block_fetch_addr:29'd0;
@@ -837,7 +904,10 @@ always @(posedge clk) begin
         exec_desc_count_latched<=0;exec_motion_end<=0;
         pending<=0;started<=0;active<=0;past_bank_latched<=0;future_bank_latched<=0;scratch_bank_latched<=0;req<=0;waitresp<=0;lookup_wait<=0;
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;
-        pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
+        pred_direction<=0;tap_index<=0;
+        lookup_issue_active<=0;lookup_issue_ei<=0;
+        lookup_issue_direction<=0;lookup_issue_tap<=0;
+        pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
         emit_advanced<=0;emit_x<=0;emit_y<=0;emit_block_start<=0;emit_block_complete<=0;
         block_fetch_start<=0;block_fetch_start_bank<=0;
         block_fetch_start_prefetch<=0;

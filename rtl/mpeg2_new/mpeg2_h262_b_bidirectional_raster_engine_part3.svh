@@ -32,7 +32,10 @@
             exec_motion_end<=bank_motion_end[execute_bank];
             row_final_latched<=
                 (bank_row[execute_bank]+1'b1==mb_height);
-            pred_direction<=0;motion_load<=1;pixel_setup<=0;
+            pred_direction<=0;lookup_issue_active<=0;
+            lookup_issue_ei<=0;lookup_issue_direction<=0;
+            lookup_issue_tap<=0;
+            motion_load<=1;pixel_setup<=0;
             residual_load<=0;residual_load_wait<=0;persisted_seen<=0;
             block_prefetch_valid<=0;block_current_prefetched<=0;
             block_current_started<=0;
@@ -84,6 +87,10 @@
         end
         if(residual_load_wait)begin
             residual_load_wait<=0;pred_sum<=0;tap_index<=0;pixel_setup<=1;
+            lookup_issue_active<=(exec_direction!=0)&&block_all_bounds_ok;
+            lookup_issue_ei<=ei;
+            lookup_issue_direction<=1'b0;
+            lookup_issue_tap<=2'd0;
             phase_base_addr<=computed_phase_base_addr;
             phase_base_byte<=block_field_dct?
                 (field_dct_fetch_x[2:0]+ei[2:0]):exec_field?
@@ -233,6 +240,26 @@
             else begin
                 if(half_x||half_y)half_sample_seen<=1;
                 lookup_wait<=1;
+            end
+        end
+
+        // Address issue is independent of response-side prediction sums.  The
+        // cursor is at most the two registered lookup stages ahead, and both
+        // sides take the same geometry-only tap grouping decisions.
+        if(block_lookup_stream_request) begin
+            if(lookup_issue_phase_complete) begin
+                if((exec_direction==2'd3)&&!lookup_issue_direction) begin
+                    lookup_issue_direction<=1'b1;
+                    lookup_issue_tap<=2'd0;
+                end else if(lookup_issue_ei!=6'd63) begin
+                    lookup_issue_ei<=lookup_issue_ei+1'b1;
+                    lookup_issue_direction<=1'b0;
+                    lookup_issue_tap<=2'd0;
+                end else begin
+                    lookup_issue_active<=1'b0;
+                end
+            end else begin
+                lookup_issue_tap<=lookup_issue_advance_tap;
             end
         end
 

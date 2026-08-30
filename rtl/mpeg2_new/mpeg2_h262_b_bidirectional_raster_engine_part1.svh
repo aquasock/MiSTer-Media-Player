@@ -120,6 +120,14 @@ reg emit,wait_store,pixel_setup,residual_load,residual_load_wait;
 reg [5:0] ei;
 reg pred_direction;
 reg [1:0] tap_index;
+// The retained-footprint lookup has registered address and data stages.  A
+// small ordered issue cursor runs ahead of response-side reconstruction so
+// those stages remain full without exposing the retained-word mux to the
+// decoder timing path.
+reg lookup_issue_active;
+reg [5:0] lookup_issue_ei;
+reg lookup_issue_direction;
+reg [1:0] lookup_issue_tap;
 // kate - Commit 182 timing closure.  src_x_tap[2:0] selects the byte of the
 // returned 64-bit DDR word, but the data does not arrive until several cycles
 // after the request is accepted.  Computing that select combinationally put the
