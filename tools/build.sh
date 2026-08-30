@@ -6,6 +6,7 @@ BUILD_HOST=${BUILD_HOST:-mister-build}
 REMOTE_ROOT=${REMOTE_ROOT:-/tmp/MiSTer-Media-Player-build}
 QUARTUS_BIN=${QUARTUS_BIN:-/home/vash/intelFPGA_lite/17.0_T/quartus/bin}
 PROJECT=MediaPlayer
+DEFAULT_BUILD_ID=260829
 
 usage() {
     cat >&2 <<'EOF'
@@ -17,8 +18,8 @@ usage:
 
 Environment overrides: BUILD_HOST, REMOTE_ROOT, QUARTUS_BIN and BUILD_ID.
 
-BUILD_ID is six digits. By default it uses the current Git commit date, making
-repeated builds of the same commit reproducible instead of changing every day.
+BUILD_ID is six digits. It defaults to 260829, the timing-clean known-good
+placement. Override it only when deliberately searching for a new placement.
 EOF
     exit 2
 }
@@ -31,11 +32,7 @@ require() {
 }
 
 build_id() {
-    local value=${BUILD_ID:-}
-
-    if [[ -z $value ]]; then
-        value=$(git -C "$ROOT" log -1 --format=%cd --date=format:%y%m%d)
-    fi
+    local value=${BUILD_ID:-$DEFAULT_BUILD_ID}
 
     [[ $value =~ ^[0-9]{6}$ ]] || {
         printf 'build.sh: BUILD_ID must contain exactly six digits\n' >&2
