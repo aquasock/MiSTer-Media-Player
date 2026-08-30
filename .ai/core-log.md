@@ -1,3 +1,32 @@
+## 758 COMMIT Unreleased 4e54e9d 2026-08-30T03:31:07-07:00
+
+#### Coming From:
+
+Unreleased 4e54e9d
+
+#### Purpose:
+
+Capture the completed five-minute Big Lebowski HDMI control and record the user's separate S/PDIF result on the unchanged timing-clean core.
+
+#### Outcome:
+
+The user authorizes capture after the complete HDMI run of `/media/fat/games/MediaPlayer/the_big_lebowski_first_5min.mpg` and explicitly reports that S/PDIF also works perfectly.  The 550,558-byte scaled capture `/tmp/entry758_big_lebowski_5min_hdmi_pass.png`, SHA-256 `fba8e5c8bb85fba397ea29883fa789e461592bf70edf685f4cb6fdab6466731e`, visibly preserves the clean intended final toilet scene without corruption.  The matching 7,647,957-byte helper log `/tmp/entry758_big_lebowski_5min_hdmi_pass.log`, SHA-256 `b5ab8d05ef08507b7688ac764aea6433549f3b93f5434b645cd686a9df2917c7`, names the exact five-minute file, selects HDMI decoded stereo PCM and AC-3 private substream `0x80`, emits all 9,375 AC-3 frames and 14,400,000 PCM samples, carries 244,700,748 video bytes with 616 timestamps, reaches helper EOF and exits zero after submitting all 306,800,752 in-band transport bytes with every byte on the fast path.  The native 720x480 capture `/tmp/entry758_big_lebowski_5min_hdmi_raw.png` is 381,718 bytes with SHA-256 `77b6f4d082444683401c38af7f75762f5dcd54c76b3d4ef645c558c98e30939b`.  Its checksum-valid schema-20 telemetry is an earlier sticky fatal snapshot rather than a terminal snapshot: at approximately 173 seconds it records exactly one PCM FIFO underrun, error flag `0x0400`, and freezes its counters at 151,212,826 accepted clean-video bytes even though the visible video and helper continue through the five-minute end.  Before that event it records no syntax, phase-one, prediction, inverse-quantization, IDCT, reconstruction, DDR store/cache, presentation, PCM-protocol or cache-overlap error and no transport block.  The user reports no audible HDMI defect, while the independent S/PDIF run is explicitly perfect, and explicitly accepts a single HDMI FIFO underrun for now.  This accepts the complete five-minute Big Lebowski video, HDMI and S/PDIF playback boundary; the one-count FIFO event remains documented without blocking the current video-compatibility work.  No source, RBF, helper, media or mode changes during either run or capture.
+
+#### Next Steps:
+
+Do not replay Big Lebowski solely to reconfirm video or audio.  Keep the explicitly accepted one-count HDMI FIFO-underrun observation separate from the proven Coming to America video admission defect and off the current critical path.  After user approval, implement entry 757's one-line `phase1_native_film_i_frame` correction and deterministic progressive-film field-DCT I/P regression, run the focused and existing regression sets, then perform a clean Quartus build and full timing analysis before any target deployment.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 757 COMMIT Unreleased 4e54e9d 2026-08-30T03:26:58-07:00
 
 #### Coming From:
@@ -1123,35 +1152,6 @@ Prepare a matched interlaced I/P/B re-encode of the same decoded passage using e
 #### Files Modified:
 
 - /media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ip_only.m2v
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 718 COMMIT Unreleased 8fd16e8 2026-08-29T18:46:29-07:00
-
-#### Coming From:
-
-Unreleased 8fd16e8
-
-#### Purpose:
-
-Record the first hardware result for the corrected 361-picture interlaced stream and isolate its remaining visible startup corruption.
-
-#### Outcome:
-
-The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2v` on the exact timing-passing `8fd16e8` RBF and reports that it now reaches the end without freezes or stutters, clearing the former 63-picture hardware stop.  Visible macroblock distortion remains near the beginning and then clears.  The completed-screen capture independently decodes as a checksum-valid schema-20 quiet snapshot with all 6,751,008 clean-video bytes accepted, 361 pictures displayed across 360 swaps, 142 reference plus 219 B pictures, sequence end and presentation completion true, and zero decoder, presentation, cache-bank, transport-block or timestamp-conflict errors.  The video-only fixture correctly emits no audio.  At the user's explicit request a bounded replay capture uses only absolute `/dev/MiSTer_cmd` and `/media/fat/screenshots/entry718_continuous.png` paths, retrieves every completed PNG locally and removes only its own temporary remote screenshot after each retrieval.  Forty-two complete frames span 32.84 seconds: frames 1 through 13 retain the prior terminal screen, frames 14 through 17 cover the black transition, frames 18 through 29 cover playback, and frames 30 through 42 retain the new terminal screen.  Frames 18 and 19 are visually clean; frames 20, 21 and 22 at capture times 14.632, 15.517 and 16.348 seconds show obvious localized macroblock corruption across the shiny hats, faces and upper background; frame 23 and every later sampled playback frame are visually clean.  Relative to the first captured video frame, the observed corruption therefore occupies the sampled interval from approximately 1.56 through 3.27 seconds after picture presentation begins.  The user then changes only the HDMI scaler deinterlacer to Bob and reports that playback behavior is otherwise identical: the stream still finishes without freezes or stutters, the same startup block corruption remains, and it appears more widespread than in Weave.  The user clarifies that both Weave and Bob runs used the core's `Interlaced output: Native 480i` setting.  This is normal processed HDMI: the core emits the same native 480i raster in both runs and the Bob/Weave choice is consumed afterward by MiSTer's scaler.  The user next selects `Interlaced output: 800x600 Diagnostic` with Weave and reports the same result as Bob to the eye, including the startup block corruption.  Its requested terminal screenshot independently confirms another checksum-valid schema-20 quiet completion with all 6,751,008 bytes, 361 pictures, 360 swaps, 142 reference plus 219 B pictures, sequence end and presentation completion true, zero error flags, zero deadline records and no transport block or timestamp conflict.  Persistence across Native 480i Weave, Native 480i Bob and 800x600 Diagnostic rules out the presentation-mode and processed-scaler selections as the origin.  The user then plays the exact same local elementary stream in a software MPEG-2 player and reports that the source looks perfect, ruling out damaged authored media.  Finally, the user plays the established interlaced all-I `/media/fat/games/MediaPlayer/test_1_interlace_tff.mpg` in 800x600 Diagnostic with Weave and reports perfect playback apart from a tiny green dot crawl at the left edge; the user clarifies that this dot crawl has existed for some time and is not a new regression.  Its requested terminal screenshot confirms all 3,068,038 clean-video bytes, 360 I pictures and 359 swaps, sequence end and presentation completion, zero B pictures, zero prediction requests, zero error flags, zero deadline or gap outliers and no transport blocks.  The clean all-I result confines the major Coming to America block corruption to interlaced predictive P/B reconstruction or reference use rather than the shared I-picture and framebuffer path.  Full-stream liveness passes, while predictive visual acceptance remains open.  No capture artifact is added to the repository under the user's streamlined reporting direction.
-
-#### Next Steps:
-
-Prepare an interlaced I/P-only version of the same Coming to America passage, preserving its 720x480, 30000/1001, TFF frame-picture structure while disabling B pictures, then install it as a separate test file without replacing the original.  The next user test should play that I/P-only file once in 800x600 Diagnostic with Weave and report whether the shiny-hat block corruption remains.  Corruption in I/P-only confines the defect to P prediction or reference use; a clean I/P-only result confines it to B-picture bidirectional prediction.  Do not substitute the existing progressive `test_ip_only.m2v`, because it does not exercise the interlaced path under investigation.  Test-media preparation and installation require a separate explicit user instruction; do not change source, build the FPGA or deploy anything in this entry.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
