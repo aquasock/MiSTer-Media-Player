@@ -1,3 +1,32 @@
+## 726 COMMIT Unreleased ??? 2026-08-29T19:45:40-07:00
+
+#### Coming From:
+
+Unreleased aef121f
+
+#### Purpose:
+
+Extend the deterministic picture-unit transformer and install a held byte-exact authored I-only diagnostic stream.
+
+#### Outcome:
+
+The user explicitly authorizes the entry-725 I-only isolation.  Extend `tools/streams/strip_h262_b_pictures.py` without changing its default B-strip behavior so it can retain only selected picture types and repeat each retained unit a requested positive number of times.  Generate an I-only derivative from the exact original authored stream by removing all 115 P and 219 B units and repeating each of its 27 independent I-picture units ten times, holding every source I frame for about one third of a second while leaving every repeated coded picture byte unchanged.  The resulting all-I rate is approximately 11.24 megabits per second at 30000/1001, so hardware cadence and error status remain observational boundaries rather than assumed acceptance.
+
+#### Next Steps:
+
+Require backward-compatible default output, invalid-option rejection, byte-exact retained-unit verification and exactly one terminal sequence-end code.  Independently verify 270 TFF interlaced I pictures, no P or B pictures, clean complete software decoding and the expected approximately nine-second duration, then install under a new absolute MiSTer filename with byte-exact readback.  The next hardware test should play the held I-only stream once in `800x600 Diagnostic` with Weave and report whether any held frame shows large block corruption; a clean result isolates P reconstruction, while corruption implicates authored I or shared intra/quantization handling.
+
+#### Files Modified:
+
+- tools/streams/strip_h262_b_pictures.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 725 COMMIT Unreleased aef121f 2026-08-29T19:43:26-07:00
 
 #### Coming From:
@@ -1259,35 +1288,6 @@ The approved investigation runs on the build PC with production source unchanged
 #### Next Steps:
 
 Obtain approval for a helper scheduling correction that supplies sufficient audio before queued video blocks extraction, preserving original video and compressed audio bytes and existing physical FIFO sizes. Add this integrated audio/video failure as a regression and require zero underruns through the full opening in both output modes and paced-source cases, without introducing video stalls or A/V drift. Prefer a verified helper-only correction; do not mask flags, add an arbitrary startup delay or start another Quartus reseed. Keep entry 683 HDMI acceptance and the installed seed-20 build intact until a replacement is separately validated.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 686 COMMIT Unreleased 83c138e 2026-08-28T13:43:04-07:00
-
-#### Coming From:
-
-Unreleased 83c138e
-
-#### Purpose:
-
-Investigate reproducible early S/PDIF audio starvation on the unchanged seed-20 opening baseline.
-
-#### Outcome:
-
-The user approves investigation after entries 684 and 685 reproduce the audible dropout and FPGA FIFO underrun near 1.8 seconds with original AC-3, including a run with S/PDIF held fixed. Record this approved scope before executing it: compare unchanged HDMI and passthrough helper outputs, trace startup scheduling, in-band transport and FPGA audio consumption, and run bounded diagnostic analysis or simulations on the build PC using the exact opening. Preserve raw evidence and original compressed audio bytes. Diagnostic scripts or isolated instrumentation may be used to establish causality, but no production correction, Quartus compile, reseed, deployment or hardware playback is authorized in this cycle. Source 83c138e remains the installed, built baseline; the unchecked hardware status concerns the unresolved S/PDIF opening test and does not revoke entry 683 HDMI acceptance.
-
-#### Next Steps:
-
-Publish this scope and synchronize the build PC, identify existing helper and audio-path regression infrastructure, and reproduce or bound starvation with controls that separate payload contents, schedule and transport pacing. Document what is proved and what remains model-dependent, then propose the smallest evidence-supported correction for approval before changing production behavior or building a new core. Do not mask the underrun flag or increase buffering without measuring the failing boundary.
 
 #### Files Modified:
 
