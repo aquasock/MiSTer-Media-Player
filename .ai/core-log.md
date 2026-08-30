@@ -1,4 +1,4 @@
-## 782 COMMIT Unreleased ??? 2026-08-30T15:41:39-07:00
+## 782 COMMIT Unreleased 81a1002 2026-08-30T15:41:39-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add encrypted DVD ISO main-feature playback through a pinned host-side libdvdcss
 
 #### Outcome:
 
-The user selects encrypted ISO files as the next target and agrees that technical decryption and licensing or distribution policy remain separate concerns.  Official VideoLAN material identifies libdvdcss 1.6.0, released in July 2026 under GPLv2, as the current library for transparent encrypted DVD block access; its 83,640-byte source archive is independently verified at SHA-256 `7ea556c8`.  The approved implementation will replace the deliberate unencrypted-only libdvdread build patch with a reproducibly pinned static libdvdcss build, link it directly beneath the existing callback-backed `iso:` source and retain longest-title selection, open-GOP startup filtering and every downstream audio/video behavior.  This is an implementation dependency rather than a substitute for the unavailable authorized DVD CCA specification, so no CSS-conformance claim will be made.
+The user selects encrypted ISO files as the next target and agrees that technical decryption and licensing or distribution policy remain separate concerns.  Source `81a1002` replaces the deliberate unencrypted-only libdvdread patch with reproducibly pinned libdvdcss 1.6.0 native and ARM builds, configures libdvdread with CSS support, directly links the static library beneath the existing callback-backed `iso:` source and clears inherited Meson compiler arguments so a reused build directory cannot silently retain `MMP_DISABLE_DVDCSS`.  Official VideoLAN material identifies the dependency as transparent encrypted DVD block access under GPLv2; its 83,640-byte source archive is independently verified at SHA-256 `7ea556c8`.  Exact native regression proves the decrypted Blazing Saddles ISO opening remains byte-identical at 1,123,504 bytes and SHA-256 `66b84e51`, including its two discarded open-GOP leading B pictures, while the ordinary five-minute MPG remains byte-identical at 224,185,582 bytes and SHA-256 `45401ab3`.  The exact ARM build succeeds as an 847,156-byte stripped, statically linked EABI5 helper with SHA-256 `620c8af3` and no dynamic section.  A raw sector scan finds no scrambled PES sectors in any available Coming To America, Blazing Saddles or The Big Lebowski ISO, so those already-decrypted images cannot validate the new decryption path and the candidate is intentionally not deployed.  This remains an implementation dependency rather than a substitute for the unavailable authorized DVD CCA specification, and no CSS-conformance claim is made.
 
 #### Next Steps:
 
-Build libdvdcss 1.6.0 natively and for ARM before libdvdread, require direct static linkage with no runtime shared-library dependency, update ISO diagnostics and documentation, and prove the ordinary decrypted Blazing Saddles ISO and MPG paths remain unchanged.  Then validate sector decryption and complete native opening against an authorized genuinely CSS-scrambled ISO fixture, build only the static ARM helper, preserve and stage-rename the installed helper with independent readback, and qualify that same encrypted ISO on HDMI and S/PDIF without changing Main, the seed-19 RBF or FPGA source.
+Provide an authorized genuinely CSS-scrambled raw ISO fixture, confirm that it contains nonzero scrambled PES sectors, prove native sector decryption and a complete valid opening, and compare against an independently decrypted control when feasible.  If that gate passes, preserve the installed helper, deploy this exact candidate by verified staging and same-directory rename, and qualify the same encrypted ISO on HDMI and S/PDIF without changing Main, the seed-19 RBF or FPGA source.
 
 #### Files Modified:
 
@@ -29,7 +29,7 @@ Build libdvdcss 1.6.0 natively and for ARM before libdvdread, require direct sta
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
