@@ -1,4 +1,4 @@
-## 726 COMMIT Unreleased ??? 2026-08-29T19:45:40-07:00
+## 726 COMMIT Unreleased 23defaa 2026-08-29T19:45:40-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Extend the deterministic picture-unit transformer and install a held byte-exact 
 
 #### Outcome:
 
-The user explicitly authorizes the entry-725 I-only isolation.  Extend `tools/streams/strip_h262_b_pictures.py` without changing its default B-strip behavior so it can retain only selected picture types and repeat each retained unit a requested positive number of times.  Generate an I-only derivative from the exact original authored stream by removing all 115 P and 219 B units and repeating each of its 27 independent I-picture units ten times, holding every source I frame for about one third of a second while leaving every repeated coded picture byte unchanged.  The resulting all-I rate is approximately 11.24 megabits per second at 30000/1001, so hardware cadence and error status remain observational boundaries rather than assumed acceptance.
+The user explicitly authorizes the entry-725 I-only isolation.  Source `23defaa` extends `tools/streams/strip_h262_b_pictures.py` without changing its default B-strip behavior: `--keep-types` selects I or I/P units, `--repeat-retained` accepts only a positive count, the original `strip_b_pictures` API remains, and output picture units are checked byte-for-byte against the selected source units in order.  Regenerating the entry-724 default produces the exact prior 4,045,136 bytes and `5f16247b` hash, proving backward compatibility; a zero repeat is rejected without creating output.  Applying `--keep-types I --repeat-retained 10` to the exact original authored stream removes all 115 P and 219 B units and repeats each of its 27 independent I-picture units ten times without altering any repeated coded-picture byte.  The resulting 12,658,036-byte stream has SHA-256 `3c28c3e9c388a929d661de5c344dc1569e6ea82c7c7efa05bd08c83d840dfdfd`; independent FFprobe enumeration finds exactly 270 720x480 TFF interlaced I pictures at 30000/1001 with no P, B or progressive picture, the tail retains exactly one `00 00 01 b7` sequence end, and a complete FFmpeg software decode exits without an error.  Its approximately nine-second all-I presentation averages 11.24 megabits per second, so cadence and error status remain observational boundaries.  Absolute FTP inventory proves the new filename absent, then installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_i_only_hold.m2v` and independent absolute-path readback reproduce all 12,658,036 bytes, the exact `3c28c3e9` hash and terminal sequence end.  Existing media, FPGA, Main, helper and configuration remain unchanged, and no Quartus build is needed.
 
 #### Next Steps:
 
-Require backward-compatible default output, invalid-option rejection, byte-exact retained-unit verification and exactly one terminal sequence-end code.  Independently verify 270 TFF interlaced I pictures, no P or B pictures, clean complete software decoding and the expected approximately nine-second duration, then install under a new absolute MiSTer filename with byte-exact readback.  The next hardware test should play the held I-only stream once in `800x600 Diagnostic` with Weave and report whether any held frame shows large block corruption; a clean result isolates P reconstruction, while corruption implicates authored I or shared intra/quantization handling.
+With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_i_only_hold.m2v` once.  Each of the 27 distinct source I frames is held for about one third of a second; report whether any held frame shows large block corruption and whether playback reaches the end.  A clean visual result isolates P prediction or P residual reconstruction, while corruption implicates an authored I-picture or shared intra/quantization feature.  Minor cadence pressure is possible because the byte-exact all-I stream averages 11.24 megabits per second; do not conflate a stutter with block corruption, and do not capture telemetry unless the user explicitly requests it.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Require backward-compatible default output, invalid-option rejection, byte-exact
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
