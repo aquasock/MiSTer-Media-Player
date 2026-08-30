@@ -1,3 +1,32 @@
+## 743 COMMIT Unreleased 6196869 2026-08-29T20:38:36-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Accept the P85 and I88 hardware results, preserve the held P85 evidence and authorize the final two-picture onset search.
+
+#### Outcome:
+
+The user reports that P85 shows the first faint strip-like flicker, estimates that onset may be two or three frames earlier, and reports greater distortion by I88.  The user leaves P85 displayed for capture.  The 401,809-byte screenshot `/tmp/entry743_p85_checkpoint_first_flicker.png`, SHA-256 `d6478d2d0d770642a96a263e9af4370ead986a2a32cd5356221c4f486209bcd1`, preserves the subtle terminal P85 evidence in the shiny-hat passage.  Its checksum-valid schema-20 snapshot accepts all 1,105,168 bytes, displays all 48 retained reference pictures across 47 swaps, ends on P temporal reference 14, sees sequence end and presentation completion, reaches quiet state and drains the scheduler.  The 1.9249-second presentation reports zero error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  With P80 previously clean and P85 now the first clearly reported flicker, the onset is within the consecutive retained P80-through-P85 chain; the stronger I88 result shows that damage is already present before the new GOP reference rather than beginning at P91.  Choose P82 and P84 as the two most informative retained endpoints.  No source, FPGA, RBF, Main, helper, installed media or configuration changes during capture.
+
+#### Next Steps:
+
+Using unchanged source `6196869`, generate byte-exact I/P checkpoints ending separately at zero-based coded P82 and P84.  Preserve every retained unit, remove only complete B units, append one terminal sequence-end code, prove exact terminal-picture identity and clean full software decode, then install under distinct absolute MiSTer paths with exact FTP readback.  The user should play P82 first and P84 second in `800x600 Diagnostic` with Weave and report even a single faint strip or flicker separately.  Together with clean P80 and corrupt P85, those two results identify the first affected P picture without an FPGA change.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 742 COMMIT Unreleased 6196869 2026-08-29T20:35:17-07:00
 
 #### Coming From:
@@ -1178,35 +1207,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 703 COMMIT Unreleased 8404035 2026-08-29T03:31:55-07:00
-
-#### Coming From:
-
-Unreleased 736f64f
-
-#### Purpose:
-
-Adopt the U.S. National Archives MPD-D2 DVD-from-film profile as the project's controlled release media target.
-
-#### Outcome:
-
-Controlled reference commit `8404035` adds the official NARA MPD-D2 web profile to the active source catalog, routing table and fast index as record `NARA-001`, and adopts it as the project's release media baseline.  The target carries MPEG-2 Main Profile at Main Level in VOB and Program Stream form, temporary eight-megabit-per-second standard-definition source, 720 by 480 constant-bit-rate video at 29.97 frames per second, interlaced top-field-first single-pass encoding, and two-channel constant-bit-rate AC-3 at 256 kilobits per second, 48 kilohertz and a listed sixteen-bit sample size.  The controlled source preserves NARA's December 22, 2023 page-review date and the August 29, 2026 verification date.  It explicitly does not replace the normative H.262, H.222.0, DVD application, filesystem, navigation, menu or CSS sources, and it records that MPD-D2 does not constrain `picture_structure`, `motion_type`, macroblock `dct_type`, GOP design or quantization matrices, so a frame-picture-only subset cannot be inferred from the profile.  No RTL, helper, RBF or MiSTer state changed.
-
-#### Next Steps:
-
-Use `NARA-001` as the controlling media baseline when defining release fixtures and acceptance language.  Retain conforming streams that exercise the implemented H.262 syntax envelope and verify complete playback, top-field-first cadence, decoded HDMI stereo and AC-3 S/PDIF passthrough, while declaring any profile-permitted syntax not covered by those streams as an explicit limitation.  The fit-qualified RBF and matching helper remain ready for a separately authorized regression and S/PDIF hardware checkpoint before field DCT and production interlaced P/B admission are added.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
