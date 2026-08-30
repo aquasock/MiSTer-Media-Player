@@ -1,3 +1,61 @@
+## 748 COMMIT Unreleased 6196869 2026-08-29T20:47:36-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Record the user's exact spatial localization of the first P81 corruption.
+
+#### Outcome:
+
+While the captured P81 terminal frame remains displayed, the user identifies the first corruption precisely as the thin horizontal line crossing the mouth of the man on the right.  This is the onset within P81, not merely a later consequence elsewhere in the frame.  The location is visible in the preserved `/tmp/entry747_p81_first_corrupt.png` evidence and replaces the broader earlier description of a central disturbance.  Combined with clean P80 and the exact byte-preserved P81 checkpoint, this provides both temporal and spatial bounds for offline comparison: the first affected authored picture is P81 and its first visible damaged region is the right-hand subject's mouth-level horizontal strip.  The clean schema-20 lifecycle and zero fault counters from entry 747 remain unchanged.  No new capture, source, FPGA, RBF, Main, helper, installed media or configuration change occurs.
+
+#### Next Steps:
+
+Do not request another hardware checkpoint.  Replay exact P81 after its clean P80 reference in the production-path RTL simulation and compare against the software oracle, prioritizing the mouth-level macroblock row and finding the first differing luma or chroma sample within that row.  Correlate the first mismatch with the owning macroblock's prediction mode, vectors, quantiser scale, coded-block pattern, DCT type, coefficient values and reconstruction saturation.  Require a bounded reproduction and pixel-exact regression before any RTL correction or Quartus build; the next user test should be a corrected RBF only after those gates pass.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
+## 747 COMMIT Unreleased 6196869 2026-08-29T20:46:34-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Accept and preserve the exact first corrupted authored P picture at P81.
+
+#### Outcome:
+
+The user performs the requested consecutive comparison and reports P80 clean and P81 as the first picture where corruption begins, then leaves P81 displayed for capture.  The 382,785-byte screenshot `/tmp/entry747_p81_first_corrupt.png`, SHA-256 `80e3310aabae0571b087b7703f7452c6b829556b5f06fe849aa5efe0e6b04e75`, visibly preserves the first central horizontal disturbance in the shiny-hat passage.  Its checksum-valid schema-20 snapshot accepts all 942,600 bytes, displays all 44 retained reference pictures across 43 swaps, ends on P temporal reference 8, sees sequence end and presentation completion, reaches quiet state and drains the scheduler.  The 1.7376-second presentation reports zero error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  Because P80 and P81 are consecutive byte-exact authored P units in the same I/P-only reference chain, this establishes an exact hardware boundary with no intervening B picture, GOP or sequence transition: P80 is clean and P81 is the first affected reconstruction.  Later P82 through P115 progressively amplify the damage.  No source, FPGA, RBF, Main, helper, installed media or configuration changes during capture.
+
+#### Next Steps:
+
+Stop hardware checkpoint playback.  Use the exact P81-ending stream and clean P80 predecessor for an offline production-path RTL replay against a software oracle, requiring localization of the first differing macroblock, block and component before changing RTL.  Correlate that location with P81 motion vectors, quantiser changes, coded-block pattern, DCT type, coefficient magnitude and saturation behavior, specifically testing the user's observation that a bright highlight appears to poison the remainder of a block.  The next MiSTer test should occur only after a bounded source correction passes the exact P80/P81 pixel regression; do not rebuild Quartus merely to gather more evidence.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 746 COMMIT Unreleased 6196869 2026-08-29T20:45:04-07:00
 
 #### Coming From:
@@ -1114,99 +1172,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 708 COMMIT Unreleased b9c2657 2026-08-29T05:59:55-07:00
-
-#### Coming From:
-
-Unreleased d89c02b
-
-#### Purpose:
-
-Close timing on the completed interlaced MPEG-2 production decoder and preserve one exact fit-qualified candidate for hardware validation.
-
-#### Outcome:
-
-Published source `98a1670` first updates the cadence regression for the established schema-20 audio fields and passes its isolated deadline, hardware-cadence, RTL-packet and decoder-layout checks.  The first clean seed-20 build fits at 33,956 ALMs but its focused decoder audit fails at negative 2.006 ns, so that RBF is rejected.  Source `ad2b27f` inserts a B prediction boundary while retaining pixel-exact mixed, field-motion and field-DCT reconstruction, but its clean build fails the same focused audit at negative 3.712 ns and is also rejected.  Final published source `b9c2657` registers the B fetchers' retained-footprint lookup, targets requests only to the selected physical fetcher and flushes pending lookup state at each start.  The progressive mixed fixture compares all 423,936 samples within its established two-level tolerance, and the B field-motion, frame-motion field-DCT and combined field-motion plus field-DCT fixtures each compare 1,036,800 samples exactly with zero parser, raster, writer or presentation errors.  A fresh detached checkout of exact full SHA `b9c2657e6aefb6c9f6101efbe72c0b29e487a3dc` completes Quartus Prime 17.0.2 seed 20 with zero errors.  The fit uses 33,589 of 41,910 ALMs, 51,747 registers, 4,181,443 memory bits, 532 of 553 RAM blocks and 67 DSP blocks.  Full timing passes with setup 0.023 ns, hold 0.246 ns, recovery 2.440 ns, removal 0.481 ns and minimum pulse width 0.925 ns; the focused audit finds zero violations with decoder setup 0.023 ns and video setup 2.735 ns.  The accepted 4,436,916-byte RBF remains on the build PC at `/home/vash/mister-builds/entry710/source_b9c_clean/output_files/MediaPlayer.rbf` with SHA-256 `f366c246854d177aa2ce4d359d370be840094ecdb09164b736e5d55f4ed3392e`.  It has not been installed or hardware-tested.
-
-#### Next Steps:
-
-Preserve this exact RBF as the sole candidate and perform one user-controlled MiSTer playback validation of the 720-by-480 NTSC interlaced target, checking native 480i first and then Bob and Weave presentation without opening 576i scope.  Do not rebuild or reseed this checkpoint; if hardware exposes a defect, retain the completed screen and helper log before deciding on a separately approved correction.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/test_decode_hardware_cadence.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 707 COMMIT Unreleased d89c02b 2026-08-29T04:29:02-07:00
-
-#### Coming From:
-
-Unreleased 736f64f
-
-#### Purpose:
-
-Complete interlaced frame-picture P/B field-DCT reconstruction and open the qualified field-motion and field-DCT paths for production decoding.
-
-#### Outcome:
-
-Published source `d89c02b` completes the field-DCT parser, metadata, raster and DDR-store path begun in `e7d4a10`, corrects prediction fetches to follow field-ordered luma rows, and applies the macroblock `dct_type` layout to coded and uncoded luma blocks alike so frame-ordered prediction cannot overwrite neighboring field rows.  P field-DCT prediction uses doubled-stride rectangles and a second parity rectangle only for frame-motion vertical half samples.  B field-DCT prediction reuses the two existing fetchers by direction, with up to two vertical-parity phases per direction, and the combined field-motion case selects the correct destination-field vector and reference-field parity without adding block memory.  The production P and B parser restrictions on clear `frame_pred_frame_dct` are removed, and the frontend now keeps native 480i ownership eligible across admitted interlaced I, P and B frame pictures.  Deterministic fixtures independently checked against FFmpeg cover P and B frame motion with field DCT, integer and horizontal, vertical and diagonal half samples, all luma layouts, chroma residuals, pure field motion, and the combined field-motion plus field-DCT case.  Each of the four production-path simulations compiles without the former test define and compares every reconstructed sample exactly, totaling 518,400 samples for the P-field fixture and 1,036,800 samples in each P/B fixture, with zero parser, raster, writer or presentation errors.  The unchanged progressive mixed-raster control compares 423,936 samples with zero mismatches above its established two-level tolerance, and the interlaced TFF, BFF, progressive and field-DCT I-picture controls retain zero out-of-tolerance pixels.  No Quartus build, RBF installation or MiSTer playback is claimed yet.
-
-#### Next Steps:
-
-Pull exact published source `d89c02b` into a fresh isolated build-PC checkout, run the broader decoder and native-presentation regression set, and then perform one clean Quartus Prime 17.0.2 build with the focused timing report.  Require a successful fit, positive timing in every required category and resource comparison against the 34,163-ALM, 532-RAM-block recovery baseline before producing a candidate RBF.  If those gates pass, generate a real interlaced National Archives profile Program Stream that exercises admitted P/B syntax for a controlled MiSTer playback test; keep field pictures, `repeat_first_field`, 576i and DVD navigation explicitly outside this checkpoint.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_03.svh
-- MediaPlayer_top_04.svh
-- README.md
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- tools/streams/generate_test_field_motion_field_dct.py
-- tools/streams/generate_test_interlaced_field_dct_residual.py
-- tools/streams/h262common.py
-- tools/streams/run_b_field_motion.sh
-- tools/streams/run_field_motion_field_dct.sh
-- tools/streams/run_interlaced_field_dct_residual.sh
-- tools/streams/run_interlaced_field_motion.sh
-- tools/streams/tb_h262_field_motion_field_dct_pixels.sv
-- tools/streams/tb_h262_interlaced_field_dct_residual_pixels.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
