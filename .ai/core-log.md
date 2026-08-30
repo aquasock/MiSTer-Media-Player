@@ -1,3 +1,32 @@
+## 768 COMMIT Unreleased 8623431 2026-08-30T06:08:24-07:00
+
+#### Coming From:
+
+Unreleased 8623431
+
+#### Purpose:
+
+Create, verify and install five-minute MPD-D2 qualification VOBs for Coming to America and The Big Lebowski.
+
+#### Outcome:
+
+The user requests that the two remaining DVD sources be tested exactly like the accepted Blazing Saddles MPD-D2 VOB.  FFmpeg's DVD-video demuxer identifies title 1 as the main feature for both `/home/vash/Videos/Coming Toamerica Ac/VIDEO_TS`, 6,737.666667 seconds, and `/home/vash/Videos/the_big_lebowski.iso`, 7,036.100000 seconds, with 720x480 MPEG-2 video and English six-channel AC-3 first.  Their first five minutes are stream-copied without transcoding into isolated staging files of 222,027,776 bytes at SHA-256 `687bd2ebb757d4b34faf0f531e1f2ddb4c4e4747b1f33cd1da9aeb05b646d4cc` and 264,787,968 bytes at SHA-256 `8fe852c10630d989448e3fb6afedf9e48d82a255c58c02815be06ff0ca494afe`.  The committed `mpd-d2-create` tool produces separate 300.038401-second VOBs; independent `mpd-d2-verify` runs accept all 8,992 720x480, 30000/1001, top-field-first MPEG-2 Main Profile/Main Level pictures at 8 Mbps, all 9,375 stereo 48 kHz AC-3 frames at 256 Kbps, manifest provenance and complete software decode for each file.  `/media/fat/games/MediaPlayer/coming_to_america_mpd_d2_5min.vob` is 313,421,824 bytes with SHA-256 `38289443906634ea9b499511bbad080e60a3960b418c3995e80c3da0e60d839a`; `/media/fat/games/MediaPlayer/the_big_lebowski_mpd_d2_5min.vob` is 313,421,824 bytes with SHA-256 `12a9c19c9f8be8ba06d36056fea8aebd99aa70e9bc3416b593af008e32a054a6`.  Absolute target inventory proves both names absent before upload, and independent downloads reproduce every byte and both exact hashes.  Repository source, the installed seed-19 RBF, Main, helper, existing media and Native 480i configuration remain unchanged.
+
+#### Next Steps:
+
+Test one file at a time in Native 480i with `16:9`, Bob and HDMI.  Play Coming to America through its full five-minute EOF, verify picture, cadence, audio and synchronization, check S/PDIF for a representative portion, and leave the completed screen untouched for telemetry and helper-log capture.  Only after that result is captured, repeat the same full run and audio-output checks for The Big Lebowski so evidence cannot be mixed between titles.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 767 COMMIT Unreleased 8623431 2026-08-30T05:57:10-07:00
 
 #### Coming From:
@@ -1130,34 +1159,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 728 COMMIT Unreleased 6196869 2026-08-29T20:01:31-07:00
-
-#### Coming From:
-
-Unreleased 23defaa
-
-#### Purpose:
-
-Add source-picture checkpoint generation and install a byte-exact authored I/P stream held on P66.
-
-#### Outcome:
-
-The user explicitly authorizes the entry-727 P-chain checkpoint.  Source `6196869` extends `tools/streams/strip_h262_b_pictures.py` with optional `--stop-after-source-picture`, requiring a non-negative in-range zero-based ordinal that is included by `--keep-types` and rejecting checkpoint repetition so predictive reference evolution cannot change.  Default generation still reproduces the exact 4,045,136-byte `5f16247b` I/P output, and held-I generation still reproduces the exact 12,658,036-byte `3c28c3e9` output.  Applied at source picture 66, the tool retains the original prefix through exact coded P66, removes 38 complete B units, preserves 6 I and 23 P units byte-for-byte, discards every later source byte and appends one terminal `00 00 01 b7`.  The 273,704-byte checkpoint has SHA-256 `1c1ec0b0d0f327565a19d5fe4b5008c939c51d5ab6396fae0f994f2a45dcb9dc`; independent FFprobe enumeration confirms exactly 29 720x480 TFF interlaced pictures at 30000/1001 comprising 6 I and 23 P with no B or progressive picture, the final output picture is proved identical to source P66, and a complete FFmpeg software decode exits without an error.  Absolute FTP inventory proves the new filename absent, then installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p66_checkpoint.m2v` and independent absolute-path readback reproduce all 273,704 bytes, the exact `1c1ec0b0` hash and terminal sequence end.  Existing media, FPGA, Main, helper and configuration remain unchanged, and no Quartus build is needed.
-
-#### Next Steps:
-
-With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p66_checkpoint.m2v` once and leave its terminal frame onscreen.  Report whether the stable final P66 frame contains large block corruption.  Corruption places the first failure at or before P66; a clean terminal frame places it after P66 and permits a bounded later checkpoint.  Do not capture telemetry unless the user explicitly requests it.
-
-#### Files Modified:
-
-- tools/streams/strip_h262_b_pictures.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
