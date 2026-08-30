@@ -1,3 +1,32 @@
+## 752 COMMIT Unreleased 4e54e9d 2026-08-30T02:45:48-07:00
+
+#### Coming From:
+
+Unreleased 4e54e9d
+
+#### Purpose:
+
+Accept the corrected P81 hardware frame in Native 480i and make that the sole product video mode.
+
+#### Outcome:
+
+Absolute FTP readback proves `/media/fat/MediaPlayer_20260829_b9c2657.rbf` already contains the exact timing-passing 4,456,984-byte candidate with SHA-256 `bc79d56a00c69188cd6dc3117944ccaa3a80fa5ba8cfc6dd45f451e4f1593837`, while the verified rollback `/media/fat/_MediaPlayer_Backups/MediaPlayer_20260829_8fd16e8_pre_7a25189_677f2e11.rbf` retains the prior 4,471,792-byte `677f2e11` build.  No redundant write is performed.  The user reloads the corrected core, plays the exact P81 checkpoint in Native 480i and reports that the thin horizontal corruption crossing the right-hand subject's mouth is gone.  At the user's explicit request, `/tmp/entry752_p81_native480i_pass.png` captures the clean held frame at 490,336 bytes with SHA-256 `c31737d705a4915af0afe62c79c327ae76bccbc563d3f14348cc865204f69df2`.  This hardware result accepts the negative-odd field-motion predictor correction at the exact first-failure boundary.  The user also confirms that development and the final product use Native 480i only; the `800x600 Diagnostic` scaler mode has no product purpose and must not be requested in future tests.
+
+#### Next Steps:
+
+Keep the exact installed RBF and Native 480i mode unchanged.  Play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_only.m2v` once from beginning to end and report whether any large block corruption remains during or after the shiny-hat passage.  This extends the accepted P81 boundary through the longer authored I/P reference chain; do not use or request diagnostic mode.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 751 COMMIT Unreleased 4e54e9d 2026-08-30T02:38:19-07:00
 
 #### Coming From:
@@ -1125,38 +1154,6 @@ Stop at the rejected seed-17 build without another seed, build, timing waiver or
 #### Files Modified:
 
 - MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 712 COMMIT Unreleased 2ca6b02 2026-08-29T17:11:30-07:00
-
-#### Coming From:
-
-Unreleased 578b7e0
-
-#### Purpose:
-
-Close decoder and HDMI timing without reverting the validated interlaced parser and scheduler corrections.
-
-#### Outcome:
-
-The user approves a source-level B-engine timing correction after seed 20 narrowly fails HDMI setup and seed 17 moves the failure into both decoder and HDMI domains.  Detailed reports exonerate the corrected parser and scheduler logic: seed 20's worst decoder path runs from live block classification through retained lookup data and reconstruction, while all five seed-17 decoder violations run from execution direction or backward-fetch selection into the prediction fetcher's phase-address registers.  The existing lookup selector also forms a reported fifteen-node combinational loop between phase choice, motion-vector choice and tap parity.  Preserve all functional fixes, return the fitter assignment to the established seed 20, register block field-DCT classification and the fetch-launch descriptor at block boundaries, and derive lookup direction, phase and vector selection acyclically from registered controls.  The user explicitly declines the long 361-picture and original-DVD soak regressions for this timing checkpoint because they take longer than the build; validation is limited to focused B field-motion, field-DCT and progressive controls before one clean compile.  Published source `158f2e7` captures block field-DCT classification with the existing residual transaction, records the complete prediction-fetch address, phase, row and span descriptor when the existing registered launch pulse is scheduled, removes all functional dependence on the old prefetch selector, derives lookup direction and field-vector slot directly from registered request controls, and restores seed 20.  The first focused compile identifies only that established simulation monitors still use the removed one-bit prefetch marker to label launch traces; final source `2ca6b02` restores that marker strictly for observability without feeding any functional selector.  A fresh detached checkout of exact full SHA `2ca6b029526a94633c0214909b1f23316dc23cd5` passes the four deliberately bounded regressions: B field motion, combined field motion plus field-DCT, and interlaced field-DCT each reconstruct 1,036,800 samples pixel-exact with all parser, raster, writer and presentation errors clear, while the progressive mixed-raster control compares all 423,936 samples within its established maximum delta of two.  No long 361-picture or original-DVD soak is run.  The single clean Quartus Prime 17.0.2 seed-20 compile completes in thirteen minutes twenty seconds with zero tool errors and 216 warnings; placement and routing finish normally with estimated peak interconnect use fifty-two percent.  The fit uses 34,134 of 41,910 ALMs and 52,666 registers, reductions of 96 ALMs and 42 registers from the rejected `17336f8` seed-20 fit, while memory remains exactly 4,181,443 bits in 532 RAM blocks and DSP use remains 67.  The intended decoder path is no longer marginal: decoder setup improves from positive 0.005 to positive 0.386 ns, and video setup remains positive at 2.333 ns.  Full timing nevertheless rejects the fit because the unchanged HDMI PLL output-clock domain fails setup by 0.090 ns with 2.441 ns TNS; hold, recovery, removal and minimum-pulse-width margins remain positive at 0.173, 3.345, 0.570 and 0.925 ns.  The rejected 4,452,104-byte RBF with SHA-256 `a3455a5c9d72a91c574e149f4dc88528f75cbc0286e0e40443f1bba29c7015c2` remains only on GUNSMOKE under `/home/vash/mister-builds/entry712/source_2ca6b02/output_files` and is not installed.
-
-#### Next Steps:
-
-Stop at the rejected seed-20 build as directed, without additional simulation, rebuild, reseed, timing waiver or RBF installation.  Preserve the passing focused decoder evidence and completed fit reports; if work resumes, address the independent HDMI scaler path under a separately approved source-level checkpoint rather than disturbing the now-positive decoder timing.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
 
 #### Status:
 
