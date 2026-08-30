@@ -1,4 +1,4 @@
-## 774 COMMIT Unreleased ??? 2026-08-30T13:13:46-07:00
+## 774 COMMIT Unreleased 205bbd7 2026-08-30T13:13:46-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Repair the two seed-19 decoder setup-path families in the registered B-picture l
 
 #### Outcome:
 
-The user approves a simulation-first timing correction after the sole entry-773 seed-19 build rejects source `9f10b55` at negative 0.176 ns decoder setup slack while retaining exactly 532 M10Ks.  The extracted report localizes the leading path from the fetcher's multi-bit `descriptor_count[2]` occupancy decode into retained `word_data` write control and a second family from live B block parity `blk[1]` through field-DCT launch-address arithmetic into `fetch_launch_phase0_base_addr`.  Replace the response-side count-zero control cone with a registered one-bit descriptor occupancy state maintained by the existing push/pop transitions, and capture the luma field-DCT block parity with the other execution metadata before address formation.  Keep the registered lookup address and data stages, ordered streaming cursor, descriptor depth, response semantics, seed 19 and all memory structures unchanged; do not add M10Ks, alter pixel reconstruction, change clocks, add diagnostics or reseed.
+Source `205bbd7` cuts the two entry-773 timing cones without changing lookup latency or memory structures.  The fetcher now uses a synthesis-preserved one-bit descriptor occupancy register for response-side direct/pop selection while its multi-bit count remains only on request-capacity and accounting paths; zero-latency, delayed, backpressured and simultaneous issue/response protocol cases all pass.  The B engine captures field-DCT slot and destination-row geometry with the existing execution metadata and uses a constant luma plane for field-DCT launch addresses, removing live `blk[1]` from that failed address path.  Exhaustive B motion math, B field motion, field-motion plus field-DCT, interlaced field-DCT residual, interlaced field motion, mixed pixel oracle, cadence, reorder, timestamp, all reference-overlap cases and the complete native-480i suite pass.  The mixed oracle checks 423,936 samples with zero mismatches outside its established two-level bound, preserves 69,556 DDR reads and remains exactly 1,239,997 cycles.  Exact generic-content simulations complete Coming to America in 128,169,997 cycles or 43.6507 cycles per byte and The Big Lebowski in 136,499,997 cycles or 46.7185 cycles per byte; each completes all 24 P and 58 B pictures with every decoder, reconstruction, writer, presentation and publication error flag clear and remains below the 49.7-cycle real-time boundary.  No Quartus build, reseed, RBF installation, MiSTer change or new M10K is made in this commit.
 
 #### Next Steps:
 
-Implement only the two registered control cuts, then repeat the exact fetcher protocol, motion, field-DCT, pixel-oracle, cadence, reorder, timestamp, overlap, native-480i and natural Coming-to-America and Lebowski simulation gates.  Require functional equivalence and both natural windows below 49.7 cycles per input byte before committing source.  If those gates pass, inspect synthesis-relevant structure and request explicit confirmation before performing at most one clean Quartus Prime 17.0.2 seed-19 build; stop without a build if throughput or correctness regresses, and stop without reseeding if timing fails again.
+After explicit user confirmation, pull exact source `205bbd7` into a new clean build-PC worktree and perform at most one clean Quartus Prime 17.0.2 build at pinned seed 19.  Require zero negative slack, no increase above 532 M10Ks and no RBF installation before reporting the result.  If timing fails, preserve the reports and stop without reseeding or starting a second compile; if timing passes, preserve the exact RBF and request separate deployment authorization.
 
 #### Files Modified:
 
