@@ -1,3 +1,32 @@
+## 720 COMMIT Unreleased 8fd16e8 2026-08-29T19:12:38-07:00
+
+#### Coming From:
+
+Unreleased 8fd16e8
+
+#### Purpose:
+
+Prepare and install a matched interlaced I/P/B control that differs from the clean entry-719 I/P-only fixture only by restoring B pictures.
+
+#### Outcome:
+
+The user explicitly authorizes the matched control after entry 719 removes the large block corruption with an interlaced I/P-only re-encode but leaves a tiny cadence stutter and narrow miscolored vertical lines.  Reuse exact source `/home/vash/MiSTer-Media-Player/output_files/entry710/capture/coming_to_america_interlaced_12s.m2v` and the successful entry-719 deterministic CFR command unchanged except replace `-bf 0` with `-bf 2`.  Install the result only if FFprobe enumerates exactly 361 TFF interlaced 720x480 pictures at 30000/1001 with I, P and B all present, full software decoding exits cleanly, and sampled shiny-hat frames are visually clean in software.  Upload only as new `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched.m2v` using an absolute FTP path and require independent readback size and SHA-256 equality.  Do not replace the original or I/P-only fixtures and do not change the RBF, Main, helper, configuration or source code.
+
+#### Next Steps:
+
+After structural, software-decode, visual and absolute-path readback gates pass, have the user keep `Interlaced output` at `800x600 Diagnostic` with Weave and play `coming_to_america_interlaced_12s_ipb_matched.m2v` once.  Report whether the large shiny-hat block corruption returns, whether the tiny vertical color lines remain, and whether playback has a cadence stutter, freeze or other visible defect.  A block regression against the otherwise matched I/P-only encode isolates B-picture presence; a clean matched I/P/B result points instead to a more specific feature of the original authored encoding.  Do not capture telemetry unless the user explicitly requests it.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 719 COMMIT Unreleased 8fd16e8 2026-08-29T19:06:13-07:00
 
 #### Coming From:
@@ -1267,35 +1296,6 @@ Publish the exact seed-20 source, pull it on the build PC, verify retained quali
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 680 COMMIT Unreleased c124aa5 2026-08-28T12:54:31-07:00
-
-#### Coming From:
-
-Unreleased c124aa5
-
-#### Purpose:
-
-Record the approved seed-19 rebuild and its remaining HDMI setup violation.
-
-#### Outcome:
-
-Source c124aa5 changes exactly one assignment, Quartus seed 18 to 19, with all functional sources, simulation inputs, clocks and timing constraints unchanged. The build PC pulls the published source into a fresh checkout and revalidates all retained native, paired and focused evidence hashes; both native analyzers reproduce their qualified results using only the approved terminal-cut exception, and all six qualification tests pass. One clean Quartus 17.0.2 seed-19 compile finishes in 763.2 seconds with zero errors and 206 warnings, but fails setup timing on csync_hdmi csync_vs to hs in the HDMI domain at minus 0.013 ns slack and TNS. This is a different path from seed 18's minus 0.002 ns scaler RAM-output failure. MPEG setup passes at plus 1.186 ns and video setup at plus 2.953 ns; every other timing category passes, with minimum hold plus 0.246 ns, recovery plus 3.492 ns, removal plus 0.629 ns and pulse width plus 0.925 ns. Resources are 33,005 ALMs, 52,220 registers, 4,054,267 RAM bits, 514 of 553 M10Ks and 67 DSPs. All four eight-bit inverse-quantization weight boundaries and expected film CDC endpoints remain present. Warning sets are unchanged from seed 18, including the existing unused last_bound_reference_count and timing-failure warnings. The rejected RBF is 4,373,716 bytes with SHA256 7b47518c472e52c4953cc516fdea316072b4438a6be84c6fb9e92d69d34b6b98 and stays on the build PC without packaging or installation. The MiSTer is reachable this turn, and read-only FTP hashes confirm Main, helper, original opening and existing dated and undated cores match the recorded files; no device write, reload or playback occurs. Complete build data remains at /home/vash/mister-builds/entry679/FPGA, with local reports under output_files/entry679 and committed evidence under .ai/current_results/entry680_*. No second reseed is attempted.
-
-#### Next Steps:
-
-Pause after this single authorized reseed and obtain renewed approval before another build or any logic or timing-constraint change. Compare HDMI placement and margins across the retained seed-18 and seed-19 paths: the negative slack moved from the scaler RAM output to sync control, while MPEG decode remains positive. Preserve all qualification evidence and the unchanged strict timing gate. Do not install either rejected image; original-audio hardware validation awaits a timing-passing candidate.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
