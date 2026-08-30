@@ -1,3 +1,32 @@
+## 713 COMMIT Unreleased ??? 2026-08-29T17:37:40-07:00
+
+#### Coming From:
+
+Unreleased 2ca6b02
+
+#### Purpose:
+
+Perform one user-authorized seed-17 rebuild of the focused-qualified B-engine timing cleanup after seed 20 misses only HDMI setup timing.
+
+#### Outcome:
+
+The user explicitly authorizes one reseed after exact source `2ca6b02` fits normally and closes the intended decoder paths at positive 0.386 ns but misses the independent HDMI PLL output-clock setup gate by 0.090 ns.  Seed 17 is selected from the directly comparable pre-cleanup evidence: on source `17336f8` it brought HDMI to negative 0.003 ns, substantially closer than seed 20's negative 0.048 ns, while the B-engine cleanup has since recovered about 0.38 ns in the decoder domain.  Change only the fitter seed assignment from 20 to 17; retain the four passing focused simulations because RTL, constraints and test inputs are unchanged, and do not repeat the long 361-picture or DVD soaks.  This authorization covers exactly one fresh Quartus Prime 17.0.2 compile, with no seed sweep, timing waiver or installation.
+
+#### Next Steps:
+
+Publish the seed-only source and verify it differs from `2ca6b02` only in `MediaPlayer.qsf`, then perform one clean seed-17 compile and audit full, decoder and video timing plus packed resources.  If compilation or any timing category fails, stop without another seed or build.  If timing passes, preserve the RBF on the build PC and request a separate installation and hardware-test handoff.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 712 COMMIT Unreleased 2ca6b02 2026-08-29T17:11:30-07:00
 
 #### Coming From:
@@ -1265,38 +1294,6 @@ Pull the final source into both build-PC checkouts, run ideal_v2 and contended_v
 #### Files Modified:
 
 - docs/testing_original_dvd_opening.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 673 COMMIT Unreleased 30f3c6d 2026-08-28T04:19:48-07:00
-
-#### Coming From:
-
-Unreleased dd0dc52
-
-#### Purpose:
-
-Extend ordinary reference decode overlap to P pictures using existing frame banks with explicit I/P/B transition ownership.
-
-#### Outcome:
-
-Implementation 30f3c6d extends the existing ordinary overlap to I/P headers, retains early B classification until the older ordinary reference presents, then binds the secondary reference before admitting B payload. Focused validation is starting in a separate checkout while comparison runs remain unchanged. The user explicitly approves the expanded overlap boundary after the full-opening trace exposes ordinary P serialization missing authored field slots despite repaired metadata ownership. Preserve the existing three ordinary reference regions and two scratch regions, permit a P transaction only when its destination is distinct from every retained or displayed ordinary frame, and retain completed primary and secondary identities until classification and presentation permit their retirement. Handle following I, P, B and sequence-end events across early, coincident and late completion without overwriting pending references or binding the wrong future reference. Prepare transition tests while the refined retirement runs finish; keep fixed-source numerical evidence separate from subsequent source changes. Clocks, physical buffers, timing constraints, placement seed, decoder arithmetic, Main and helper remain unchanged. No new build or installation is yet performed.
-
-#### Next Steps:
-
-Publish this approved expansion, finish the active checks, implement and exercise explicit reference-slot admission and secondary-to-B ownership handoff, and retain strict display-bank protection and terminal draining. Re-run focused ownership, timestamp and film tests, both complete 289-picture native memory cases and the paired reconstruction qualification on the final source. Require each picture once in display order, complete per-picture metadata and authored cadence before one clean Quartus build and full timing and warning review. Install only a verified timing-passing candidate with backup and FTP readback hashes, leave replay user controlled, and pause without speculative seed changes if build qualification fails.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_native_ordinary_overlap_ownership.sv
-- tools/streams/tb_h262_film_reorder_timestamp.sv
-- tools/streams/run_film_presentation.sh
 
 #### Status:
 
