@@ -1,3 +1,32 @@
+## 728 COMMIT Unreleased ??? 2026-08-29T20:01:31-07:00
+
+#### Coming From:
+
+Unreleased 23defaa
+
+#### Purpose:
+
+Add source-picture checkpoint generation and install a byte-exact authored I/P stream held on P66.
+
+#### Outcome:
+
+The user explicitly authorizes the entry-727 P-chain checkpoint.  Extend `tools/streams/strip_h262_b_pictures.py` with an optional zero-based source-picture endpoint while preserving the existing default B-strip and held-I behaviors exactly.  For checkpoint 66, retain the original source prefix through coded P66, remove only complete B units within that prefix, preserve every retained I and P unit byte-for-byte, discard all later source bytes, and append one terminal H.262 sequence-end code.  Do not repeat P pictures because repetition would change their prediction reference evolution, and do not change the FPGA, Main, helper or configuration.
+
+#### Next Steps:
+
+Require the endpoint to be in range and name a retained picture, prove both established output hashes unchanged, and verify the checkpoint's final picture is exact original zero-based coded P66.  Require 720x480 TFF interlaced signalling, no B pictures, exactly one terminal sequence end and a clean complete software decode, then install under a new absolute MiSTer filename with independent byte-exact readback.  The next hardware test should play the checkpoint once in `800x600 Diagnostic` with Weave and inspect the stable terminal P66 frame for large block corruption.
+
+#### Files Modified:
+
+- tools/streams/strip_h262_b_pictures.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 727 COMMIT Unreleased 23defaa 2026-08-29T19:55:00-07:00
 
 #### Coming From:
@@ -1257,41 +1286,6 @@ Play `games/MediaPlayer/dvd_opening_original.mpg` first over S/PDIF with Weave h
 #### Files Modified:
 
 - host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 688 COMMIT Unreleased 8423f20 2026-08-28T17:22:05-07:00
-
-#### Coming From:
-
-Unreleased 83c138e
-
-#### Purpose:
-
-Correct helper audio delivery across blocking video intervals and add the reproduced underrun as a regression.
-
-#### Outcome:
-
-The user reports visually perfect video over approximately eighteen minutes with minor recurring audio underruns, and this correction addresses the entry 687 mechanism entirely in the helper. The scheduler now records each video timestamp at its source-byte anchor, interpolates a bounded audio-delivery horizon toward the next visible timestamp across queued video, and rounds delivery to the existing 128-frame guard quantum; FIFO sizes, the 4096-frame reserve, 2048-frame steady batch cap, startup behavior, timestamp format, video bytes and FPGA production logic remain unchanged. The checked-in regression drives the production extractor, clean-video queue, audio FIFO and output adapter: the prior helper deterministically underruns at cycle 108,142,511 and video byte 368,134 with the clean queue full, while corrected S/PDIF and paced HDMI prefixes complete without starvation, underrun or protocol faults. A full corrected S/PDIF run consumes all 12,818,397 transport bytes, 10,334,168 clean-video bytes and 576,000 audio frames, reaches normal playback completion, and reports zero decoder, presentation, chain or audio errors. HDMI preserves the original video and PCM hashes, all 375 S/PDIF bursts preserve and decode to the original AC-3 payload, and the two output forms have identical record positions and lengths. All four existing helper audio profiles pass after correcting their stale expectation that supported AC-3 private audio should be rejected. A clean 8423f20 clone produces a stripped, statically linked ARM EABI5 helper with SHA-256 fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a. No Quartus build, MiSTer installation or hardware playback is part of this result, so hardware acceptance remains open.
-
-#### Next Steps:
-
-After separate user authorization, install only the committed ARM helper on the MiSTer with a backup and readback hash, leaving the accepted RBF and Main transport untouched. Replay the original opening over S/PDIF and HDMI, preferably extending the S/PDIF run to the prior eighteen-minute observation window, then collect the helper log and terminal 2DID evidence and require no audio underrun indication before accepting this commit in hardware. If an underrun remains, preserve the exact playback evidence and reopen diagnosis without enlarging buffers, adding arbitrary delay or relaxing error criteria.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_live_native_presentation.svh
-- tools/streams/tb_h262_live_audio_transport.svh
-- tools/streams/run_original_dvd_audio_delivery.sh
-- tools/streams/analyze_original_audio_delivery.py
-- tools/streams/verify_arm_av_pipeline.py
 
 #### Status:
 
