@@ -1,3 +1,32 @@
+## 734 COMMIT Unreleased 6196869 2026-08-29T20:15:15-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Prepare and install the byte-exact authored I/P checkpoint ending on P80.
+
+#### Outcome:
+
+The user explicitly authorizes the entry-733 jump to P80 after clean P66 and P69 prove the earlier dark fade is not where the remembered large distortion occurs.  Reuse unchanged source `6196869` and the exact original authored stream.  Generate an I/P prefix ending immediately after zero-based coded P80, remove only complete B units within the retained prefix, preserve every retained I and P unit byte-for-byte, append exactly one sequence-end code, and install it under a new absolute MiSTer filename.  Leave every existing fixture, FPGA, Main, helper and configuration unchanged.
+
+#### Next Steps:
+
+Require exact P80 termination, only 720x480 TFF interlaced I/P pictures, one terminal sequence end and a clean complete software decode.  Require independent absolute-path FTP readback equality after installation.  Then have the user play the intentionally short checkpoint once in `800x600 Diagnostic` with Weave and inspect the stable bright-passage P80 framebuffer for large block corruption.  If corrupt, search backward within P74 through P80; if clean, move later in the bright passage.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 733 COMMIT Unreleased 6196869 2026-08-29T20:13:51-07:00
 
 #### Coming From:
@@ -1258,34 +1287,5 @@ Three pieces of this cycle remain before hardware.  The macroblock `dct_type` bi
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 694 COMMIT Unreleased f2c10be 2026-08-28T22:21:11-07:00
-
-#### Coming From:
-
-Unreleased 100072a
-
-#### Purpose:
-
-Scale the helper PCM reserve with the doubled sink FIFO after the entry 693 build starved audio once at startup.
-
-#### Outcome:
-
-The entry 693 bitstream removed the eighty-four second starvation but underran once at approximately 1.7 seconds, with forty-two pictures already displayed, so the startup video burst had not wedged the extractor and the audio cushion was the weak point. The reserve is half the sink FIFO by construction; doubling the FIFO to 16,384 frames while leaving the reserve at 4,096 left audio with the old eighty-five millisecond cushion exactly as the halved clean video queue made transport blocks more frequent. This commit takes the reserve and the initial release to 8,192 frames, keeping reserve plus one batch below the sink FIFO, and corrects the stale documented sink depth. The first attempt aborted playback on the build PC with a video lookahead limit exceeded at 524,288 bytes and exit status one, because a deeper reserve makes the scheduler read further ahead for audio and hold more video meanwhile, so the lookahead bound moves to two mebibytes, negligible against 492 mebibytes of host memory and still a runaway guard. Equivalence is proven before installation: video, PCM and PTS payloads are byte-identical to the previous helper in both output modes, at 10,334,172 video bytes and 2,304,000 PCM bytes, with only delivery order changed, and all four helper audio profiles and the AC-3 passthrough verification pass. The helper installed as `ed13bc9357bff0a5e28bcfa703badb1614a6220cb29a51c4886316067f201a35` during playback without disturbing it, since the helper is executed per playback. A full nineteen minute hardware run then completed with all 1,126,974,123 transport bytes submitted, 867 reports, the helper never behind and its lead between 1.15 and 1.89 seconds. The startup underrun is gone, confirming the inference this commit rests on. The user reports the entire movie, including a continuous intro song, looked and sounded perfect. Hardware counted exactly one audio underrun, at STC 521 seconds, which the user did not hear and which the helper log shows no disturbance around, so it is transient and downstream of the host. Against four consecutive runs that starved at eighty-three to eighty-five seconds with audible recurring dropouts, this is accepted.
-
-#### Next Steps:
-
-Two instrumentation defects from entry 693 remain and should ride along with the next FPGA build rather than justify one alone. The transport block counters read zero blocks and zero milliseconds across the whole run while an underrun demonstrably occurred, because the probe used a conventional valid-and-ready pair on a path whose decoder advances on stream_valid itself, so the longest blocked interval was never actually measured and should instead be probed at the clean video queue's own full condition. The snapshot still latches on the first error flag, so it froze at 521 seconds and the last ten minutes of the run are unmeasured; now that underruns are counted, the trigger should move to the terminal or quiet path. Until both are fixed the remaining single underrun cannot be sized, so do not attempt to tune it further. Watch for video stutter on material heavier than this title, since the clean video queue is half its former depth, and revisit the trade rather than defend it if stutter appears. The HDMI session of the bounded opening remains outstanding from entry 690.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
