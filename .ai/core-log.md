@@ -1,4 +1,4 @@
-## 713 COMMIT Unreleased ??? 2026-08-29T17:37:40-07:00
+## 713 COMMIT Unreleased 53bc8e7 2026-08-29T17:37:40-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Perform one user-authorized seed-17 rebuild of the focused-qualified B-engine ti
 
 #### Outcome:
 
-The user explicitly authorizes one reseed after exact source `2ca6b02` fits normally and closes the intended decoder paths at positive 0.386 ns but misses the independent HDMI PLL output-clock setup gate by 0.090 ns.  Seed 17 is selected from the directly comparable pre-cleanup evidence: on source `17336f8` it brought HDMI to negative 0.003 ns, substantially closer than seed 20's negative 0.048 ns, while the B-engine cleanup has since recovered about 0.38 ns in the decoder domain.  Change only the fitter seed assignment from 20 to 17; retain the four passing focused simulations because RTL, constraints and test inputs are unchanged, and do not repeat the long 361-picture or DVD soaks.  This authorization covers exactly one fresh Quartus Prime 17.0.2 compile, with no seed sweep, timing waiver or installation.
+The user explicitly authorizes one reseed after exact source `2ca6b02` fits normally and closes the intended decoder paths at positive 0.386 ns but misses the independent HDMI PLL output-clock setup gate by 0.090 ns.  Seed 17 is selected from the directly comparable pre-cleanup evidence: on source `17336f8` it brought HDMI to negative 0.003 ns, substantially closer than seed 20's negative 0.048 ns, while the B-engine cleanup has since recovered about 0.38 ns in the decoder domain.  Change only the fitter seed assignment from 20 to 17; retain the four passing focused simulations because RTL, constraints and test inputs are unchanged, and do not repeat the long 361-picture or DVD soaks.  This authorization covers exactly one fresh Quartus Prime 17.0.2 compile, with no seed sweep, timing waiver or installation.  Published source `53bc8e7` changes only the fitter seed assignment, and a fresh detached build-PC checkout at exact full SHA `53bc8e7f16d49e18596205ca0b6e4926850f185a` confirms `MediaPlayer.qsf` is the sole non-log difference from focused-qualified source `2ca6b02` and contains seed 17.
 
 #### Next Steps:
 
