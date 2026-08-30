@@ -1,3 +1,39 @@
+## 770 COMMIT Unreleased ??? 2026-08-30T06:28:45-07:00
+
+#### Coming From:
+
+Unreleased 1e8c44f
+
+#### Purpose:
+
+Add a bounded unencrypted DVD ISO source that automatically plays the longest title through the existing Program Stream pipeline.
+
+#### Outcome:
+
+The user explicitly authorizes ISO support while the final Coming to America VOB hardware run proceeds and supplies three full images on the authorized build PC at `/run/media/vash/GIT`.  The approved boundary is image-file playback only: Main will expose `.iso`, the helper will use pinned VideoLAN `libdvdread` 7.1.1 and `libdvdnav` 7.0.0 to interpret UDF, IFO and program-chain order, and the source will select the longest described title without menus, navigation controls, subtitles, track switching or direct optical-disc support.  CSS and every other decryption path remain explicitly unsupported; because upstream `libdvdread` can dynamically discover `libdvdcss`, the dependency build will carry and verify a project patch that forces its builtin unencrypted reader.  This is host software work only and does not change or rebuild the accepted seed-19 FPGA artifact.
+
+#### Next Steps:
+
+Pin both official source archives and hashes in the reproducible helper build, add the CSS-disable patch, implement `iso:` as a rewindable sequential Program Stream source, route `.iso` selections from Main, and update the architecture boundary.  Build native, static ARM helper and pinned Main artifacts from the eventual source commit; test longest-title selection and bounded reads against all three supplied images, prove the ARM helper contains no dynamic library or `libdvdcss` dependency, and only then prepare a separately preserved target installation for an end-to-end unencrypted ISO hardware gate.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/Makefile
+- host/arm/libdvdread-disable-css.patch
+- host/arm/media_player_protocol.h
+- host/arm/media_source.c
+- host/arm/media_source.h
+- host/build_arm_stack.sh
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 769 COMMIT Unreleased 1e8c44f 2026-08-30T06:12:22-07:00
 
 #### Coming From:
@@ -1121,35 +1157,6 @@ Using unchanged source `6196869` and the exact 6,751,008-byte original authored 
 #### Next Steps:
 
 With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p69_checkpoint.m2v` once and inspect the stable terminal framebuffer after its intentionally short live passage.  Report whether the held P69 frame contains large block corruption.  Corruption narrows onset to P67 through P69; a clean result narrows it to P70 through P72.  Do not capture telemetry unless the user explicitly requests it.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 730 COMMIT Unreleased 6196869 2026-08-29T20:08:11-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Prepare and install the byte-exact authored I/P checkpoint ending on P69.
-
-#### Outcome:
-
-The user explicitly authorizes the entry-729 P69 checkpoint after exact P66 completes cleanly.  Reuse source `6196869` and the exact original authored stream without modifying either.  Generate an I/P prefix ending immediately after zero-based coded P69, remove only complete B units within that retained prefix, preserve every retained I and P unit byte-for-byte, append exactly one sequence-end code, and install it under a new absolute MiSTer filename.  Leave every existing fixture, FPGA, Main, helper and configuration unchanged.
-
-#### Next Steps:
-
-Require the tool to prove exact P69 termination, enumerate only 720x480 TFF interlaced I/P pictures, retain one terminal sequence end and decode completely in software.  Require independent absolute-path FTP readback equality after installation.  Then have the user play the intentionally short checkpoint once in `800x600 Diagnostic` with Weave and inspect its stable terminal P69 framebuffer for large block corruption; corruption narrows onset to P67 through P69, while a clean result narrows it to P70 through P72.
 
 #### Files Modified:
 
