@@ -1,3 +1,32 @@
+## 742 COMMIT Unreleased 6196869 2026-08-29T20:35:17-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Record verified construction and installation of the GOP-boundary checkpoints ending at P85 and I88.
+
+#### Outcome:
+
+Using unchanged source `6196869` and the exact original authored stream, generate the authorized pair.  The P85 stream ends on byte-identical zero-based source P85, removes 38 complete B units and preserves 7 I plus 41 P units unchanged; its 1,105,168 bytes have SHA-256 `d31c51a5c94df9bee1025f3acf510c60f05872274f6af5815a4c3bd717bff369`.  The I88 stream ends on byte-identical source I88 after removing 40 complete B units and preserves 8 I plus 41 P units unchanged; its 1,153,180 bytes have SHA-256 `efb95578db11f2dabb6b8d174bbd7e3e02f2cc184d8045ee96f1b8eeb00eee6f`.  Independent FFprobe enumeration confirms respectively 48 and 49 720x480 pictures at 30000/1001 with no B picture; both end with the required single `00 00 01 b7` sequence-end code and complete full FFmpeg software decode without error.  Absolute FTP inventory proves both new names absent; installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p85_checkpoint.m2v` and `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_i88_checkpoint.m2v`, followed by independent absolute-path FTP readback, reproduces each exact byte count, SHA-256 and terminal sequence end.  No source, FPGA, RBF, Main, helper, existing media or configuration changes.
+
+#### Next Steps:
+
+In `800x600 Diagnostic` with Weave selected, play P85 first and inspect its stable terminal frame for the central corruption seen at P91; then play I88 and inspect its stable terminal frame separately.  Report `P85 clean` or `P85 corrupt`, followed by `I88 clean` or `I88 corrupt`.  If both are clean, the first corrupted retained frame is exactly P91, the first P picture dependent on I88.  Do not capture telemetry unless the user explicitly requests it, and do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 741 COMMIT Unreleased 6196869 2026-08-29T20:33:13-07:00
 
 #### Coming From:
@@ -1178,35 +1207,6 @@ None.
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 702 COMMIT Unreleased 736f64f 2026-08-29T03:10:56-07:00
-
-#### Coming From:
-
-Unreleased 736f64f
-
-#### Purpose:
-
-Qualify the published interlaced prediction recovery and pending decoded-PCM S/PDIF correction with one clean exact-source Quartus build.
-
-#### Outcome:
-
-An isolated fresh GitHub clone was verified at exact published source `736f64f` with no tracked mismatch or reused Quartus database, and Quartus Prime Lite 17.0.2 completed the full configured flow in fourteen minutes twenty-three seconds with zero errors and 218 warnings.  The fitter succeeds at 34,163 of 41,910 ALMs, eighty-two percent, with 52,455 registers, 4,178,743 memory bits, 532 of 553 RAM blocks and 67 DSP blocks.  This reclaims 5,539 ALMs and 2,562 registers from the failed near-final report and leaves field prediction only 1,808 ALMs above the 32,355-ALM pre-field baseline instead of 7,347; RAM remains the binding resource at ninety-six percent.  One routing-congestion warning is emitted while the router converges, but routing completes in the same invocation and no critical or timing-failure warning occurs.  Every reported timing category has zero TNS and positive slack: minimum setup plus 0.100 nanoseconds in the sixty-megahertz MPEG domain, hold plus 0.243, recovery plus 3.086, removal plus 0.404 and minimum pulse width plus 0.925; the focused report independently finds zero violated decoder or video paths, with video setup plus 2.885 nanoseconds.  The 4,459,744-byte RBF has SHA-256 `3f66a5eb38bcff783472b977764bc34366a07570b01278822e705718edf224fa`, and complete build and focused timing evidence remains under `/home/vash/mister-builds/entry702/source_0313` on GUNSMOKE.  No production admission gate, field DCT, MiSTer installation or hardware playback occurred, so hardware acceptance remains open.
-
-#### Next Steps:
-
-Preserve this exact source, reports and RBF as the fit-qualified recovery baseline.  Under separate authorization, deploy the matching RBF and static helper together after backing up the installed files, then physically verify MP3, WAV and FLAC over S/PDIF while preserving HDMI decoded PCM and AC-3 and DTS receiver lock.  For the next DVD RTL cycle, add and fixture-test inter-macroblock field DCT before opening the P, B and frontend production admission gates; avoid new block memories because only twenty-one RAM blocks remain, and require the complete progressive and interlaced regression set before another clean build.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
