@@ -10,15 +10,16 @@ Deploy the exact timing-passing interlaced decoder and HDMI scaler RBF to the Mi
 
 #### Outcome:
 
-The user explicitly authorizes deployment of the entry-714 candidate without changing Main or the helper.  Read-only FTP inventory finds exactly one core at `/media/fat/MediaPlayer.rbf`; its 4,200,652 bytes have SHA-256 `98c73c1b23499e5461fa789b3b77fbf59d798e957b9f7e9357bf6d932009a615`.  The candidate re-verifies on GUNSMOKE as the exact 4,471,792-byte output of source `8fd16e8`, SHA-256 `677f2e11df6104c8409abcd541df81f1b2d178e6a249038b16afdf5e0282ac7c`.  Preserve the current core under `/media/fat/_MediaPlayer_Backups`, verify its remote readback hash, upload the candidate under a temporary staging name, verify that readback, then promote it to the sole `/media/fat/MediaPlayer.rbf` and verify the final readback.  Do not alter, delete or rename Main, the helper, media files or any other core.
+The user explicitly authorizes deployment of the entry-714 candidate without changing Main or the helper.  An initial FTP preflight mistakenly uses relative server paths and is discarded before any write; after the user corrects the procedure, every device access uses an absolute `/media/fat/...` path through a double-slash FTP URL.  Absolute inventory identifies the sole active core as `/media/fat/MediaPlayer_20260829_b9c2657.rbf`, not `/media/fat/MediaPlayer.rbf`.  Its downloaded 4,436,916 bytes have SHA-256 `f366c246854d177aa2ce4d359d370be840094ecdb09164b736e5d55f4ed3392e`.  That exact file is uploaded to `/media/fat/_MediaPlayer_Backups/MediaPlayer_20260829_b9c2657_pre_8fd16e8_f366c246.rbf` and its independent FTP readback matches the original size and hash.  The candidate re-verifies locally as the exact 4,471,792-byte output of source `8fd16e8`, SHA-256 `677f2e11df6104c8409abcd541df81f1b2d178e6a249038b16afdf5e0282ac7c`; it is uploaded to absolute staging path `/media/fat/MediaPlayer_entry715_stage.rbf`, downloaded, and verified with the same size and hash before promotion.  An absolute FTP rename then atomically replaces the existing active filename.  Final readback of `/media/fat/MediaPlayer_20260829_b9c2657.rbf` again matches all 4,471,792 bytes and SHA-256 `677f2e11df6104c8409abcd541df81f1b2d178e6a249038b16afdf5e0282ac7c`, and absolute root inventory confirms that it is the only root-level `MediaPlayer*.rbf`; no staging file remains.  Main, the helper, media files and all other cores are untouched, and the newly installed core is not reloaded during deployment.
 
 #### Next Steps:
 
-Complete the staged FTP deployment with all three hashes matching their preflight values, leave only the promoted `MediaPlayer.rbf` in the active root, and report that a core reload is required.  After the user reloads, perform one user-controlled HDMI playback check of the known interlaced DVD sample with audio; collect telemetry only after the user reports the screen and sound result.  Do not rebuild, reseed or change source during hardware validation.
+Have the user reload the sole installed `/media/fat/MediaPlayer_20260829_b9c2657.rbf`, then perform one user-controlled HDMI playback check of the known interlaced DVD sample with audio; collect telemetry only after the user reports the screen and sound result.  If rollback is needed, restore the verified `f366c246` backup using absolute FTP paths.  Do not rebuild, reseed or change source during hardware validation.
 
 #### Files Modified:
 
-None.
+- /media/fat/MediaPlayer_20260829_b9c2657.rbf
+- /media/fat/_MediaPlayer_Backups/MediaPlayer_20260829_b9c2657_pre_8fd16e8_f366c246.rbf
 
 #### Status:
 
