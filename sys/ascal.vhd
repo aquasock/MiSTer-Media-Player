@@ -566,6 +566,10 @@ ARCHITECTURE rtl OF ascal IS
 	ATTRIBUTE ramstyle OF o_hpixq : SIGNAL IS "logic"; -- avoid blockram shift register
 	SIGNAL o_vpixq, o_vpixq_pre : arr_pix(0 TO 3);
 	SIGNAL o_vpix_outer : arr_pix(0 TO 2);
+	-- MiSTer-Media-Player entry 714: same-cycle physical duplicate of
+	-- o_vpix_outer(1) for the distant C8 queue element-three boundary mux.
+	-- This is not a pipeline stage; both registers capture the same C2 pixel.
+	SIGNAL o_vpix_outer1_c8 : type_pix;
 	SIGNAL o_vpix_inner : arr_pix(0 TO 6);
 
 	SIGNAL o_vpe : std_logic;
@@ -1068,6 +1072,7 @@ ARCHITECTURE rtl OF ascal IS
 	ATTRIBUTE dont_merge : boolean;
 	ATTRIBUTE dont_merge OF o_v_poly_use_adaptive_c8 : SIGNAL IS true;
 	ATTRIBUTE dont_merge OF o_h_poly_use_adaptive_c8 : SIGNAL IS true;
+	ATTRIBUTE dont_merge OF o_vpix_outer1_c8 : SIGNAL IS true;
 	SIGNAL poly_wr_mode : std_logic_vector(2 DOWNTO 0);
 	SIGNAL poly_tdw : unsigned(39 DOWNTO 0);
 	SIGNAL poly_a2 : unsigned(FRAC-1 DOWNTO 0);
@@ -2926,9 +2931,11 @@ BEGIN
 
 				IF fracnn_v = '0' THEN
 					o_vpix_outer<=(pixq_v(0), pixq_v(2), pixq_v(3));
+					o_vpix_outer1_c8<=pixq_v(2);
 					o_vpix_inner(0)<=pixq_v(1);
 				ELSE
 					o_vpix_outer<=(pixq_v(0), pixq_v(1), pixq_v(3));
+					o_vpix_outer1_c8<=pixq_v(1);
 					o_vpix_inner(0)<=pixq_v(2);
 				END IF;
 
@@ -2940,11 +2947,11 @@ BEGIN
 					IF fracnn_v = '0' THEN
 						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_inner(5), o_vpix_inner(5), o_vpix_inner(5));
 					ELSE
-						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_outer(1), o_vpix_outer(1), o_vpix_outer(1));
+						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_outer(1), o_vpix_outer(1), o_vpix_outer1_c8);
 					END IF;
 				ELSIF o_vacpt_eq_ivsize='1' THEN
 					IF fracnn_v = '0' THEN
-						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_inner(5), o_vpix_outer(1), o_vpix_outer(1));
+						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_inner(5), o_vpix_outer(1), o_vpix_outer1_c8);
 					ELSE
 						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_outer(1), o_vpix_inner(5), o_vpix_inner(5));
 					END IF;
