@@ -1,3 +1,32 @@
+## 724 COMMIT Unreleased ??? 2026-08-29T19:26:37-07:00
+
+#### Coming From:
+
+Unreleased 8fd16e8
+
+#### Purpose:
+
+Add a deterministic test-media tool and install a bit-exact B-stripped derivative of the original authored interlaced stream.
+
+#### Outcome:
+
+The user explicitly authorizes the entry-723 isolation test.  Add a narrowly scoped H.262 elementary-stream transformer that identifies picture units from start-code boundaries and removes only units whose picture coding type is B, while copying every other source byte unchanged.  Use it on the exact original authored Coming to America fixture, retain the existing terminal sequence-end code, and leave the original, re-encoded fixtures, FPGA, Main, helper and configuration unchanged.
+
+#### Next Steps:
+
+Require the tool to reject malformed or already B-free inputs and prove each retained sequence, GOP, I-picture and P-picture byte range is identical to the source.  Verify the generated derivative contains exactly the original 27 I and 115 P pictures with all 219 B units absent, retains 720x480 TFF interlaced signalling and the terminal sequence-end code, and decodes completely in software.  Upload it under a new absolute MiSTer filename with exact independent readback verification, then have the user play it once in `800x600 Diagnostic` with Weave and report whether large shiny-hat corruption remains; its reduced frame count and jerkier motion are intentional.
+
+#### Files Modified:
+
+- tools/streams/strip_h262_b_pictures.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 723 COMMIT Unreleased 8fd16e8 2026-08-29T19:25:05-07:00
 
 #### Coming From:
@@ -1259,35 +1288,6 @@ The user reports the same dropout at the same passage while remaining on S/PDIF,
 #### Next Steps:
 
 Propose tracing delivery of the original opening through the helper scheduler, in-band transport and FPGA audio FIFO around the early starvation interval on the build PC. Preserve the original AC-3 data, passing HDMI build and prior core backup, and obtain approval before starting that development and simulation cycle or modifying instrumentation. Do not perform another reseed, mask the underrun flag or attribute the interruption to loudness without evidence; another identical user replay is not needed to establish recurrence.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 684 COMMIT Unreleased 83c138e 2026-08-28T13:36:33-07:00
-
-#### Coming From:
-
-Unreleased 83c138e
-
-#### Purpose:
-
-Record repeated opening playback, live deinterlacer switching and the S/PDIF startup-dropout evidence.
-
-#### Outcome:
-
-The user reports repeated playback, visible differences when switching Bob and Weave during playback, and working S/PDIF output, then clarifies that one S/PDIF run briefly stuttered at startup and resumed without sounding distorted; the impression of soundbar rejection is an observation, not an established cause. Helper-first collection confirms latest AC-3 IEC 61937 passthrough, all 375 audio frames and 576,000 carrier samples emitted, exit zero and all 783 pipe reads reconciling to 12,818,502 completed transport bytes with no slow-path bytes. Two complete, byte-identical screenshots decode to matching checksum-valid schema-19 snapshots with error flags 0x0400, audio underrun, latched at 1.803186 seconds. No other error bits are set. The generic fatal_or_no_progress reason is triggered by this audio flag; early counts of 368,134 accepted video bytes, 24 reference and 20 B pictures are not terminal playback totals. Full helper completion does not erase the early underrun or prove uninterrupted output. The captured artifacts do not preserve every run or mode-switch chronology, so they cannot tie the reported dropout to a specific transition or distinguish receiver lock behavior from core starvation. Entry 683 HDMI opening acceptance is preserved, while clean S/PDIF qualification remains pending. FTP hashes match the installed seed-20 RBF, original clip and unchanged Main, helper and undated core. Legacy cadence counters and saturated PCM fields remain unmodified and do not establish exact cadence or full sample totals. Raw evidence stays local under output_files/entry684; scoped analysis, decoded snapshot, helper summary and hashes are published under .ai/current_results/entry684_*. No production change, build, deployment, mode change, reload or playback is initiated by the agent.
-
-#### Next Steps:
-
-Have the user select S/PDIF before playback, hold one deinterlacer mode fixed and replay the original opening once without changing modes, then leave 2DID and the latest helper log intact for collection before another replay. Compare that controlled capture with this early-underrun result before deciding whether startup needs investigation. Preserve the accepted HDMI baseline and original backup; do not start a new build or longer clip preparation from this evidence alone.
 
 #### Files Modified:
 
