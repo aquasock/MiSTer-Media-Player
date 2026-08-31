@@ -1,3 +1,32 @@
+## 792 COMMIT Unreleased 531f741 2026-08-30T21:12:55-07:00
+
+#### Coming From:
+
+Unreleased 627b329
+
+#### Purpose:
+
+Capture the repeated first-minute physical-DVD pause and verify which helper produced the run.
+
+#### Outcome:
+
+The user reports that a new Coming to America physical-disc run takes about the same time to start, pauses at the same playback point for perceptibly less time without an audible drive spin-down, and then resumes perfect video and audio; the user leaves playback and telemetry running for immediate capture.  Absolute-path FTP readback proves that this run is not using source `627b329`: `/media/fat/linux/MediaPlayer_Helper` remains the prior 847,156-byte source-`531f741` helper at SHA-256 `d5067fa1d924f066b9a48ec581e34a392616fef39268df811622621a2a92bb25`, rather than the built 859,444-byte buffered candidate at `ff3b4f41`.  The live log independently confirms the old path by recording three complete CSS key scans and none of the candidate's authenticated-reset, prefill or buffer-wait diagnostics.  First verified transport arrives 56.942903 seconds after launch, then the only producer gap over 500 milliseconds spans 2.608982 seconds from pipe-read event 3,171 at diagnostic time 112.246762 seconds to event 3,172 at 114.855744 seconds, or 55.301187 seconds after first transport; this closely repeats entry 790's 2.471110-second interruption at approximately the same playback point and shows that the optical pause is deterministic enough to qualify the candidate against.  The 752,307-byte scaled screenshot `/tmp/entry792_coming_to_america_usb_buffer_pause.png` has SHA-256 `a0d0203b6cb3d1e15db77663c67cfa4a4de2bb004e836959c0f94c9af5995583` and visibly preserves a clean active frame after recovery.  The 6,032,092-byte helper log `/tmp/entry792_coming_to_america_usb_buffer_pause_arm_helper.log` has SHA-256 `d12f0813efdfebb4ab0ed3f6ca4e117a7e0c57834679418cff70b5daa99a0b6f`.  Because the buffered helper was never installed, this result neither supports the theory that its launch changes cancel each other nor tests whether its ring shortens the pause; no repository, MiSTer file, RBF, Main, launcher or playback configuration changes during collection.
+
+#### Next Steps:
+
+Let the user's current recovered movie continue without interruption.  After the user stops playback and explicitly authorizes deployment, preserve the installed `d5067fa1` helper, stage and independently read back exact candidate `ff3b4f41` at absolute MiSTer paths, activate it by same-directory rename, and verify the final active hash.  Then launch the same physical disc once and require one CSS key scan, two authenticated resets, a logged 4 MiB prefill and uninterrupted audio and video across approximately 55 seconds after first transport; compare the candidate's measured launch and any consumer wait directly with this valid old-helper control.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 791 COMMIT Unreleased 627b329 2026-08-30T20:42:55-07:00
 
 #### Coming From:
@@ -1160,35 +1189,6 @@ The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_au
 #### Next Steps:
 
 Keep the exact installed RBF and Native 480i mode unchanged.  Play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2v` once from beginning to end and report whether it runs for its normal approximately twelve seconds without large block corruption, freeze or stutter.  This restores the original 219 B pictures and is the next full authored I/P/B hardware gate; the elementary video stream contains no audio.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 752 COMMIT Unreleased 4e54e9d 2026-08-30T02:45:48-07:00
-
-#### Coming From:
-
-Unreleased 4e54e9d
-
-#### Purpose:
-
-Accept the corrected P81 hardware frame in Native 480i and make that the sole product video mode.
-
-#### Outcome:
-
-Absolute FTP readback proves `/media/fat/MediaPlayer_20260829_b9c2657.rbf` already contains the exact timing-passing 4,456,984-byte candidate with SHA-256 `bc79d56a00c69188cd6dc3117944ccaa3a80fa5ba8cfc6dd45f451e4f1593837`, while the verified rollback `/media/fat/_MediaPlayer_Backups/MediaPlayer_20260829_8fd16e8_pre_7a25189_677f2e11.rbf` retains the prior 4,471,792-byte `677f2e11` build.  No redundant write is performed.  The user reloads the corrected core, plays the exact P81 checkpoint in Native 480i and reports that the thin horizontal corruption crossing the right-hand subject's mouth is gone.  At the user's explicit request, `/tmp/entry752_p81_native480i_pass.png` captures the clean held frame at 490,336 bytes with SHA-256 `c31737d705a4915af0afe62c79c327ae76bccbc563d3f14348cc865204f69df2`.  This hardware result accepts the negative-odd field-motion predictor correction at the exact first-failure boundary.  The user also confirms that development and the final product use Native 480i only; the `800x600 Diagnostic` scaler mode has no product purpose and must not be requested in future tests.
-
-#### Next Steps:
-
-Keep the exact installed RBF and Native 480i mode unchanged.  Play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_only.m2v` once from beginning to end and report whether any large block corruption remains during or after the shiny-hat passage.  This extends the accepted P81 boundary through the longer authored I/P reference chain; do not use or request diagnostic mode.
 
 #### Files Modified:
 
