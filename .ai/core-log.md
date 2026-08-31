@@ -1,3 +1,32 @@
+## 816 COMMIT Unreleased 0e70319 2026-08-31T06:23:51-07:00
+
+#### Coming From:
+
+Unreleased 0e70319
+
+#### Purpose:
+
+Capture the first reported menu-direction and activation result and verify whether the source-`0e70319` helper actually produced it.
+
+#### Outcome:
+
+The user reports that keyboard `M` now reaches the physical disc's root menu, none of the keyboard arrow keys causes a visible change there, and Space activation produces the diagnostic screen left visible for collection.  Main records root command `0x09` at 100.597697 seconds and activation command `0x08` at 129.365372 seconds; both helper ready/go barriers complete, with activation discarding 105,816 pending Main bytes before the helper emits another subpicture overlay and enters an indefinite authored still.  The 31,913-byte screenshot `/tmp/entry816_menu_activate_failure.png`, SHA-256 `c07d08ce0ffb238f319f483e772d787f0409c665be0258e6356f0ddd04bb1a0b`, has all 64 schema-20 headers, row indices and parity bits valid and checksum `d8861e13` matching.  Its fatal snapshot accepts only 18,182 bytes and runs 24,263 decoder clocks in a new 30000/1001 B-picture session at temporal reference 7 before latching exactly error `0x0200` with presentation-error state asserted; no syntax, reconstruction, writer, cache, transport-block or timestamp-conflict error appears.  The 6,666,888-byte matching log has SHA-256 `5349d190bc9bd01c4bcaf342ad6f465c0f97d480f6b887db77c699c48e77969c`.  Absolute-path readback proves this is not a test of source `0e70319`: installed `/media/fat/linux/MediaPlayer_Helper` is the previous 904,564-byte source-`a9899e0` helper at SHA-256 `a00173f62ec4a8b0d126ef48695e299b2fecf4e836bff28abdc1107fe62eac7c`, not the identically sized source-`0e70319` candidate at `c8a39413c5131ddfa26947013986e2088f0e72fa618f2ff6dd85fdb4bc7d3baf`.  The missing `discarded_block_tail` log independently confirms the old helper ran, so neither the activation failure nor the arrow-key observation accepts or rejects the new helper.
+
+#### Next Steps:
+
+Manually replace only `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-0e70319/host/build/MediaPlayer_Helper` from the build PC and verify the destination SHA-256 is `c8a39413c5131ddfa26947013986e2088f0e72fa618f2ff6dd85fdb4bc7d3baf`, not merely the shared 904,564-byte size.  Restart MediaPlayer, press `M` during first-play, test all four arrow directions before Space, and leave the result visible; source-`0e70319` is accepted only if its root and activation `discarded_block_tail` logs appear, the highlight moves where the authored menu offers adjacent buttons, activation avoids the `0x0200` raster, and native 480i remains active.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 815 COMMIT Unreleased 0e70319 2026-08-31T05:45:08-07:00
 
 #### Coming From:
@@ -1192,35 +1221,6 @@ The user reports that `/media/fat/games/MediaPlayer/the_big_lebowski_mpd_d2_5min
 #### Next Steps:
 
 Keep the installed source-`205bbd7` core and native 480i mode unchanged.  Confirm whether the user's “Blazing Saddles is good (the NARA file)” report refers to `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob`, a Blazing Saddles fixture, or both; run only any still-unverified adopted control and report its exact filename and result.  Coming to America and Big Lebowski have now both cleared their former sustained audio-starvation failures, so do not rebuild or alter the decoder.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 776 COMMIT Unreleased 205bbd7 2026-08-30T14:22:25-07:00
-
-#### Coming From:
-
-Unreleased 205bbd7
-
-#### Purpose:
-
-Accept the previously worst-stuttering Coming to America MPD-D2 VOB on the installed source-`205bbd7` core and quantify removal of the sustained audio-starvation failure.
-
-#### Outcome:
-
-The user chooses `/media/fat/games/MediaPlayer/coming_to_america_mpd_d2_5min.vob` first because it previously developed severe audio stutter near 56 seconds and its opening song makes defects easiest to hear, then reports that the complete run is now perfect and leaves the terminal telemetry visible for collection.  The matching helper log identifies S/PDIF decoded-PCM output and the exact VOB, submits all 362,080,761 bytes through the fast path in 299.928360 seconds at 1.207224 MB/s, emits all 9,375 AC-3 frames and 14,400,000 PCM samples, reaches EOF and exits zero; the prior failing run required 308.544 seconds and audibly starved.  The 795,454-byte screenshot `/tmp/entry776_coming_mpd_d2_5min_pass.png`, SHA-256 `a37601e8f1cc65160c57397e5cf92ebe300c7b95036b4f83cb76d0e0d771353b`, visibly preserves a clean final pool scene.  Its 64 schema-20 telemetry records have valid headers, row indices and parity, and checksum `883c99bf` matches; the terminal no-progress snapshot accepts 299,975,349 clean-video bytes, records 2,998 reference pictures, 8,991 displayed pictures and 8,990 swaps, and reports zero hardware error flags, audio underruns, PCM protocol errors, presentation errors, cache overlaps, transport blocks, deadline gaps, cadence outliers or timestamp conflicts.  The 13,383,575-byte helper log has SHA-256 `6cf89dd8da88b9d49e8d6b8d9b75baee6ebd950bc2e460c8ed138b1048481314`.  A later redundant raw-screenshot request occurred after the user had changed media and is explicitly excluded; no source, installed file, playback mode or configuration change is attributed to this accepted capture.
-
-#### Next Steps:
-
-Keep the installed source-`205bbd7` core and native 480i mode unchanged.  When ready, run `/media/fat/games/MediaPlayer/the_big_lebowski_mpd_d2_5min.vob` once for five uninterrupted minutes with HDMI audio and check S/PDIF for a representative interval if convenient, then leave its terminal telemetry visible for one requested capture; afterward repeat the NARA MPD-D2 control.  Do not capture or interrupt unrelated playback, and do not change or rebuild the FPGA.
 
 #### Files Modified:
 
