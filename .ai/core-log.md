@@ -1,4 +1,4 @@
-## 784 COMMIT Unreleased ??? 2026-08-30T18:21:34-07:00
+## 784 COMMIT Unreleased eb7bed6 2026-08-30T18:21:34-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Normalize DVD ISO presentation timestamps across VOB or cell discontinuities so 
 
 #### Outcome:
 
-The user approves the host-only correction after entry 783 proves that the complete Blazing Saddles ISO crosses a DVD packet-position boundary near 2,904.6 seconds, leaves the helper's raw maximum video PTS frozen at 2,905.18 seconds and drains the audio FIFO while video continues.  The proposed implementation will extend the source-`81a1002` helper with an ISO-scoped PTS epoch normalizer that distinguishes a material backward discontinuity from ordinary MPEG decode-order reordering, applies the resulting offset before both scheduler admission and FPGA timestamp-record generation, and leaves ordinary MPG, VOB, raw-video, audio, Main and FPGA behavior unchanged.  Architecture and changelog text will state the continuous ISO timeline contract.
+Source `eb7bed6` adds an ISO-only PTS epoch normalizer with an explicitly documented ten-second implementation guard: ordinary decode-order reversals pass through unchanged, while a material backward reset is translated before both scheduler admission and FPGA timestamp-record generation so its first timestamp follows the preceding maximum by one 90 kHz tick.  A focused exact-source native harness preserves a 45,000-tick reorder, maps a synthetic large reset to one new epoch and leaves non-ISO timestamps unchanged.  The accelerated real Blazing Saddles scheduler test reaches the captured boundary, maps raw PTS 32,764 to normalized PTS 261,466,438 immediately after the prior 261,466,437 maximum, and continues growing its PCM target from 139,227,264 through 255,009,280 frames with zero held backlog rather than freezing at entry 783's 139,443,456-frame target.  The unchanged five-minute MPG again produces exactly 224,185,582 bytes with SHA-256 `45401ab3`, and the first 16 MiB of scheduled ISO transport compares byte-for-byte with the accepted CSS-enabled opening capture.  One static ARM GNU 10.2 build from exact full source `eb7bed668f39c97b79a691b2c721fe42283e19f0` produces an 847,156-byte stripped EABI5 helper with SHA-256 `f16e83fa` and no dynamic section; the expected static-libdvdcss `getpwuid` link warning remains.  The accelerated run separately shows that after the declared 501,030,000-tick title duration libdvdnav follows post-title protection or navigation commands into another epoch and eventually exceeds the two-MiB video lookahead; that end-of-title behavior predates this correction and is reserved for a later host-only boundary rather than expanding the timestamp fix.  No Quartus build or MiSTer deployment occurs.
 
 #### Next Steps:
 
-Implement the bounded normalizer, verify its wrap-safe arithmetic and construct a compact native Program Stream discontinuity fixture whose second segment resets raw PTS while decoded content remains continuous.  Prove the normalized output timestamps remain monotonic, rerun the byte-exact ordinary MPG and decrypted Blazing Saddles ISO opening regressions, then build exactly one static ARM helper.  Do not run Quartus or deploy to the MiSTer until those native and ARM gates pass; after deployment, replay Blazing Saddles through the 2,905-second boundary over HDMI and S/PDIF before resuming encrypted-ISO qualification.
+After explicit user authorization, preserve the installed helper and deploy exact candidate SHA-256 `f16e83fa` by candidate upload, readback, same-directory rename and final readback.  Replay Blazing Saddles past the 2,905-second boundary over HDMI and S/PDIF and accept this correction only if video remains stable, audio remains continuous and telemetry records no underrun.  Then separately bound the selected ISO source to its declared longest-title duration so post-title protection or navigation commands cannot loop into a second traversal, and resume genuinely scrambled-ISO qualification only after both long-title gates pass.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Implement the bounded normalizer, verify its wrap-safe arithmetic and construct 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
