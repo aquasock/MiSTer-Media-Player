@@ -1,3 +1,32 @@
+## 793 COMMIT Unreleased 627b329 2026-08-30T21:17:28-07:00
+
+#### Coming From:
+
+Unreleased 531f741
+
+#### Purpose:
+
+Deploy the authenticated-reset and direct-DVD HPS-ring helper with verified rollback preservation.
+
+#### Outcome:
+
+The user reports that the source-`531f741` Coming to America physical-disc control remains perfect at 15 minutes after its repeated first-minute pause and explicitly authorizes deployment.  The exact source-`627b329` build-PC artifact is retrieved and independently verified as an 859,444-byte statically linked ARMv7 helper at SHA-256 `ff3b4f41d81a070ad4ef5226dd3380ab12bb409118b1e6981af4c95b3138f7a6`.  Immediate absolute-path readback confirms `/media/fat/linux/MediaPlayer_Helper` still contains the 847,156-byte predecessor at `d5067fa1d924f066b9a48ec581e34a392616fef39268df811622621a2a92bb25`.  The candidate is uploaded only as `/media/fat/linux/MediaPlayer_Helper.candidate_627b329_ff3b4f41`, independently downloaded and compared byte-for-byte, then same-directory FTP renames preserve the predecessor as `/media/fat/linux/MediaPlayer_Helper.pre_627b329_d5067fa1` and activate the candidate at `/media/fat/linux/MediaPlayer_Helper`.  Final independent readbacks reproduce the full active `ff3b4f41` and rollback `d5067fa1` hashes and sizes, and directory inventory proves the candidate staging name is gone.  Main, the seed-19 RBF, USB DVD launcher, media and configuration remain untouched.  Any helper process already running when the rename occurs continues its old executable inode until that playback exits; the next launch will use the newly installed candidate without a MiSTer reboot.
+
+#### Next Steps:
+
+Stop any playback that began before this deployment, then launch `/media/fat/games/MediaPlayer/USB DVD Drive.dvd` once with the same Coming to America disc.  Expect one CSS key scan, two `DVD reset authenticated navigation` lines and one `DVD buffer ready` line before first transport; report selection-to-picture time and whether audio or video pauses around 55 seconds after playback begins.  If any pause occurs, leave playback and telemetry running for immediate helper-log capture so the candidate's reserve and consumer-wait diagnostics can measure it directly.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 792 COMMIT Unreleased 531f741 2026-08-30T21:12:55-07:00
 
 #### Coming From:
@@ -1160,35 +1189,6 @@ The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2
 #### Next Steps:
 
 Keep the exact installed RBF and Native 480i mode unchanged.  Select HDMI audio and play `/media/fat/games/MediaPlayer/dvd_opening_original.mpg` once from beginning to end, then report whether video, cadence and audio are all clean.  This checks the known DVD program-stream transport and audio integration boundary on the corrected core without changing playback mode or requesting another elementary-video diagnostic.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 753 COMMIT Unreleased 4e54e9d 2026-08-30T02:48:43-07:00
-
-#### Coming From:
-
-Unreleased 4e54e9d
-
-#### Purpose:
-
-Accept the corrected full authored I/P reference chain in Native 480i.
-
-#### Outcome:
-
-The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_only.m2v` from beginning to end in Native 480i and reports that it looks perfect with no large block corruption.  Its fast run is expected: the byte-exact diagnostic retains 27 I and 115 P pictures but removes all 219 B pictures, so its 142 coded pictures present in about 4.7 seconds at 30000/1001 rather than the original twelve-second duration.  This is fixture construction, not a decoder cadence failure.  At the user's explicit request, `/tmp/entry753_authored_ip_native480i_pass.png` captures the clean terminal frame at 532,998 bytes with SHA-256 `6761b2b91538abccc26827c966813d6fbf855f66fd5801701f8cb6cb97597fa4`.  Together with the exact P81 acceptance, this clears the corrected forward-predicted reference chain through the complete authored I/P derivative.  No RBF, media, Main, helper or configuration change occurs.
-
-#### Next Steps:
-
-Keep the exact installed RBF and Native 480i mode unchanged.  Play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2v` once from beginning to end and report whether it runs for its normal approximately twelve seconds without large block corruption, freeze or stutter.  This restores the original 219 B pictures and is the next full authored I/P/B hardware gate; the elementary video stream contains no audio.
 
 #### Files Modified:
 
