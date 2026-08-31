@@ -1,4 +1,4 @@
-## 834 COMMIT Unreleased ??? 2026-08-31T15:36:39-07:00
+## 834 COMMIT Unreleased d4ed809 2026-08-31T15:36:39-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Localize the physically absent known-pattern DVD highlight inside the FPGA after
 
 #### Outcome:
 
-The user approves the first RBF modification after source `0e89c73` proves the complete all-index-one plane, opaque-magenta palette, visible menu configuration, commit and moving style records enter the FPGA FIFO with matching accepted-word count and rolling digest but produce no magenta screen pixels.  The planned change is observability only: retain the exact helper, Main, in-band protocol, DDR addresses, rendering logic and fitter seed while adding saturating stage counters and retained state for extracted overlay commands and bytes, engine data acceptance and DDR writes, successful or rejected commit conditions, line-cache fills, memory-domain style publication, video-domain style arrival, row-tag matches, highlighted samples, nonzero-alpha samples and magenta blend samples.  A schema-21 diagnostic snapshot will defer the unrelated early audio-underrun capture, arm on overlay activity, allow the plane commit and video-domain pipeline to settle, and fall back after a bounded session interval so zero downstream activity is still observable.
+The user approves and source `d4ed809` implements the first RBF observability change after source `0e89c73` proves the complete all-index-one plane, opaque-magenta palette, visible menu configuration, commit and moving style records enter the FPGA FIFO with matching accepted-word count and rolling digest but produce no magenta screen pixels.  The helper, Main, in-band record protocol, overlay control, DDR addresses, cache behavior, compositor and fitter seed remain unchanged.  Passive saturating counters now report accepted config, data, commit, style and clear records, all engine record and plane bytes, accepted DDR writes, valid and rejected commits, line-cache fills, memory-domain plane and style publications, synchronized video-domain publication and row-tag arrivals, row-tag-matched samples, highlighted samples, nonzero-alpha samples and exact opaque-magenta samples.  Schema 21 maps this evidence into words 37 through 54, suppresses the unrelated first-error snapshot, captures one decoder-clock second after any commit reaches the engine, and falls back after thirty active seconds if no commit arrives.  Each video counter crosses back as separately valid registered Gray code through two explicit synchronizer stages, with only the source-to-first-stage path cut.  The focused exact all-`0x55` engine simulation writes and reads 86,400 bytes through 10,800 DDR words, publishes the probe plane and style, renders opaque magenta, clears back to base video and requires every schema-21 stage to advance; the retained extractor and arbiter tests pass, and the new trigger regression passes both settled-commit and no-commit fallback paths under Icarus Verilog with warnings limited to pre-existing inherited timescales.
 
 #### Next Steps:
 
-Implement the passive counters with explicit clock-domain synchronization, extend the focused engine test to require the known all-`0x55` frame and highlight to advance every relevant stage, add a focused snapshot-trigger regression, and run the existing overlay metadata, engine and arbiter tests plus retained native-video regressions.  If they pass, commit the source, pull that exact commit onto build PC `10.10.0.42`, perform one clean Quartus Prime 17.0.2 seed-20 build, require positive setup, hold, recovery, removal and minimum-pulse-width timing, and provide a uniquely named diagnostic RBF while preserving the installed target files until the user replaces the RBF.
+Check out exact source `d4ed809` on build PC `10.10.0.42`, rerun all four focused overlay regressions there, perform one clean Quartus Prime 17.0.2 seed-20 build, require positive setup, hold, recovery, removal and minimum-pulse-width timing plus resolved schema-21 CDC constraints, and provide a uniquely named diagnostic RBF while preserving the installed target files until the user replaces only the RBF.
 
 #### Files Modified:
 
@@ -27,7 +27,7 @@ Implement the passive counters with explicit clock-domain synchronization, exten
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
