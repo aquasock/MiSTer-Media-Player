@@ -41,7 +41,8 @@ struct iso_source_state {
     uint64_t duration;
     int title_active;
     int32_t title_part;
-    int64_t title_time;
+    int32_t payload_part;
+    int64_t payload_time;
     int end_of_stream;
     int error;
 };
@@ -160,7 +161,8 @@ static int iso_select_title(struct iso_source_state *state)
     state->duration = longest_duration;
     state->title_active = 0;
     state->title_part = 0;
-    state->title_time = -1;
+    state->payload_part = 0;
+    state->payload_time = -1;
     state->block_offset = 0;
     state->block_size = 0;
     state->end_of_stream = 0;
@@ -168,11 +170,15 @@ static int iso_select_title(struct iso_source_state *state)
     return 0;
 }
 
-static int iso_guard_selected_title(struct iso_source_state *state)
+static int iso_guard_selected_title(struct iso_source_state *state,
+                                    int32_t event, int32_t length)
 {
     int32_t title = 0;
     int32_t part = 0;
     int64_t current_time;
+    int payload =
+        (event == DVDNAV_BLOCK_OK || event == DVDNAV_NAV_PACKET) &&
+        length == DVD_VIDEO_LB_LEN;
     const char *reason = NULL;
 
     if (dvdnav_current_title_info(state->navigation, &title, &part) !=
@@ -186,22 +192,23 @@ static int iso_guard_selected_title(struct iso_source_state *state)
             return 1;
         state->title_active = 1;
         state->title_part = part;
-        state->title_time = current_time;
     } else if (title != state->title) {
         reason = "title exit";
     } else if (part < state->title_part) {
         reason = "title replay";
-    } else if (part == state->title_part && current_time >= 0 &&
-               state->title_time >= 0 && current_time < state->title_time &&
-               (uint64_t)(state->title_time - current_time) >
+    } else if (payload && part == state->payload_part && current_time >= 0 &&
+               state->payload_time >= 0 && current_time < state->payload_time &&
+               (uint64_t)(state->payload_time - current_time) >
                    ISO_TITLE_TIME_REGRESSION_TICKS) {
         /*
-         * dvdnav time is derived from IFO cell durations.  Ignore small
-         * implementation jitter, but treat a material same-part rewind as a
+         * dvdnav reports transitional time values before CELL_CHANGE has
+         * settled.  Compare only payload-bearing events, ignore small
+         * implementation jitter, and treat a material same-part rewind as a
          * navigation replay rather than exposing a second title traversal.
          */
         reason = "title time replay";
-    } else if ((uint32_t)part == state->chapters && current_time >= 0 &&
+    } else if (payload && (uint32_t)part == state->chapters &&
+               current_time >= 0 &&
                (uint64_t)current_time >= state->duration) {
         reason = "declared duration";
     }
@@ -217,11 +224,14 @@ static int iso_guard_selected_title(struct iso_source_state *state)
         state->end_of_stream = 1;
         return 0;
     }
-    if (part > state->title_part) {
+    if (part > state->title_part)
         state->title_part = part;
-        state->title_time = current_time;
-    } else if (part == state->title_part && current_time > state->title_time) {
-        state->title_time = current_time;
+    if (payload && part > state->payload_part) {
+        state->payload_part = part;
+        state->payload_time = current_time;
+    } else if (payload && part == state->payload_part &&
+               current_time > state->payload_time) {
+        state->payload_time = current_time;
     }
     return 1;
 }
@@ -243,7 +253,7 @@ static int iso_next_payload_block(struct iso_source_state *state)
             state->end_of_stream = 1;
             return 0;
         }
-        if (iso_guard_selected_title(state) <= 0)
+        if (iso_guard_selected_title(state, event, length) <= 0)
             return state->error ? -1 : 0;
         if ((event == DVDNAV_BLOCK_OK || event == DVDNAV_NAV_PACKET) &&
             length == DVD_VIDEO_LB_LEN) {
@@ -318,7 +328,8 @@ static int iso_rewind(void *opaque)
     state->block_size = 0;
     state->title_active = 0;
     state->title_part = 0;
-    state->title_time = -1;
+    state->payload_part = 0;
+    state->payload_time = -1;
     state->end_of_stream = 0;
     state->error = 0;
     return 0;
