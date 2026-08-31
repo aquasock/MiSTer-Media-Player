@@ -14,6 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define ISO_TITLE_TIME_REGRESSION_TICKS (10u * 90000u)
+
 struct media_source_ops {
     size_t (*read)(void *state, void *data, size_t size);
     int (*get_character)(void *state);
@@ -35,7 +37,11 @@ struct iso_source_state {
     size_t block_offset;
     size_t block_size;
     int32_t title;
+    uint32_t chapters;
     uint64_t duration;
+    int title_active;
+    int32_t title_part;
+    int64_t title_time;
     int end_of_stream;
     int error;
 };
@@ -124,6 +130,7 @@ static int iso_select_title(struct iso_source_state *state)
     int32_t title_count = 0;
     int32_t title;
     int32_t longest_title = 0;
+    uint32_t longest_chapters = 0;
     uint64_t longest_duration = 0;
 
     if (dvdnav_get_number_of_titles(state->navigation, &title_count) !=
@@ -133,11 +140,14 @@ static int iso_select_title(struct iso_source_state *state)
     for (title = 1; title <= title_count; ++title) {
         uint64_t *chapter_times = NULL;
         uint64_t duration = 0;
+        uint32_t chapters;
 
-        if (dvdnav_describe_title_chapters(state->navigation, title,
-                                           &chapter_times, &duration) != 0 &&
+        chapters = dvdnav_describe_title_chapters(state->navigation, title,
+                                                   &chapter_times, &duration);
+        if (chapters != 0 &&
             duration > longest_duration) {
             longest_title = title;
+            longest_chapters = chapters;
             longest_duration = duration;
         }
         free(chapter_times);
@@ -146,12 +156,74 @@ static int iso_select_title(struct iso_source_state *state)
         dvdnav_title_play(state->navigation, longest_title) != DVDNAV_STATUS_OK)
         return -1;
     state->title = longest_title;
+    state->chapters = longest_chapters;
     state->duration = longest_duration;
+    state->title_active = 0;
+    state->title_part = 0;
+    state->title_time = -1;
     state->block_offset = 0;
     state->block_size = 0;
     state->end_of_stream = 0;
     state->error = 0;
     return 0;
+}
+
+static int iso_guard_selected_title(struct iso_source_state *state)
+{
+    int32_t title = 0;
+    int32_t part = 0;
+    int64_t current_time;
+    const char *reason = NULL;
+
+    if (dvdnav_current_title_info(state->navigation, &title, &part) !=
+            DVDNAV_STATUS_OK) {
+        state->error = 1;
+        return -1;
+    }
+    current_time = dvdnav_get_current_time(state->navigation);
+    if (!state->title_active) {
+        if (title != state->title)
+            return 1;
+        state->title_active = 1;
+        state->title_part = part;
+        state->title_time = current_time;
+    } else if (title != state->title) {
+        reason = "title exit";
+    } else if (part < state->title_part) {
+        reason = "title replay";
+    } else if (part == state->title_part && current_time >= 0 &&
+               state->title_time >= 0 && current_time < state->title_time &&
+               (uint64_t)(state->title_time - current_time) >
+                   ISO_TITLE_TIME_REGRESSION_TICKS) {
+        /*
+         * dvdnav time is derived from IFO cell durations.  Ignore small
+         * implementation jitter, but treat a material same-part rewind as a
+         * navigation replay rather than exposing a second title traversal.
+         */
+        reason = "title time replay";
+    } else if ((uint32_t)part == state->chapters && current_time >= 0 &&
+               (uint64_t)current_time >= state->duration) {
+        reason = "declared duration";
+    }
+    if (reason) {
+        fprintf(stderr,
+                "media_source: ISO selected title %d complete (%s, "
+                "part=%d time90k=%lld duration90k=%llu)\n",
+                (int)state->title, reason, (int)part,
+                (long long)current_time,
+                (unsigned long long)state->duration);
+        state->block_offset = 0;
+        state->block_size = 0;
+        state->end_of_stream = 1;
+        return 0;
+    }
+    if (part > state->title_part) {
+        state->title_part = part;
+        state->title_time = current_time;
+    } else if (part == state->title_part && current_time > state->title_time) {
+        state->title_time = current_time;
+    }
+    return 1;
 }
 
 static int iso_next_payload_block(struct iso_source_state *state)
@@ -167,15 +239,17 @@ static int iso_next_payload_block(struct iso_source_state *state)
             state->error = 1;
             return -1;
         }
+        if (event == DVDNAV_STOP) {
+            state->end_of_stream = 1;
+            return 0;
+        }
+        if (iso_guard_selected_title(state) <= 0)
+            return state->error ? -1 : 0;
         if ((event == DVDNAV_BLOCK_OK || event == DVDNAV_NAV_PACKET) &&
             length == DVD_VIDEO_LB_LEN) {
             state->block_offset = 0;
             state->block_size = (size_t)length;
             return 1;
-        }
-        if (event == DVDNAV_STOP) {
-            state->end_of_stream = 1;
-            return 0;
         }
         if (event == DVDNAV_STILL_FRAME) {
             if (dvdnav_still_skip(state->navigation) != DVDNAV_STATUS_OK)
@@ -242,6 +316,9 @@ static int iso_rewind(void *opaque)
     }
     state->block_offset = 0;
     state->block_size = 0;
+    state->title_active = 0;
+    state->title_part = 0;
+    state->title_time = -1;
     state->end_of_stream = 0;
     state->error = 0;
     return 0;
