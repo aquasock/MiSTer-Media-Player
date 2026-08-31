@@ -65,6 +65,13 @@ set_false_path \
     -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_request_toggle_video[*]}] \
     -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_request_toggle_sync0[*]}]
 
+# Schema 21 observes video-domain event counters through registered Gray code.
+# Cut only the Gray source -> first synchronizer stage; the second stage and
+# Gray-to-binary diagnostic decode remain timed in the 60 MHz domain.
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|debug_video_gray[*]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|debug_video_gray_sync0[*]}]
+
 # 60 MHz DDR -> 54 MHz style publication handshake.
 set_false_path \
     -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|published_normal[*]}] \

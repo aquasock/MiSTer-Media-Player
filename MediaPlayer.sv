@@ -140,6 +140,8 @@ wire        dvd_overlay_record_last;
 wire        dvd_overlay_record_valid;
 wire        dvd_overlay_record_ready;
 wire        dvd_overlay_extractor_error;
+wire [543:0] dvd_overlay_debug_words;
+wire         dvd_overlay_debug_commit_seen;
 
 hps_io #(.CONF_STR(CONF_STR), .CONF_STR_BRAM(1), .WIDE(1), .MEDIA_BURST(1)) hps_io
 (
@@ -2164,7 +2166,9 @@ mpeg2_h262_dvd_overlay mpeg2_h262_dvd_overlay
     .base_de          (fb_video_de && !mpeg2_new_startup_video_blank),
     .video_r          (dvd_overlay_video_r),
     .video_g          (dvd_overlay_video_g),
-    .video_b          (dvd_overlay_video_b)
+    .video_b          (dvd_overlay_video_b),
+    .debug_words      (dvd_overlay_debug_words),
+    .debug_commit_seen(dvd_overlay_debug_commit_seen)
 );
 
 mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
@@ -2267,7 +2271,8 @@ wire [15:0] mpeg2_new_cadence_error_flags = {
 };
 
 mpeg2_h262_hardware_cadence_profiler #(
-    .PROFILE_START_STC_SECONDS(14'd0)
+    .PROFILE_START_STC_SECONDS(14'd0),
+    .OVERLAY_DIAGNOSTICS(1'b1)
 )
 mpeg2_h262_hardware_cadence_profiler
 (
@@ -2376,6 +2381,8 @@ mpeg2_h262_hardware_cadence_profiler
     .transport_block_count     (transport_block_count),
     .audio_underrun_count      (audio_pcm_underrun_count),
     .audio_fifo_floor          (audio_pcm_fifo_floor),
+    .overlay_debug_words       (dvd_overlay_debug_words),
+    .overlay_debug_commit_seen (dvd_overlay_debug_commit_seen),
     .top_field_first           (mpeg2_new_top_field_first),
     .repeat_first_field        (mpeg2_new_repeat_first_field),
     .picture_coding_type       (mpeg2_new_picture_coding_type),

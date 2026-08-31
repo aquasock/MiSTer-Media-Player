@@ -47,7 +47,12 @@ module mpeg2_h262_dvd_overlay
     input  wire        base_de,
     output reg   [7:0] video_r,
     output reg   [7:0] video_g,
-    output reg   [7:0] video_b
+    output reg   [7:0] video_b,
+
+    // Schema-21 passive observability.  The packed words are generated from
+    // retained counters only and never feed overlay control or rendering.
+    output wire [543:0] debug_words,
+    output wire         debug_commit_seen
 );
 
 localparam [7:0] COMMAND_CLEAR  = 8'd0;
@@ -106,6 +111,104 @@ reg [1:0] row_request_toggle_sync1;
 reg [1:0] row_request_toggle_seen;
 reg [8:0] row_request_value_m1 [0:1];
 reg [8:0] row_request_value_m2 [0:1];
+
+reg [7:0] debug_clear_records;
+reg [7:0] debug_config_records;
+reg [7:0] debug_data_records;
+reg [7:0] debug_commit_records;
+reg [7:0] debug_style_records;
+reg [7:0] debug_commit_ok;
+reg [7:0] debug_commit_bad;
+reg [7:0] debug_plane_publications;
+reg [7:0] debug_style_publications;
+reg [31:0] debug_record_bytes;
+reg [31:0] debug_plane_bytes;
+reg [15:0] debug_writer_accepts;
+reg [15:0] debug_cache_rows;
+
+reg [7:0] debug_video_publications_bin;
+reg [15:0] debug_video_row_tags_bin;
+reg [31:0] debug_video_row_matches_bin;
+reg [31:0] debug_video_highlights_bin;
+reg [31:0] debug_video_alpha_bin;
+reg [31:0] debug_video_magenta_bin;
+reg [151:0] debug_video_gray;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [151:0] debug_video_gray_sync0;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [151:0] debug_video_gray_sync1;
+
+function automatic [7:0] gray_to_binary8;
+    input [7:0] gray;
+    integer bit_index;
+    begin
+        gray_to_binary8[7]=gray[7];
+        for(bit_index=6;bit_index>=0;bit_index=bit_index-1)
+            gray_to_binary8[bit_index]=gray_to_binary8[bit_index+1]^gray[bit_index];
+    end
+endfunction
+
+function automatic [15:0] gray_to_binary16;
+    input [15:0] gray;
+    integer bit_index;
+    begin
+        gray_to_binary16[15]=gray[15];
+        for(bit_index=14;bit_index>=0;bit_index=bit_index-1)
+            gray_to_binary16[bit_index]=gray_to_binary16[bit_index+1]^gray[bit_index];
+    end
+endfunction
+
+function automatic [31:0] gray_to_binary32;
+    input [31:0] gray;
+    integer bit_index;
+    begin
+        gray_to_binary32[31]=gray[31];
+        for(bit_index=30;bit_index>=0;bit_index=bit_index-1)
+            gray_to_binary32[bit_index]=gray_to_binary32[bit_index+1]^gray[bit_index];
+    end
+endfunction
+
+wire [7:0] debug_video_publications =
+    gray_to_binary8(debug_video_gray_sync1[7:0]);
+wire [15:0] debug_video_row_tags =
+    gray_to_binary16(debug_video_gray_sync1[23:8]);
+wire [31:0] debug_video_row_matches =
+    gray_to_binary32(debug_video_gray_sync1[55:24]);
+wire [31:0] debug_video_highlights =
+    gray_to_binary32(debug_video_gray_sync1[87:56]);
+wire [31:0] debug_video_alpha =
+    gray_to_binary32(debug_video_gray_sync1[119:88]);
+wire [31:0] debug_video_magenta =
+    gray_to_binary32(debug_video_gray_sync1[151:120]);
+
+assign debug_commit_seen = (debug_commit_records != 8'd0);
+assign debug_words[31:0] = 32'h4f564c31;
+assign debug_words[63:32] = {debug_style_records,debug_commit_records,
+                             debug_data_records,debug_config_records};
+assign debug_words[95:64] = {debug_clear_records,debug_commit_bad,
+                             debug_commit_ok,debug_plane_publications};
+assign debug_words[127:96] = debug_record_bytes;
+assign debug_words[159:128] = debug_plane_bytes;
+assign debug_words[191:160] = {debug_writer_accepts,debug_cache_rows};
+assign debug_words[223:192] = {debug_style_publications,
+                               debug_plane_publications,
+                               debug_video_publications,
+                               5'd0,protocol_error,plane_publish_pending,
+                               style_publish_pending};
+assign debug_words[255:224] = {current_command,write_word_index,
+                               write_byte_lane,display_bank,
+                               published_visible,published_menu,
+                               plane_publish_pending,style_publish_pending,
+                               protocol_error,record_ready};
+assign debug_words[287:256] = {published_x1,published_y1};
+assign debug_words[319:288] = {published_x2,published_y2};
+assign debug_words[351:320] = published_highlight[63:32];
+assign debug_words[383:352] = {15'd0,received_bytes};
+assign debug_words[415:384] = {16'd0,debug_video_row_tags};
+assign debug_words[447:416] = debug_video_row_matches;
+assign debug_words[479:448] = debug_video_highlights;
+assign debug_words[511:480] = debug_video_alpha;
+assign debug_words[543:512] = debug_video_magenta;
 
 wire writer_accept = write_pending && !writer_busy;
 assign record_ready = !write_pending;
@@ -178,10 +281,28 @@ always @(posedge mem_clk) begin
         row_request_value_m1[1] <= 9'd1;
         row_request_value_m2[0] <= 9'd0;
         row_request_value_m2[1] <= 9'd1;
+        debug_clear_records <= 8'd0;
+        debug_config_records <= 8'd0;
+        debug_data_records <= 8'd0;
+        debug_commit_records <= 8'd0;
+        debug_style_records <= 8'd0;
+        debug_commit_ok <= 8'd0;
+        debug_commit_bad <= 8'd0;
+        debug_plane_publications <= 8'd0;
+        debug_style_publications <= 8'd0;
+        debug_record_bytes <= 32'd0;
+        debug_plane_bytes <= 32'd0;
+        debug_writer_accepts <= 16'd0;
+        debug_cache_rows <= 16'd0;
+        debug_video_gray_sync0 <= 152'd0;
+        debug_video_gray_sync1 <= 152'd0;
         protocol_error <= 1'b0;
     end
     else begin
         cache_wr_en <= 1'b0;
+
+        debug_video_gray_sync0 <= debug_video_gray;
+        debug_video_gray_sync1 <= debug_video_gray_sync0;
 
         row_request_toggle_sync0 <= row_request_toggle_video;
         row_request_toggle_sync1 <= row_request_toggle_sync0;
@@ -205,6 +326,8 @@ always @(posedge mem_clk) begin
         if (writer_accept) begin
             write_pending <= 1'b0;
             write_word_index <= write_word_index + 14'd1;
+            if (debug_writer_accepts != 16'hffff)
+                debug_writer_accepts <= debug_writer_accepts + 16'd1;
         end
 
         if (style_publish_pending) begin
@@ -218,20 +341,28 @@ always @(posedge mem_clk) begin
             published_y2 <= staging_y2;
             style_toggle_mem <= ~style_toggle_mem;
             style_publish_pending <= 1'b0;
+            if (debug_style_publications != 8'hff)
+                debug_style_publications <= debug_style_publications + 8'd1;
         end
 
         if (record_valid && record_ready) begin
+            if (debug_record_bytes != 32'hffffffff)
+                debug_record_bytes <= debug_record_bytes + 32'd1;
             if (record_start) begin
                 current_command <= record_data;
                 payload_index <= 6'd0;
                 case (record_data)
                     COMMAND_CLEAR: begin
+                        if (debug_clear_records != 8'hff)
+                            debug_clear_records <= debug_clear_records + 8'd1;
                         if (!record_last)
                             protocol_error <= 1'b1;
                         published_visible <= 1'b0;
                         style_toggle_mem <= ~style_toggle_mem;
                     end
                     COMMAND_CONFIG: begin
+                        if (debug_config_records != 8'hff)
+                            debug_config_records <= debug_config_records + 8'd1;
                         received_bytes <= 17'd0;
                         write_word_index <= 14'd0;
                         write_byte_lane <= 3'd0;
@@ -240,16 +371,24 @@ always @(posedge mem_clk) begin
                             protocol_error <= 1'b1;
                     end
                     COMMAND_DATA: begin
+                        if (debug_data_records != 8'hff)
+                            debug_data_records <= debug_data_records + 8'd1;
                         if (record_last)
                             protocol_error <= 1'b1;
                     end
                     COMMAND_COMMIT: begin
+                        if (debug_commit_records != 8'hff)
+                            debug_commit_records <= debug_commit_records + 8'd1;
                         if (!record_last || received_bytes != PLANE_BYTES ||
                             write_byte_lane != 3'd0 || write_pending ||
                             write_word_index != PLANE_WORDS) begin
                             protocol_error <= 1'b1;
+                            if (debug_commit_bad != 8'hff)
+                                debug_commit_bad <= debug_commit_bad + 8'd1;
                         end
                         else begin
+                            if (debug_commit_ok != 8'hff)
+                                debug_commit_ok <= debug_commit_ok + 8'd1;
                             display_bank <= ~display_bank;
                             row_pending <= 2'b11;
                             row_pending_value[0] <= 9'd0;
@@ -259,6 +398,8 @@ always @(posedge mem_clk) begin
                         end
                     end
                     COMMAND_STYLE: begin
+                        if (debug_style_records != 8'hff)
+                            debug_style_records <= debug_style_records + 8'd1;
                         if (record_last)
                             protocol_error <= 1'b1;
                     end
@@ -271,6 +412,8 @@ always @(posedge mem_clk) begin
                     if (received_bytes == PLANE_BYTES)
                         protocol_error <= 1'b1;
                     else begin
+                        if (debug_plane_bytes != 32'hffffffff)
+                            debug_plane_bytes <= debug_plane_bytes + 32'd1;
                         write_word[write_byte_lane*8 +: 8] <= record_data;
                         received_bytes <= received_bytes + 17'd1;
                         if (write_byte_lane == 3'd7) begin
@@ -342,6 +485,8 @@ always @(posedge mem_clk) begin
                     cache_wr_data <= reader_dout;
                     cache_wr_en <= 1'b1;
                     if (read_word_index == 5'd22) begin
+                        if (debug_cache_rows != 16'hffff)
+                            debug_cache_rows <= debug_cache_rows + 16'd1;
                         row_pending[read_parity] <= 1'b0;
                         row_tag_mem[read_parity] <= read_row;
                         row_tag_toggle_mem[read_parity] <=
@@ -360,6 +505,9 @@ always @(posedge mem_clk) begin
                             published_y2 <= staging_y2;
                             style_toggle_mem <= ~style_toggle_mem;
                             plane_publish_pending <= 1'b0;
+                            if (debug_plane_publications != 8'hff)
+                                debug_plane_publications <=
+                                    debug_plane_publications + 8'd1;
                         end
                     end
                     else
@@ -421,6 +569,10 @@ reg [2:0] row_tag_toggle0_sync,row_tag_toggle1_sync;
 reg [1:0] row_tag_toggle_seen_video;
 reg [8:0] row_tag0_v1,row_tag0_v2,row_tag1_v1,row_tag1_v2;
 reg [8:0] row_tag_visible [0:1];
+wire row_tag_event0 =
+    row_tag_toggle0_sync[2] != row_tag_toggle_seen_video[0];
+wire row_tag_event1 =
+    row_tag_toggle1_sync[2] != row_tag_toggle_seen_video[1];
 
 wire [8:0] overlay_byte_index = {1'b0,h_pos[9:2]} +
                                 (v_pos[0] ? 9'd4 : 9'd0);
@@ -511,11 +663,26 @@ always @(posedge video_clk) begin
         row_tag0_v1<=9'h1ff;row_tag0_v2<=9'h1ff;
         row_tag1_v1<=9'h1ff;row_tag1_v2<=9'h1ff;
         row_tag_visible[0]<=9'h1ff;row_tag_visible[1]<=9'h1ff;
+        debug_video_publications_bin <= 8'd0;
+        debug_video_row_tags_bin <= 16'd0;
+        debug_video_row_matches_bin <= 32'd0;
+        debug_video_highlights_bin <= 32'd0;
+        debug_video_alpha_bin <= 32'd0;
+        debug_video_magenta_bin <= 32'd0;
+        debug_video_gray <= 152'd0;
         video_r <= 8'd0;
         video_g <= 8'd0;
         video_b <= 8'd0;
     end
     else begin
+        debug_video_gray <= {
+            debug_video_magenta_bin ^ (debug_video_magenta_bin >> 1),
+            debug_video_alpha_bin ^ (debug_video_alpha_bin >> 1),
+            debug_video_highlights_bin ^ (debug_video_highlights_bin >> 1),
+            debug_video_row_matches_bin ^ (debug_video_row_matches_bin >> 1),
+            debug_video_row_tags_bin ^ (debug_video_row_tags_bin >> 1),
+            debug_video_publications_bin ^
+                (debug_video_publications_bin >> 1)};
         style_toggle_sync <= {style_toggle_sync[1:0],style_toggle_mem};
         normal_v1 <= published_normal;
         normal_v2 <= normal_v1;
@@ -536,19 +703,31 @@ always @(posedge video_clk) begin
 
         if (style_toggle_sync[2] != style_toggle_seen) begin
             style_toggle_seen <= style_toggle_sync[2];
+            if (debug_video_publications_bin != 8'hff)
+                debug_video_publications_bin <=
+                    debug_video_publications_bin + 8'd1;
             normal_visible <= normal_v2;
             highlight_visible <= highlight_v2;
             x1_visible<=x1_v2;y1_visible<=y1_v2;
             x2_visible<=x2_v2;y2_visible<=y2_v2;
             visible_video<=visible_v2;menu_video<=menu_v2;
         end
-        if (row_tag_toggle0_sync[2] != row_tag_toggle_seen_video[0]) begin
+        if (row_tag_event0) begin
             row_tag_toggle_seen_video[0] <= row_tag_toggle0_sync[2];
             row_tag_visible[0] <= row_tag0_v2;
         end
-        if (row_tag_toggle1_sync[2] != row_tag_toggle_seen_video[1]) begin
+        if (row_tag_event1) begin
             row_tag_toggle_seen_video[1] <= row_tag_toggle1_sync[2];
             row_tag_visible[1] <= row_tag1_v2;
+        end
+        if (row_tag_event0 || row_tag_event1) begin
+            if (debug_video_row_tags_bin == 16'hffff ||
+                (debug_video_row_tags_bin == 16'hfffe &&
+                 row_tag_event0 && row_tag_event1))
+                debug_video_row_tags_bin <= 16'hffff;
+            else
+                debug_video_row_tags_bin <= debug_video_row_tags_bin +
+                    (row_tag_event0 && row_tag_event1 ? 16'd2 : 16'd1);
         end
 
         if (pixel_ce && native_active && h_pos == 12'd720 &&
@@ -559,6 +738,23 @@ always @(posedge video_clk) begin
         end
 
         if (pixel_ce) begin
+            if (overlay_sample_valid &&
+                debug_video_row_matches_bin != 32'hffffffff)
+                debug_video_row_matches_bin <=
+                    debug_video_row_matches_bin + 32'd1;
+            if (overlay_sample_valid && highlight_active &&
+                debug_video_highlights_bin != 32'hffffffff)
+                debug_video_highlights_bin <=
+                    debug_video_highlights_bin + 32'd1;
+            if (overlay_sample_valid && overlay_a != 8'd0 &&
+                debug_video_alpha_bin != 32'hffffffff)
+                debug_video_alpha_bin <= debug_video_alpha_bin + 32'd1;
+            if (overlay_sample_valid && overlay_a == 8'hff &&
+                overlay_r == 8'hff && overlay_g == 8'h00 &&
+                overlay_b == 8'hff &&
+                debug_video_magenta_bin != 32'hffffffff)
+                debug_video_magenta_bin <=
+                    debug_video_magenta_bin + 32'd1;
             if (overlay_sample_valid && overlay_a != 8'd0) begin
                 video_r <= blend_channel(base_r,overlay_r,overlay_a);
                 video_g <= blend_channel(base_g,overlay_g,overlay_a);

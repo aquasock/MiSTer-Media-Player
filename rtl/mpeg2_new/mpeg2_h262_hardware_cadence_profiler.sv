@@ -8,8 +8,11 @@
 `timescale 1ns/1ps
 module mpeg2_h262_hardware_cadence_profiler #(
     parameter DEADLINE_DIAGNOSTICS = 1'b1,
+    parameter OVERLAY_DIAGNOSTICS = 1'b0,
     parameter [23:0] TERMINAL_SNAPSHOT_DELAY = 24'd15000000,
     parameter [26:0] NO_PROGRESS_SNAPSHOT_DELAY = 27'd60000000,
+    parameter [31:0] OVERLAY_SNAPSHOT_DELAY = 32'd60000000,
+    parameter [31:0] OVERLAY_FALLBACK_DELAY = 32'd1800000000,
     parameter [31:0] OUTLIER_GAP_CYCLES = 32'd3000000,
     // Entry 468: rank gaps and admission conflicts only in the requested
     // late-session window. A zero default preserves unit-level reuse.
@@ -108,6 +111,8 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire [15:0] transport_block_count,
     input wire [15:0] audio_underrun_count,
     input wire [13:0] audio_fifo_floor,
+    input wire [543:0] overlay_debug_words,
+    input wire overlay_debug_commit_seen,
     input wire top_field_first,input wire repeat_first_field,
     input wire [15:0] error_flags,input wire [11:0] h_pos,
     input wire [11:0] v_pos,input wire [7:0] base_r,
@@ -124,7 +129,8 @@ localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
 localparam [31:0] SNAPSHOT_FORMAT=
-    {DEADLINE_DIAGNOSTICS ? 8'd20 : 8'd18,8'd64,16'd60000};
+    {OVERLAY_DIAGNOSTICS ? 8'd21 :
+     DEADLINE_DIAGNOSTICS ? 8'd20 : 8'd18,8'd64,16'd60000};
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
@@ -164,6 +170,25 @@ reg [15:0] transport_block_count_q;
 reg [15:0] audio_underrun_count_q;
 reg [13:0] audio_fifo_floor_q;
 reg top_field_first_q,repeat_first_field_q;
+
+wire overlay_snapshot_capture;
+wire overlay_snapshot_armed;
+wire [1:0] overlay_snapshot_reason;
+wire [31:0] overlay_snapshot_settle_elapsed;
+
+mpeg2_h262_overlay_snapshot_trigger #(
+    .SETTLE_CYCLES(OVERLAY_SNAPSHOT_DELAY),
+    .FALLBACK_CYCLES(OVERLAY_FALLBACK_DELAY)
+) overlay_snapshot_trigger (
+    .clk(clk_mpeg2),
+    .reset(reset_mpeg2),
+    .session_active(session_active || decoder_byte_accepted_q),
+    .overlay_commit_seen(overlay_debug_commit_seen),
+    .capture(overlay_snapshot_capture),
+    .armed(overlay_snapshot_armed),
+    .reason(overlay_snapshot_reason),
+    .settle_elapsed(overlay_snapshot_settle_elapsed)
+);
 
 reg [31:0] session_cycles,accepted_bytes;
 reg [31:0] first_present_cycle,last_present_cycle;
@@ -599,44 +624,74 @@ wire [31:0] legacy_snapshot_word_61={last_first_cache_writes,
     last_second_cache_writes};
 wire [31:0] legacy_snapshot_word_62={last_first_cache_addr_sum,
     last_second_cache_addr_sum};
+// Schema 21 overlays words 37..54 with the authored-menu pipeline:
+// 37 magic "OVL1"; 38 config/data/commit/style record counts; 39 clear,
+// rejected commit, accepted commit and plane-publication counts; 40 accepted
+// record bytes; 41 plane bytes; 42 DDR writes and cache-row fills; 43 memory
+// style/plane publication, video publication and retained flags; 44 engine
+// state; 45..46 published rectangle; 47 highlight index-one ABGR; 48 received
+// plane bytes; 49 video row-tag arrivals; 50 row-tag-matched samples; 51
+// highlighted samples; 52 nonzero-alpha samples; 53 opaque-magenta samples;
+// 54 capture reason, armed/commit bits and settle clocks.
+//
 // Schema 19 reuses the retired framebuffer-detail payload. Schema 18 stays
 // selectable for the established regression; no framebuffer control changes.
 wire [31:0] snapshot_word_37=DEADLINE_DIAGNOSTICS ?
-    {display_picture_count_full,display_swap_count_full} : legacy_snapshot_word_37;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[31:0] :
+     {display_picture_count_full,display_swap_count_full}) : legacy_snapshot_word_37;
 wire [31:0] snapshot_word_38=DEADLINE_DIAGNOSTICS ?
-    {reference_count_full,deadline_gap_count} : legacy_snapshot_word_38;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[63:32] :
+     {reference_count_full,deadline_gap_count}) : legacy_snapshot_word_38;
 wire [31:0] snapshot_word_39=DEADLINE_DIAGNOSTICS ?
-    deadline_records[0] : legacy_snapshot_word_39;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[95:64] :
+     deadline_records[0]) : legacy_snapshot_word_39;
 wire [31:0] snapshot_word_40=DEADLINE_DIAGNOSTICS ?
-    deadline_records[1] : legacy_snapshot_word_40;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[127:96] :
+     deadline_records[1]) : legacy_snapshot_word_40;
 wire [31:0] snapshot_word_41=DEADLINE_DIAGNOSTICS ?
-    deadline_records[2] : legacy_snapshot_word_41;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[159:128] :
+     deadline_records[2]) : legacy_snapshot_word_41;
 wire [31:0] snapshot_word_42=DEADLINE_DIAGNOSTICS ?
-    deadline_records[3] : legacy_snapshot_word_42;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[191:160] :
+     deadline_records[3]) : legacy_snapshot_word_42;
 wire [31:0] snapshot_word_43=DEADLINE_DIAGNOSTICS ?
-    deadline_records[4] : legacy_snapshot_word_43;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[223:192] :
+     deadline_records[4]) : legacy_snapshot_word_43;
 wire [31:0] snapshot_word_44=DEADLINE_DIAGNOSTICS ?
-    deadline_records[5] : legacy_snapshot_word_44;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[255:224] :
+     deadline_records[5]) : legacy_snapshot_word_44;
 wire [31:0] snapshot_word_45=DEADLINE_DIAGNOSTICS ?
-    deadline_records[6] : legacy_snapshot_word_45;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[287:256] :
+     deadline_records[6]) : legacy_snapshot_word_45;
 wire [31:0] snapshot_word_46=DEADLINE_DIAGNOSTICS ?
-    deadline_records[7] : legacy_snapshot_word_46;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[319:288] :
+     deadline_records[7]) : legacy_snapshot_word_46;
 wire [31:0] snapshot_word_47=DEADLINE_DIAGNOSTICS ?
-    deadline_records[8] : legacy_snapshot_word_47;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[351:320] :
+     deadline_records[8]) : legacy_snapshot_word_47;
 wire [31:0] snapshot_word_48=DEADLINE_DIAGNOSTICS ?
-    deadline_records[9] : legacy_snapshot_word_48;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[383:352] :
+     deadline_records[9]) : legacy_snapshot_word_48;
 wire [31:0] snapshot_word_49=DEADLINE_DIAGNOSTICS ?
-    deadline_records[10] : legacy_snapshot_word_49;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[415:384] :
+     deadline_records[10]) : legacy_snapshot_word_49;
 wire [31:0] snapshot_word_50=DEADLINE_DIAGNOSTICS ?
-    deadline_records[11] : legacy_snapshot_word_50;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[447:416] :
+     deadline_records[11]) : legacy_snapshot_word_50;
 wire [31:0] snapshot_word_51=DEADLINE_DIAGNOSTICS ?
-    deadline_records[12] : legacy_snapshot_word_51;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[479:448] :
+     deadline_records[12]) : legacy_snapshot_word_51;
 wire [31:0] snapshot_word_52=DEADLINE_DIAGNOSTICS ?
-    deadline_records[13] : legacy_snapshot_word_52;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[511:480] :
+     deadline_records[13]) : legacy_snapshot_word_52;
 wire [31:0] snapshot_word_53=DEADLINE_DIAGNOSTICS ?
-    deadline_records[14] : legacy_snapshot_word_53;
+    (OVERLAY_DIAGNOSTICS ? overlay_debug_words[543:512] :
+     deadline_records[14]) : legacy_snapshot_word_53;
 wire [31:0] snapshot_word_54=DEADLINE_DIAGNOSTICS ?
-    deadline_records[15] : legacy_snapshot_word_54;
+    (OVERLAY_DIAGNOSTICS ?
+     {overlay_snapshot_reason,overlay_snapshot_armed,
+      overlay_debug_commit_seen,overlay_snapshot_settle_elapsed[27:0]} :
+     deadline_records[15]) : legacy_snapshot_word_54;
 // Entry 693: schema 20 spends the third deadline-diagnostics record, whose
 // presentation investigation is closed, on the audio block telemetry.
 wire [31:0] snapshot_word_55=DEADLINE_DIAGNOSTICS ?
@@ -1234,28 +1289,42 @@ always @(posedge clk_mpeg2) begin
             end
         end
 
+        // Schema 21 is intentionally independent of the ordinary first-error
+        // latch: the audio FIFO may underrun before a DVD menu emits its first
+        // overlay.  Capture one second after any commit reaches the engine, or
+        // use the trigger's bounded fallback when no commit is observed.
+        if(OVERLAY_DIAGNOSTICS&&!snapshot_ready_mpeg2&&
+           overlay_snapshot_capture)begin
+            snapshot_reason<=overlay_snapshot_reason;
+            quiet_count<=0;terminal_wait_count<=0;no_progress_wait_count<=0;
+            capture_snapshot();
+        end
         // Entry 314: a fatal transport result can suppress all later decoder
         // validity, including the sequence-end code that previously gated
         // this snapshot.  Capture the first settled fatal state directly.
-        if(!snapshot_ready_mpeg2&&session_active&&(error_flags_q!=0))begin
+        else if(!OVERLAY_DIAGNOSTICS&&!snapshot_ready_mpeg2&&
+                session_active&&(error_flags_q!=0))begin
             snapshot_reason<=3;terminal_wait_count<=0;
             no_progress_wait_count<=0;
             if(quiet_count==10'd1)capture_snapshot();
             else quiet_count<=quiet_count+1'b1;
-        end else if(!snapshot_ready_mpeg2&&session_active&&sequence_end_seen_q&&
+        end else if(!OVERLAY_DIAGNOSTICS&&!snapshot_ready_mpeg2&&
+           session_active&&sequence_end_seen_q&&
            session_quiet_q)begin
             snapshot_reason<=1;terminal_wait_count<=0;no_progress_wait_count<=0;
             if(quiet_count==10'd1023)capture_snapshot();
             else quiet_count<=quiet_count+1'b1;
-        end else if(!snapshot_ready_mpeg2&&session_active&&sequence_end_seen_q&&
+        end else if(!OVERLAY_DIAGNOSTICS&&!snapshot_ready_mpeg2&&
+           session_active&&sequence_end_seen_q&&
            terminal_defer_q)begin
             snapshot_reason<=2;quiet_count<=0;terminal_wait_count<=0;
             no_progress_wait_count<=0;
-        end else if(!snapshot_ready_mpeg2&&session_active&&sequence_end_seen_q)begin
+        end else if(!OVERLAY_DIAGNOSTICS&&!snapshot_ready_mpeg2&&
+           session_active&&sequence_end_seen_q)begin
             snapshot_reason<=2;quiet_count<=0;no_progress_wait_count<=0;
             if(terminal_wait_count==TERMINAL_SNAPSHOT_LIMIT)capture_snapshot();
             else terminal_wait_count<=terminal_wait_count+1'b1;
-        end else if(!snapshot_ready_mpeg2&&session_active)begin
+        end else if(!OVERLAY_DIAGNOSTICS&&!snapshot_ready_mpeg2&&session_active)begin
             snapshot_reason<=3;quiet_count<=0;terminal_wait_count<=0;
             if(session_progress)
                 no_progress_wait_count<=0;
@@ -1379,4 +1448,61 @@ always @* begin
         video_b=overlay_shift[42]?8'hff:8'h00;
     end
 end
+endmodule
+
+// Passive schema-21 capture controller. Reason 1 is a settled overlay commit;
+// reason 2 is the bounded no-commit fallback.  It owns no rendering signal.
+module mpeg2_h262_overlay_snapshot_trigger #(
+    parameter [31:0] SETTLE_CYCLES = 32'd60000000,
+    parameter [31:0] FALLBACK_CYCLES = 32'd1800000000
+)(
+    input  wire        clk,
+    input  wire        reset,
+    input  wire        session_active,
+    input  wire        overlay_commit_seen,
+    output reg         capture,
+    output reg         armed,
+    output reg  [1:0]  reason,
+    output reg  [31:0] settle_elapsed
+);
+
+reg captured;
+reg [31:0] fallback_elapsed;
+
+always @(posedge clk) begin
+    if (reset) begin
+        capture <= 1'b0;
+        armed <= 1'b0;
+        captured <= 1'b0;
+        reason <= 2'd0;
+        settle_elapsed <= 32'd0;
+        fallback_elapsed <= 32'd0;
+    end
+    else begin
+        capture <= 1'b0;
+        if (!captured && session_active) begin
+            if (fallback_elapsed != 32'hffffffff)
+                fallback_elapsed <= fallback_elapsed + 32'd1;
+            if (!armed && overlay_commit_seen) begin
+                armed <= 1'b1;
+                settle_elapsed <= 32'd0;
+            end
+            else if (armed) begin
+                if (settle_elapsed >= SETTLE_CYCLES-32'd1) begin
+                    capture <= 1'b1;
+                    captured <= 1'b1;
+                    reason <= 2'd1;
+                end
+                else
+                    settle_elapsed <= settle_elapsed + 32'd1;
+            end
+            else if (fallback_elapsed >= FALLBACK_CYCLES-32'd1) begin
+                capture <= 1'b1;
+                captured <= 1'b1;
+                reason <= 2'd2;
+            end
+        end
+    end
+end
+
 endmodule
