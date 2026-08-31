@@ -426,6 +426,67 @@ static void overlay_style_payload(const struct dvd_spu_overlay *overlay,
     payload[offset] = (uint8_t)overlay->highlight_y2;
 }
 
+#ifdef MMP_DVD_OVERLAY_PROBE
+static void overlay_probe_style_payload(uint8_t payload[41])
+{
+    /* Index one is transparent normally and opaque magenta when selected. */
+    memset(payload + 1, 0, 32u);
+    payload[21] = 0xffu;
+    payload[22] = 0x00u;
+    payload[23] = 0xffu;
+    payload[24] = 0xffu;
+}
+
+static uint32_t overlay_probe_plane_hash(const uint8_t *plane)
+{
+    uint32_t hash = 2166136261u;
+    size_t offset;
+
+    for (offset = 0; offset < DVD_SPU_PLANE_BYTES; ++offset) {
+        hash ^= plane[offset];
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+static void overlay_probe_dump_plane(const struct dvd_spu_overlay *overlay)
+{
+    static unsigned sequence;
+    static const char digits[] = "0123456789abcdef";
+    char row_hex[(DVD_SPU_WIDTH / 4u) * 2u + 1u];
+    uint32_t hash;
+    unsigned row;
+
+    if (!overlay || !overlay->pixels)
+        return;
+    sequence++;
+    hash = overlay_probe_plane_hash(overlay->pixels);
+    fprintf(stderr,
+            "media_player_helper: DVD overlay real-plane begin sequence=%u "
+            "bytes=%u rows=%u row_bytes=%u fnv1a=%08x\n",
+            sequence, (unsigned)DVD_SPU_PLANE_BYTES,
+            (unsigned)DVD_SPU_HEIGHT, (unsigned)(DVD_SPU_WIDTH / 4u),
+            (unsigned)hash);
+    for (row = 0; row < DVD_SPU_HEIGHT; ++row) {
+        const uint8_t *source = overlay->pixels +
+                                (size_t)row * (DVD_SPU_WIDTH / 4u);
+        unsigned byte;
+
+        for (byte = 0; byte < DVD_SPU_WIDTH / 4u; ++byte) {
+            row_hex[byte * 2u] = digits[source[byte] >> 4];
+            row_hex[byte * 2u + 1u] = digits[source[byte] & 15u];
+        }
+        row_hex[sizeof(row_hex) - 1u] = '\0';
+        fprintf(stderr,
+                "media_player_helper: DVD overlay real-plane sequence=%u "
+                "row=%03u data=%s\n", sequence, row, row_hex);
+    }
+    fprintf(stderr,
+            "media_player_helper: DVD overlay real-plane end sequence=%u "
+            "fnv1a=%08x\n", sequence, (unsigned)hash);
+}
+#endif
+
 static int emit_overlay_style(struct output_state *output,
                               const struct dvd_spu_overlay *overlay,
                               uint8_t command)
@@ -441,6 +502,9 @@ static int emit_overlay_style(struct output_state *output,
     unsigned color;
 
     overlay_style_payload(overlay, payload);
+#ifdef MMP_DVD_OVERLAY_PROBE
+    overlay_probe_style_payload(payload);
+#endif
     result = emit_overlay_record(output, command, payload, sizeof(payload));
     if (result < 0)
         return result;
@@ -450,9 +514,19 @@ static int emit_overlay_style(struct output_state *output,
                 "selected rectangle\n", name);
         return 0;
     }
+#ifdef MMP_DVD_OVERLAY_PROBE
+    memset(histogram, 0, sizeof(histogram));
+    histogram[1] =
+        ((uint32_t)overlay->highlight_x2 - overlay->highlight_x1 + 1u) *
+        ((uint32_t)overlay->highlight_y2 - overlay->highlight_y1 + 1u);
+#endif
     for (color = 0; color < 4u; ++color) {
         selected_pixels += histogram[color];
+#ifdef MMP_DVD_OVERLAY_PROBE
+        if (payload[17u + color * 4u + 3u] != 0)
+#else
         if (overlay->highlight_rgba[color][3] != 0)
+#endif
             selected_nontransparent_pixels += histogram[color];
     }
     fprintf(stderr,
@@ -461,12 +535,22 @@ static int emit_overlay_style(struct output_state *output,
             "%02x%02x%02x%02x/%02x%02x%02x%02x/"
             "%02x%02x%02x%02x/%02x%02x%02x%02x "
             "selected_histogram=%u,%u,%u,%u selected_pixels=%u "
-            "selected_nontransparent_pixels=%u\n",
-            name, overlay->visible, overlay->menu,
+            "selected_nontransparent_pixels=%u%s\n",
+            name, payload[0] & 1u, (payload[0] >> 1) & 1u,
             (unsigned)overlay->highlight_x1,
             (unsigned)overlay->highlight_y1,
             (unsigned)overlay->highlight_x2,
             (unsigned)overlay->highlight_y2,
+#ifdef MMP_DVD_OVERLAY_PROBE
+            (unsigned)payload[17], (unsigned)payload[18],
+            (unsigned)payload[19], (unsigned)payload[20],
+            (unsigned)payload[21], (unsigned)payload[22],
+            (unsigned)payload[23], (unsigned)payload[24],
+            (unsigned)payload[25], (unsigned)payload[26],
+            (unsigned)payload[27], (unsigned)payload[28],
+            (unsigned)payload[29], (unsigned)payload[30],
+            (unsigned)payload[31], (unsigned)payload[32],
+#else
             (unsigned)overlay->highlight_rgba[0][0],
             (unsigned)overlay->highlight_rgba[0][1],
             (unsigned)overlay->highlight_rgba[0][2],
@@ -483,10 +567,17 @@ static int emit_overlay_style(struct output_state *output,
             (unsigned)overlay->highlight_rgba[3][1],
             (unsigned)overlay->highlight_rgba[3][2],
             (unsigned)overlay->highlight_rgba[3][3],
+#endif
             (unsigned)histogram[0], (unsigned)histogram[1],
             (unsigned)histogram[2], (unsigned)histogram[3],
             (unsigned)selected_pixels,
-            (unsigned)selected_nontransparent_pixels);
+            (unsigned)selected_nontransparent_pixels,
+#ifdef MMP_DVD_OVERLAY_PROBE
+            " probe=solid-index1-magenta"
+#else
+            ""
+#endif
+            );
     return 0;
 }
 
@@ -494,6 +585,12 @@ static int emit_overlay_frame(struct output_state *output,
                               const struct dvd_spu_overlay *overlay)
 {
     size_t offset = 0;
+#ifdef MMP_DVD_OVERLAY_PROBE
+    uint8_t probe_plane[4096];
+
+    overlay_probe_dump_plane(overlay);
+    memset(probe_plane, 0x55, sizeof(probe_plane));
+#endif
 
     if (emit_overlay_style(output, overlay, MEDIA_PLAYER_OVERLAY_CONFIG) < 0)
         return -1;
@@ -503,7 +600,12 @@ static int emit_overlay_frame(struct output_state *output,
         if (count > 4096u)
             count = 4096u;
         if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_DATA,
-                                overlay->pixels + offset, count) < 0)
+#ifdef MMP_DVD_OVERLAY_PROBE
+                                probe_plane,
+#else
+                                overlay->pixels + offset,
+#endif
+                                count) < 0)
             return -1;
         offset += count;
     }
