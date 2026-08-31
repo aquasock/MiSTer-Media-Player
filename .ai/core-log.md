@@ -19,6 +19,7 @@ Implement the passive counters with explicit clock-domain synchronization, exten
 #### Files Modified:
 
 - MediaPlayer.sv
+- MediaPlayer.sdc
 - rtl/mpeg2_new/mpeg2_h262_dvd_overlay.sv
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - tools/test_dvd_overlay_engine.sv
