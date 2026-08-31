@@ -1,3 +1,32 @@
+## 807 COMMIT Unreleased 6e44472 2026-08-31T01:20:21-07:00
+
+#### Coming From:
+
+Unreleased 6e44472
+
+#### Purpose:
+
+Complete hardware acceptance of the source-`6e44472` menu and mixed-film chapter corrections.
+
+#### Outcome:
+
+The user reports skipping throughout the physical DVD without any issue, including the previously abnormal chapters, which now look normal, and reports that the reorganized menu looks great.  Together with entry 806's perfect previous, next, play, pause, button-control, audio, video, WAV, MP3, FLAC and Ogg Vorbis results, this clears the chapter-two-to-three black-screen gate, the legacy 800x600 or vertically corrupted mixed-film chapter behavior and the OSD acceptance boundary for entries 803 through 805.  Source `6e44472`, its timing-clean seed-19 RBF, the installed Main and the installed helper are hardware-accepted; no screenshot, target capture, repository source, installed file, running playback, media or configuration changes during this report.
+
+#### Next Steps:
+
+Keep source `6e44472`, fitter seed 19 and the accepted installed artifacts unchanged as the current hardware baseline.  The transport controls, chapter navigation, mixed film and interlaced presentation, reorganized menu and four consumer-audio formats are accepted; choose and approve the next development or release-qualification boundary before changing source or rebuilding Quartus.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 806 COMMIT Unreleased 6e44472 2026-08-31T01:17:02-07:00
 
 #### Coming From:
@@ -1190,34 +1219,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 767 COMMIT Unreleased 8623431 2026-08-30T05:57:10-07:00
-
-#### Coming From:
-
-Unreleased 8623431
-
-#### Purpose:
-
-Accept corrected VOB selection and complete the retained frame-picture NARA MPD-D2 hardware playback gate.
-
-#### Outcome:
-
-After rebooting into the exact `61766c5e` Main built from source `8623431`, the user confirms that `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob` is visible, launches normally, and plays its complete five minutes with perfect picture and sound; the user also checks S/PDIF and reports that it works.  The 639,643-byte scaled EOF capture `/tmp/entry766_nara_mpd_d2_hdmi_pass.png`, SHA-256 `76724924c69d3c199fd1ea0ef2d83de3a4c874460d12ef2a53e9f928f40c790f`, and 405,141-byte native 720x480 capture `/tmp/entry766_nara_mpd_d2_hdmi_raw.png`, SHA-256 `f32983f568bae9e24bdad3359ccfabe4b12939a414cdb816d9524f84c03eb128`, visibly preserve a clean final frame.  All 64 schema-20 records have valid headers, indices and parity, and checksum `c46d8e97` matches; the no-progress EOF snapshot accepts 300,095,133 clean-video bytes, records 2,998 reference pictures, 8,991 displayed pictures and 8,990 swaps, and reports zero hardware error flags, zero presentation errors, zero transport blocks and zero audio FIFO underruns.  It records one 4,004,000-cycle cadence gap near displayed picture 77: the passive deadline record attributes the missed window to the candidate becoming ready 67,134 cycles later, with no input starvation or writer-capacity block, and the user reports no visible defect.  The 7,313,085-byte HDMI helper log `/tmp/entry766_nara_mpd_d2_hdmi_pass.log`, SHA-256 `68a8af73a3182273c54bf9ce47b9e872072190614c5dd854b88600e728f9498b`, names the exact VOB, selects decoded stereo PCM, emits all 9,375 AC-3 frames and 14,400,000 samples, reaches EOF, exits zero, and submits all 362,200,545 annotated transport bytes on the fast path.  This accepts source `8623431`, native VOB selection, the adopted frame-picture MPD-D2 fixture, HDMI and S/PDIF playback; field-picture MPEG-2 remains the previously disclosed deferred limitation.
-
-#### Next Steps:
-
-Prepare the final reproducibility and release-qualification boundary by pinning fitter seed 19 in the QSF, retaining Native 480i as the sole product mode, documenting the accepted MPD-D2 frame-picture scope and deferred field-picture limitation, and then performing a clean from-scratch seed-19 Quartus release build and regression gate before any version tag or GitHub release.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
