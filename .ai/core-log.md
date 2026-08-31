@@ -1,3 +1,34 @@
+## 784 COMMIT Unreleased ??? 2026-08-30T18:21:34-07:00
+
+#### Coming From:
+
+Unreleased 0711d3d
+
+#### Purpose:
+
+Normalize DVD ISO presentation timestamps across VOB or cell discontinuities so long-title audio scheduling remains continuous.
+
+#### Outcome:
+
+The user approves the host-only correction after entry 783 proves that the complete Blazing Saddles ISO crosses a DVD packet-position boundary near 2,904.6 seconds, leaves the helper's raw maximum video PTS frozen at 2,905.18 seconds and drains the audio FIFO while video continues.  The proposed implementation will extend the source-`81a1002` helper with an ISO-scoped PTS epoch normalizer that distinguishes a material backward discontinuity from ordinary MPEG decode-order reordering, applies the resulting offset before both scheduler admission and FPGA timestamp-record generation, and leaves ordinary MPG, VOB, raw-video, audio, Main and FPGA behavior unchanged.  Architecture and changelog text will state the continuous ISO timeline contract.
+
+#### Next Steps:
+
+Implement the bounded normalizer, verify its wrap-safe arithmetic and construct a compact native Program Stream discontinuity fixture whose second segment resets raw PTS while decoded content remains continuous.  Prove the normalized output timestamps remain monotonic, rerun the byte-exact ordinary MPG and decrypted Blazing Saddles ISO opening regressions, then build exactly one static ARM helper.  Do not run Quartus or deploy to the MiSTer until those native and ARM gates pass; after deployment, replay Blazing Saddles through the 2,905-second boundary over HDMI and S/PDIF before resuming encrypted-ISO qualification.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 783 COMMIT Unreleased 0711d3d 2026-08-30T16:25:29-07:00
 
 #### Coming From:
@@ -1152,34 +1183,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 744 COMMIT Unreleased 6196869 2026-08-29T20:40:52-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Record verified construction and installation of the final onset-search checkpoints ending at P82 and P84.
-
-#### Outcome:
-
-Using unchanged source `6196869` and the exact original authored stream, generate the authorized pair.  The P82 stream ends on byte-identical zero-based source P82, removes 38 complete B units and preserves 7 I plus 38 P units unchanged; its 983,588 bytes have SHA-256 `04cbfe0fef0d2aa10dcf260daf7c2ef848b2c13012e1e42be87e2757dee58927`.  The P84 stream ends on byte-identical source P84, removes the same 38 B units and preserves 7 I plus 40 P units unchanged; its 1,075,936 bytes have SHA-256 `f905bd22168353dd78300d3431e14d4c2289944284d77cedca41ae0dd2d5f24c`.  Independent FFprobe enumeration confirms respectively 45 and 47 720x480 pictures at 30000/1001 with no B picture; both end with the required single `00 00 01 b7` sequence-end code and complete full FFmpeg software decode without error.  Absolute FTP inventory proves both new names absent; installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p82_checkpoint.m2v` and `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p84_checkpoint.m2v`, followed by independent absolute-path FTP readback, reproduces each exact byte count, SHA-256 and terminal sequence end.  No source, FPGA, RBF, Main, helper, existing media or configuration changes.
-
-#### Next Steps:
-
-In `800x600 Diagnostic` with Weave selected, play P82 first and watch for even one faint horizontal strip or flicker in its live passage and stable terminal frame; then play P84 and make the same observation.  Report `P82 clean` or `P82 flicker`, followed by `P84 clean` or `P84 flicker`.  Combined with clean P80 and affected P85, these results identify the first affected authored P picture.  Do not capture telemetry unless the user explicitly leaves a failure displayed for evidence, and do not change or rebuild the FPGA.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
