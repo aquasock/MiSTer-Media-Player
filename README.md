@@ -13,11 +13,11 @@ required before that extension becomes a released capability.
 
 The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.8.0 provides:
 
-- raw MPEG-2 Video elementary-stream playback, a bounded H.222.0 MPEG-2 Program Stream path for `.mpg` and `.mpeg` files, and audio-only `.mp3`, `.wav` or `.flac` playback;
+- raw MPEG-2 Video elementary-stream playback, a bounded H.222.0 MPEG-2 Program Stream path for `.mpg` and `.mpeg` files, and audio-only `.mp3`, `.wav`, `.flac` or Ogg Vorbis `.ogg` playback;
 - decrypted or CSS-encrypted DVD ISO and direct USB optical-disc main-feature
   playback, selecting the longest described title with previous/next chapter
   and pause/resume controls but without authored menus;
-- a matching ARM helper that demultiplexes Program Streams, decodes MPEG Layers II/III, WAV, FLAC or AC-3 audio to signed stereo PCM, and transports video, picture PTS, and PCM or passthrough bursts to the FPGA;
+- a matching ARM helper that demultiplexes Program Streams, decodes MPEG Layers II/III, WAV, FLAC, Ogg Vorbis or AC-3 audio to signed stereo PCM, and transports video, picture PTS, and PCM or passthrough bursts to the FPGA;
 - byte-exact raw `.m2v` pass-through with a synthetic 90 kHz fallback timeline;
 - Program Stream picture PTS driving the FPGA 90 kHz presentation timeline;
 - cadence as a mandatory floor: PTS may delay a picture but never presents it earlier than its encoded H.262 frame cadence;
@@ -34,14 +34,14 @@ The supported subset is intentionally bounded while the architecture is being pr
 
 | Area | Current implementation |
 | --- | --- |
-| Input | Raw MPEG-2 Video `.m2v`, bounded MPEG-2 Program Stream `.mpg` / `.mpeg`, decrypted or CSS-encrypted DVD `.iso` main features, direct USB DVD main features through `/dev/sr0`, or audio-only MPEG-1 Layer III `.mp3`, RIFF WAVE `.wav` and FLAC `.flac` through the ARM helper |
+| Input | Raw MPEG-2 Video `.m2v`, bounded MPEG-2 Program Stream `.mpg` / `.mpeg`, decrypted or CSS-encrypted DVD `.iso` main features, direct USB DVD main features through `/dev/sr0`, or audio-only MPEG-1 Layer III `.mp3`, RIFF WAVE `.wav`, FLAC `.flac` and Ogg Vorbis `.ogg` through the ARM helper |
 | Video, progressive | 4:2:0 I, P and B pictures through 720x480 |
 | Video, interlaced | Current `master`: 720x480 at 30000/1001, 4:2:0 frame pictures with I, P and B coding, frame or field motion, frame or field DCT, and top- or bottom-field-first presentation. `repeat_first_field` and field pictures remain unsupported; Quartus and MiSTer qualification are pending |
 | Picture types | Coded-order/display-order presentation with B reordering |
 | Presentation rates | H.262 frame-rate codes 1..5; codes 6..8 are rejected before transport |
 | Program Stream timing | Picture PTS on a 33-bit / 90 kHz FPGA timeline with cadence-floor enforcement |
 | Raw-stream timing | Synthetic 33-bit / 90 kHz cadence derived from H.262 frame-rate metadata |
-| Audio | MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV and FLAC converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. The AC-3 stereo downmix discards LFE |
+| Audio | MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV, FLAC and Ogg Vorbis converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. The AC-3 stereo downmix discards LFE |
 | Audio passthrough | AC-3 and DTS carried to S/PDIF as IEC 61937 bursts for an external decoder. DTS is passthrough only; there is no DTS decoder |
 | Audio output | A menu option selects HDMI or S/PDIF. The unused output is muted, because both are fed from one stereo stream |
 | Audio buffering | Packed signed PCM records into an 8,192-frame stereo FPGA FIFO |
@@ -71,13 +71,21 @@ session during preflight, then fills a 4 MiB launch reserve inside an 8 MiB
 HPS-RAM ring before playback begins. The ring is direct-disc-only and does not
 consume FPGA M10K memory.
 
+The development menu separates `Run DVD-Video`, `Open MPEG-2 Video`, and
+`Open WAV, MP3, FLAC, OGG` so each picker exposes only its relevant files.
+Aspect Ratio defaults to 16:9 with 4:3 as the alternate; Deinterlacer Mode
+offers Bob and Weave. The Audio Test and Audio Output choices are unchanged.
+
 For `.iso` and `.dvd` playback, player-one Left and Right select the previous
 or next chapter and Start toggles pause/resume while the MiSTer OSD is closed.
 On a keyboard, P and N select the previous and next chapter, and Space toggles
 pause/resume under the same OSD-closed guard.
 A chapter change preserves the authenticated libdvdnav session, flushes every
 old HPS/Main byte, resets the existing FPGA download session, and begins from
-the selected chapter's random-access boundary. Pause intentionally holds the
+the selected chapter's random-access boundary. The helper retains the selected
+Program Stream audio codec and DVD private substream across that reset and
+performs bounded AC-3 byte resynchronization if the new chapter boundary lands
+on an undecodable candidate frame. Pause intentionally holds the
 Main-to-FPGA transport; a long pause can still raise the current FPGA audio
 FIFO-underrun telemetry because this ARM-only boundary cannot add an explicit
 pause state to the core.
@@ -169,7 +177,7 @@ test when qualifying the decoder's actual compatibility envelope.
 
 ### Audio
 
-Four audio paths exist, and which one runs is decided by the track's codec and
+The supported audio paths are selected by the track's codec and
 by the `Audio output` menu option together:
 
 | Track | HDMI selected | S/PDIF selected |
@@ -178,6 +186,7 @@ by the `Audio output` menu option together:
 | Standalone MPEG-1 Layer III, 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
 | WAV PCM, 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
 | FLAC, 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
+| Ogg Vorbis, converted to 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
 | AC-3, 48 kHz | decoded to stereo, LFE discarded | passed through as IEC 61937 for your receiver to decode |
 | DTS | refused, with a message in the helper log | passed through as IEC 61937 |
 
@@ -202,7 +211,7 @@ MiSTer Main file selection
           v
 MediaPlayer_Helper
 Program Stream demux / picture PTS
-MP2 or AC-3 decode / AC-3 or DTS burst packing
+consumer audio or AC-3 decode / AC-3 or DTS burst packing
           |
           v
 packed video + PTS + PCM-or-burst transport
@@ -248,12 +257,12 @@ ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host arm
 ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host main
 ```
 
-The build script pins minimp3, miniaudio, liba52, MiSTer Main, dependency hashes, and the Main patch. Release candidates require reproducible FPGA, helper, and Main binaries plus host and MiSTer regression evidence. See [building and testing](docs/BUILDING.md) for the current workflow.
+The build script pins minimp3, miniaudio, stb_vorbis, liba52, MiSTer Main, dependency hashes, and the Main patch. Release candidates require reproducible FPGA, helper, and Main binaries plus host and MiSTer regression evidence. See [building and testing](docs/BUILDING.md) for the current workflow.
 
 ## Known limitations
 
 - Program Stream support is bounded; MPEG Transport Stream, authored DVD menus, DVD LPCM, subpictures, angles and arbitrary systems-layer layouts are not supported. ISO and direct `/dev/sr0` playback select the longest title, support previous/next chapter control, and use statically linked libdvdcss for encrypted sectors. DVD private stream 1 supports AC-3 decode/passthrough and DTS passthrough.
-- Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV and FLAC from 8 through 192 kHz converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III remain rejected; AAC and Ogg Vorbis are not yet enabled. Only the first Program Stream audio track is played; track switching needs a control channel that protocol one does not implement.
+- Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV, FLAC and Ogg Vorbis converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III remain rejected; AAC is not enabled. Only the first Program Stream audio track is played; chapter changes retain that identity, while deliberate track switching needs a control channel that protocol one does not implement.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
 - Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. Current `master` also implements 720x480-at-30000/1001 interlaced frame-picture I/P/B decoding with frame or field motion and frame or field DCT, but this remains simulation-qualified until a clean fit and MiSTer playback pass. Field pictures, `repeat_first_field` (3:2 pulldown), and 576i remain rejected. DVD navigation, subpictures and broader systems-layer behavior are separate limitations.
@@ -313,7 +322,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
 ## Standards and design policy
 
-Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC 13818-2**. Program Stream, PES, and timing work uses **ITU-T H.222.0 / ISO/IEC 13818-1**. MPEG Layers II and III are decoded by the pinned minimp3 source, and RIFF WAVE/FLAC decode, channel conversion and resampling use pinned miniaudio source. DVD ISO access uses pinned libdvdcss, libdvdread and libdvdnav sources. These dependencies are compiled directly into the static helper binary; libdvdcss is an implementation dependency and does not establish DVD CSS conformance.
+Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC 13818-2**. Program Stream, PES, and timing work uses **ITU-T H.222.0 / ISO/IEC 13818-1**. MPEG Layers II and III are decoded by the pinned minimp3 source; RIFF WAVE/FLAC decode, channel conversion and resampling use pinned miniaudio source; and its Ogg Vorbis backend uses pinned stb_vorbis source. DVD ISO access uses pinned libdvdcss, libdvdread and libdvdnav sources. These dependencies are compiled directly into the static helper binary; libdvdcss is an implementation dependency and does not establish DVD CSS conformance.
 
 AC-3 decode is performed by the pinned liba52 dependency, and IEC 61937 framing follows that standard for passthrough.
 

@@ -10,6 +10,9 @@ license_sha=6a1ee543e5282cd9061881edf462e6fdab181f328da71fc2c9a6950a80e94d01
 miniaudio_commit=9634bedb5b5a2ca38c1ee7108a9358a4e233f14d
 miniaudio_sha=ac7af4de748b7e26b777f37e01cee313a308a7296a3eb080e2906b320cc55c89
 miniaudio_license_sha=457f1b500e0adf6bc059edddfa78a2f62012e7c3bb43476c20e0bd23b25ba0eb
+stb_commit=2c980bb59875b0d32144a71867fbdebb2f77cd20
+stb_vorbis_sha=4c7cb2ff1f7011e9d67950446b7eb9ca044f2e464d76bfbb0b84dd2e23e65636
+stb_license_sha=bebfe904b14301657e4e5d655c811d51fd31b97c455b9cc2d8600d6bac6cff63
 # liba52 0.7.4 decodes AC-3.  Upstream ships only a release tarball, so the
 # tarball itself is pinned and the five translation units the helper needs are
 # extracted from it.  GPL-2, matching this project's own licence.
@@ -56,6 +59,12 @@ fetch_checked \
 fetch_checked \
     "https://raw.githubusercontent.com/mackron/miniaudio/$miniaudio_commit/LICENSE" \
     "$deps_dir/LICENSE.miniaudio" "$miniaudio_license_sha"
+fetch_checked \
+    "https://raw.githubusercontent.com/nothings/stb/$stb_commit/stb_vorbis.c" \
+    "$deps_dir/stb_vorbis.c" "$stb_vorbis_sha"
+fetch_checked \
+    "https://raw.githubusercontent.com/nothings/stb/$stb_commit/LICENSE" \
+    "$deps_dir/LICENSE.stb" "$stb_license_sha"
 
 fetch_liba52() {
     local tarball="$deps_dir/a52dec-$liba52_version.tar.gz"

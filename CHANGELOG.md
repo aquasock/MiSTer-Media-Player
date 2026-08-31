@@ -30,9 +30,19 @@ This project is still in active pre-release development. Published milestone rel
 - Added simulation-qualified 720x480 interlaced frame-picture P/B decoding with frame or field motion and frame or field DCT. Deterministic P, B and combined field-motion/field-DCT fixtures cover field selection, integer and half-sample prediction, all luma block layouts, chroma residuals, and coded-order/display-order presentation against independently FFmpeg-checked pixel oracles.
 - Added helper-only RIFF WAVE playback through the existing MediaPlayer picker and PCM transport. Pinned miniaudio source is compiled into the static helper to convert ordinary PCM/float mono, stereo or multichannel WAV input to 44.1 or 48 kHz signed stereo without an FPGA change.
 - Added helper-only FLAC playback through the existing MediaPlayer picker and PCM transport. The same statically compiled miniaudio dependency converts 16- or 24-bit mono, stereo or multichannel FLAC input to 44.1 or 48 kHz signed stereo without an FPGA change.
+- Added helper-only Ogg Vorbis playback through a dedicated audio picker. The
+  miniaudio backend uses pinned stb_vorbis source and converts decoded audio to
+  44.1 or 48 kHz signed stereo without a target runtime library or FPGA change.
 
 ### Changed
 
+- Reorganized the core menu into separate DVD-Video, MPEG-2 video and consumer
+  audio pickers; made 16:9 the default aspect ratio while retaining 4:3; and
+  kept the existing Bob/Weave, Audio Test and Audio Output choices.
+- Chapter changes now retain the established Program Stream codec and DVD
+  private audio substream. AC-3 decode performs a bounded 64 KiB rescan and
+  decoder reinitialization after a rejected boundary frame instead of exiting
+  playback or selecting a different track because its PES arrived first.
 - Direct USB-DVD playback now reuses its authenticated libdvdnav session across
   helper preflight rewinds instead of reopening and rescanning CSS keys. After
   preflight it reads through an 8 MiB asynchronous HPS-RAM ring with a 4 MiB

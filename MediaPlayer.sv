@@ -68,7 +68,9 @@ assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////
 
-wire widescreen = status[121];
+// The first OSD option is the reset/default value. Keep bit 121 as the saved
+// preference, but make zero mean the user's requested 16:9 default.
+wire widescreen = !status[121];
 
 assign VIDEO_ARX = widescreen ? 12'd16 : 12'd4;
 assign VIDEO_ARY = widescreen ? 12'd9  : 12'd3;
@@ -76,11 +78,12 @@ assign VIDEO_ARY = widescreen ? 12'd9  : 12'd3;
 `include "build_id.v"
 localparam CONF_STR = {
 	"MediaPlayer;;",
-	"F1,M2V,Open MPEG-2 Video;",
+	"F1,DVD,Run DVD-Video;",
+	"F1,M2VMPGMPEVOBISO,Open MPEG-2 Video;",
+	"F1,WAVMP3FLCOGG,Open WAV, MP3, FLAC, OGG;",
 	"-;",
-	"-;",
-	"O[121],Aspect Ratio,4:3,16:9;",
-	"O[124],Deinterlacer Mode,Bob,Weave;",
+	"O[121],Aspect Ratio,16:9,4:3;",
+	"O[124],Deinterlacer Mode:,Bob,Weave;",
 	"O[3:1],Audio Test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
 	"O[126],Audio Output,HDMI,S/PDIF;",
 	"-;",

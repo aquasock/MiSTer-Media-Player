@@ -106,6 +106,7 @@
 #define AC3_BLOCKS_PER_FRAME 6
 #define AC3_SAMPLES_PER_BLOCK 256
 #define AC3_SAMPLES_PER_FRAME (AC3_BLOCKS_PER_FRAME * AC3_SAMPLES_PER_BLOCK)
+#define AC3_RESYNC_LIMIT (64u * 1024u)
 
 /*
  * IEC 61937 passthrough. The burst period for AC-3 is the frame's own 1536
@@ -273,6 +274,8 @@ struct audio_state {
     a52_state_t *a52;
     int a52_substream;
     int a52_synced;
+    size_t ac3_resync_bytes;
+    unsigned ac3_resync_events;
     uint8_t *data;
     size_t size;
     size_t capacity;
@@ -950,16 +953,25 @@ static void free_video_head(struct output_state *output)
 
 static void reset_audio_for_chapter(struct audio_state *audio)
 {
+    enum audio_codec selected_codec = audio->codec;
     enum audio_output selected_output = audio->output;
+    int selected_a52_substream = audio->a52_substream;
+    int selected_dts_substream = audio->dts_substream;
 
     if (audio->a52)
         a52_free(audio->a52);
     free(audio->data);
     memset(audio, 0, sizeof(*audio));
+    audio->codec = selected_codec;
     audio->output = selected_output;
-    audio->a52_substream = -1;
-    audio->dts_substream = -1;
+    audio->a52_substream = selected_a52_substream;
+    audio->dts_substream = selected_dts_substream;
     mp3dec_init(&audio->decoder);
+    fprintf(stderr,
+            "media_player_helper: chapter audio retained codec=%d "
+            "ac3_substream=%d dts_substream=%d\n",
+            (int)audio->codec, audio->a52_substream,
+            audio->dts_substream);
 }
 
 static void reset_output_for_chapter(struct output_state *output,
@@ -1410,6 +1422,12 @@ static int decode_ac3_buffer(struct audio_state *audio,
             /* Resynchronize a byte at a time rather than discarding the run. */
             offset++;
             audio->a52_synced = 0;
+            if (++audio->ac3_resync_bytes > AC3_RESYNC_LIMIT) {
+                fprintf(stderr,
+                        "media_player_helper: AC-3 resynchronization "
+                        "exceeded %u bytes\n", AC3_RESYNC_LIMIT);
+                return -1;
+            }
             continue;
         }
         if ((size_t)length > original_size - offset)
@@ -1425,23 +1443,34 @@ static int decode_ac3_buffer(struct audio_state *audio,
             /* The frame is validated by syncinfo above; hand it on untouched. */
             if (emit_ac3_burst(output, frame, length) < 0)
                 return -1;
+            if (audio->ac3_resync_bytes) {
+                fprintf(stderr,
+                        "media_player_helper: AC-3 resynchronized after "
+                        "%zu byte(s), %u rejected candidate(s)\n",
+                        audio->ac3_resync_bytes, audio->ac3_resync_events);
+            }
             audio->a52_synced = 1;
+            audio->ac3_resync_bytes = 0;
+            audio->ac3_resync_events = 0;
             offset += (size_t)length;
             continue;
         }
         flags = A52_STEREO | A52_ADJUST_LEVEL;
         if (a52_frame(audio->a52, frame, &flags, &level, 0)) {
-            fprintf(stderr, "media_player_helper: undecodable AC-3 frame\n");
-            return -1;
+            fprintf(stderr,
+                    "media_player_helper: resynchronizing after "
+                    "undecodable AC-3 frame\n");
+            goto resynchronize_candidate;
         }
-        audio->a52_synced = 1;
         for (block = 0; block < AC3_BLOCKS_PER_FRAME; ++block) {
             const sample_t *samples;
             int i;
 
             if (a52_block(audio->a52)) {
-                fprintf(stderr, "media_player_helper: undecodable AC-3 block\n");
-                return -1;
+                fprintf(stderr,
+                        "media_player_helper: resynchronizing after "
+                        "undecodable AC-3 block %d\n", block);
+                goto resynchronize_candidate;
             }
             samples = a52_samples(audio->a52);
             for (i = 0; i < AC3_SAMPLES_PER_BLOCK; ++i) {
@@ -1459,9 +1488,38 @@ static int decode_ac3_buffer(struct audio_state *audio,
                 }
             }
         }
+        if (audio->ac3_resync_bytes) {
+            fprintf(stderr,
+                    "media_player_helper: AC-3 resynchronized after "
+                    "%zu byte(s), %u rejected candidate(s)\n",
+                    audio->ac3_resync_bytes, audio->ac3_resync_events);
+        }
+        audio->a52_synced = 1;
+        audio->ac3_resync_bytes = 0;
+        audio->ac3_resync_events = 0;
         offset += (size_t)length;
         if (write_pcm(output, pcm, AC3_SAMPLES_PER_FRAME, 2, sample_rate) < 0)
             return -1;
+        continue;
+
+resynchronize_candidate:
+        ++audio->ac3_resync_events;
+        audio->a52_synced = 0;
+        offset++;
+        if (++audio->ac3_resync_bytes > AC3_RESYNC_LIMIT) {
+            fprintf(stderr,
+                    "media_player_helper: AC-3 resynchronization exceeded "
+                    "%u bytes after %u candidate frame(s)\n",
+                    AC3_RESYNC_LIMIT, audio->ac3_resync_events);
+            return -1;
+        }
+        a52_free(audio->a52);
+        audio->a52 = a52_init(0);
+        if (!audio->a52) {
+            fprintf(stderr,
+                    "media_player_helper: AC-3 decoder reinit failed\n");
+            return -1;
+        }
     }
     if (offset) {
         memmove(audio->data, audio->data + offset, audio->size - offset);
@@ -2343,6 +2401,27 @@ static int process_flac_stream(struct media_source *input,
     return 0;
 }
 
+static int process_ogg_stream(struct media_source *input,
+                              struct output_state *output)
+{
+    struct consumer_audio_info info = {0};
+    char error[160];
+
+    output->audio_only_mode = 1;
+    output->hold_active = 0;
+    output->scheduler_started = 1;
+    if (consumer_audio_decode_ogg(input, write_consumer_pcm, output, &info,
+                                  error, sizeof(error)) < 0) {
+        fprintf(stderr, "media_player_helper: %s\n", error);
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: Ogg Vorbis %u channel(s) at %u Hz, "
+            "output %u Hz\n",
+            info.source_channels, info.source_rate_hz, info.output_rate_hz);
+    return 0;
+}
+
 static int finish_output(struct output_state *output, int success)
 {
     if (output->video && fflush(output->video) == EOF)
@@ -2374,6 +2453,7 @@ int main(int argc, char **argv)
     int is_mp3;
     int is_wav;
     int is_flac;
+    int is_ogg;
     int is_audio_file;
     int i;
     int success = 0;
@@ -2509,13 +2589,14 @@ int main(int argc, char **argv)
     is_mp3 = has_suffix_case(source_specification, ".mp3");
     is_wav = has_suffix_case(source_specification, ".wav");
     is_flac = has_suffix_case(source_specification, ".flac");
-    is_audio_file = is_mp3 || is_wav || is_flac;
+    is_ogg = has_suffix_case(source_specification, ".ogg");
+    is_audio_file = is_mp3 || is_wav || is_flac || is_ogg;
     is_program_stream = !is_audio_file &&
                         !memcmp(signature, "\x00\x00\x01\xba", 4);
     if (is_mp3) {
         if (preflight_mp3(&input) < 0)
             goto done;
-    } else if (!is_wav && !is_flac &&
+    } else if (!is_wav && !is_flac && !is_ogg &&
                preflight_input(&input, is_program_stream) < 0) {
         goto done;
     }
@@ -2539,6 +2620,9 @@ int main(int argc, char **argv)
             goto done;
     } else if (is_flac) {
         if (process_flac_stream(&input, &output) < 0)
+            goto done;
+    } else if (is_ogg) {
+        if (process_ogg_stream(&input, &output) < 0)
             goto done;
     } else if (is_program_stream) {
         for (;;) {

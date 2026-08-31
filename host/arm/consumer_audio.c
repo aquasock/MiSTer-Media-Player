@@ -7,9 +7,13 @@
 #define MA_NO_THREADING
 #define MA_NO_RUNTIME_LINKING
 #define MA_NO_MP3
+#define STB_VORBIS_HEADER_ONLY
+#include "stb_vorbis.c"
+#undef STB_VORBIS_HEADER_ONLY
 #define MINIAUDIO_IMPLEMENTATION
 
 #include "miniaudio.h"
+#include "stb_vorbis.c"
 
 #include "consumer_audio.h"
 
@@ -181,4 +185,14 @@ int consumer_audio_decode_flac(struct media_source *source,
     return consumer_audio_decode_miniaudio(
         source, ma_encoding_format_flac, "FLAC", callback, opaque, info,
         error, error_size);
+}
+
+int consumer_audio_decode_ogg(struct media_source *source,
+                              consumer_pcm_callback callback, void *opaque,
+                              struct consumer_audio_info *info,
+                              char *error, size_t error_size)
+{
+    return consumer_audio_decode_miniaudio(
+        source, ma_encoding_format_vorbis, "Ogg Vorbis", callback, opaque,
+        info, error, error_size);
 }

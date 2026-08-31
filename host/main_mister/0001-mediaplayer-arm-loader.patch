@@ -1,15 +1,16 @@
 # Applies to Main_MiSTer commit 0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f.
 diff --git a/file_io.cpp b/file_io.cpp
-index 2c9f406..29fdcc3 100644
+index 2c9f406..0a02ef2 100644
 --- a/file_io.cpp
 +++ b/file_io.cpp
-@@ -1789,6 +1789,14 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
+@@ -1789,6 +1789,15 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
  							}
  
  							e[3] = 0;
-+							if (!strcasecmp(e, "FLC"))
++							if (!strcasecmp(e, "FLC") || !strcasecmp(e, "MPE"))
 +							{
-+								found = !strcasecmp(fext, "flac");
++								found = !strcasecmp(fext,
++								                    !strcasecmp(e, "FLC") ? "flac" : "mpeg");
 +								if (found) break;
 +								if (strlen(ext) < 3) break;
 +								ext += 3;
@@ -170,7 +171,7 @@ index 50f1991..a4cc7c6 100644
  				if (ev->value) modifier |= ps2code;
  				else modifier &= ~ps2code;
 diff --git a/menu.cpp b/menu.cpp
-index 0c74e21..cb3376e 100644
+index 0c74e21..ceb3743 100644
 --- a/menu.cpp
 +++ b/menu.cpp
 @@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
@@ -190,17 +191,18 @@ index 0c74e21..cb3376e 100644
  static uint32_t fs_ExtLen = 0;
  static uint32_t fs_Options;
  static uint32_t fs_MenuSelect;
-@@ -337,7 +338,8 @@ static char* GetExt(char *ext)
+@@ -337,7 +338,9 @@ static char* GetExt(char *ext)
  
  	while (*ext) {
  		strcpy(p, ",");
 -		strncat(p, ext, 3);
 +		if (!strncasecmp(ext, "FLC", 3)) strcat(p, "FLAC");
++		else if (!strncasecmp(ext, "MPE", 3)) strcat(p, "MPEG");
 +		else strncat(p, ext, 3);
  		while (*(p + strlen(p) - 1) == ' ') *(p + strlen(p) - 1) = 0;
  		if (strlen(ext) <= 3) break;
  		ext += 3;
-@@ -458,10 +460,11 @@ void SelectFile(const char* path, const char* pFileExt, int Options, unsigned ch
+@@ -458,10 +461,11 @@ void SelectFile(const char* path, const char* pFileExt, int Options, unsigned ch
  	}
  	else
  	{
@@ -214,14 +216,6 @@ index 0c74e21..cb3376e 100644
  		home_dir = strrchr(home, '/');
  		if (home_dir) home_dir++;
  		else home_dir = home;
-@@ -2423,6 +2426,7 @@ void HandleUI(void)
- 
- 						if (p[idx] >= '0' && p[idx] <= '9') ioctl_index = p[idx] - '0';
- 						substrcpy(ext, p, 1);
-+						if (mediaplayer_is_core()) strcpy(ext, "M2VMPGVOBISOMP3WAVFLCDVD");
- 						if (is_gba() && FileExists(user_io_make_filepath(HomeDir(), "goomba.rom"))) strcat(ext, "GB GBC");
- 						while (strlen(ext) % 3) strcat(ext, " ");
- 
 @@ -2443,7 +2447,9 @@ void HandleUI(void)
  						}
  
@@ -266,10 +260,10 @@ index 0c74e21..cb3376e 100644
  				printf("Saving config to %s\n", filename);
 diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
 new file mode 100644
-index 0000000..4101221
+index 0000000..003dccf
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,645 @@
+@@ -0,0 +1,646 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -464,7 +458,8 @@ index 0000000..4101221
 +	                     !strcasecmp(extension, ".dvd") ||
 +	                     !strcasecmp(extension, ".mp3") ||
 +	                     !strcasecmp(extension, ".wav") ||
-+	                     !strcasecmp(extension, ".flac"));
++	                     !strcasecmp(extension, ".flac") ||
++	                     !strcasecmp(extension, ".ogg"));
 +}
 +
 +static void finish_download(const char *reason)

@@ -8,7 +8,8 @@ DVD_PREFIX ?= $(DEPS_DIR)/dvd-install-native
 OUTPUT ?= media_player_helper
 SOURCES := media_player_helper.c media_source.c
 HEADERS := media_source.h media_player_protocol.h consumer_audio.h \
-	$(DEPS_DIR)/minimp3.h $(DEPS_DIR)/miniaudio.h
+	$(DEPS_DIR)/minimp3.h $(DEPS_DIR)/miniaudio.h \
+	$(DEPS_DIR)/stb_vorbis.c
 DVDNAV_LIBRARY := $(DVD_PREFIX)/lib/libdvdnav.a
 DVDREAD_LIBRARY := $(DVD_PREFIX)/lib/libdvdread.a
 DVDCSS_LIBRARY := $(DVD_PREFIX)/lib/libdvdcss.a
@@ -35,7 +36,7 @@ $(A52_OBJDIR)/%.o: $(A52_DIR)/%.c
 	$(CC) $(CPPFLAGS) -I$(A52_DIR) $(A52_CFLAGS) -c $< -o $@
 
 $(CONSUMER_OBJECT): consumer_audio.c consumer_audio.h media_source.h \
-		$(DEPS_DIR)/miniaudio.h
+		$(DEPS_DIR)/miniaudio.h $(DEPS_DIR)/stb_vorbis.c
 	@mkdir -p $(CONSUMER_OBJDIR)
 	$(CC) $(CPPFLAGS) -I$(DEPS_DIR) $(CONSUMER_CFLAGS) -c $< -o $@
 

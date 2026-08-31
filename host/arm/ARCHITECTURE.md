@@ -90,20 +90,21 @@ share a compilation unit:
    helper demux, audio, scheduler and PTS state behind a Main download-session
    barrier; general seeking will need the same explicit discontinuity contract.
 4. Audio codec: MPEG Layer II on stream ids 0xC0-0xDF, standalone MPEG-1
-   Layer III, RIFF WAVE and FLAC files, and AC-3 on private stream 1 substreams 0x80-0x87, all
+   Layer III, RIFF WAVE, FLAC and Ogg Vorbis files, and AC-3 on private stream 1 substreams 0x80-0x87, all
    behind codec selection rather than output-specific decode paths. MPEG audio
    is decoded by the pinned minimp3 source compiled directly into the static
    helper binary; MP3 support adds no runtime library. A Program Stream codec
    is decided by the first audio PES seen and the other is ignored for the
-   rest of the session; only the first
-   AC-3 substream is played, because track switching needs the versioned
+   rest of the session; chapter changes retain that established codec and
+   private substream instead of selecting whichever PES arrives first after
+   the discontinuity. Only the first AC-3 substream is played, because track switching needs the versioned
    control channel protocol one omits. AC-3 is downmixed to stereo by liba52
    using the stream's own coefficients. DTS on substreams 0x88-0x8F is
    passthrough only, since no DTS decoder is present; a DTS track selected for
    HDMI output is refused rather than played as silence. DVD LPCM is still
    later.
 5. Audio output: `--audio-out hdmi` (default) sends decoded stereo to HDMI.
-   `--audio-out spdif` sends decoded MP2, MP3, WAV and FLAC stereo as ordinary
+   `--audio-out spdif` sends decoded MP2, MP3, WAV, FLAC and Ogg Vorbis stereo as ordinary
    S/PDIF PCM. For AC-3 and DTS it bypasses the decode stage and emits IEC 61937
    bursts instead, carried unchanged on the existing PCM transport and marked
    by the transport's independent non-audio flag. AC-3 uses
@@ -139,11 +140,21 @@ FLAC decoder through the same bounded `media_source` callbacks. Sixteen- and
 The decoder is compiled directly into the static helper and adds no runtime
 library or FPGA dependency.
 
+Standalone `.ogg` follows the same audio-only contract. Miniaudio drives the
+pinned stb_vorbis decoder through bounded `media_source` callbacks, converts
+mono or multichannel Vorbis to signed 16-bit stereo, and emits at 44.1 or
+48 kHz. The decoder is compiled into the static helper and has no target-side
+runtime-library dependency.
+
 Previous and next chapter commands use the private control protocol while Start
 pause/resume is a Main-side transport hold. General seek, title, angle,
 audio-track and subtitle-track commands remain deferred. The ARM-only pause
 does not suppress the FPGA audio FIFO underrun after its existing reserve
 drains; that product polish requires an explicit future core pause state.
+At a chapter barrier the helper discards partial decoder bytes but retains the
+selected codec and DVD private substream. AC-3 decode then scans forward at
+most 64 KiB, rebuilding liba52 after a rejected candidate frame, so boundary
+damage cannot silently switch tracks or terminate playback immediately.
 
 ## Deferred DVD scope
 
