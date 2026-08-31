@@ -1,3 +1,34 @@
+## 819 COMMIT Unreleased ??? 2026-08-31T07:01:17-07:00
+
+#### Coming From:
+
+Unreleased 0e70319
+
+#### Purpose:
+
+Synchronize DVD menu commands and selected-button highlighting to the displayed NAV packet while making directional transitions directly testable.
+
+#### Outcome:
+
+The approved boundary is helper-only.  Retain a decoded copy of the most recently emitted DVD NAV PCI in the media source, invalidate it across rewinds and successful hops, and use that stable displayed packet for directional selection, activation and highlight-area lookup rather than libdvdnav's potentially ahead current PCI.  Selected buttons will use the selection palette rather than the activation palette.  Every menu command will report its command name, packet logical-block number, available-button count, before and after button numbers, authored directional target, status and resulting highlight rectangle, allowing physical-disc logs to distinguish missing keyboard delivery, an authored self-link and an actual selection transition.  The focused native test and real-DVD harness will be strengthened to require retained-PCI reset behavior and at least one logged nontrivial directional transition.  Main, RTL, QSF, RBF and Quartus remain unchanged.
+
+#### Next Steps:
+
+Implement only the recorded helper and test changes, run the strict native helper suite and focused regressions locally, commit the source, then reproduce the native and static ARM builds from the exact source commit on the build PC.  Qualify the real-DVD navigation harness against an authored fixture with a provable button transition before giving the user the single replacement helper path and digest for physical-disc testing.
+
+#### Files Modified:
+
+- host/arm/media_source.c
+- tools/test_dvd_menu_hop.c
+- tools/test_dvd_menu_navigation.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 818 COMMIT Unreleased 0e70319 2026-08-31T06:54:47-07:00
 
 #### Coming From:
@@ -1201,34 +1232,5 @@ Relaunch the same Blazing Saddles ISO in Native 480i at 16:9, Bob and HDMI and c
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 779 COMMIT Unreleased 205bbd7 2026-08-30T14:31:18-07:00
-
-#### Coming From:
-
-Unreleased 205bbd7
-
-#### Purpose:
-
-Capture and independently verify the accepted NARA MPD-D2 qualification control on the installed source-`205bbd7` core.
-
-#### Outcome:
-
-At the user's request, one screenshot and the matching helper log are collected from the completed `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob` run; the visible terminal frame confirms that this adopted NARA-named qualification file contains the Blazing Saddles footage referenced by the user.  The helper identifies S/PDIF decoded-PCM output and the exact VOB, submits all 362,200,545 bytes through the fast path in 299.946401 seconds at 1.207551 MB/s, emits all 9,375 AC-3 frames and 14,400,000 PCM samples, reaches EOF and exits zero.  The 639,401-byte screenshot `/tmp/entry779_nara_mpd_d2_qualification_5min_pass.png`, SHA-256 `518e59b9673258da6e1fca55af759d6ac02f6c2ff3ae5d589cd1de792f64d677`, visibly preserves a clean final western scene.  Its 64 schema-20 telemetry records have valid headers, row indices and parity, and checksum `bfb4da57` matches; the terminal no-progress snapshot accepts 300,095,133 clean-video bytes, records 2,998 reference pictures, 8,991 displayed pictures and 8,990 swaps, and reports zero hardware error flags, audio underruns, PCM protocol errors, presentation errors, cache overlaps, transport blocks, deadline gaps, cadence outliers or timestamp conflicts.  The 12,330,598-byte helper log has SHA-256 `b2e3ccb3ce427162adea35ccdceca6226a76ad19fca7e5f3d3279dcc0744ccc4`.  This replaces the user-report-only NARA evidence in entry 778 with a complete captured control result and changes no source, installed file, playback mode or configuration.
-
-#### Next Steps:
-
-Keep source `205bbd7`, fitter seed 19, the installed RBF, native 480i mode and current decoder capability boundary unchanged.  All three adopted five-minute frame-picture MPD-D2 VOBs now have accepted results, and each captured run shows real-time completion with no audio starvation; field-picture MPEG-2 remains intentionally deferred.  If the user wants to resume the previously paused roadmap, scope decrypted ISO playback as a host-side input and navigation boundary first, without an FPGA rebuild unless later evidence proves one necessary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
