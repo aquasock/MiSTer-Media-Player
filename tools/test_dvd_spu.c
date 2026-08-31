@@ -30,6 +30,17 @@ int main(void)
     static const uint8_t malformed[] = {
         0x00,0x08,0x00,0x04,0x00,0x00,0x00,0x04
     };
+    static const uint8_t scheduled_stop[] = {
+        0x00,0x24, 0x00,0x06, 0x90,0xa0,
+        0x00,0x00, 0x00,0x1e,
+        0x00,
+        0x03,0x32,0x10,
+        0x04,0xff,0xf0,
+        0x05,0x00,0xa0,0x0b,0x01,0x40,0x15,
+        0x06,0x00,0x04,0x00,0x05,
+        0xff,
+        0x00,0x01, 0x00,0x1e, 0x02,0xff
+    };
     uint32_t clut[16] = {0};
     struct dvd_spu_decoder *decoder = dvd_spu_create();
     const struct dvd_spu_overlay *overlay;
@@ -75,8 +86,20 @@ int main(void)
 
     dvd_spu_reset(decoder);
     dvd_spu_set_stream(decoder, 0);
+    assert(dvd_spu_feed(decoder, 0, scheduled_stop,
+                        sizeof(scheduled_stop)) == 1);
+    assert(!overlay->visible && overlay->menu);
+    assert(pixel_at(overlay, 10, 20) == 1);
+    assert(dvd_spu_set_highlight(decoder, 1,
+                                 (uint32_t)2u << 20 | (uint32_t)8u << 4,
+                                 10,20,11,21) == 1);
+    assert(overlay->visible && overlay->menu);
+    assert(pixel_at(overlay, 10, 20) == 1);
+
+    dvd_spu_reset(decoder);
+    dvd_spu_set_stream(decoder, 0);
     assert(dvd_spu_feed(decoder, 0, malformed, sizeof(malformed)) == -1);
     dvd_spu_destroy(decoder);
-    puts("dvd_spu: fragmented decode, palette, alpha, highlight and rejection pass");
+    puts("dvd_spu: fragmented decode, palette, scheduled stop, visible highlight and rejection pass");
     return 0;
 }

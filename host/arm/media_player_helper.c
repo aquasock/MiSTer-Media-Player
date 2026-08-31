@@ -2457,10 +2457,12 @@ done:
  * A menu still leaves the last decoded video frame resident in the FPGA while
  * the DVD virtual machine waits.  Poll the private control socket here rather
  * than skipping the still immediately: directional changes remain interactive,
- * activation/root calls retain the normal decoder barrier, finite stills expire
- * at their authored duration, and 0xff waits indefinitely for a command.
- * Return 0 when no still is active, 1 after a finite still resumes, 2 when the
- * caller must enter a navigation barrier, and -1 on failure.
+ * title/root hops retain the normal decoder barrier, finite stills expire at
+ * their authored duration, and 0xff waits indefinitely for a command.  An
+ * overlay-only menu continuation is acknowledged without resetting the
+ * resident video frame.  Return 0 when no still is active, 1 when processing
+ * should resume, 2 when the caller must enter a navigation barrier, and -1 on
+ * failure.
  */
 static int wait_dvd_still(struct media_source *input,
                           struct dvd_menu_state *menu,
@@ -2497,7 +2499,15 @@ static int wait_dvd_still(struct media_source *input,
                 return -1;
             if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
                 return -1;
-            if (navigation > 0) {
+            if (navigation == MEDIA_SOURCE_DVD_MENU_CONTINUE) {
+                if (control_send(control_fd,
+                                 MEDIA_PLAYER_CONTROL_MENU_CONTINUE) < 0)
+                    return -1;
+                fprintf(stderr,
+                        "media_player_helper: DVD menu continuation\n");
+                return 1;
+            }
+            if (navigation == MEDIA_SOURCE_DVD_STREAM_HOP) {
                 *control_command = command;
                 return 2;
             }
@@ -2554,12 +2564,20 @@ static int process_program_stream(struct media_source *input,
                         command);
                 return -1;
             }
-            if (navigation > 0) {
+            if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
+                return -1;
+            if (navigation == MEDIA_SOURCE_DVD_MENU_CONTINUE) {
+                if (control_send(control_fd,
+                                 MEDIA_PLAYER_CONTROL_MENU_CONTINUE) < 0)
+                    return -1;
+                fprintf(stderr,
+                        "media_player_helper: DVD menu continuation\n");
+                continue;
+            }
+            if (navigation == MEDIA_SOURCE_DVD_STREAM_HOP) {
                 *control_command = command;
                 return 1;
             }
-            if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
-                return -1;
             continue;
         }
         if (command)

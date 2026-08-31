@@ -40,6 +40,13 @@ enum media_source_dvd_command {
     MEDIA_SOURCE_DVD_ROOT_MENU
 };
 
+enum media_source_dvd_command_result {
+    MEDIA_SOURCE_DVD_COMMAND_ERROR = -1,
+    MEDIA_SOURCE_DVD_NO_HOP = 0,
+    MEDIA_SOURCE_DVD_STREAM_HOP = 1,
+    MEDIA_SOURCE_DVD_MENU_CONTINUE = 2
+};
+
 struct media_source_dvd_state {
     int menu_active;
     int menu_changed;

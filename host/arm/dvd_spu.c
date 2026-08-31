@@ -384,6 +384,15 @@ int dvd_spu_set_highlight(struct dvd_spu_decoder *decoder, int display,
     reset_highlight(decoder);
     if (!display)
         return 0;
+    /*
+     * libdvdnav's displayed-button state is synchronized to the active NAV
+     * packet.  Some authored menu SPUs contain a later timed stop command;
+     * this decoder has no SPU clock and therefore sees that stop immediately.
+     * A displayed button is authoritative evidence that the menu plane must
+     * still be composited.
+     */
+    decoder->overlay.visible = 1;
+    decoder->overlay.menu = 1;
     for (i = 0; i < 4u; ++i) {
         unsigned color = (palette >> (16u + i * 4u)) & 15u;
         unsigned alpha = (palette >> (i * 4u)) & 15u;

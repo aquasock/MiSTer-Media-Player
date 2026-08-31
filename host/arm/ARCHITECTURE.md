@@ -26,8 +26,11 @@ protocol. Keyboard P/N use the same previous/next actions and Space uses the
 same pause action while the MiSTer OSD is closed.
 
 Menu-mode sources use the same channel for directional, activate and root-menu
-commands. Navigation hops and button activation reuse the ready/go barrier;
-highlight-only moves do not reset the video stream. Main maps player-one
+commands. Root calls and button activations that enter a title use the ready/go
+barrier.  An activation that remains in menu space receives a distinct
+menu-continuation acknowledgment, so Main preserves the resident video frame
+while the helper advances the overlay. Highlight-only moves likewise do not
+reset the video stream. Main maps player-one
 D-pad/A/Start/Select and keyboard arrows/Enter/M while an authored menu is
 active.
 
@@ -80,7 +83,9 @@ transitions, authored finite or indefinite stills, button state, CLUT changes
 and root-menu calls. DVD private-stream subpicture packets are reassembled and
 decoded into a packed 720x480 two-bit plane; normal/highlight palettes and the
 inclusive button rectangle travel separately so highlight motion does not
-reload the plane. Future work may add optical-device discovery beyond the
+reload the plane. A displayed libdvdnav button forces menu compositing even
+when the packet also carries a later scheduled stop that the clockless helper
+has already parsed. Future work may add optical-device discovery beyond the
 explicit `/dev/sr0` launcher. Angles, track selection and general seeking
 remain separate work.
 

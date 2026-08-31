@@ -874,7 +874,8 @@ static int iso_change_chapter(struct iso_source_state *state, int direction)
  * block; the next read then asks libdvdnav for the first block at its new VM
  * position.
  */
-static size_t iso_reset_after_menu_hop(struct iso_source_state *state)
+static size_t iso_reset_after_menu_transition(struct iso_source_state *state,
+                                              int stream_hop)
 {
     size_t discarded = state->block_offset < state->block_size ?
                        state->block_size - state->block_offset : 0;
@@ -886,19 +887,30 @@ static size_t iso_reset_after_menu_hop(struct iso_source_state *state)
     state->still_active = 0;
     state->still_seconds = 0;
     iso_invalidate_menu_pci(state);
-    state->dvd_state.hop = 1;
+    state->dvd_state.hop = stream_hop;
     return discarded;
 }
 
 static int iso_complete_menu_hop(struct iso_source_state *state,
                                  const char *command)
 {
-    size_t discarded = iso_reset_after_menu_hop(state);
+    size_t discarded = iso_reset_after_menu_transition(state, 1);
 
     fprintf(stderr,
             "media_source: %s menu hop %s discarded_block_tail=%zu\n",
             state->direct_device ? "DVD" : "ISO", command, discarded);
-    return 1;
+    return MEDIA_SOURCE_DVD_STREAM_HOP;
+}
+
+static int iso_complete_menu_continue(struct iso_source_state *state,
+                                      const char *command)
+{
+    size_t discarded = iso_reset_after_menu_transition(state, 0);
+
+    fprintf(stderr,
+            "media_source: %s menu continue %s discarded_block_tail=%zu\n",
+            state->direct_device ? "DVD" : "ISO", command, discarded);
+    return MEDIA_SOURCE_DVD_MENU_CONTINUE;
 }
 
 static const char *iso_menu_command_name(enum media_source_dvd_command command)
@@ -1016,11 +1028,17 @@ static int iso_menu_command(struct iso_source_state *state,
             goto ignored;
         status = dvdnav_button_activate(state->navigation, pci);
         if (status == DVDNAV_STATUS_OK) {
+            int32_t title = 0;
+            int32_t part = 0;
+
             if (dvdnav_get_current_highlight(state->navigation, &after) !=
                     DVDNAV_STATUS_OK)
                 after = 0;
             iso_log_menu_command(state, command, pci, before, target, after,
                                  "ok");
+            if (dvdnav_current_title_info(state->navigation, &title, &part) ==
+                    DVDNAV_STATUS_OK && title == 0)
+                return iso_complete_menu_continue(state, "activate");
             return iso_complete_menu_hop(state, "activate");
         }
         break;

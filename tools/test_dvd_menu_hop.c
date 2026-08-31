@@ -30,7 +30,7 @@ int main(void)
     state.still_seconds = 0xffu;
     state.menu_pci_valid = 1;
     state.menu_pci.pci_gi.nv_pck_lbn = 1234u;
-    discarded = iso_reset_after_menu_hop(&state);
+    discarded = iso_reset_after_menu_transition(&state, 1);
 
     failed |= require(discarded == DVD_VIDEO_LB_LEN - 513u,
                       "unread block-tail count was not preserved");
@@ -50,7 +50,7 @@ int main(void)
     state.block_offset = DVD_VIDEO_LB_LEN;
     state.block_size = DVD_VIDEO_LB_LEN;
     state.menu_pci_valid = 1;
-    discarded = iso_reset_after_menu_hop(&state);
+    discarded = iso_reset_after_menu_transition(&state, 1);
     failed |= require(discarded == 0,
                       "empty block boundary reported discarded bytes");
     failed |= require(state.block_offset == 0 && state.block_size == 0 &&
@@ -58,6 +58,18 @@ int main(void)
                       "empty block boundary did not complete the hop");
     failed |= require(!state.menu_pci_valid,
                       "empty-boundary hop retained displayed NAV PCI");
+
+    memset(&state, 0, sizeof(state));
+    state.block_offset = 1024;
+    state.block_size = DVD_VIDEO_LB_LEN;
+    state.still_active = 1;
+    state.still_seconds = 0xffu;
+    state.menu_pci_valid = 1;
+    discarded = iso_reset_after_menu_transition(&state, 0);
+    failed |= require(discarded == 1024 && !state.dvd_state.hop,
+                      "menu continuation incorrectly requested a stream hop");
+    failed |= require(!state.still_active && !state.menu_pci_valid,
+                      "menu continuation retained stale still or NAV state");
 
     memset(&state, 0, sizeof(state));
     state.menu_pci_valid = 1;
@@ -87,6 +99,6 @@ int main(void)
 
     if (failed)
         return 1;
-    puts("dvd menu hop: stale block tail and empty boundary pass");
+    puts("dvd menu hop: stream-hop and menu-continuation boundaries pass");
     return 0;
 }

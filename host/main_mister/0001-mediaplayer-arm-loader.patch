@@ -306,6 +306,7 @@ index 0000000..d828649
 +static int first_byte_seen = 0;
 +static bool playback_paused = false;
 +static bool chapter_barrier = false;
++static bool navigation_pending = false;
 +static bool chapter_controls = false;
 +static bool menu_controls = false;
 +static bool menu_active = false;
@@ -325,6 +326,7 @@ index 0000000..d828649
 +	MEDIA_CONTROL_READY = 0x81,
 +	MEDIA_CONTROL_MENU_ENTER = 0x82,
 +	MEDIA_CONTROL_MENU_LEAVE = 0x83,
++	MEDIA_CONTROL_MENU_CONTINUE = 0x84,
 +	MEDIA_CONTROL_ERROR = 0xff
 +};
 +
@@ -504,6 +506,7 @@ index 0000000..d828649
 +	}
 +	playback_paused = false;
 +	chapter_barrier = false;
++	navigation_pending = false;
 +	chapter_controls = false;
 +	menu_controls = false;
 +	menu_active = false;
@@ -639,6 +642,7 @@ index 0000000..d828649
 +	playback_index = index;
 +	playback_paused = false;
 +	chapter_barrier = false;
++	navigation_pending = false;
 +	menu_active = false;
 +	menu_controls = !strncasecmp(source_spec, "dvdmenu:", 8) ||
 +	                !strncasecmp(source_spec, "isomenu:", 8);
@@ -736,7 +740,8 @@ index 0000000..d828649
 +	ssize_t count;
 +	uint64_t discarded = 0;
 +
-+	if (!chapter_barrier || control_fd < 0 || helper_fd < 0) return;
++	if ((!chapter_barrier && !navigation_pending) ||
++	    control_fd < 0 || helper_fd < 0) return;
 +	count = read(control_fd, &event, sizeof(event));
 +	if (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
 +	{
@@ -744,6 +749,34 @@ index 0000000..d828649
 +		stop_with_reason("control-read-error");
 +		return;
 +	}
++	if (navigation_pending && count == 1)
++	{
++		if (event == MEDIA_CONTROL_MENU_CONTINUE)
++		{
++			navigation_pending = false;
++			diagnostic_write("DVD menu continuation preserved resident frame\n");
++			return;
++		}
++		if (event == MEDIA_CONTROL_READY)
++		{
++			navigation_pending = false;
++			chapter_barrier = true;
++			if (download_active)
++			{
++				user_io_set_download(0);
++				download_active = 0;
++			}
++			pending_size = pending_offset = 0;
++			pending_eof = false;
++			diagnostic_write("DVD navigation stream hop ready\n");
++		}
++		else
++		{
++			if (!handle_control_event(event)) return;
++			return;
++		}
++	}
++	if (navigation_pending) return;
 +	if (count == 1 && event != MEDIA_CONTROL_READY)
 +	{
 +		if (!handle_control_event(event)) return;
@@ -791,7 +824,7 @@ index 0000000..d828649
 +
 +	if (input == MEDIAPLAYER_INPUT_PLAY_PAUSE)
 +	{
-+		if (chapter_barrier) return 1;
++		if (chapter_barrier || navigation_pending) return 1;
 +		playback_paused = !playback_paused;
 +		diagnostic_write("playback %s submitted=%llu\n",
 +		                 playback_paused ? "paused" : "resumed",
@@ -810,16 +843,13 @@ index 0000000..d828649
 +		                  input == MEDIAPLAYER_INPUT_MENU_RIGHT ? MEDIA_CONTROL_MENU_RIGHT :
 +		                  input == MEDIAPLAYER_INPUT_MENU_ACTIVATE ? MEDIA_CONTROL_MENU_ACTIVATE :
 +		                  MEDIA_CONTROL_ROOT_MENU;
-+		if (chapter_barrier || playback_paused) return 1;
++		if (chapter_barrier || navigation_pending || playback_paused) return 1;
 +		if (command != MEDIA_CONTROL_MENU_ACTIVATE && command != MEDIA_CONTROL_ROOT_MENU)
 +		{
 +			if (!send_control(command)) stop_with_reason("menu-command-error");
 +			return 1;
 +		}
-+		if (download_active) { user_io_set_download(0); download_active = 0; }
-+		pending_size = pending_offset = 0;
-+		pending_eof = false;
-+		chapter_barrier = true;
++		navigation_pending = true;
 +		if (!send_control(command)) stop_with_reason("menu-command-error");
 +		diagnostic_write("DVD navigation command=0x%02x submitted=%llu\n",
 +		                 command, (unsigned long long)submitted_bytes);
@@ -829,7 +859,8 @@ index 0000000..d828649
 +	if (input != MEDIAPLAYER_INPUT_PREVIOUS &&
 +	    input != MEDIAPLAYER_INPUT_NEXT)
 +		return 0;
-+	if (chapter_barrier || playback_paused || !chapter_controls) return 1;
++	if (chapter_barrier || navigation_pending || playback_paused ||
++	    !chapter_controls) return 1;
 +
 +	uint8_t command = input == MEDIAPLAYER_INPUT_PREVIOUS ?
 +	                  MEDIA_CONTROL_PREVIOUS_CHAPTER :
@@ -996,8 +1027,12 @@ index 0000000..d828649
 +void mediaplayer_poll()
 +{
 +	if (helper_fd < 0) return;
-+	if (chapter_barrier) { chapter_barrier_poll(); return; }
-+	control_event_poll();
++	if (chapter_barrier || navigation_pending)
++	{
++		chapter_barrier_poll();
++		if (helper_fd < 0 || chapter_barrier) return;
++	}
++	if (!navigation_pending) control_event_poll();
 +	if (helper_fd < 0) return;
 +	if (playback_paused) return;
 +	if (diagnostic_fd >= 0)
