@@ -1,3 +1,32 @@
+## 789 COMMIT Unreleased 531f741 2026-08-30T20:14:46-07:00
+
+#### Coming From:
+
+Unreleased eb7bed6
+
+#### Purpose:
+
+Deploy the direct USB DVD helper, patched Main and optical-drive launcher with independently verified rollback preservation.
+
+#### Outcome:
+
+After the user stops the accepted Blazing Saddles run and explicitly authorizes deployment, the build PC remains at exact source `531f741ff4831f30b748957bcc4d2d605ea3614f` and reproduces the recorded artifacts: the 847,156-byte static helper has SHA-256 `d5067fa1d924f066b9a48ec581e34a392616fef39268df811622621a2a92bb25`, and the 1,170,396-byte patched Main has `e428c8b097b70f15e9452781433bd9afbf84c33d4b94da575dea8fe127ccc9d6`.  Absolute-path readback identifies the installed predecessor helper as 847,156 bytes at `f16e83fa2c89b3ed3071e9fa3d40355a67e85e9a5a3634ba055a5c2a7835f8db` and Main as 1,170,340 bytes at `01229bc57680d84651cc907ace880332d18347f0afc08c9c7ab5fc9197c3eefe`.  Unique helper and Main candidate uploads and independent readbacks match their source bytes.  The first launcher upload attempt stops before any activation because the repository FTP helper does not encode spaces in URLs; direct FTP with encoded spaces then installs and reads back the 111-byte launcher at SHA-256 `4757d49e9d1b94d88f554b3bd3157ed5d2064caaa65a6cf0f856e8ab6fbe2d2e`.  Same-directory absolute FTP renames preserve the predecessors as `/media/fat/linux/MediaPlayer_Helper.pre_531f741_f16e83fa` and `/media/fat/MiSTer.pre_531f741_01229bc5`, activate the new files at `/media/fat/linux/MediaPlayer_Helper` and `/media/fat/MiSTer`, and install `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`.  Final independent readbacks reproduce all five active and rollback sizes and hashes, and no candidate staging name remains.  The seed-19 RBF, FPGA, media and configuration remain unchanged; the old Main process continues in memory until reboot, so physical-disc qualification has not begun.
+
+#### Next Steps:
+
+Have the user perform one normal MiSTer reboot so `/media/fat/MiSTer` becomes the running Main, then verify the active Main, helper and launcher again by absolute-path readback.  Load the existing MediaPlayer core, select `USB DVD Drive.dvd`, and begin a bounded Coming to America physical-disc gate from `dvd:/dev/sr0` using HDMI first; require successful device open, CSS authentication, longest-title selection, immediate valid video and audio, stable optical reads and no fatal telemetry, then check representative S/PDIF output before extending the run.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 788 COMMIT Unreleased eb7bed6 2026-08-30T20:08:02-07:00
 
 #### Coming From:
@@ -1163,35 +1192,6 @@ Retain the arithmetic correction and its exact P81 evidence, keep the cleaned re
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 749 COMMIT Unreleased 6196869 2026-08-29T20:50:07-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Authorize an exact offline production-path replay and bounded correction for the first P81 mouth-level corruption.
-
-#### Outcome:
-
-The user explicitly authorizes the entry-748 next step.  Use the byte-verified P81-ending authored I/P checkpoint, its clean consecutive P80 predecessor and independently decoded FFmpeg YUV 4:2:0 pixels.  First adapt or invoke the existing full-frame production-path harness to reproduce P81 without changing decode RTL, locate the first differing component and coordinate, and correlate it with the exact owning macroblock syntax and reconstruction arithmetic.  Only after a deterministic mismatch exists may source change, and any correction must remain bounded to its proven cause, add exact P80/P81 regression coverage, preserve the existing interlaced P/B field-motion and field-DCT regressions, and avoid Quartus until simulation is pixel-exact.  No source, FPGA, RBF, Main, helper, installed media or configuration change occurs in this authorization entry.
-
-#### Next Steps:
-
-Run the exact P81 production-path replay with a software oracle and machine-readable pixel report.  Establish the first mismatch before editing RTL, then inspect the associated prediction, residual, inverse-quantization, IDCT and saturation values.  Implement only the correction justified by that trace and run the exact P80/P81 gate plus the focused and broader decoder regressions.  Record source and test outcomes in new entries; do not start Quartus or request another MiSTer test in this cycle.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
