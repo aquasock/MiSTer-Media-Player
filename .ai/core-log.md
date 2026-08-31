@@ -1,3 +1,32 @@
+## 833 COMMIT Unreleased 0e89c73 2026-08-31T15:30:28-07:00
+
+#### Coming From:
+
+Unreleased 0e89c73
+
+#### Purpose:
+
+Determine whether the complete known-pattern DVD overlay stream reaches the FPGA ingress FIFO before the physically absent menu highlight.
+
+#### Outcome:
+
+The source-`0e89c73` physical-disc result proves one complete synthetic overlay frame crossed the helper, Main, SPI file-transfer path and FPGA ingress acceptance boundary without corruption or backpressure failure, while the rendered menu still contains no magenta selection pixels.  The 1,321,892-byte Main/helper log at SHA-256 `ec8523c89cd34d22821c6c5a2666158d6754a3c08d5375f8e1687c053299de18` records config flags `3`, rectangle `135,397` through `208,436`, opaque-magenta highlight entry one, 22 data records, exactly 86,400 data bytes, FNV-1a `f8555d45`, zero non-`0x55` bytes, zero order errors and `probe_complete=1`; its 26 successfully submitted style changes follow 26 root or directional menu commands through all four authored rectangles, and no `transport_fault` occurs.  Because `user_io_file_tx_data_step` verifies each batch against the FPGA FIFO's returned accepted-word counter and rolling digest before the verifier receives those bytes, this clears not only helper construction and Main forwarding but also physical acceptance into the FPGA ingress FIFO.  The 745,871-byte 1,920-by-1,080 screenshot at SHA-256 `7ee61103f6fae63fe62ced7716dea093fc00be3b5949dfcbd200ce297b023287` visibly shows the active menu and unobscured button area with no magenta rectangle.  The 792-byte schema-20 matrix text at SHA-256 `fc469765c947ca4910204205dd29347e1c05460e2c833ecdf299ccb3467f3436` passes all row framing and checksum `70fb7917`; word 19 again contains only audio-underrun flag `0x0400`, and its 209,628,414 decoder clocks or 3.494 seconds precede the first submitted overlay config at 12.847 seconds, so that sticky snapshot cannot report later overlay state.  A verifier-only oversized B9 candidate with length 65,503 appears at byte offset 28,625,926 about 23 seconds after the valid commit and cannot explain the initial failure; because the bounded Main verifier recognizes only B9 framing while the FPGA extractor also consumes B0, B1 and B6 payloads atomically, this later candidate is not evidence by itself that hardware saw an invalid overlay record.  The remaining defect is strictly downstream of the accepted FPGA FIFO write, in FIFO read or in-band extraction, overlay command handling and DDR publication/cache, or final video-domain style publication and blending.
+
+#### Next Steps:
+
+Do not modify the helper or Main again for this fault because the source-`0e89c73` evidence exhausts their observable transport boundary.  After explicit user approval, add an FPGA-observability-only schema that captures after a valid overlay commit or style change instead of freezing on the earlier audio underrun and positively counts extractor config, data, commit and style records, engine plane bytes and accepted DDR writes, initial and moving row-cache fills, style publications, row-tag matches and opaque blend samples; strengthen the focused simulation to require those counters across the known all-`0x55` magenta probe, then build one timing-clean diagnostic RBF while preserving the current helper, Main and rendering behavior.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 832 COMMIT Unreleased 0e89c73 2026-08-31T14:59:02-07:00
 
 #### Coming From:
@@ -1188,35 +1217,6 @@ The user defines the target as each disc's authored DVD-Video menus, including c
 #### Next Steps:
 
 Hold authored DVD menus until the user explicitly permits an RBF feature boundary.  Preserve libdvdnav 7.0.0 as the navigation engine when that work resumes, add the bidirectional controller path and SPU decoder together with a bounded overlay design, and avoid any claim of DVD-Video menu conformance until the applicable authorized specification is available.  In the meantime, continue the current physical-disc compatibility qualification or choose a separate helper/Main-only feature such as direct previous and next chapter controls if desired.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 793 COMMIT Unreleased 627b329 2026-08-30T21:17:28-07:00
-
-#### Coming From:
-
-Unreleased 531f741
-
-#### Purpose:
-
-Deploy the authenticated-reset and direct-DVD HPS-ring helper with verified rollback preservation.
-
-#### Outcome:
-
-The user reports that the source-`531f741` Coming to America physical-disc control remains perfect at 15 minutes after its repeated first-minute pause and explicitly authorizes deployment.  The exact source-`627b329` build-PC artifact is retrieved and independently verified as an 859,444-byte statically linked ARMv7 helper at SHA-256 `ff3b4f41d81a070ad4ef5226dd3380ab12bb409118b1e6981af4c95b3138f7a6`.  Immediate absolute-path readback confirms `/media/fat/linux/MediaPlayer_Helper` still contains the 847,156-byte predecessor at `d5067fa1d924f066b9a48ec581e34a392616fef39268df811622621a2a92bb25`.  The candidate is uploaded only as `/media/fat/linux/MediaPlayer_Helper.candidate_627b329_ff3b4f41`, independently downloaded and compared byte-for-byte, then same-directory FTP renames preserve the predecessor as `/media/fat/linux/MediaPlayer_Helper.pre_627b329_d5067fa1` and activate the candidate at `/media/fat/linux/MediaPlayer_Helper`.  Final independent readbacks reproduce the full active `ff3b4f41` and rollback `d5067fa1` hashes and sizes, and directory inventory proves the candidate staging name is gone.  Main, the seed-19 RBF, USB DVD launcher, media and configuration remain untouched.  Any helper process already running when the rename occurs continues its old executable inode until that playback exits; the next launch will use the newly installed candidate without a MiSTer reboot.
-
-#### Next Steps:
-
-Stop any playback that began before this deployment, then launch `/media/fat/games/MediaPlayer/USB DVD Drive.dvd` once with the same Coming to America disc.  Expect one CSS key scan, two `DVD reset authenticated navigation` lines and one `DVD buffer ready` line before first transport; report selection-to-picture time and whether audio or video pauses around 55 seconds after playback begins.  If any pause occurs, leave playback and telemetry running for immediate helper-log capture so the candidate's reserve and consumer-wait diagnostics can measure it directly.
 
 #### Files Modified:
 
