@@ -1,4 +1,4 @@
-## 821 COMMIT Unreleased ??? 2026-08-31T07:45:34-07:00
+## 821 COMMIT Unreleased 53ccc04 2026-08-31T07:45:34-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make authored DVD-menu highlights visible and preserve the resident video frame 
 
 #### Outcome:
 
-The approved bounded implementation will make a displayed libdvdnav highlight authoritative over a prematurely applied scheduled subpicture stop, classify successful menu activation as either an in-menu continuation or a decoder stream hop, extend the helper-to-Main control protocol with that distinction, and delay Main's download reset until the helper reports which transition occurred.  In-menu continuations will preserve the resident decoded frame while refreshing menu state and overlay data; title exits and explicit root-menu requests will retain the existing ready, discard, reset and go barrier.  RTL, QSF, RBF and Quartus will remain unchanged.
+Source `53ccc04` makes displayed libdvdnav button state authoritative over a later scheduled subpicture stop, classifies successful activation as either a menu continuation or stream hop, adds control event `0x84` for the continuation, and makes Main defer its download reset until that decision arrives.  Menu continuations discard only stale helper block and still state while preserving the FPGA's resident video frame; title exits and root calls retain the ready, discard, reset and go barrier.  The focused scheduled-stop/highlight and stream-hop/menu-continuation tests pass, and the exact native helper builds with `-Werror`.  The corrected Coming to America authored-directory harness completes in 1.67 seconds with all six commands, three real directional transitions, one root ready barrier, one activation continuation acknowledgment, 17 overlay commits, 1,468,899 plane bytes, 1,311 visible highlighted states and 4,637 nonzero pixels in the largest selected rectangle.  Exact source `53ccc04` builds a 904,564-byte static stripped ARMv7 helper at SHA-256 `29665e7dbe7790872988d0f0d05e26487f95550128f6719f148fab2d1114c09f` and a 1,174,492-byte patched Main at SHA-256 `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496` under `/home/vash/MiSTer-Media-Player-53ccc04/host/build`; RTL, QSF, RBF and Quartus are unchanged.
 
 #### Next Steps:
 
-Implement the helper and patched-Main handshake, update its architecture description, and add native regressions requiring visible highlighted styles with nonzero pixels plus distinct continuation and stream-hop acknowledgments.  Build and test the native helper and Main patch on the build PC, then cross-build only the ARM helper and patched Main from the exact source commit for user-managed transfer and physical-menu validation.
+The user should manually replace `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-53ccc04/host/build/MediaPlayer_Helper` and the MiSTer root `MiSTer` executable with `/home/vash/MiSTer-Media-Player-53ccc04/host/build/MiSTer`, preserve the installed RBF, verify the recorded SHA-256 values and executable modes, then restart MediaPlayer.  Press `M`, verify that a visible highlight moves among all authored buttons, activate Scene Selection and confirm its submenu retains the background instead of going black, then activate a title and confirm its stream-hop barrier starts playback cleanly; leave the resulting screen and helper log available if any failure occurs.
 
 #### Files Modified:
 
@@ -31,7 +31,7 @@ Implement the helper and patched-Main handshake, update its architecture descrip
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
