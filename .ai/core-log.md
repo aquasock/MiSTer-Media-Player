@@ -1,3 +1,35 @@
+## 827 COMMIT Unreleased ??? 2026-08-31T10:20:37-07:00
+
+#### Coming From:
+
+Unreleased 3e4f54c
+
+#### Purpose:
+
+Prove the exact DVD highlight style and selected-region plane indices emitted by the helper before considering any FPGA or RBF change.
+
+#### Outcome:
+
+The user approves the helper-only observability boundary after the physical menu regresses from sparse distorted selection pixels to no visible indicator.  Independent absolute-path FTP readback now proves the installed artifacts are exactly the intended 904,564-byte source-`3e4f54c` helper at SHA-256 `c4c47141205c99ade8a9ed266574beb9d072dce827d508efbff47694bb2ce197`, the 1,174,492-byte source-`53ccc04` Main at `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496`, and the unchanged 4,511,756-byte seed-20 RBF at `02928bff70b25eb0e0b1a6b8f24afec0dfe687f2524754b33fe13f4ed3014e9d`.  The proposed source change adds no transport, decoder, scheduler, menu-selection or overlay behavior: it will report every emitted overlay configuration and style record with the visible and menu flags, highlight rectangle, four decoded RGBA entries and exact two-bit pixel-index histogram inside that rectangle, with a focused native test covering the histogram boundary.
+
+#### Next Steps:
+
+Implement and review the bounded helper diagnostics, run the strict native helper build plus focused DVD subpicture, random-access and menu regressions, commit the source only if every existing result remains unchanged, then build only the static ARM helper from the exact committed source on the build PC.  Preserve Main, RTL, QSF and the seed-20 RBF; hardware acceptance will require a fresh physical menu log whose emitted style is visible and nontransparent and whose selected rectangle contains nonzero plane indices, thereby deciding whether later work remains in the helper plane or may proceed to FPGA overlay composition.
+
+#### Files Modified:
+
+- host/arm/dvd_spu.c
+- host/arm/dvd_spu.h
+- host/arm/media_player_helper.c
+- tools/test_dvd_spu.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 826 COMMIT Unreleased 3e4f54c 2026-08-31T10:11:41-07:00
 
 #### Coming From:
@@ -1199,42 +1231,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 787 COMMIT Unreleased 531f741 2026-08-30T19:40:26-07:00
-
-#### Coming From:
-
-Unreleased b71cc8b
-
-#### Purpose:
-
-Add direct main-feature playback from the absolute USB optical-device path `/dev/sr0` without staging a DVD ISO.
-
-#### Outcome:
-
-The MiSTer drive is confirmed by read-only absolute-path inspection as the removable root:`cdrom` block device `/dev/sr0`, with `/dev/cdrom -> sr0`, 16,461,784 reported 512-byte sectors and model HL-DT-ST DVDRAM GP63EX70 revision RF01; no `/media/usb0` through `/media/usb7` filesystem mount is required.  Source `531f741` adds the explicit `dvd:` media-source backend, requires an absolute device path, opens it directly through libdvdnav so libdvdread and statically linked libdvdcss own optical authentication and sector reads, and reuses longest-title selection, initial random-access filtering, PTS epoch normalization, scheduling, rewind and one-traversal termination.  Patched Main recognizes the `USB DVD Drive.dvd` launcher under `/media/fat/games/MediaPlayer` and maps it only to `dvd:/dev/sr0`; capabilities now advertise `sources=file,iso,dvd`.  A full native direct-backend traversal against the existing Blazing Saddles image selects title 2, emits 3,823,399,998 video bytes, 11,150 timestamps and 267,482,112 PCM samples, handles one expected PTS discontinuity, and stops once at title exit with stream SHA-256 `58badf9c`.  The first Main attempt exposes a full 7.7 GiB `/tmp`; relocating `TMPDIR` to `/run/media/vash/GIT/.mmp-entry787-main-tmp` then exposes and corrects the new-file patch hunk count before a clean pinned-upstream build.  Exact outputs are a 1,580,488-byte native helper at SHA-256 `b63e2e46`, an 847,156-byte stripped static ARM EABI5 helper at `d5067fa1`, and a 1,170,396-byte stripped dynamically linked ARM EABI5 Main at `e428c8b0`; the expected upstream packed-attribute and static-libdvdcss `getpwuid` warnings remain.  Menus, chapters, track selection, subpictures, DVD LPCM and ejection remain outside this commit, and no FPGA, seed-19 RBF, Quartus, MiSTer executable, media or configuration change occurs.
-
-#### Next Steps:
-
-Do not alter the MiSTer while the deployed source-`eb7bed6` Blazing Saddles test is active; let it pass the prior 48:25 boundary, preferably reach about 51 minutes, and capture its displayed telemetry first.  Then preserve both installed executables, deploy the exact helper and Main through unique candidate uploads and independent absolute-path readbacks followed by same-directory renames and final readbacks, and install the launcher only at `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`.  Reboot before the first bounded physical Coming to America disc launch, and require direct `/dev/sr0` open, CSS key acquisition, valid longest-title Program Stream output, continuous HDMI audio and video, and representative S/PDIF output before extending the run.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- README.md
-- assets/USB DVD Drive.dvd
-- docs/BUILDING.md
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/arm/media_source.c
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
