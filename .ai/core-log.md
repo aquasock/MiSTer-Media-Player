@@ -1,4 +1,4 @@
-## 811 COMMIT Unreleased ??? 2026-08-31T04:19:24-07:00
+## 811 COMMIT Unreleased a9899e0 2026-08-31T04:19:24-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Find and pin a timing-clean fitter placement for the source-`2738e99` authored-m
 
 #### Outcome:
 
-The user authorizes reseeding and another build after source `2738e99` removed the authored-menu overlay crossing failures but seed 19 exposed negative 0.107 ns global setup slack on sixteen ordinary same-clock HDMI scaler paths.  The approved boundary performs a bounded search of at most eight new fitter seeds against the exact synthesized source-`2738e99` netlist, stopping at the first placement whose setup, hold, recovery, removal and minimum-pulse-width margins are all positive; it changes no RTL, SDC, interface, memory allocation or MiSTer installation.  The winning seed alone will be pinned in `MediaPlayer.qsf`, committed as the source boundary, and subjected to one clean full Quartus build and complete timing/resource extraction before any artifact can be considered for later deployment.
+The user authorizes the bounded placement-only search after source `2738e99` removed the authored-menu overlay crossing failures but seed 19 exposed negative 0.107 ns global setup slack on sixteen ordinary same-clock HDMI scaler paths.  Seed 20 is the first and only searched placement and passes, so source `a9899e0` changes only the QSF seed from 19 to 20 and stops the search without any RTL, SDC, interface or memory-allocation change.  The retained-netlist fit, assembly and timing run passes all five categories, and the required clean exact-commit Quartus build then completes analysis and synthesis with zero errors and 154 warnings, fitting with zero errors and 45 warnings, assembly with zero errors and zero warnings, and TimeQuest plus Phase-1P extraction with zero errors.  Global setup is positive 0.161 ns with zero TNS in every reported setup clock, hold is positive 0.243 ns, recovery is positive 3.980 ns, removal is positive 0.428 ns and minimum pulse width is positive 0.925 ns; the 60 MHz decoder and 54 MHz video setup domains are positive 0.925 ns and 2.564 ns with zero violated paths.  The clean fit uses 35,797 of 41,910 ALMs, 54,851 registers, 4,187,011 memory bits, 535 of 553 M10Ks and 70 of 112 DSPs, with 38 percent average and 61 percent peak interconnect usage.  The retained-netlist and clean builds produce byte-identical 4,511,756-byte RBFs at SHA-256 `02928bff70b25eb0e0b1a6b8f24afec0dfe687f2524754b33fe13f4ed3014e9d`; the clean artifact is preserved on the build PC and fetched to the Raspberry Pi but is not installed on the MiSTer.
 
 #### Next Steps:
 
-Synchronize the build PC to this proposal and exact source `2738e99`, preserve the completed seed-19 reports, and search seeds 20 through 27 using placement, assembly and timing only while reusing the exact synthesized netlist.  Stop immediately at the first five-category timing-clean result, pin only that seed, commit and push the QSF change, then perform one clean full build from the resulting exact source commit; if no searched seed passes, leave source and MiSTer unchanged and request approval before any scaler pipeline or constraint change.
+Keep exact source `a9899e0`, fitter seed 20 and RBF SHA-256 `02928bff` frozen as the final FPGA boundary and perform no further Quartus work unless the user explicitly reopens it after a demonstrated FPGA-only defect.  After separate deployment authorization, build or verify the matching source-`a9899e0` Main and ARM helper, preserve the accepted source-`6e44472` installation as rollback, install and read back all three candidate artifacts, then hardware-test first-play and root menus, directional selection, activation, animated menu audio and video, subpicture graphics and highlights on several differently authored ISO and physical discs; keep subsequent compatibility work in Main and the helper wherever this frozen overlay architecture permits.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Synchronize the build PC to this proposal and exact source `2738e99`, preserve t
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
