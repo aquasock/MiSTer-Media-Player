@@ -134,6 +134,12 @@ wire        mpeg2_new_p_destination_ownership_hold;
 wire [32:0] mpeg2_new_extracted_pts_90k;
 wire        mpeg2_new_extracted_metadata_valid;
 wire        mpeg2_new_extracted_metadata_ready;
+wire [7:0]  dvd_overlay_record_data;
+wire        dvd_overlay_record_start;
+wire        dvd_overlay_record_last;
+wire        dvd_overlay_record_valid;
+wire        dvd_overlay_record_ready;
+wire        dvd_overlay_extractor_error;
 
 hps_io #(.CONF_STR(CONF_STR), .CONF_STR_BRAM(1), .WIDE(1), .MEDIA_BURST(1)) hps_io
 (
@@ -734,7 +740,13 @@ mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 	.pcm_end            (mpeg2_new_inband_pcm_end),
 	.pcm_ready          (mpeg2_new_inband_pcm_ready),
 	.pcm_sample_count   (mpeg2_new_inband_pcm_sample_count),
-	.pcm_protocol_error (mpeg2_new_inband_pcm_protocol_error)
+	.pcm_protocol_error (mpeg2_new_inband_pcm_protocol_error),
+	.overlay_data       (dvd_overlay_record_data),
+	.overlay_start      (dvd_overlay_record_start),
+	.overlay_last       (dvd_overlay_record_last),
+	.overlay_valid      (dvd_overlay_record_valid),
+	.overlay_ready      (dvd_overlay_record_ready),
+	.overlay_protocol_error(dvd_overlay_extractor_error)
 );
 
 wire mpeg2_new_clean_video_pending;
@@ -831,6 +843,9 @@ wire        presentation_base_vs;
 wire [7:0]  cadence_video_r;
 wire [7:0]  cadence_video_g;
 wire [7:0]  cadence_video_b;
+wire [7:0]  dvd_overlay_video_r;
+wire [7:0]  dvd_overlay_video_g;
+wire [7:0]  dvd_overlay_video_b;
 wire        cadence_snapshot_ready;
 
 // ---------------------------------------------------------------------------
@@ -1137,6 +1152,20 @@ wire [28:0] mpeg2_new_ddr_rd_banked_addr;
 wire        mpeg2_new_ddr_rd;
 wire        mpeg2_new_ddr_reader_busy;
 wire        mpeg2_new_ddr_reader_dout_ready;
+
+wire [7:0]  dvd_overlay_writer_burstcnt;
+wire [28:0] dvd_overlay_writer_addr;
+wire        dvd_overlay_writer_rd;
+wire [63:0] dvd_overlay_writer_din;
+wire [7:0]  dvd_overlay_writer_be;
+wire        dvd_overlay_writer_we;
+wire        dvd_overlay_writer_busy;
+wire [7:0]  dvd_overlay_reader_burstcnt;
+wire [28:0] dvd_overlay_reader_addr;
+wire        dvd_overlay_reader_rd;
+wire        dvd_overlay_reader_busy;
+wire        dvd_overlay_reader_dout_ready;
+wire        dvd_overlay_engine_error;
 
 wire [7:0]  mpeg2_new_pred_burstcnt;
 wire [28:0] mpeg2_new_pred_addr;
@@ -1690,6 +1719,7 @@ mpeg2_h262_native_startup mpeg2_h262_native_startup (
     .sequence_end_seen(mpeg2_new_sequence_end_seen),
     .bypass_event(mpeg2_new_extracted_metadata_valid ||
         mpeg2_new_inband_pcm_valid ||
+        dvd_overlay_record_valid ||
         (mpeg2_new_picture_header_classified_now && !mpeg2_new_i_picture_start_now) ||
         mpeg2_new_syntax_error || mpeg2_new_phase1_probe_error),
     .frame_window(display_frame_window),
@@ -2099,6 +2129,44 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .video_vs       (fb_video_vs)
 );
 
+mpeg2_h262_dvd_overlay mpeg2_h262_dvd_overlay
+(
+    .mem_clk          (clk_mpeg2),
+    .mem_reset        (reset_mpeg2),
+    .record_data      (dvd_overlay_record_data),
+    .record_start     (dvd_overlay_record_start),
+    .record_last      (dvd_overlay_record_last),
+    .record_valid     (dvd_overlay_record_valid),
+    .record_ready     (dvd_overlay_record_ready),
+    .protocol_error   (dvd_overlay_engine_error),
+    .writer_burstcnt  (dvd_overlay_writer_burstcnt),
+    .writer_addr      (dvd_overlay_writer_addr),
+    .writer_rd        (dvd_overlay_writer_rd),
+    .writer_din       (dvd_overlay_writer_din),
+    .writer_be        (dvd_overlay_writer_be),
+    .writer_we        (dvd_overlay_writer_we),
+    .writer_busy      (dvd_overlay_writer_busy),
+    .reader_burstcnt  (dvd_overlay_reader_burstcnt),
+    .reader_addr      (dvd_overlay_reader_addr),
+    .reader_rd        (dvd_overlay_reader_rd),
+    .reader_busy      (dvd_overlay_reader_busy),
+    .reader_dout      (DDRAM_DOUT),
+    .reader_dout_ready(dvd_overlay_reader_dout_ready),
+    .video_clk        (clk_video),
+    .video_reset      (reset_video),
+    .pixel_ce         (display_pixel_ce),
+    .h_pos            (display_h_pos),
+    .v_pos            (display_v_pos),
+    .native_active    (display_native_interlaced),
+    .base_r           (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_r),
+    .base_g           (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_g),
+    .base_b           (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_b),
+    .base_de          (fb_video_de && !mpeg2_new_startup_video_blank),
+    .video_r          (dvd_overlay_video_r),
+    .video_g          (dvd_overlay_video_g),
+    .video_b          (dvd_overlay_video_b)
+);
+
 mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
 (
     .clk             (clk_mpeg2),
@@ -2120,6 +2188,18 @@ mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
     .prediction_rd       (mpeg2_new_pred_rd),
     .prediction_busy     (mpeg2_new_pred_busy),
     .prediction_dout_ready(mpeg2_new_pred_dout_ready),
+    .overlay_reader_burstcnt(dvd_overlay_reader_burstcnt),
+    .overlay_reader_addr (dvd_overlay_reader_addr),
+    .overlay_reader_rd   (dvd_overlay_reader_rd),
+    .overlay_reader_busy (dvd_overlay_reader_busy),
+    .overlay_reader_dout_ready(dvd_overlay_reader_dout_ready),
+    .overlay_writer_burstcnt(dvd_overlay_writer_burstcnt),
+    .overlay_writer_addr (dvd_overlay_writer_addr),
+    .overlay_writer_rd   (dvd_overlay_writer_rd),
+    .overlay_writer_din  (dvd_overlay_writer_din),
+    .overlay_writer_be   (dvd_overlay_writer_be),
+    .overlay_writer_we   (dvd_overlay_writer_we),
+    .overlay_writer_busy (dvd_overlay_writer_busy),
     .ddram_busy      (DDRAM_BUSY),
     .ddram_dout_ready(DDRAM_DOUT_READY),
     .ddram_burstcnt  (DDRAM_BURSTCNT),
@@ -2140,9 +2220,9 @@ assign VGA_R = cadence_video_r;
 assign VGA_G = cadence_video_g;
 assign VGA_B = cadence_video_b;
 
-assign presentation_base_r = mpeg2_new_startup_video_blank ? 8'd0 : fb_video_r;
-assign presentation_base_g = mpeg2_new_startup_video_blank ? 8'd0 : fb_video_g;
-assign presentation_base_b = mpeg2_new_startup_video_blank ? 8'd0 : fb_video_b;
+assign presentation_base_r = dvd_overlay_video_r;
+assign presentation_base_g = dvd_overlay_video_g;
+assign presentation_base_b = dvd_overlay_video_b;
 assign presentation_base_de = fb_video_de;
 assign presentation_base_hs = fb_video_hs;
 assign presentation_base_vs = fb_video_vs;
@@ -2163,10 +2243,14 @@ wire mpeg2_new_cadence_session_quiet =
     !mpeg2_new_p_destination_ownership_hold &&
     !mpeg2_new_pred_rd &&
     !mpeg2_new_ddr_wr_we &&
+    !dvd_overlay_reader_rd &&
+    !dvd_overlay_writer_we &&
     !audio_pcm_terminal_pending;
 
 wire [15:0] mpeg2_new_cadence_error_flags = {
-    3'd0,
+    1'd0,
+    dvd_overlay_extractor_error,
+    dvd_overlay_engine_error,
     mpeg2_new_ddr_bank_overlap_error,
     mpeg2_new_inband_pcm_protocol_error,
     audio_pcm_underrun_sync[1],

@@ -14,9 +14,9 @@ required before that extension becomes a released capability.
 The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.8.0 provides:
 
 - raw MPEG-2 Video elementary-stream playback, a bounded H.222.0 MPEG-2 Program Stream path for `.mpg` and `.mpeg` files, and audio-only `.mp3`, `.wav`, `.flac` or Ogg Vorbis `.ogg` playback;
-- decrypted or CSS-encrypted DVD ISO and direct USB optical-disc main-feature
-  playback, selecting the longest described title with previous/next chapter
-  and pause/resume controls but without authored menus;
+- decrypted or CSS-encrypted DVD ISO and direct USB optical-disc playback,
+  including authored first-play/root menus, highlighted button navigation,
+  previous/next chapter controls and pause/resume;
 - a matching ARM helper that demultiplexes Program Streams, decodes MPEG Layers II/III, WAV, FLAC, Ogg Vorbis or AC-3 audio to signed stereo PCM, and transports video, picture PTS, and PCM or passthrough bursts to the FPGA;
 - byte-exact raw `.m2v` pass-through with a synthetic 90 kHz fallback timeline;
 - Program Stream picture PTS driving the FPGA 90 kHz presentation timeline;
@@ -34,7 +34,7 @@ The supported subset is intentionally bounded while the architecture is being pr
 
 | Area | Current implementation |
 | --- | --- |
-| Input | Raw MPEG-2 Video `.m2v`, bounded MPEG-2 Program Stream `.mpg` / `.mpeg`, decrypted or CSS-encrypted DVD `.iso` main features, direct USB DVD main features through `/dev/sr0`, or audio-only MPEG-1 Layer III `.mp3`, RIFF WAVE `.wav`, FLAC `.flac` and Ogg Vorbis `.ogg` through the ARM helper |
+| Input | Raw MPEG-2 Video `.m2v`, bounded MPEG-2 Program Stream `.mpg` / `.mpeg`, decrypted or CSS-encrypted DVD `.iso` and direct USB DVD playback through `/dev/sr0`, including authored menus, or audio-only MPEG-1 Layer III `.mp3`, RIFF WAVE `.wav`, FLAC `.flac` and Ogg Vorbis `.ogg` through the ARM helper |
 | Video, progressive | 4:2:0 I, P and B pictures through 720x480 |
 | Video, interlaced | Current `master`: 720x480 at 30000/1001, 4:2:0 frame pictures with I, P and B coding, frame or field motion, frame or field DCT, top- or bottom-field-first presentation, and mixed ordinary-interlaced/progressive-film frames within one interlaced sequence. Field pictures remain unsupported; Quartus and MiSTer qualification are pending |
 | Picture types | Coded-order/display-order presentation with B reordering |
@@ -80,6 +80,14 @@ For `.iso` and `.dvd` playback, player-one Left and Right select the previous
 or next chapter and Start toggles pause/resume while the MiSTer OSD is closed.
 On a keyboard, P and N select the previous and next chapter, and Space toggles
 pause/resume under the same OSD-closed guard.
+
+In an authored DVD menu, the player-one D-pad moves the highlight, A or Start
+activates it, and Select calls the root menu. Keyboard arrows, Enter (including
+keypad Enter), and M provide the same actions. Main uses distinct `isomenu:` and
+`dvdmenu:` launch routes for this mode; legacy `iso:` and `dvd:` retain
+longest-title behavior for regression and host use. Finite menu stills honor
+their authored duration, while indefinite stills remain interactive until a
+navigation command. The FPGA overlay compositor is active only in native 480i.
 A chapter change preserves the authenticated libdvdnav session, flushes every
 old HPS/Main byte, resets the existing FPGA download session, and begins from
 the selected chapter's random-access boundary. The helper retains the selected
@@ -261,17 +269,17 @@ The build script pins minimp3, miniaudio, stb_vorbis, liba52, MiSTer Main, depen
 
 ## Known limitations
 
-- Program Stream support is bounded; MPEG Transport Stream, authored DVD menus, DVD LPCM, subpictures, angles and arbitrary systems-layer layouts are not supported. ISO and direct `/dev/sr0` playback select the longest title, support previous/next chapter control, and use statically linked libdvdcss for encrypted sectors. DVD private stream 1 supports AC-3 decode/passthrough and DTS passthrough.
+- Program Stream support is bounded; MPEG Transport Stream, DVD LPCM, subtitle-track presentation, angles and arbitrary systems-layer layouts are not supported. Authored DVD menus use DVD subpictures only for their button overlay and run in native 480i; ISO and direct `/dev/sr0` playback use statically linked libdvdcss for encrypted sectors. DVD private stream 1 supports AC-3 decode/passthrough and DTS passthrough.
 - Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV, FLAC and Ogg Vorbis converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III remain rejected; AAC is not enabled. Only the first Program Stream audio track is played; chapter changes retain that identity, while deliberate track switching needs a control channel that protocol one does not implement.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
-- Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. Current `master` also implements 720x480-at-30000/1001 interlaced frame-picture I/P/B decoding with frame or field motion, frame or field DCT, per-picture `repeat_first_field`, and mixed ordinary-interlaced/progressive-film frame pictures, but this remains simulation-qualified until a clean fit and MiSTer playback pass. Field pictures and 576i remain rejected. DVD navigation, subpictures and broader systems-layer behavior are separate limitations.
+- Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. Current `master` also implements 720x480-at-30000/1001 interlaced frame-picture I/P/B decoding with frame or field motion, frame or field DCT, per-picture `repeat_first_field`, and mixed ordinary-interlaced/progressive-film frame pictures, but this remains simulation-qualified until a clean fit and MiSTer playback pass. Field pictures and 576i remain rejected. DVD subtitle tracks and broader systems-layer behavior remain separate limitations.
 - Comprehensive playback pixel accuracy remains unqualified. Simulation comparisons cover decoder reconstruction, and a targeted hardware-screenshot comparison found the chroma-edge difference below; that comparison is not a full playback pixel-validation suite.
 - Sharp colour transitions show one blended pixel column that an independent software decoder does not produce, consistent with horizontal chroma upsampling in the display path. It is obvious on synthetic colour bars and subtle on ordinary material, and it is not specific to any picture type.
 - On material whose peak coded picture is large enough, one or two display slots are missed at that picture, shown as a repeated frame rather than a dropped one. This is a property of input buffer depth against peak picture size, not of the stream; the qualified full-length fixture hits it once, at a scene cut.
 - The framework scaler has little timing margin: seed 16 missed setup by 0.070 ns after audio routing changed; the seed-17 release has +0.243 ns worst setup. Future logic changes may expose the path again, and 93% M10K usage limits buffering headroom.
 - H.262 frame-rate codes 6 through 8 (50, 59.94, and 60 fps) are rejected.
-- General seeking and scrubbing, authored DVD menus, drive discovery beyond `/dev/sr0`, and software-controlled ejection are not implemented. ARM-side pause/resume is a transport hold; until an FPGA pause state is added, a long pause may set the existing audio-underrun telemetry before playback resumes.
+- General seeking and scrubbing, DVD title/angle/audio/subtitle-track selection, drive discovery beyond `/dev/sr0`, and software-controlled ejection are not implemented. ARM-side pause/resume is a transport hold; until an FPGA pause state is added, a long pause may set the existing audio-underrun telemetry before playback resumes.
 - Output offers two interlaced tiers. Normal processed HDMI sends native 480i timing into MiSTer's scaler and lets the `HDMI scaler deinterlacer` menu choose Weave or Bob. The external-processing tier preserves native 480i fields; truly unscaled HDMI additionally requires MiSTer's separate `direct_video` setting, which the core menu cannot enable.
 - Files should be opened through the normal MiSTer file menu; MGL injection is not a qualified loading method.
 
@@ -316,7 +324,7 @@ tools/mister.sh screenshot-stream 60 playback-frames
 
 ## Development roadmap
 
-Future work can extend the qualified envelope toward 50/59.94/60 fps, field-picture structures, `repeat_first_field` and 576i, broader Program Stream handling, additional audio codecs and multi-track selection, qualification of playback pixel accuracy against a software decoder, improved chroma presentation, an FPGA-native pause state, seeking, authored DVD menus and subpictures, optical-drive discovery, and qualification of native 480i through external HDMI-to-SDI hardware.
+Future work can extend the qualified envelope toward 50/59.94/60 fps, field-picture structures and 576i, broader Program Stream handling, additional audio codecs and multi-track selection, qualification of playback pixel accuracy against a software decoder, improved chroma presentation, an FPGA-native pause state, seeking, DVD subtitle presentation and title/angle selection, optical-drive discovery, and qualification of native 480i through external HDMI-to-SDI hardware.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 

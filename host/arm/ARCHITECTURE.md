@@ -14,7 +14,8 @@ MediaPlayer_Helper --protocol 1 --source file:/absolute/path/movie.mpg
 
 `--capabilities` prints the implemented and reserved source types. Bare paths
 remain accepted for transition and local verification, but Main uses the
-versioned form.
+versioned form. Menu-capable launches use `isomenu:` or `dvdmenu:`; the
+corresponding `iso:` and `dvd:` routes retain longest-title playback.
 
 Main optionally passes `--control-fd FD`, a private version-one
 `SOCK_SEQPACKET` channel separate from standard output.  Player-one Left and
@@ -24,27 +25,33 @@ owned by Main as a stdout transport hold, so no pause byte enters the FPGA
 protocol. Keyboard P/N use the same previous/next actions and Space uses the
 same pause action while the MiSTer OSD is closed.
 
+Menu-mode sources use the same channel for directional, activate and root-menu
+commands. Navigation hops and button activation reuse the ready/go barrier;
+highlight-only moves do not reset the video stream. Main maps player-one
+D-pad/A/Start/Select and keyboard arrows/Enter/M while an authored menu is
+active.
+
 The helper writes one annotated transport to standard output. Reserved H.262
-codes distinguish picture timestamps, fixed signed 16-bit PCM samples, and a
-clean audio-end token. Main brokers those bytes through its existing file path
+codes distinguish picture timestamps, fixed signed 16-bit PCM samples, a clean
+audio-end token, and length-bounded DVD overlay records. Main brokers those bytes through its existing file path
 without parsing them and remains the sole FPGA SPI owner. The FPGA strips the
 records before H.262 decode, applies PCM FIFO backpressure, and owns final sample
 pacing and audio/video output. Diagnostics go to standard error. Explicit
 `--pcm-out` remains a host-verification path and does not change hardware
-ownership. Main's isolated broker exposes a source-string launch function; its
-current file-selector wrapper constructs `file:` while a later disc-menu action
-can pass `dvd:` without changing process, pipe or FPGA-transfer ownership.
+ownership. Main's isolated broker exposes a source-string launch function, so
+file, longest-title and authored-menu routes retain the same process, pipe and
+FPGA-transfer ownership.
 
 ## Source boundary
 
 `media_source` is a pull interface with read, character-read, rewind, seek,
 error and close operations. The current backends implement `file:`, `iso:` and
-`dvd:`. The ISO backend uses stream callbacks for an absolute image path. The
+`dvd:` plus their `isomenu:` and `dvdmenu:` counterparts. The ISO backend uses stream callbacks for an absolute image path. The
 direct backend requires an absolute device path such as `dvd:/dev/sr0` and lets
 libdvdnav/libdvdread/libdvdcss own optical-device access, CSS authentication and
-sector reads; no filesystem mount is required. Both DVD backends choose the
-longest described DVD-Video title and expose its cells in program-chain playback
-order as one sequential Program Stream. The source retains the selected title,
+sector reads; no filesystem mount is required. The `iso:` and `dvd:` routes
+choose the longest described DVD-Video title and expose its cells in
+program-chain playback order as one sequential Program Stream. The source retains the selected title,
 chapter count and declared duration and converts a title exit, replay or
 backward chapter or cell transition into clean end-of-stream before libdvdnav
 can expose a following navigation domain or second traversal. The declared
@@ -68,18 +75,22 @@ producer/consumer totals are diagnostic output. ISO and ordinary file sources
 remain synchronous and byte-identical, and none of this buffer consumes FPGA
 memory.
 
-Future work may add optical-device discovery beyond the explicit `/dev/sr0`
-launcher. Previous and next chapter controls now use the private Main/helper
-channel and retain the authenticated libdvdnav handle; menu navigation, angles,
-track selection and general seeking remain separate work.
+The menu routes instead preserve libdvdnav first-play behavior, VM domain
+transitions, authored finite or indefinite stills, button state, CLUT changes
+and root-menu calls. DVD private-stream subpicture packets are reassembled and
+decoded into a packed 720x480 two-bit plane; normal/highlight palettes and the
+inclusive button rectangle travel separately so highlight motion does not
+reload the plane. Future work may add optical-device discovery beyond the
+explicit `/dev/sr0` launcher. Angles, track selection and general seeking
+remain separate work.
 
 ## Pipeline boundaries
 
 The current implementation contains these logical stages even where they still
 share a compilation unit:
 
-1. Source: `file:`, decrypted or CSS-encrypted `iso:`, and direct optical
-   `dvd:/dev/sr0` now.
+1. Source: `file:`, decrypted or CSS-encrypted `iso:`/`isomenu:`, and direct
+   optical `dvd:`/`dvdmenu:` through `/dev/sr0` now.
 2. Container: raw M2V pass-through or MPEG Program Stream/PES demultiplexing.
 3. Timeline: PTS extraction and FPGA in-band timestamp records.  An `iso:`
    title may cross VOB or cell boundaries whose raw PES clock restarts; the
@@ -114,8 +125,10 @@ share a compilation unit:
    runs here, so only this process can choose what to emit. A burst is only
    audible as surround if nothing downstream scales it: any gain, mix or filter
    between here and the S/PDIF pin destroys it.
-6. Outputs: one annotated H.262-plus-PCM transport to Main, with the FPGA owning
-   the separate video and PCM sinks after record extraction.
+6. Outputs: one annotated H.262-plus-PCM-and-overlay transport to Main, with the
+   FPGA owning the separate video, PCM and native-480i overlay sinks after
+   record extraction. Overlay plane data is split into records no larger than
+   4,096 payload bytes and becomes visible only after an explicit commit.
 
 Standalone `.mp3` is an audio-only use of the same output contract: the helper
 skips bounded ID3v2 and terminal ID3v1 metadata, decodes MPEG-1 Layer III mono
@@ -146,8 +159,8 @@ mono or multichannel Vorbis to signed 16-bit stereo, and emits at 44.1 or
 48 kHz. The decoder is compiled into the static helper and has no target-side
 runtime-library dependency.
 
-Previous and next chapter commands use the private control protocol while Start
-pause/resume is a Main-side transport hold. General seek, title, angle,
+Previous and next chapter plus authored-menu commands use the private control
+protocol while Start pause/resume is a Main-side transport hold. General seek, title, angle,
 audio-track and subtitle-track commands remain deferred. The ARM-only pause
 does not suppress the FPGA audio FIFO underrun after its existing reserve
 drains; that product polish requires an explicit future core pause state.
@@ -158,12 +171,13 @@ damage cannot silently switch tracks or terminate playback immediately.
 
 ## Deferred DVD scope
 
-The `iso:` and `dvd:` backends deliberately share a main-feature playback
-subset: they select the longest title and provide previous/next chapter control
-without menus, angles, DVD LPCM, subpictures or track switching. Broader
-DVD-Video filesystem and navigation conformance is not claimed because the
-project's retained normative references do not cover those specifications.
-Those deferred features require separately approved development scopes.
+The menu path implements first-play/root navigation, button highlights and the
+menu subpicture plane. It does not present subtitle tracks during title
+playback, switch angles, titles, audio or subtitle tracks, decode DVD LPCM,
+discover drives beyond `/dev/sr0`, or eject media. Broader DVD-Video filesystem
+and navigation conformance is not claimed because the project's retained
+normative references do not cover those specifications. Those deferred
+features require separately approved development scopes.
 
 ## Main to FPGA guarded fast-block transport
 

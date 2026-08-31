@@ -8,6 +8,12 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Added authored DVD first-play and root-menu navigation for ISO images and
+  direct `/dev/sr0` playback. The helper follows libdvdnav menu state, decodes
+  DVD subpicture RLE and authored CLUT/alpha/highlight data, and sends bounded
+  double-buffered overlay records to a native-480i FPGA compositor. Main maps
+  player-one D-pad/A/Start/Select and keyboard arrows/Enter/M to directional,
+  activate and root-menu controls through the existing ready/go barrier.
 - Added longest-title playback from decrypted or CSS-encrypted DVD ISO files.
   The static helper pins libdvdcss 1.6.0 beneath libdvdread/libdvdnav, with no
   target-installed shared-library dependency and no Main or FPGA change.  ISO

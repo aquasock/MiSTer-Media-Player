@@ -6,6 +6,7 @@
 #include "a52.h"
 #include "mm_accel.h"
 #include "consumer_audio.h"
+#include "dvd_spu.h"
 #include "media_player_protocol.h"
 #include "media_source.h"
 
@@ -281,6 +282,20 @@ struct audio_state {
     size_t capacity;
 };
 
+struct dvd_menu_state {
+    struct dvd_spu_decoder *decoder;
+    int enabled;
+    int menu_active;
+    int spu_stream;
+    int overlay_emitted;
+    int highlight_display;
+    uint32_t highlight_palette;
+    uint16_t highlight_x1;
+    uint16_t highlight_y1;
+    uint16_t highlight_x2;
+    uint16_t highlight_y2;
+};
+
 static void usage(const char *program)
 {
     fprintf(stderr,
@@ -361,6 +376,160 @@ static int write_all(FILE *stream, const void *data, size_t size,
         fprintf(stderr, "media_player_helper: writing %s failed: %s\n",
                 what, strerror(errno));
         return -1;
+    }
+    return 0;
+}
+
+static int emit_overlay_record(struct output_state *output, uint8_t command,
+                               const uint8_t *payload, size_t size)
+{
+    uint8_t header[7] = {
+        0x00, 0x00, 0x01, MEDIA_PLAYER_OVERLAY_MARKER_CODE,
+        0x00, 0x00, command
+    };
+    size_t record_size = size + 1u;
+
+    if (!output->video || record_size > 65535u)
+        return -1;
+    header[4] = (uint8_t)(record_size >> 8);
+    header[5] = (uint8_t)record_size;
+    if (write_all(output->video, header, sizeof(header), "DVD overlay record") < 0 ||
+        write_all(output->video, payload, size, "DVD overlay payload") < 0)
+        return -1;
+    return 0;
+}
+
+static void overlay_style_payload(const struct dvd_spu_overlay *overlay,
+                                  uint8_t payload[41])
+{
+    size_t offset = 1;
+    unsigned color;
+
+    payload[0] = (uint8_t)((overlay->visible ? 1u : 0u) |
+                           (overlay->menu ? 2u : 0u));
+    for (color = 0; color < 4u; ++color) {
+        memcpy(payload + offset, overlay->rgba[color], 4u);
+        offset += 4u;
+    }
+    for (color = 0; color < 4u; ++color) {
+        memcpy(payload + offset, overlay->highlight_rgba[color], 4u);
+        offset += 4u;
+    }
+    payload[offset++] = (uint8_t)(overlay->highlight_x1 >> 8);
+    payload[offset++] = (uint8_t)overlay->highlight_x1;
+    payload[offset++] = (uint8_t)(overlay->highlight_y1 >> 8);
+    payload[offset++] = (uint8_t)overlay->highlight_y1;
+    payload[offset++] = (uint8_t)(overlay->highlight_x2 >> 8);
+    payload[offset++] = (uint8_t)overlay->highlight_x2;
+    payload[offset++] = (uint8_t)(overlay->highlight_y2 >> 8);
+    payload[offset] = (uint8_t)overlay->highlight_y2;
+}
+
+static int emit_overlay_style(struct output_state *output,
+                              const struct dvd_spu_overlay *overlay,
+                              uint8_t command)
+{
+    uint8_t payload[41];
+
+    overlay_style_payload(overlay, payload);
+    return emit_overlay_record(output, command, payload, sizeof(payload));
+}
+
+static int emit_overlay_frame(struct output_state *output,
+                              const struct dvd_spu_overlay *overlay)
+{
+    size_t offset = 0;
+
+    if (emit_overlay_style(output, overlay, MEDIA_PLAYER_OVERLAY_CONFIG) < 0)
+        return -1;
+    while (offset < DVD_SPU_PLANE_BYTES) {
+        size_t count = DVD_SPU_PLANE_BYTES - offset;
+
+        if (count > 4096u)
+            count = 4096u;
+        if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_DATA,
+                                overlay->pixels + offset, count) < 0)
+            return -1;
+        offset += count;
+    }
+    return emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_COMMIT, NULL, 0);
+}
+
+static int emit_overlay_clear(struct output_state *output)
+{
+    return emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_CLEAR, NULL, 0);
+}
+
+static enum media_source_dvd_command dvd_source_command(int command)
+{
+    switch (command) {
+    case MEDIA_PLAYER_CONTROL_MENU_UP:
+        return MEDIA_SOURCE_DVD_MENU_UP;
+    case MEDIA_PLAYER_CONTROL_MENU_DOWN:
+        return MEDIA_SOURCE_DVD_MENU_DOWN;
+    case MEDIA_PLAYER_CONTROL_MENU_LEFT:
+        return MEDIA_SOURCE_DVD_MENU_LEFT;
+    case MEDIA_PLAYER_CONTROL_MENU_RIGHT:
+        return MEDIA_SOURCE_DVD_MENU_RIGHT;
+    case MEDIA_PLAYER_CONTROL_MENU_ACTIVATE:
+        return MEDIA_SOURCE_DVD_MENU_ACTIVATE;
+    case MEDIA_PLAYER_CONTROL_ROOT_MENU:
+        return MEDIA_SOURCE_DVD_ROOT_MENU;
+    default:
+        return 0;
+    }
+}
+
+static int refresh_dvd_menu_state(struct media_source *input,
+                                  struct dvd_menu_state *menu,
+                                  struct output_state *output,
+                                  int control_fd)
+{
+    struct media_source_dvd_state state;
+
+    if (!menu->enabled || !media_source_dvd_state(input, &state))
+        return 0;
+    if (state.menu_changed || state.menu_active != menu->menu_active) {
+        menu->menu_active = state.menu_active;
+        if (control_fd >= 0 &&
+            control_send(control_fd, state.menu_active ?
+                         MEDIA_PLAYER_CONTROL_MENU_ENTER :
+                         MEDIA_PLAYER_CONTROL_MENU_LEAVE) < 0)
+            return -1;
+        fprintf(stderr, "media_player_helper: DVD menu %s\n",
+                state.menu_active ? "entered" : "left");
+    }
+    if (state.clut_changed)
+        dvd_spu_set_clut(menu->decoder, state.clut);
+    if (state.spu_stream_changed) {
+        menu->spu_stream = state.spu_stream;
+        dvd_spu_set_stream(menu->decoder, menu->spu_stream);
+        fprintf(stderr, "media_player_helper: DVD SPU stream %d\n",
+                menu->spu_stream);
+    }
+    if (state.highlight_changed) {
+        menu->highlight_display = state.highlight_display;
+        menu->highlight_palette = state.highlight_palette;
+        menu->highlight_x1 = state.highlight_x1;
+        menu->highlight_y1 = state.highlight_y1;
+        menu->highlight_x2 = state.highlight_x2;
+        menu->highlight_y2 = state.highlight_y2;
+    }
+    if (state.clut_changed || state.highlight_changed) {
+        if (dvd_spu_set_highlight(menu->decoder, menu->highlight_display,
+                                  menu->highlight_palette,
+                                  menu->highlight_x1, menu->highlight_y1,
+                                  menu->highlight_x2, menu->highlight_y2) < 0)
+            return -1;
+        if (menu->overlay_emitted &&
+            emit_overlay_style(output, dvd_spu_overlay(menu->decoder),
+                               MEDIA_PLAYER_OVERLAY_STYLE) < 0)
+            return -1;
+    }
+    if (state.hop && menu->overlay_emitted) {
+        if (emit_overlay_clear(output) < 0)
+            return -1;
+        menu->overlay_emitted = 0;
     }
     return 0;
 }
@@ -2071,7 +2240,8 @@ done:
 
 static int process_private_pes(struct media_source *input,
                                struct audio_state *audio,
-                               struct output_state *output)
+                               struct output_state *output,
+                               struct dvd_menu_state *menu)
 {
     uint8_t length_bytes[2];
     uint8_t *packet;
@@ -2101,6 +2271,41 @@ static int process_private_pes(struct media_source *input,
     }
     if (parse_pes_header(packet, length, &payload_offset, &pts, &has_pts) < 0) {
         fprintf(stderr, "media_player_helper: invalid private PES header\n");
+        goto done;
+    }
+    if (menu && menu->enabled && payload_offset < length &&
+        packet[payload_offset] >= 0x20u && packet[payload_offset] <= 0x3fu) {
+        int physical = packet[payload_offset] - 0x20u;
+        int update;
+
+        if (menu->spu_stream < 0) {
+            menu->spu_stream = physical;
+            dvd_spu_set_stream(menu->decoder, physical);
+        }
+        update = dvd_spu_feed(menu->decoder, physical,
+                              packet + payload_offset + 1u,
+                              length - payload_offset - 1u);
+        if (update < 0) {
+            fprintf(stderr,
+                    "media_player_helper: malformed DVD subpicture packet\n");
+            goto done;
+        }
+        if (update > 0) {
+            if (dvd_spu_set_highlight(menu->decoder,
+                                      menu->highlight_display,
+                                      menu->highlight_palette,
+                                      menu->highlight_x1,
+                                      menu->highlight_y1,
+                                      menu->highlight_x2,
+                                      menu->highlight_y2) < 0 ||
+                emit_overlay_frame(output,
+                                   dvd_spu_overlay(menu->decoder)) < 0)
+                goto done;
+            menu->overlay_emitted = 1;
+            fprintf(stderr,
+                    "media_player_helper: DVD subpicture overlay updated\n");
+        }
+        result = 0;
         goto done;
     }
     if (payload_offset + AC3_PRIVATE_HEADER <= length &&
@@ -2248,9 +2453,78 @@ done:
     return result;
 }
 
+/*
+ * A menu still leaves the last decoded video frame resident in the FPGA while
+ * the DVD virtual machine waits.  Poll the private control socket here rather
+ * than skipping the still immediately: directional changes remain interactive,
+ * activation/root calls retain the normal decoder barrier, finite stills expire
+ * at their authored duration, and 0xff waits indefinitely for a command.
+ * Return 0 when no still is active, 1 after a finite still resumes, 2 when the
+ * caller must enter a navigation barrier, and -1 on failure.
+ */
+static int wait_dvd_still(struct media_source *input,
+                          struct dvd_menu_state *menu,
+                          struct output_state *output,
+                          int control_fd, int *control_command)
+{
+    struct timespec delay = {0, 10 * 1000 * 1000};
+    unsigned seconds = 0;
+    uint64_t deadline = 0;
+
+    if (!media_source_dvd_still(input, &seconds))
+        return 0;
+    if (seconds != 0xffu)
+        deadline = monotonic_us() + (uint64_t)seconds * 1000000u;
+    fprintf(stderr, "media_player_helper: DVD still wait %s%u seconds\n",
+            seconds == 0xffu ? "indefinite/" : "", seconds);
+
+    for (;;) {
+        int command = control_read_command(control_fd);
+        enum media_source_dvd_command menu_command;
+
+        if (command < 0)
+            return -1;
+        if (command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
+            command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER) {
+            *control_command = command;
+            return 2;
+        }
+        menu_command = dvd_source_command(command);
+        if (menu_command) {
+            int navigation = media_source_dvd_command(input, menu_command);
+
+            if (navigation < 0)
+                return -1;
+            if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
+                return -1;
+            if (navigation > 0) {
+                *control_command = command;
+                return 2;
+            }
+        }
+        else if (command) {
+            fprintf(stderr,
+                    "media_player_helper: ignoring unexpected still "
+                    "control 0x%02x\n", command);
+        }
+
+        if (seconds != 0xffu && monotonic_us() >= deadline) {
+            if (media_source_dvd_still_skip(input) < 0)
+                return -1;
+            fprintf(stderr, "media_player_helper: DVD finite still complete\n");
+            return 1;
+        }
+        while (nanosleep(&delay, &delay) < 0 && errno == EINTR)
+            ;
+        delay.tv_sec = 0;
+        delay.tv_nsec = 10 * 1000 * 1000;
+    }
+}
+
 static int process_program_stream(struct media_source *input,
                                   struct audio_state *audio,
                                   struct output_state *output,
+                                  struct dvd_menu_state *menu,
                                   int control_fd, int *control_command)
 {
     int video_code = -1;
@@ -2259,25 +2533,59 @@ static int process_program_stream(struct media_source *input,
     for (;;) {
         uint8_t code;
         int command = control_read_command(control_fd);
+        enum media_source_dvd_command menu_command;
 
         if (command < 0)
+            return -1;
+        if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
             return -1;
         if (command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
             command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER) {
             *control_command = command;
             return 1;
         }
+        menu_command = dvd_source_command(command);
+        if (menu_command) {
+            int navigation = media_source_dvd_command(input, menu_command);
+
+            if (navigation < 0) {
+                fprintf(stderr,
+                        "media_player_helper: DVD menu control 0x%02x failed\n",
+                        command);
+                return -1;
+            }
+            if (navigation > 0) {
+                *control_command = command;
+                return 1;
+            }
+            if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
+                return -1;
+            continue;
+        }
         if (command)
             fprintf(stderr,
                     "media_player_helper: ignoring unexpected control "
                     "0x%02x during playback\n", command);
         int found = find_start_code(input, &code);
-        if (found == 0)
+        if (found == 0) {
+            int still = wait_dvd_still(input, menu, output, control_fd,
+                                       control_command);
+
+            if (still < 0)
+                return -1;
+            if (still == 1)
+                continue;
+            if (still == 2)
+                return 1;
             return 0;
+        }
         if (found < 0)
             return -1;
-        if (code == 0xb9)
+        if (code == 0xb9) {
+            if (menu && menu->enabled)
+                continue;
             return 0;
+        }
         if (code == 0xba) {
             uint8_t header[10];
             if (read_exact(input, header, 1) < 0)
@@ -2302,7 +2610,7 @@ static int process_program_stream(struct media_source *input,
             continue;
         }
         if (code == 0xbd) {
-            if (process_private_pes(input, audio, output) < 0)
+            if (process_private_pes(input, audio, output, menu) < 0)
                 return -1;
             continue;
         }
@@ -2447,6 +2755,7 @@ int main(int argc, char **argv)
     unsigned audio_delay_ms = PCM_HOLD_DEFAULT_MS;
     struct audio_state audio = {0};
     struct media_source input = {0};
+    struct dvd_menu_state dvd_menu = {0};
     char source_error[512];
     uint8_t signature[4];
     int is_program_stream;
@@ -2455,6 +2764,7 @@ int main(int argc, char **argv)
     int is_flac;
     int is_ogg;
     int is_audio_file;
+    int dvd_menu_mode;
     int i;
     int success = 0;
 
@@ -2533,6 +2843,12 @@ int main(int argc, char **argv)
         usage(argv[0]);
         return 2;
     }
+    dvd_menu_mode = !strncmp(source_specification,
+                             MEDIA_PLAYER_DVD_MENU_PREFIX,
+                             strlen(MEDIA_PLAYER_DVD_MENU_PREFIX)) ||
+                    !strncmp(source_specification,
+                             MEDIA_PLAYER_ISO_MENU_PREFIX,
+                             strlen(MEDIA_PLAYER_ISO_MENU_PREFIX));
     if (control_fd >= 0) {
         int flags = fcntl(control_fd, F_GETFL);
 
@@ -2550,6 +2866,17 @@ int main(int argc, char **argv)
                           sizeof(source_error)) != MEDIA_SOURCE_OK) {
         fprintf(stderr, "media_player_helper: %s\n", source_error);
         return 1;
+    }
+    dvd_menu.enabled = dvd_menu_mode;
+    dvd_menu.spu_stream = -1;
+    if (dvd_menu.enabled) {
+        dvd_menu.decoder = dvd_spu_create();
+        if (!dvd_menu.decoder) {
+            fprintf(stderr,
+                    "media_player_helper: cannot allocate DVD SPU decoder\n");
+            media_source_close(&input);
+            return 1;
+        }
     }
     output.video = video_path ? fopen(video_path, "wb") : stdout;
     if (!output.video) {
@@ -2628,18 +2955,21 @@ int main(int argc, char **argv)
         for (;;) {
             int command = 0;
             int result = process_program_stream(&input, &audio, &output,
+                                                &dvd_menu,
                                                 control_fd, &command);
 
             if (result < 0)
                 goto done;
             if (!result)
                 break;
-            if ((input.kind != MEDIA_SOURCE_ISO &&
-                 input.kind != MEDIA_SOURCE_DVD) ||
-                media_source_change_chapter(
-                    &input,
-                    command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ? -1 : 1)
-                    < 0) {
+            if ((command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
+                 command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER) &&
+                ((input.kind != MEDIA_SOURCE_ISO &&
+                  input.kind != MEDIA_SOURCE_DVD) ||
+                 media_source_change_chapter(
+                     &input,
+                     command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ? -1 : 1)
+                     < 0)) {
                 (void)control_send(control_fd, MEDIA_PLAYER_CONTROL_ERROR);
                 fprintf(stderr,
                         "media_player_helper: chapter control failed\n");
@@ -2661,8 +2991,14 @@ int main(int argc, char **argv)
                         "media_player_helper: chapter barrier failed\n");
                 goto done;
             }
+            if (dvd_menu.enabled) {
+                dvd_spu_reset(dvd_menu.decoder);
+                dvd_menu.overlay_emitted = 0;
+                if (emit_overlay_clear(&output) < 0)
+                    goto done;
+            }
             fprintf(stderr,
-                    "media_player_helper: chapter barrier released\n");
+                    "media_player_helper: navigation barrier released\n");
         }
         if (!output.audio_pes_seen) {
             if (output.scheduler_enabled &&
@@ -2708,6 +3044,7 @@ done:
     if (audio.a52)
         a52_free(audio.a52);
     free(audio.data);
+    dvd_spu_destroy(dvd_menu.decoder);
     media_source_close(&input);
     output.hold_active = 0;
     if (success && !output.pcm && hold_flush(&output, 0) < 0)

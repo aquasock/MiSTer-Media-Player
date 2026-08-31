@@ -40,6 +40,7 @@ struct iso_source_state {
     FILE *stream;
     char *device_path;
     int direct_device;
+    int menu_mode;
     dvdnav_t *navigation;
     uint8_t block[DVD_VIDEO_LB_LEN];
     size_t block_offset;
@@ -53,6 +54,9 @@ struct iso_source_state {
     int32_t cell_number;
     int end_of_stream;
     int error;
+    int still_active;
+    unsigned still_seconds;
+    struct media_source_dvd_state dvd_state;
     pthread_t buffer_thread;
     pthread_mutex_t buffer_lock;
     pthread_cond_t buffer_can_read;
@@ -188,13 +192,14 @@ static int dvd_navigation_open(struct iso_source_state *state)
     if (status != DVDNAV_STATUS_OK)
         return -1;
     if (dvdnav_set_readahead_flag(state->navigation,
-                                  state->direct_device ? 1 : 0) !=
+                                  state->direct_device && !state->menu_mode ?
+                                      1 : 0) !=
             DVDNAV_STATUS_OK)
         return -1;
     return 0;
 }
 
-static int iso_select_title(struct iso_source_state *state)
+static int iso_inventory_titles(struct iso_source_state *state, int play)
 {
     int32_t title_count = 0;
     int32_t title;
@@ -222,7 +227,8 @@ static int iso_select_title(struct iso_source_state *state)
         free(chapter_times);
     }
     if (!longest_title ||
-        dvdnav_title_play(state->navigation, longest_title) != DVDNAV_STATUS_OK)
+        (play && dvdnav_title_play(state->navigation, longest_title) !=
+                     DVDNAV_STATUS_OK))
         return -1;
     state->title = longest_title;
     state->chapters = longest_chapters;
@@ -235,7 +241,48 @@ static int iso_select_title(struct iso_source_state *state)
     state->block_size = 0;
     state->end_of_stream = 0;
     state->error = 0;
+    state->still_active = 0;
+    state->still_seconds = 0;
     return 0;
+}
+
+static void iso_refresh_menu_state(struct iso_source_state *state)
+{
+    int32_t title = 0;
+    int32_t part = 0;
+    int menu_active;
+
+    if (dvdnav_current_title_info(state->navigation, &title, &part) !=
+            DVDNAV_STATUS_OK)
+        return;
+    menu_active = title == 0;
+    if (menu_active != state->dvd_state.menu_active) {
+        state->dvd_state.menu_active = menu_active;
+        state->dvd_state.menu_changed = 1;
+    }
+}
+
+static void iso_refresh_highlight(struct iso_source_state *state,
+                                  int display, int button, int mode)
+{
+    dvdnav_highlight_area_t area;
+    pci_t *pci;
+
+    memset(&area, 0, sizeof(area));
+    pci = dvdnav_get_current_nav_pci(state->navigation);
+    if (!display || button <= 0 || !pci ||
+        dvdnav_get_highlight_area(pci, button, mode, &area) !=
+            DVDNAV_STATUS_OK) {
+        state->dvd_state.highlight_display = 0;
+    } else {
+        state->dvd_state.highlight_display = 1;
+        state->dvd_state.highlight_palette = area.palette;
+        state->dvd_state.highlight_x1 = area.sx;
+        state->dvd_state.highlight_y1 = area.sy;
+        state->dvd_state.highlight_x2 = area.ex;
+        state->dvd_state.highlight_y2 = area.ey;
+    }
+    state->dvd_state.highlight_changed = 1;
 }
 
 static int iso_guard_selected_title(struct iso_source_state *state,
@@ -307,6 +354,9 @@ static int iso_next_payload_block(struct iso_source_state *state)
 {
     unsigned events_without_payload = 0;
 
+    if (state->still_active)
+        return 0;
+
     while (events_without_payload++ < 1024) {
         int32_t event = 0;
         int32_t length = 0;
@@ -320,15 +370,72 @@ static int iso_next_payload_block(struct iso_source_state *state)
             state->end_of_stream = 1;
             return 0;
         }
-        if (iso_guard_selected_title(state, event, length) <= 0)
+        if (!state->menu_mode &&
+            iso_guard_selected_title(state, event, length) <= 0)
             return state->error ? -1 : 0;
+        if (event == DVDNAV_SPU_CLUT_CHANGE) {
+            if (length != (int32_t)sizeof(state->dvd_state.clut))
+                break;
+            memcpy(state->dvd_state.clut, state->block,
+                   sizeof(state->dvd_state.clut));
+            state->dvd_state.clut_changed = 1;
+            continue;
+        }
+        if (event == DVDNAV_SPU_STREAM_CHANGE) {
+            const dvdnav_spu_stream_change_event_t *change;
+
+            if (length != (int32_t)sizeof(*change))
+                break;
+            change = (const dvdnav_spu_stream_change_event_t *)state->block;
+            state->dvd_state.spu_stream = change->physical_wide;
+            state->dvd_state.spu_stream_changed = 1;
+            continue;
+        }
+        if (event == DVDNAV_HIGHLIGHT) {
+            const dvdnav_highlight_event_t *highlight;
+
+            if (length != (int32_t)sizeof(*highlight))
+                break;
+            highlight = (const dvdnav_highlight_event_t *)state->block;
+            iso_refresh_highlight(state, highlight->display,
+                                  (int)highlight->buttonN, 1);
+            continue;
+        }
+        if (event == DVDNAV_HOP_CHANNEL) {
+            state->dvd_state.hop = 1;
+            continue;
+        }
+        if (event == DVDNAV_CELL_CHANGE || event == DVDNAV_VTS_CHANGE)
+            iso_refresh_menu_state(state);
         if ((event == DVDNAV_BLOCK_OK || event == DVDNAV_NAV_PACKET) &&
             length == DVD_VIDEO_LB_LEN) {
+            if (event == DVDNAV_NAV_PACKET) {
+                int32_t button = 0;
+
+                iso_refresh_menu_state(state);
+                if (dvdnav_get_current_highlight(state->navigation, &button) ==
+                        DVDNAV_STATUS_OK)
+                    iso_refresh_highlight(state, button > 0, (int)button, 1);
+            }
             state->block_offset = 0;
             state->block_size = (size_t)length;
             return 1;
         }
         if (event == DVDNAV_STILL_FRAME) {
+            const dvdnav_still_event_t *still;
+
+            if (length != (int32_t)sizeof(*still))
+                break;
+            still = (const dvdnav_still_event_t *)state->block;
+            if (state->menu_mode) {
+                state->still_active = 1;
+                state->still_seconds = still->length;
+                fprintf(stderr,
+                        "media_source: DVD menu still duration=%s%u\n",
+                        still->length == 0xff ? "indefinite/" : "",
+                        (unsigned)still->length);
+                return 0;
+            }
             if (dvdnav_still_skip(state->navigation) != DVDNAV_STATUS_OK)
                 break;
         } else if (event == DVDNAV_WAIT) {
@@ -564,12 +671,14 @@ static int iso_rewind(void *opaque)
     iso_stop_buffer(state);
     if (state->direct_device) {
         if (dvdnav_reset(state->navigation) != DVDNAV_STATUS_OK ||
-            dvdnav_title_play(state->navigation, title) != DVDNAV_STATUS_OK) {
+            (!state->menu_mode &&
+             dvdnav_title_play(state->navigation, title) != DVDNAV_STATUS_OK)) {
             state->error = 1;
             return -1;
         }
         fprintf(stderr,
-                "media_source: DVD reset authenticated navigation title %d\n",
+                "media_source: DVD reset authenticated navigation %s%d\n",
+                state->menu_mode ? "first-play mode title=" : "title ",
                 (int)title);
     } else {
         dvdnav_close(state->navigation);
@@ -578,7 +687,8 @@ static int iso_rewind(void *opaque)
             clearerr(state->stream);
         if ((state->stream && fseeko(state->stream, 0, SEEK_SET) != 0) ||
             dvd_navigation_open(state) < 0 ||
-            dvdnav_title_play(state->navigation, title) != DVDNAV_STATUS_OK) {
+            (!state->menu_mode &&
+             dvdnav_title_play(state->navigation, title) != DVDNAV_STATUS_OK)) {
             state->error = 1;
             return -1;
         }
@@ -592,6 +702,14 @@ static int iso_rewind(void *opaque)
     state->cell_number = 0;
     state->end_of_stream = 0;
     state->error = 0;
+    state->still_active = 0;
+    state->still_seconds = 0;
+    state->dvd_state.menu_changed = 1;
+    state->dvd_state.clut_changed = 1;
+    state->dvd_state.spu_stream_changed = 1;
+    state->dvd_state.highlight_changed = 1;
+    state->dvd_state.hop = 1;
+    iso_refresh_menu_state(state);
     return 0;
 }
 
@@ -621,7 +739,8 @@ static int iso_prepare(void *opaque)
     int lock_ready = 0;
     int read_ready = 0;
 
-    if (!state->direct_device || state->buffer_thread_started)
+    if (!state->direct_device || state->menu_mode ||
+        state->buffer_thread_started)
         return 0;
     if (!state->buffer_sync_initialized) {
         state->buffer = malloc(DVD_BUFFER_CAPACITY);
@@ -703,6 +822,8 @@ static int iso_change_chapter(struct iso_source_state *state, int direction)
     state->cell_number = 0;
     state->end_of_stream = 0;
     state->error = 0;
+    state->still_active = 0;
+    state->still_seconds = 0;
     iso_reset_buffer(state, 0);
     fprintf(stderr,
             "media_source: %s chapter control current=%d target=%d of %u "
@@ -714,6 +835,67 @@ static int iso_change_chapter(struct iso_source_state *state, int direction)
         return -1;
     }
     return target;
+}
+
+static int iso_menu_command(struct iso_source_state *state,
+                            enum media_source_dvd_command command)
+{
+    dvdnav_status_t status = DVDNAV_STATUS_ERR;
+    pci_t *pci;
+    int32_t button = 0;
+
+    if (!state->menu_mode)
+        return -1;
+    iso_refresh_menu_state(state);
+    pci = dvdnav_get_current_nav_pci(state->navigation);
+    switch (command) {
+    case MEDIA_SOURCE_DVD_MENU_UP:
+        if (!state->dvd_state.menu_active || !pci)
+            return 0;
+        status = dvdnav_upper_button_select(state->navigation, pci);
+        break;
+    case MEDIA_SOURCE_DVD_MENU_DOWN:
+        if (!state->dvd_state.menu_active || !pci)
+            return 0;
+        status = dvdnav_lower_button_select(state->navigation, pci);
+        break;
+    case MEDIA_SOURCE_DVD_MENU_LEFT:
+        if (!state->dvd_state.menu_active || !pci)
+            return 0;
+        status = dvdnav_left_button_select(state->navigation, pci);
+        break;
+    case MEDIA_SOURCE_DVD_MENU_RIGHT:
+        if (!state->dvd_state.menu_active || !pci)
+            return 0;
+        status = dvdnav_right_button_select(state->navigation, pci);
+        break;
+    case MEDIA_SOURCE_DVD_MENU_ACTIVATE:
+        if (!state->dvd_state.menu_active || !pci)
+            return 0;
+        status = dvdnav_button_activate(state->navigation, pci);
+        if (status == DVDNAV_STATUS_OK) {
+            state->still_active = 0;
+            state->dvd_state.hop = 1;
+            return 1;
+        }
+        break;
+    case MEDIA_SOURCE_DVD_ROOT_MENU:
+        status = dvdnav_menu_call(state->navigation, DVD_MENU_Root);
+        if (status == DVDNAV_STATUS_OK) {
+            state->still_active = 0;
+            state->dvd_state.hop = 1;
+            return 1;
+        }
+        break;
+    default:
+        return -1;
+    }
+    if (status != DVDNAV_STATUS_OK)
+        return -1;
+    if (dvdnav_get_current_highlight(state->navigation, &button) ==
+            DVDNAV_STATUS_OK)
+        iso_refresh_highlight(state, button > 0, (int)button, 1);
+    return 0;
 }
 
 static int iso_seek(void *opaque, int64_t offset,
@@ -796,22 +978,40 @@ static void set_error(char *error, size_t error_size, const char *message,
         snprintf(error, error_size, "%s", message);
 }
 
+static void iso_initialize_menu_metadata(struct iso_source_state *state,
+                                         int menu_mode)
+{
+    unsigned index;
+
+    state->menu_mode = menu_mode;
+    state->dvd_state.spu_stream = -1;
+    for (index = 0; index < 16; ++index)
+        state->dvd_state.clut[index] = 0x00108080u;
+}
+
 int media_source_open(struct media_source *source, const char *specification,
                       char *error, size_t error_size)
 {
     struct file_source_state *state;
     const char *location;
+    int dvd_menu_source;
+    int iso_menu_source;
 
     if (!source || !specification || !*specification) {
         set_error(error, error_size, "empty media source", NULL);
         return MEDIA_SOURCE_INVALID;
     }
     memset(source, 0, sizeof(*source));
-    if (starts_with(specification, MEDIA_PLAYER_DVD_PREFIX)) {
+    dvd_menu_source = starts_with(specification, MEDIA_PLAYER_DVD_MENU_PREFIX);
+    iso_menu_source = starts_with(specification, MEDIA_PLAYER_ISO_MENU_PREFIX);
+    if (dvd_menu_source ||
+        starts_with(specification, MEDIA_PLAYER_DVD_PREFIX)) {
         struct iso_source_state *dvd_state;
+        const char *prefix = dvd_menu_source ? MEDIA_PLAYER_DVD_MENU_PREFIX :
+                                               MEDIA_PLAYER_DVD_PREFIX;
 
         source->kind = MEDIA_SOURCE_DVD;
-        location = specification + strlen(MEDIA_PLAYER_DVD_PREFIX);
+        location = specification + strlen(prefix);
         if (!*location || location[0] != '/') {
             set_error(error, error_size,
                       "DVD source requires an absolute device path",
@@ -825,13 +1025,14 @@ int media_source_open(struct media_source *source, const char *specification,
         }
         dvd_state->device_path = strdup(location);
         dvd_state->direct_device = 1;
+        iso_initialize_menu_metadata(dvd_state, dvd_menu_source);
         if (!dvd_state->device_path) {
             set_error(error, error_size, "out of memory", NULL);
             iso_close(dvd_state);
             return MEDIA_SOURCE_IO_ERROR;
         }
         if (dvd_navigation_open(dvd_state) < 0 ||
-            iso_select_title(dvd_state) < 0) {
+            iso_inventory_titles(dvd_state, !dvd_menu_source) < 0) {
             const char *detail = dvd_state->navigation ?
                 dvdnav_err_to_string(dvd_state->navigation) : location;
             set_error(error, error_size, "cannot open DVD device", detail);
@@ -839,20 +1040,30 @@ int media_source_open(struct media_source *source, const char *specification,
             return MEDIA_SOURCE_IO_ERROR;
         }
         fprintf(stderr,
-                "media_source: DVD device %s selected longest title %d "
+                "media_source: DVD device %s %s longest title %d "
                 "chapters=%u duration90k=%llu\n",
-                dvd_state->device_path, (int)dvd_state->title,
+                dvd_state->device_path,
+                dvd_menu_source ? "first-play; inventoried" : "selected",
+                (int)dvd_state->title,
                 dvd_state->chapters,
                 (unsigned long long)dvd_state->duration);
+        dvd_state->dvd_state.menu_changed = 1;
+        dvd_state->dvd_state.clut_changed = 1;
+        dvd_state->dvd_state.spu_stream_changed = 1;
+        dvd_state->dvd_state.highlight_changed = 1;
+        iso_refresh_menu_state(dvd_state);
         source->ops = &iso_ops;
         source->state = dvd_state;
         return MEDIA_SOURCE_OK;
     }
-    if (starts_with(specification, MEDIA_PLAYER_ISO_PREFIX)) {
+    if (iso_menu_source ||
+        starts_with(specification, MEDIA_PLAYER_ISO_PREFIX)) {
         struct iso_source_state *iso_state;
+        const char *prefix = iso_menu_source ? MEDIA_PLAYER_ISO_MENU_PREFIX :
+                                               MEDIA_PLAYER_ISO_PREFIX;
 
         source->kind = MEDIA_SOURCE_ISO;
-        location = specification + strlen(MEDIA_PLAYER_ISO_PREFIX);
+        location = specification + strlen(prefix);
         if (!*location) {
             set_error(error, error_size, "empty ISO source", NULL);
             return MEDIA_SOURCE_INVALID;
@@ -862,6 +1073,7 @@ int media_source_open(struct media_source *source, const char *specification,
             set_error(error, error_size, "out of memory", NULL);
             return MEDIA_SOURCE_IO_ERROR;
         }
+        iso_initialize_menu_metadata(iso_state, iso_menu_source);
         iso_state->stream = fopen(location, "rb");
         if (!iso_state->stream) {
             set_error(error, error_size, strerror(errno), location);
@@ -869,7 +1081,7 @@ int media_source_open(struct media_source *source, const char *specification,
             return MEDIA_SOURCE_IO_ERROR;
         }
         if (dvd_navigation_open(iso_state) < 0 ||
-            iso_select_title(iso_state) < 0) {
+            iso_inventory_titles(iso_state, !iso_menu_source) < 0) {
             const char *detail = iso_state->navigation ?
                 dvdnav_err_to_string(iso_state->navigation) : location;
             set_error(error, error_size, "cannot open DVD ISO",
@@ -878,11 +1090,17 @@ int media_source_open(struct media_source *source, const char *specification,
             return MEDIA_SOURCE_IO_ERROR;
         }
         fprintf(stderr,
-                "media_source: ISO selected longest title %d "
+                "media_source: ISO %s longest title %d "
                 "chapters=%u duration90k=%llu\n",
+                iso_menu_source ? "first-play; inventoried" : "selected",
                 (int)iso_state->title,
                 iso_state->chapters,
                 (unsigned long long)iso_state->duration);
+        iso_state->dvd_state.menu_changed = 1;
+        iso_state->dvd_state.clut_changed = 1;
+        iso_state->dvd_state.spu_stream_changed = 1;
+        iso_state->dvd_state.highlight_changed = 1;
+        iso_refresh_menu_state(iso_state);
         source->ops = &iso_ops;
         source->state = iso_state;
         return MEDIA_SOURCE_OK;
@@ -958,6 +1176,64 @@ int media_source_change_chapter(struct media_source *source, int direction)
     if (!source || source->ops != &iso_ops || !source->state)
         return -1;
     return iso_change_chapter(source->state, direction);
+}
+
+int media_source_dvd_command(struct media_source *source,
+                             enum media_source_dvd_command command)
+{
+    if (!source || source->ops != &iso_ops || !source->state)
+        return -1;
+    return iso_menu_command(source->state, command);
+}
+
+int media_source_dvd_state(struct media_source *source,
+                           struct media_source_dvd_state *dvd_state)
+{
+    struct iso_source_state *state;
+
+    if (!source || source->ops != &iso_ops || !source->state || !dvd_state)
+        return 0;
+    state = source->state;
+    iso_refresh_menu_state(state);
+    *dvd_state = state->dvd_state;
+    state->dvd_state.menu_changed = 0;
+    state->dvd_state.clut_changed = 0;
+    state->dvd_state.spu_stream_changed = 0;
+    state->dvd_state.highlight_changed = 0;
+    state->dvd_state.hop = 0;
+    return 1;
+}
+
+int media_source_dvd_still(struct media_source *source, unsigned *seconds)
+{
+    struct iso_source_state *state;
+
+    if (!source || source->ops != &iso_ops || !source->state)
+        return 0;
+    state = source->state;
+    if (!state->menu_mode || !state->still_active)
+        return 0;
+    if (seconds)
+        *seconds = state->still_seconds;
+    return 1;
+}
+
+int media_source_dvd_still_skip(struct media_source *source)
+{
+    struct iso_source_state *state;
+
+    if (!source || source->ops != &iso_ops || !source->state)
+        return -1;
+    state = source->state;
+    if (!state->menu_mode || !state->still_active)
+        return 0;
+    if (dvdnav_still_skip(state->navigation) != DVDNAV_STATUS_OK) {
+        state->error = 1;
+        return -1;
+    }
+    state->still_active = 0;
+    state->still_seconds = 0;
+    return 0;
 }
 
 void media_source_close(struct media_source *source)

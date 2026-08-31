@@ -13,8 +13,9 @@
 //  14,315-picture file with working backpressure.
 //
 //  Records use reserved H.262 start codes: B0 carries picture metadata, B1 a
-//  run of PCM frames, and B6 a zero-payload PCM end token. No encoder emits
-//  these codes. Payload lengths are declared rather than scanned, so arbitrary
+//  run of PCM frames, B6 a zero-payload PCM end token, and B9 a length-bounded
+//  DVD overlay record. No encoder emits these codes. Payload lengths are
+//  declared rather than scanned, so arbitrary
 //  signed PCM bytes are consumed as data and can never be mistaken for a nested
 //  marker. A plain elementary stream contains no records and passes through
 //  unchanged.
@@ -78,23 +79,35 @@ module mpeg2_h262_inband_metadata
     output reg         pcm_end,             // one-cycle pulse
     input  wire        pcm_ready,
     output reg  [13:0] pcm_sample_count,
-    output reg         pcm_protocol_error
+    output reg         pcm_protocol_error,
+
+    output reg   [7:0] overlay_data,
+    output reg         overlay_start,       // first command/payload byte
+    output reg         overlay_last,        // final command/payload byte
+    output reg         overlay_valid,       // one-cycle pulse
+    input  wire        overlay_ready,
+    output reg         overlay_protocol_error
 );
 
 localparam [31:0] PTS_MARKER     = 32'h000001B0;
 localparam [31:0] PCM_MARKER     = 32'h000001B1;
 localparam [31:0] PCM_END_MARKER = 32'h000001B6;
+localparam [31:0] OVERLAY_MARKER = 32'h000001B9;
 localparam integer PAYLOAD_BYTES = 5;
 localparam [4:0]   MAX_PCM_FRAMES = 5'd16;
+localparam [15:0]  MAX_OVERLAY_BYTES = 16'd4097;
 
-localparam [2:0] S_FILL        = 3'd0,
-                 S_STREAM      = 3'd1,
-                 S_PTS_PAYLOAD = 3'd2,
-                 S_PCM_PAYLOAD = 3'd3,
-                 S_PCM_END     = 3'd4,
-                 S_FLUSH       = 3'd5;
+localparam [3:0] S_FILL           = 4'd0,
+                 S_STREAM         = 4'd1,
+                 S_PTS_PAYLOAD    = 4'd2,
+                 S_PCM_PAYLOAD    = 4'd3,
+                 S_PCM_END        = 4'd4,
+                 S_FLUSH          = 4'd5,
+                 S_OVERLAY_LEN_HI = 4'd6,
+                 S_OVERLAY_LEN_LO = 4'd7,
+                 S_OVERLAY_PAYLOAD= 4'd8;
 
-reg [2:0]  state;
+reg [3:0]  state;
 reg [31:0] window;
 reg [2:0]  window_fill;
 reg [2:0]  payload_index;
@@ -104,6 +117,8 @@ reg [5:0]  pcm_frames_left;
 reg        pcm_mode_seen;
 reg [1:0]  pcm_byte_index;
 reg [23:0] pcm_frame;
+reg [15:0] overlay_length;
+reg [15:0] overlay_remaining;
 
 // The integrated decoder advances on stream_valid itself rather than on a
 // conventional valid-and-ready transfer.  Retain a pending output byte while
@@ -127,7 +142,8 @@ assign input_ready =
     (state != S_PCM_END) &&
     (!stream_pending || stream_ready) &&
     (!pts_payload_final || metadata_ready) &&
-    (!pcm_payload_final || pcm_ready);
+    (!pcm_payload_final || pcm_ready) &&
+    ((state != S_OVERLAY_PAYLOAD) || overlay_ready);
 
 wire [31:0] window_next = {window[23:0], input_data};
 // window_fill saturates at four; the window then always holds the true
@@ -135,8 +151,10 @@ wire [31:0] window_next = {window[23:0], input_data};
 wire pts_marker_hit = (window_next == PTS_MARKER);
 wire pcm_marker_hit = (window_next == PCM_MARKER);
 wire pcm_end_marker_hit = (window_next == PCM_END_MARKER);
+wire overlay_marker_hit = (window_next == OVERLAY_MARKER);
 wire marker_hit = (window_fill == 3'd4) &&
-    (pts_marker_hit || pcm_marker_hit || pcm_end_marker_hit);
+    (pts_marker_hit || pcm_marker_hit || pcm_end_marker_hit ||
+     overlay_marker_hit);
 wire [39:0] payload_full = {payload[31:0], input_data};
 
 always @(posedge clk) begin
@@ -168,11 +186,21 @@ always @(posedge clk) begin
         pcm_mode_seen      <= 1'b0;
         pcm_byte_index     <= 2'd0;
         pcm_frame          <= 24'd0;
+        overlay_data       <= 8'd0;
+        overlay_start      <= 1'b0;
+        overlay_last       <= 1'b0;
+        overlay_valid      <= 1'b0;
+        overlay_protocol_error <= 1'b0;
+        overlay_length     <= 16'd0;
+        overlay_remaining  <= 16'd0;
     end
     else begin
         metadata_valid <= 1'b0;
         pcm_valid      <= 1'b0;
         pcm_end        <= 1'b0;
+        overlay_start  <= 1'b0;
+        overlay_last   <= 1'b0;
+        overlay_valid  <= 1'b0;
 
         if (stream_pending && stream_ready)
             stream_pending <= 1'b0;
@@ -186,7 +214,8 @@ always @(posedge clk) begin
                 window      <= window_next;
                 window_fill <= window_fill + 3'd1;
                 if (window_fill == 3'd3) begin
-                    if (pts_marker_hit || pcm_marker_hit || pcm_end_marker_hit) begin
+                    if (pts_marker_hit || pcm_marker_hit || pcm_end_marker_hit ||
+                        overlay_marker_hit) begin
                         window        <= 32'd0;
                         window_fill   <= 3'd0;
                         payload_index <= 3'd0;
@@ -194,8 +223,10 @@ always @(posedge clk) begin
                             state <= S_PTS_PAYLOAD;
                         else if (pcm_marker_hit)
                             state <= S_PCM_PAYLOAD;
-                        else
+                        else if (pcm_end_marker_hit)
                             state <= S_PCM_END;
+                        else
+                            state <= S_OVERLAY_LEN_HI;
                     end
                     else
                         state <= S_STREAM;
@@ -229,8 +260,10 @@ always @(posedge clk) begin
                         state <= S_PTS_PAYLOAD;
                     else if (pcm_marker_hit)
                         state <= S_PCM_PAYLOAD;
-                    else
+                    else if (pcm_end_marker_hit)
                         state <= S_PCM_END;
+                    else
+                        state <= S_OVERLAY_LEN_HI;
                 end
                 else begin
                     stream_data  <= window[31:24];
@@ -314,6 +347,44 @@ always @(posedge clk) begin
             if (pcm_ready) begin
                 pcm_end <= 1'b1;
                 state   <= S_FILL;
+            end
+
+        // B9 records carry a big-endian byte count followed by exactly that
+        // many bytes.  The first byte is the overlay command; subsequent bytes
+        // are command data.  The extractor retains no record body, so the
+        // overlay engine's ready signal applies backpressure to ioctl_download.
+        S_OVERLAY_LEN_HI:
+            if (input_valid && input_ready) begin
+                overlay_length <= {input_data, 8'd0};
+                state          <= S_OVERLAY_LEN_LO;
+            end
+
+        S_OVERLAY_LEN_LO:
+            if (input_valid && input_ready) begin
+                overlay_length <= {overlay_length[15:8], input_data};
+                if ({overlay_length[15:8], input_data} == 16'd0 ||
+                    {overlay_length[15:8], input_data} > MAX_OVERLAY_BYTES) begin
+                    overlay_protocol_error <= 1'b1;
+                    state <= S_FILL;
+                end
+                else begin
+                    overlay_remaining <= {overlay_length[15:8], input_data};
+                    state <= S_OVERLAY_PAYLOAD;
+                end
+            end
+
+        S_OVERLAY_PAYLOAD:
+            if (input_valid && input_ready) begin
+                overlay_data  <= input_data;
+                overlay_start <= (overlay_remaining == overlay_length);
+                overlay_last  <= (overlay_remaining == 16'd1);
+                overlay_valid <= 1'b1;
+                if (overlay_remaining == 16'd1) begin
+                    overlay_remaining <= 16'd0;
+                    state <= S_FILL;
+                end
+                else
+                    overlay_remaining <= overlay_remaining - 16'd1;
             end
 
         // Emit the residual window at end of transfer, oldest byte first.

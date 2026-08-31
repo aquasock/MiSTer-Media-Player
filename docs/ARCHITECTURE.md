@@ -6,16 +6,19 @@ MiSTer Media Player is being developed as a standards-driven media decoder for M
 
 ### HPS / host side
 
-The ARM helper opens file sources, demultiplexes bounded MPEG-2 Program Streams, extracts picture PTS, decodes MPEG Layer II or AC-3 to stereo, and packs AC-3 or DTS passthrough bursts. Patched MiSTer Main launches the helper with the selected audio mode and brokers its annotated byte stream through guarded, resumable transfers. Main remains the sole FPGA SPI owner; the helper does not access that bridge directly.
+The ARM helper opens file sources, demultiplexes bounded MPEG-2 Program Streams, extracts picture PTS, decodes MPEG Layer II or AC-3 to stereo, packs AC-3 or DTS passthrough bursts, and translates authored DVD menu subpictures into bounded overlay records. Patched MiSTer Main launches the helper with the selected audio mode and brokers its annotated byte stream through guarded, resumable transfers. Main remains the sole FPGA SPI owner; the helper does not access that bridge directly.
 
-DVD/ISO source navigation, optical-device integration and playback-control commands remain deferred. See the [helper architecture](../host/arm/ARCHITECTURE.md) for the source and transport contracts.
+DVD/ISO navigation uses libdvdnav first-play/root-menu state plus a private
+Main/helper control channel for directional, activation and root commands.
+See the [helper architecture](../host/arm/ARCHITECTURE.md) for the source and
+transport contracts.
 
 ### FPGA side
 
 The active FPGA pipeline performs:
 
 1. asynchronous input buffering and clock-domain crossing;
-2. separation of video, picture-PTS and PCM-or-burst records, followed by H.262 byte/bit reading with backpressure;
+2. separation of video, picture-PTS, PCM-or-burst and DVD-overlay records, followed by H.262 byte/bit reading with backpressure;
 3. picture/slice/macroblock/block parsing;
 4. MPEG-2 DCT VLC decoding;
 5. inverse quantization;
@@ -25,7 +28,8 @@ The active FPGA pipeline performs:
 9. DDR3 readback through small ping-pong line caches;
 10. 4:2:0 chroma expansion;
 11. limited-range BT.601 YCbCr-to-RGB conversion;
-12. cadence-floor and picture-PTS scheduling with selectable 800x600 diagnostic or native 480i presentation.
+12. cadence-floor and picture-PTS scheduling with selectable 800x600 diagnostic or native 480i presentation;
+13. native-480i composition of the double-buffered DVD overlay with authored normal/highlight RGBA state.
 
 Audio records enter an 8,192-frame stereo FIFO. The selected output routes decoded PCM to HDMI or S/PDIF, or sends AC-3/DTS bursts through a bit-preserving S/PDIF path that bypasses gain, mixing and filtering. The unused output is muted. Video decoder backpressure is isolated by the separate 64 KiB clean-video queue; the ingress FIFO adds 32 KiB of compressed read-ahead.
 
@@ -55,6 +59,12 @@ For the maximum current diagnostic geometry:
 - Cb/Cr stride: 45 DDR words per row.
 
 The current frame resides in a DDR region beginning at physical byte address `0x30000000`. This region was chosen after an earlier base at `0x20000000` collided with MiSTer's system-video/scaler use of DDR.
+
+DVD menu overlays use two packed two-bit 720x480 planes at byte addresses
+`0x30280000` and `0x30300000`. The display client caches one parity line while
+the helper loads the inactive plane, then publishes it atomically on commit.
+The DDR arbiter preserves display-read priority, followed by overlay reads,
+prediction reads, decoder writes and overlay writes.
 
 ## Presentation path
 

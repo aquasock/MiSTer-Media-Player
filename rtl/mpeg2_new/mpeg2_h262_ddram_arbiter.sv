@@ -22,6 +22,11 @@
 // arbiter returns to three explicit clients: presentation read, prediction read,
 // and reconstruction write. No prediction-side write encoding remains.
 //
+// Authored DVD menus add two explicit clients in disjoint regions 5 and 6:
+// a low-priority plane writer and a line-cache reader.  Display reads retain
+// highest priority; response ownership is widened instead of inferring a client
+// from addresses or timing.
+//
 // Commit 142 extends display ownership to the B scratch frame.  Entry 276 adds
 // a third retained reference at region 100.  Writer exclusion therefore keeps
 // all three region bits [18:16]; truncating the tag would alias reference bank
@@ -57,6 +62,20 @@ module mpeg2_h262_ddram_arbiter
     output wire        prediction_busy,
     output wire        prediction_dout_ready,
 
+    input  wire [7:0]  overlay_reader_burstcnt,
+    input  wire [28:0] overlay_reader_addr,
+    input  tri0        overlay_reader_rd,
+    output wire        overlay_reader_busy,
+    output wire        overlay_reader_dout_ready,
+
+    input  wire [7:0]  overlay_writer_burstcnt,
+    input  wire [28:0] overlay_writer_addr,
+    input  wire        overlay_writer_rd,
+    input  wire [63:0] overlay_writer_din,
+    input  wire [7:0]  overlay_writer_be,
+    input  tri0        overlay_writer_we,
+    output wire        overlay_writer_busy,
+
     input  wire        ddram_busy,
     input  wire        ddram_dout_ready,
     output wire [7:0]  ddram_burstcnt,
@@ -78,14 +97,17 @@ localparam integer DESCRIPTOR_COUNT_WIDTH=$clog2(DESCRIPTOR_DEPTH+1);
 reg [DESCRIPTOR_COUNT_WIDTH-1:0] read_descriptor_count;
 reg [DESCRIPTOR_POINTER_WIDTH-1:0]
     read_descriptor_head,read_descriptor_tail;
-reg       read_descriptor_owner [0:DESCRIPTOR_DEPTH-1];
+reg [1:0] read_descriptor_owner [0:DESCRIPTOR_DEPTH-1];
 reg [7:0] read_descriptor_words [0:DESCRIPTOR_DEPTH-1];
 reg       reader_bank_valid;
 reg [2:0] reader_frame_region;
 
 wire read_outstanding=(read_descriptor_count!=0);
-wire read_owner_prediction=read_outstanding?
-    read_descriptor_owner[read_descriptor_head]:1'b0;
+localparam [1:0] READ_OWNER_DISPLAY=2'd0,
+                 READ_OWNER_OVERLAY=2'd1,
+                 READ_OWNER_PREDICTION=2'd2;
+wire [1:0] read_owner=read_outstanding?
+    read_descriptor_owner[read_descriptor_head]:READ_OWNER_DISPLAY;
 wire [7:0] read_words_remaining=read_outstanding?
     read_descriptor_words[read_descriptor_head]:8'd0;
 wire response_existing=ddram_dout_ready&&read_outstanding;
@@ -100,11 +122,18 @@ wire grant_reader =
     read_descriptor_room && reader_rd;
 
 wire grant_prediction =
-    read_descriptor_room && !reader_rd && prediction_rd;
+    read_descriptor_room && !reader_rd && !overlay_reader_rd && prediction_rd;
+
+wire grant_overlay_reader =
+    read_descriptor_room && !reader_rd && overlay_reader_rd;
 
 wire grant_writer =
-    !read_outstanding && !reader_rd && !prediction_rd &&
+    !read_outstanding && !reader_rd && !overlay_reader_rd && !prediction_rd &&
     writer_we && !writer_targets_reader_region;
+
+wire grant_overlay_writer =
+    !read_outstanding && !reader_rd && !overlay_reader_rd && !prediction_rd &&
+    !writer_we && overlay_writer_we;
 
 // Busy reports capacity/priority independently of the corresponding request.
 // This is a ready/valid boundary: acceptance below remains request-qualified,
@@ -112,41 +141,58 @@ wire grant_writer =
 assign reader_busy = !read_descriptor_room||ddram_busy;
 
 assign prediction_busy =
+    !read_descriptor_room||reader_rd||overlay_reader_rd||ddram_busy;
+
+assign overlay_reader_busy =
     !read_descriptor_room||reader_rd||ddram_busy;
 
-assign writer_busy = read_outstanding||reader_rd||prediction_rd||
+assign writer_busy = read_outstanding||reader_rd||overlay_reader_rd||prediction_rd||
     writer_targets_reader_region||ddram_busy;
+
+assign overlay_writer_busy = read_outstanding||reader_rd||overlay_reader_rd||
+    prediction_rd||writer_we||ddram_busy;
 
 assign ddram_burstcnt =
     grant_reader ? reader_burstcnt :
+    grant_overlay_reader ? overlay_reader_burstcnt :
     grant_prediction ? prediction_burstcnt :
-    grant_writer ? writer_burstcnt : 8'd0;
+    grant_writer ? writer_burstcnt :
+    grant_overlay_writer ? overlay_writer_burstcnt : 8'd0;
 
 assign ddram_addr =
     grant_reader ? reader_addr :
+    grant_overlay_reader ? overlay_reader_addr :
     grant_prediction ? prediction_addr :
-    grant_writer ? writer_addr : 29'd0;
+    grant_writer ? writer_addr :
+    grant_overlay_writer ? overlay_writer_addr : 29'd0;
 
 assign ddram_rd =
     grant_reader ? 1'b1 :
+    grant_overlay_reader ? 1'b1 :
     grant_prediction ? 1'b1 : 1'b0;
 
 assign ddram_din =
-    grant_writer ? writer_din : 64'd0;
+    grant_writer ? writer_din :
+    grant_overlay_writer ? overlay_writer_din : 64'd0;
 
 assign ddram_be =
-    grant_writer ? writer_be : 8'hFF;
+    grant_writer ? writer_be :
+    grant_overlay_writer ? overlay_writer_be : 8'hFF;
 
 assign ddram_we =
-    grant_writer ? writer_we : 1'b0;
+    grant_writer ? writer_we :
+    grant_overlay_writer ? overlay_writer_we : 1'b0;
 
 wire reader_accept=grant_reader&&!ddram_busy;
+wire overlay_reader_accept=grant_overlay_reader&&!ddram_busy;
 wire prediction_accept=grant_prediction&&!ddram_busy;
 assign writer_accept_debug=grant_writer&&!ddram_busy;
-wire read_accept=reader_accept||prediction_accept;
-wire accepted_owner_prediction=prediction_accept;
+wire read_accept=reader_accept||overlay_reader_accept||prediction_accept;
+wire [1:0] accepted_owner=reader_accept?READ_OWNER_DISPLAY:
+    overlay_reader_accept?READ_OWNER_OVERLAY:READ_OWNER_PREDICTION;
 wire [7:0] accepted_words=reader_accept?
-    reader_burstcnt:prediction_burstcnt;
+    reader_burstcnt:overlay_reader_accept?
+    overlay_reader_burstcnt:prediction_burstcnt;
 wire direct_response=ddram_dout_ready&&!read_outstanding&&read_accept;
 wire direct_response_finishes=direct_response&&(accepted_words<=8'd1);
 wire descriptor_push=read_accept&&!direct_response_finishes;
@@ -161,11 +207,15 @@ wire [DESCRIPTOR_POINTER_WIDTH-1:0] read_descriptor_tail_next=
     {DESCRIPTOR_POINTER_WIDTH{1'b0}}:read_descriptor_tail+1'b1;
 
 assign reader_dout_ready =
-    (response_existing&&!read_owner_prediction)||
+    (response_existing&&(read_owner==READ_OWNER_DISPLAY))||
     (direct_response&&reader_accept);
 
+assign overlay_reader_dout_ready =
+    (response_existing&&(read_owner==READ_OWNER_OVERLAY))||
+    (direct_response&&overlay_reader_accept);
+
 assign prediction_dout_ready =
-    (response_existing&&read_owner_prediction)||
+    (response_existing&&(read_owner==READ_OWNER_PREDICTION))||
     (direct_response&&prediction_accept);
 
 integer descriptor_index;
@@ -176,7 +226,7 @@ always @(posedge clk) begin
         read_descriptor_tail  <= {DESCRIPTOR_POINTER_WIDTH{1'b0}};
         for(descriptor_index=0;descriptor_index<DESCRIPTOR_DEPTH;
             descriptor_index=descriptor_index+1)begin
-            read_descriptor_owner[descriptor_index] <= 1'b0;
+            read_descriptor_owner[descriptor_index] <= READ_OWNER_DISPLAY;
             read_descriptor_words[descriptor_index] <= 8'd0;
         end
         reader_bank_valid     <= 1'b0;
@@ -185,7 +235,7 @@ always @(posedge clk) begin
     else begin
         if(descriptor_push)begin
             read_descriptor_owner[read_descriptor_tail]<=
-                accepted_owner_prediction;
+                accepted_owner;
             read_descriptor_words[read_descriptor_tail]<=pushed_words;
             read_descriptor_tail<=read_descriptor_tail_next;
         end
@@ -209,5 +259,6 @@ always @(posedge clk) begin
 end
 
 wire unused_writer_rd = writer_rd;
+wire unused_overlay_writer_rd = overlay_writer_rd;
 
 endmodule

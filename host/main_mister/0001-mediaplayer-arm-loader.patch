@@ -1,4 +1,3 @@
-# Applies to Main_MiSTer commit 0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f.
 diff --git a/file_io.cpp b/file_io.cpp
 index 2c9f406..0a02ef2 100644
 --- a/file_io.cpp
@@ -131,7 +130,7 @@ index b912439..447b56d 100644
  
  void fpga_spi_fast_block_write(const uint16_t *buf, uint32_t length);
 diff --git a/input.cpp b/input.cpp
-index 50f1991..a4cc7c6 100644
+index 50f1991..180d511 100644
 --- a/input.cpp
 +++ b/input.cpp
 @@ -36,6 +36,7 @@
@@ -155,13 +154,20 @@ index 50f1991..a4cc7c6 100644
  					if (mouse_emu)
  					{
  						int use_analog = (input[dev].mmap[SYS_AXIS_MX] || input[dev].mmap[SYS_AXIS_MY]);
-@@ -3790,6 +3797,14 @@ static void input_cb(struct input_event *ev, struct input_absinfo *absinfo, int
+@@ -3790,6 +3797,21 @@ static void input_cb(struct input_event *ev, struct input_absinfo *absinfo, int
  				int keyrah = (cfg.keyrah_mode && (((((uint32_t)input[dev].vid) << 16) | input[dev].pid) == cfg.keyrah_mode));
  				if (keyrah) ev->code = keyrah_trans(ev->code, ev->value);
  
 +				unsigned media_input = ev->code == KEY_SPACE ? MEDIAPLAYER_INPUT_PLAY_PAUSE :
 +				                       ev->code == KEY_P ? MEDIAPLAYER_INPUT_PREVIOUS :
-+				                       ev->code == KEY_N ? MEDIAPLAYER_INPUT_NEXT : 0;
++				                       ev->code == KEY_N ? MEDIAPLAYER_INPUT_NEXT :
++				                       ev->code == KEY_UP ? MEDIAPLAYER_INPUT_MENU_UP :
++				                       ev->code == KEY_DOWN ? MEDIAPLAYER_INPUT_MENU_DOWN :
++				                       ev->code == KEY_LEFT ? MEDIAPLAYER_INPUT_MENU_LEFT :
++				                       ev->code == KEY_RIGHT ? MEDIAPLAYER_INPUT_MENU_RIGHT :
++				                       (ev->code == KEY_ENTER || ev->code == KEY_KPENTER) ?
++				                           MEDIAPLAYER_INPUT_MENU_ACTIVATE :
++				                       ev->code == KEY_M ? MEDIAPLAYER_INPUT_ROOT_MENU : 0;
 +				if (!menu_event && media_input &&
 +				    mediaplayer_input(media_input, ev->value == 1,
 +				                      user_io_osd_is_visible()))
@@ -260,10 +266,10 @@ index 0c74e21..ceb3743 100644
  				printf("Saving config to %s\n", filename);
 diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
 new file mode 100644
-index 0000000..003dccf
+index 0000000..d828649
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,646 @@
+@@ -0,0 +1,748 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -301,6 +307,8 @@ index 0000000..003dccf
 +static bool playback_paused = false;
 +static bool chapter_barrier = false;
 +static bool chapter_controls = false;
++static bool menu_controls = false;
++static bool menu_active = false;
 +static unsigned char playback_index = 0;
 +
 +enum
@@ -308,7 +316,15 @@ index 0000000..003dccf
 +	MEDIA_CONTROL_PREVIOUS_CHAPTER = 0x01,
 +	MEDIA_CONTROL_NEXT_CHAPTER = 0x02,
 +	MEDIA_CONTROL_GO = 0x03,
++	MEDIA_CONTROL_MENU_UP = 0x04,
++	MEDIA_CONTROL_MENU_DOWN = 0x05,
++	MEDIA_CONTROL_MENU_LEFT = 0x06,
++	MEDIA_CONTROL_MENU_RIGHT = 0x07,
++	MEDIA_CONTROL_MENU_ACTIVATE = 0x08,
++	MEDIA_CONTROL_ROOT_MENU = 0x09,
 +	MEDIA_CONTROL_READY = 0x81,
++	MEDIA_CONTROL_MENU_ENTER = 0x82,
++	MEDIA_CONTROL_MENU_LEAVE = 0x83,
 +	MEDIA_CONTROL_ERROR = 0xff
 +};
 +
@@ -489,6 +505,8 @@ index 0000000..003dccf
 +	playback_paused = false;
 +	chapter_barrier = false;
 +	chapter_controls = false;
++	menu_controls = false;
++	menu_active = false;
 +}
 +
 +static void stop_with_reason(const char *reason)
@@ -522,10 +540,10 @@ index 0000000..003dccf
 +	if (!mediaplayer_handles_file(path)) return 0;
 +	const char *extension = strrchr(path, '.');
 +	std::string source_spec;
-+	if (!strcasecmp(extension, ".dvd")) source_spec = "dvd:/dev/sr0";
++	if (!strcasecmp(extension, ".dvd")) source_spec = "dvdmenu:/dev/sr0";
 +	else
 +	{
-+		source_spec = !strcasecmp(extension, ".iso") ? "iso:" : "file:";
++		source_spec = !strcasecmp(extension, ".iso") ? "isomenu:" : "file:";
 +		source_spec += getFullPath(path);
 +	}
 +	return mediaplayer_start_source(source_spec.c_str(), index);
@@ -621,7 +639,10 @@ index 0000000..003dccf
 +	playback_index = index;
 +	playback_paused = false;
 +	chapter_barrier = false;
-+	chapter_controls = !strncasecmp(source_spec, "dvd:", 4) ||
++	menu_active = false;
++	menu_controls = !strncasecmp(source_spec, "dvdmenu:", 8) ||
++	                !strncasecmp(source_spec, "isomenu:", 8);
++	chapter_controls = menu_controls || !strncasecmp(source_spec, "dvd:", 4) ||
 +	                   !strncasecmp(source_spec, "iso:", 4);
 +	user_io_set_index(index);
 +	user_io_file_info(".M2V");
@@ -668,6 +689,47 @@ index 0000000..003dccf
 +	}
 +}
 +
++static int handle_control_event(uint8_t event)
++{
++	if (event == MEDIA_CONTROL_MENU_ENTER || event == MEDIA_CONTROL_MENU_LEAVE)
++	{
++		menu_active = event == MEDIA_CONTROL_MENU_ENTER;
++		diagnostic_write("DVD menu %s\n", menu_active ? "entered" : "left");
++		return 1;
++	}
++	if (event == MEDIA_CONTROL_ERROR)
++	{
++		diagnostic_write("helper control error\n");
++		stop_with_reason("control-error");
++		return 0;
++	}
++	return 1;
++}
++
++static void control_event_poll()
++{
++	if (control_fd < 0) return;
++	for (;;)
++	{
++		uint8_t event = 0;
++		ssize_t count = read(control_fd, &event, sizeof(event));
++		if (count == 1)
++		{
++			if (!handle_control_event(event)) return;
++			if (event != MEDIA_CONTROL_MENU_ENTER &&
++			    event != MEDIA_CONTROL_MENU_LEAVE)
++				diagnostic_write("unexpected control event=0x%02x\n", event);
++			continue;
++		}
++		if (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
++		{
++			diagnostic_write("control read failed errno=%d message=%s\n", errno, strerror(errno));
++			stop_with_reason("control-read-error");
++		}
++		return;
++	}
++}
++
 +static void chapter_barrier_poll()
 +{
 +	uint8_t event = 0;
@@ -682,11 +744,10 @@ index 0000000..003dccf
 +		stop_with_reason("control-read-error");
 +		return;
 +	}
-+	if (count == 1 && event == MEDIA_CONTROL_ERROR)
++	if (count == 1 && event != MEDIA_CONTROL_READY)
 +	{
-+		diagnostic_write("chapter barrier helper error\n");
-+		stop_with_reason("chapter-error");
-+		return;
++		if (!handle_control_event(event)) return;
++		event = 0;
 +	}
 +	if (!discard_helper_output(&discarded))
 +	{
@@ -719,7 +780,14 @@ index 0000000..003dccf
 +int mediaplayer_input(unsigned input, int pressed, int osd_visible)
 +{
 +	if (helper_fd < 0 || osd_visible || !mediaplayer_is_core()) return 0;
++	if (input >= MEDIAPLAYER_INPUT_MENU_UP &&
++	    input <= MEDIAPLAYER_INPUT_MENU_ACTIVATE &&
++	    (!menu_controls || !menu_active)) return 0;
++	if (input == MEDIAPLAYER_INPUT_ROOT_MENU && !menu_controls) return 0;
 +	if (!pressed) return 1;
++
++	if (input == MEDIAPLAYER_INPUT_PLAY_PAUSE && menu_active)
++		input = MEDIAPLAYER_INPUT_MENU_ACTIVATE;
 +
 +	if (input == MEDIAPLAYER_INPUT_PLAY_PAUSE)
 +	{
@@ -729,6 +797,32 @@ index 0000000..003dccf
 +		                 playback_paused ? "paused" : "resumed",
 +		                 (unsigned long long)submitted_bytes);
 +		printf("MediaPlayer: %s\n", playback_paused ? "paused" : "resumed");
++		return 1;
++	}
++	if (input >= MEDIAPLAYER_INPUT_MENU_UP &&
++	    input <= MEDIAPLAYER_INPUT_ROOT_MENU)
++	{
++		if (!menu_controls) return 0;
++		if (input != MEDIAPLAYER_INPUT_ROOT_MENU && !menu_active) return 0;
++		uint8_t command = input == MEDIAPLAYER_INPUT_MENU_UP ? MEDIA_CONTROL_MENU_UP :
++		                  input == MEDIAPLAYER_INPUT_MENU_DOWN ? MEDIA_CONTROL_MENU_DOWN :
++		                  input == MEDIAPLAYER_INPUT_MENU_LEFT ? MEDIA_CONTROL_MENU_LEFT :
++		                  input == MEDIAPLAYER_INPUT_MENU_RIGHT ? MEDIA_CONTROL_MENU_RIGHT :
++		                  input == MEDIAPLAYER_INPUT_MENU_ACTIVATE ? MEDIA_CONTROL_MENU_ACTIVATE :
++		                  MEDIA_CONTROL_ROOT_MENU;
++		if (chapter_barrier || playback_paused) return 1;
++		if (command != MEDIA_CONTROL_MENU_ACTIVATE && command != MEDIA_CONTROL_ROOT_MENU)
++		{
++			if (!send_control(command)) stop_with_reason("menu-command-error");
++			return 1;
++		}
++		if (download_active) { user_io_set_download(0); download_active = 0; }
++		pending_size = pending_offset = 0;
++		pending_eof = false;
++		chapter_barrier = true;
++		if (!send_control(command)) stop_with_reason("menu-command-error");
++		diagnostic_write("DVD navigation command=0x%02x submitted=%llu\n",
++		                 command, (unsigned long long)submitted_bytes);
 +		return 1;
 +	}
 +
@@ -769,7 +863,19 @@ index 0000000..003dccf
 +	if (joystick != 0) return;
 +	pressed = map & ~previous_map;
 +	previous_map = map;
-+	if (pressed & JOY_LEFT)
++	if (pressed & JOY_SELECT)
++		mediaplayer_input(MEDIAPLAYER_INPUT_ROOT_MENU, 1, osd_visible);
++	else if (menu_active && (pressed & JOY_A))
++		mediaplayer_input(MEDIAPLAYER_INPUT_MENU_ACTIVATE, 1, osd_visible);
++	else if (menu_active && (pressed & JOY_UP))
++		mediaplayer_input(MEDIAPLAYER_INPUT_MENU_UP, 1, osd_visible);
++	else if (menu_active && (pressed & JOY_DOWN))
++		mediaplayer_input(MEDIAPLAYER_INPUT_MENU_DOWN, 1, osd_visible);
++	else if (menu_active && (pressed & JOY_LEFT))
++		mediaplayer_input(MEDIAPLAYER_INPUT_MENU_LEFT, 1, osd_visible);
++	else if (menu_active && (pressed & JOY_RIGHT))
++		mediaplayer_input(MEDIAPLAYER_INPUT_MENU_RIGHT, 1, osd_visible);
++	else if (pressed & JOY_LEFT)
 +		mediaplayer_input(MEDIAPLAYER_INPUT_PREVIOUS, 1, osd_visible);
 +	else if (pressed & JOY_RIGHT)
 +		mediaplayer_input(MEDIAPLAYER_INPUT_NEXT, 1, osd_visible);
@@ -891,6 +997,8 @@ index 0000000..003dccf
 +{
 +	if (helper_fd < 0) return;
 +	if (chapter_barrier) { chapter_barrier_poll(); return; }
++	control_event_poll();
++	if (helper_fd < 0) return;
 +	if (playback_paused) return;
 +	if (diagnostic_fd >= 0)
 +	{
@@ -912,10 +1020,10 @@ index 0000000..003dccf
 +}
 diff --git a/support/mediaplayer/mediaplayer.h b/support/mediaplayer/mediaplayer.h
 new file mode 100644
-index 0000000..22a7e7e
+index 0000000..0a0b254
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.h
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,29 @@
 +#ifndef MEDIAPLAYER_ARM_LOADER_H
 +#define MEDIAPLAYER_ARM_LOADER_H
 +
@@ -932,7 +1040,13 @@ index 0000000..22a7e7e
 +{
 +	MEDIAPLAYER_INPUT_PLAY_PAUSE = 1,
 +	MEDIAPLAYER_INPUT_PREVIOUS,
-+	MEDIAPLAYER_INPUT_NEXT
++	MEDIAPLAYER_INPUT_NEXT,
++	MEDIAPLAYER_INPUT_MENU_UP,
++	MEDIAPLAYER_INPUT_MENU_DOWN,
++	MEDIAPLAYER_INPUT_MENU_LEFT,
++	MEDIAPLAYER_INPUT_MENU_RIGHT,
++	MEDIAPLAYER_INPUT_MENU_ACTIVATE,
++	MEDIAPLAYER_INPUT_ROOT_MENU
 +};
 +
 +int mediaplayer_input(unsigned input, int pressed, int osd_visible);
