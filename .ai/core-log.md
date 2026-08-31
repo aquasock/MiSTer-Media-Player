@@ -1,3 +1,32 @@
+## 805 COMMIT Unreleased ??? 2026-08-31T00:16:48-07:00
+
+#### Coming From:
+
+Unreleased 4525ae4
+
+#### Purpose:
+
+Move the expanded MediaPlayer configuration string into exactly one M10K so the timing-clean decoder and video logic no longer displace the HDMI scaler into a failing placement.
+
+#### Outcome:
+
+The user approves the correction only on the condition that it consumes exactly one additional M10K.  The planned source change will enable the existing synchronous `CONF_STR_BRAM` implementation on the sole `hps_io` instance, preserving every configuration byte, selector, status bit, menu label, scaler function, decoder path, clock and fitter seed while replacing the expanded configuration string's distributed ALM mux with one small block-memory ROM.  The source-`4525ae4` build used 532 of 553 M10Ks, so the resource gate requires the correction to use exactly 533 and rejects any artifact that consumes more.
+
+#### Next Steps:
+
+Change only the `MediaPlayer.sv` `hps_io` parameter, verify the synchronous configuration-string path and rerun the focused field-order plus complete native-480i regression boundary, then commit and push the source and pull that exact commit on the build PC.  Perform exactly one clean Quartus Prime 17.0.2 build at pinned seed 19, require exactly 533 M10Ks and positive setup, hold, recovery, removal and minimum-pulse-width margins, and install only a readback-verified passing RBF before the pending chapter, menu and Ogg hardware tests.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 804 COMMIT Unreleased 4525ae4 2026-08-30T23:17:00-07:00
 
 #### Coming From:
@@ -1185,36 +1214,6 @@ Preserve the currently installed `40e15ff2` Main before replacing it with the ex
 #### Files Modified:
 
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 765 COMMIT Unreleased 65e8af3 2026-08-30T05:19:43-07:00
-
-#### Coming From:
-
-Unreleased cee1a9e
-
-#### Purpose:
-
-Add exact NARA MPD-D2 media creation and verification plus native `.vob` selection through the pinned MiSTer Main integration.
-
-#### Outcome:
-
-The user explicitly approved the exact frame-picture MPD-D2 qualification plan and deferred field-picture decoding as a disclosed limitation.  Commit `e6462db` added `.vob` to the pinned Main file dispatcher and added deterministic `mpd-d2-create` and strict `mpd-d2-verify` commands for the adopted NARA properties: an 8 Mbps single-pass MPEG-2 Main Profile/Main Level intermediate, 720x480 at 30000/1001, interlaced top-field-first frame pictures, documented 16-bit stereo PCM source, 48 kHz 256 Kbps constant-bit-rate AC-3 and VOB/Program Stream output.  Local syntax, rejection-path, full-decode, per-frame interlace and two-run byte-determinism checks passed with a generated two-second fixture.  The first pinned Main build exposed an incorrect new-file hunk count after the `.vob` line was added; commit `65e8af3` corrected only that patch metadata.  A fresh exact-commit build on the authorized build PC then passed and produced a stripped ARM EABI5 hard-float executable, 1,170,340 bytes, SHA-256 `40e15ff2c89dc1580a0bcb746deeb8186ebfcc0ef1155f6ac9ce17cba8125d41`.
-
-#### Next Steps:
-
-Generate the retained five-minute MPD-D2 qualification VOB from the validated Blazing Saddles source, require the committed verifier and a complete software decode to pass, and preserve its manifest and hashes.  Preserve and independently hash the installed MiSTer Main before replacing it with the built candidate, verify both Main and VOB by target readback, then reboot to activate Main and complete HDMI and S/PDIF hardware playback gates.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/media.sh
 
 #### Status:
 
