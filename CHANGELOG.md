@@ -17,6 +17,13 @@ This project is still in active pre-release development. Published milestone rel
 - Added direct longest-title playback from the absolute USB optical-device path
   `/dev/sr0`, using the same pinned CSS, navigation, timestamp and audio paths
   without requiring an ISO image or filesystem mount.
+- Added player-one Left/Right previous and next chapter controls for DVD ISO and
+  direct optical playback through a private Main/helper ready-go channel.  The
+  helper retains the authenticated navigation handle while both sides flush the
+  old byte stream before Main resets the existing FPGA download boundary.
+- Added player-one Start pause/resume as an ARM-side transport hold.  It keeps
+  the helper and optical navigation session alive without an RBF change; a long
+  pause may still set the FPGA's existing audio-underrun telemetry.
 - Added simulation-qualified 720x480 interlaced frame-picture P/B decoding with frame or field motion and frame or field DCT. Deterministic P, B and combined field-motion/field-DCT fixtures cover field selection, integer and half-sample prediction, all luma block layouts, chroma residuals, and coded-order/display-order presentation against independently FFmpeg-checked pixel oracles.
 - Added helper-only RIFF WAVE playback through the existing MediaPlayer picker and PCM transport. Pinned miniaudio source is compiled into the static helper to convert ordinary PCM/float mono, stereo or multichannel WAV input to 44.1 or 48 kHz signed stereo without an FPGA change.
 - Added helper-only FLAC playback through the existing MediaPlayer picker and PCM transport. The same statically compiled miniaudio dependency converts 16- or 24-bit mono, stereo or multichannel FLAC input to 44.1 or 48 kHz signed stereo without an FPGA change.

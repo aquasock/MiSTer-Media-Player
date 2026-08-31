@@ -10,12 +10,15 @@
 #include "media_source.h"
 
 #include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <time.h>
+#include <unistd.h>
 
 #define AUDIO_BUFFER_LIMIT (256u * 1024u)
 /*
@@ -278,13 +281,74 @@ struct audio_state {
 static void usage(const char *program)
 {
     fprintf(stderr,
-            "usage: %s [--protocol 1] [--source SOURCE | INPUT] "
-            "[--pcm-out FILE] [--video-out FILE] [--audio-delay-ms MS]\n"
+        "usage: %s [--protocol 1] [--source SOURCE | INPUT] "
+            "[--pcm-out FILE] [--video-out FILE] [--audio-delay-ms MS] "
+            "[--control-fd FD]\n"
             "       %s [--audio-out hdmi|spdif]\n"
             "       %s --capabilities\n",
             program,
             program,
             program);
+}
+
+static int control_read_command(int fd)
+{
+    uint8_t command;
+    ssize_t count;
+
+    if (fd < 0)
+        return 0;
+    count = read(fd, &command, sizeof(command));
+    if (count == 1)
+        return command;
+    if (!count) {
+        fprintf(stderr, "media_player_helper: control channel closed\n");
+        return -1;
+    }
+    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+        return 0;
+    fprintf(stderr, "media_player_helper: control read failed: %s\n",
+            strerror(errno));
+    return -1;
+}
+
+static int control_send(int fd, uint8_t event)
+{
+    ssize_t count;
+
+    if (fd < 0)
+        return -1;
+    do {
+        count = write(fd, &event, sizeof(event));
+    } while (count < 0 && errno == EINTR);
+    if (count == 1)
+        return 0;
+    fprintf(stderr, "media_player_helper: control write failed: %s\n",
+            count < 0 ? strerror(errno) : "short write");
+    return -1;
+}
+
+static int control_wait_for_go(int fd)
+{
+    struct pollfd descriptor = {fd, POLLIN, 0};
+
+    for (;;) {
+        int result = poll(&descriptor, 1, -1);
+        int command;
+
+        if (result < 0 && errno == EINTR)
+            continue;
+        if (result <= 0 || !(descriptor.revents & POLLIN))
+            return -1;
+        command = control_read_command(fd);
+        if (command == MEDIA_PLAYER_CONTROL_GO)
+            return 0;
+        if (command < 0)
+            return -1;
+        fprintf(stderr,
+                "media_player_helper: ignoring control 0x%02x while "
+                "waiting for go\n", command);
+    }
 }
 
 static int write_all(FILE *stream, const void *data, size_t size,
@@ -882,6 +946,41 @@ static void free_video_head(struct output_state *output)
     output->video_queued_bytes -= chunk->size - chunk->offset;
     free(chunk->data);
     free(chunk);
+}
+
+static void reset_audio_for_chapter(struct audio_state *audio)
+{
+    enum audio_output selected_output = audio->output;
+
+    if (audio->a52)
+        a52_free(audio->a52);
+    free(audio->data);
+    memset(audio, 0, sizeof(*audio));
+    audio->output = selected_output;
+    audio->a52_substream = -1;
+    audio->dts_substream = -1;
+    mp3dec_init(&audio->decoder);
+}
+
+static void reset_output_for_chapter(struct output_state *output,
+                                     size_t hold_limit)
+{
+    FILE *video = output->video;
+    FILE *pcm = output->pcm;
+
+    free(output->hold);
+    output->hold = NULL;
+    while (output->video_head)
+        free_video_head(output);
+    memset(output, 0, sizeof(*output));
+    output->video = video;
+    output->pcm = pcm;
+    output->hold_limit = hold_limit;
+    output->hold_active = hold_limit != 0;
+    output->scheduler_started = !output->hold_active;
+    output->scheduler_enabled = pcm == NULL;
+    output->iso_pts_normalization = 1;
+    output->iso_start_filter_active = output->scheduler_enabled;
 }
 
 /*
@@ -2093,13 +2192,27 @@ done:
 
 static int process_program_stream(struct media_source *input,
                                   struct audio_state *audio,
-                                  struct output_state *output)
+                                  struct output_state *output,
+                                  int control_fd, int *control_command)
 {
     int video_code = -1;
     int audio_code = -1;
 
     for (;;) {
         uint8_t code;
+        int command = control_read_command(control_fd);
+
+        if (command < 0)
+            return -1;
+        if (command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
+            command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER) {
+            *control_command = command;
+            return 1;
+        }
+        if (command)
+            fprintf(stderr,
+                    "media_player_helper: ignoring unexpected control "
+                    "0x%02x during playback\n", command);
         int found = find_start_code(input, &code);
         if (found == 0)
             return 0;
@@ -2249,6 +2362,7 @@ int main(int argc, char **argv)
     const char *video_path = NULL;
     int protocol_version = 0;
     int protocol_requested = 0;
+    int control_fd = -1;
     int show_capabilities = 0;
     struct output_state output = {0};
     unsigned audio_delay_ms = PCM_HOLD_DEFAULT_MS;
@@ -2300,6 +2414,18 @@ int main(int argc, char **argv)
                 return 2;
             }
             source_specification = argv[++i];
+        } else if (!strcmp(argv[i], "--control-fd") && i + 1 < argc) {
+            char *end = NULL;
+            long parsed;
+
+            errno = 0;
+            parsed = strtol(argv[++i], &end, 10);
+            if (errno || !end || *end || parsed < 0 || parsed > INT32_MAX) {
+                fprintf(stderr,
+                        "media_player_helper: invalid control descriptor\n");
+                return 2;
+            }
+            control_fd = (int)parsed;
         } else if (!strcmp(argv[i], "--capabilities")) {
             show_capabilities = 1;
         } else if (argv[i][0] == '-' || source_specification) {
@@ -2326,6 +2452,19 @@ int main(int argc, char **argv)
     if (!source_specification) {
         usage(argv[0]);
         return 2;
+    }
+    if (control_fd >= 0) {
+        int flags = fcntl(control_fd, F_GETFL);
+
+        if (flags < 0 || fcntl(control_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: cannot configure control channel: %s\n",
+                    strerror(errno));
+            return 2;
+        }
+        fprintf(stderr,
+                "media_player_helper: control protocol %d fd=%d\n",
+                MEDIA_PLAYER_CONTROL_PROTOCOL_VERSION, control_fd);
     }
     if (media_source_open(&input, source_specification, source_error,
                           sizeof(source_error)) != MEDIA_SOURCE_OK) {
@@ -2402,8 +2541,45 @@ int main(int argc, char **argv)
         if (process_flac_stream(&input, &output) < 0)
             goto done;
     } else if (is_program_stream) {
-        if (process_program_stream(&input, &audio, &output) < 0)
-            goto done;
+        for (;;) {
+            int command = 0;
+            int result = process_program_stream(&input, &audio, &output,
+                                                control_fd, &command);
+
+            if (result < 0)
+                goto done;
+            if (!result)
+                break;
+            if ((input.kind != MEDIA_SOURCE_ISO &&
+                 input.kind != MEDIA_SOURCE_DVD) ||
+                media_source_change_chapter(
+                    &input,
+                    command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ? -1 : 1)
+                    < 0) {
+                (void)control_send(control_fd, MEDIA_PLAYER_CONTROL_ERROR);
+                fprintf(stderr,
+                        "media_player_helper: chapter control failed\n");
+                goto done;
+            }
+            if (fflush(output.video) == EOF) {
+                fprintf(stderr,
+                        "media_player_helper: chapter barrier flush failed: %s\n",
+                        strerror(errno));
+                goto done;
+            }
+            reset_audio_for_chapter(&audio);
+            reset_output_for_chapter(&output,
+                                     (size_t)audio_delay_ms *
+                                     (size_t)PCM_SAMPLE_RATE / 1000u);
+            if (control_send(control_fd, MEDIA_PLAYER_CONTROL_READY) < 0 ||
+                control_wait_for_go(control_fd) < 0) {
+                fprintf(stderr,
+                        "media_player_helper: chapter barrier failed\n");
+                goto done;
+            }
+            fprintf(stderr,
+                    "media_player_helper: chapter barrier released\n");
+        }
         if (!output.audio_pes_seen) {
             if (output.scheduler_enabled &&
                 scheduler_release_silent_video(&output) < 0)
@@ -2443,6 +2619,8 @@ int main(int argc, char **argv)
                 "media_player_helper: DVD PTS discontinuities=%u\n",
                 output.iso_pts_discontinuities);
 done:
+    if (control_fd >= 0)
+        close(control_fd);
     if (audio.a52)
         a52_free(audio.a52);
     free(audio.data);

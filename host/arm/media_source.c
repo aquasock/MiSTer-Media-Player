@@ -432,6 +432,67 @@ static void *iso_buffer_producer(void *opaque)
     return NULL;
 }
 
+static void iso_stop_buffer(struct iso_source_state *state)
+{
+    if (!state->buffer_thread_started)
+        return;
+    pthread_mutex_lock(&state->buffer_lock);
+    state->buffer_stop = 1;
+    pthread_cond_broadcast(&state->buffer_can_write);
+    pthread_cond_broadcast(&state->buffer_can_read);
+    pthread_mutex_unlock(&state->buffer_lock);
+    pthread_join(state->buffer_thread, NULL);
+    state->buffer_thread_started = 0;
+}
+
+static void iso_reset_buffer(struct iso_source_state *state, int reset_stats)
+{
+    if (!state->buffer_sync_initialized)
+        return;
+    pthread_mutex_lock(&state->buffer_lock);
+    state->buffer_read = 0;
+    state->buffer_write = 0;
+    state->buffer_fill = 0;
+    state->buffer_stop = 0;
+    state->buffer_end_of_stream = 0;
+    state->buffer_error = 0;
+    if (reset_stats) {
+        state->buffer_produced = 0;
+        state->buffer_consumed = 0;
+        state->buffer_stall_events = 0;
+        state->buffer_stall_us = 0;
+        state->buffer_stall_max_us = 0;
+        state->test_stall_injected = 0;
+    }
+    pthread_mutex_unlock(&state->buffer_lock);
+}
+
+static int iso_start_buffer(struct iso_source_state *state)
+{
+    uint64_t prefill_start = monotonic_microseconds();
+
+    if (pthread_create(&state->buffer_thread, NULL, iso_buffer_producer,
+                       state) != 0)
+        return -1;
+    state->buffer_thread_started = 1;
+    pthread_mutex_lock(&state->buffer_lock);
+    while (state->buffer_fill < DVD_BUFFER_PREFILL &&
+           !state->buffer_end_of_stream && !state->buffer_error)
+        pthread_cond_wait(&state->buffer_can_read, &state->buffer_lock);
+    if (state->buffer_error || (!state->buffer_fill &&
+                                state->buffer_end_of_stream)) {
+        pthread_mutex_unlock(&state->buffer_lock);
+        return -1;
+    }
+    fprintf(stderr,
+            "media_source: DVD buffer ready reserve=%zu capacity=%u "
+            "prefill_us=%llu\n",
+            state->buffer_fill, DVD_BUFFER_CAPACITY,
+            (unsigned long long)(monotonic_microseconds() - prefill_start));
+    pthread_mutex_unlock(&state->buffer_lock);
+    return 0;
+}
+
 static size_t iso_read(void *opaque, void *data, size_t size)
 {
     struct iso_source_state *state = opaque;
@@ -500,15 +561,7 @@ static int iso_rewind(void *opaque)
     struct iso_source_state *state = opaque;
     int32_t title = state->title;
 
-    if (state->buffer_thread_started) {
-        pthread_mutex_lock(&state->buffer_lock);
-        state->buffer_stop = 1;
-        pthread_cond_broadcast(&state->buffer_can_write);
-        pthread_cond_broadcast(&state->buffer_can_read);
-        pthread_mutex_unlock(&state->buffer_lock);
-        pthread_join(state->buffer_thread, NULL);
-        state->buffer_thread_started = 0;
-    }
+    iso_stop_buffer(state);
     if (state->direct_device) {
         if (dvdnav_reset(state->navigation) != DVDNAV_STATUS_OK ||
             dvdnav_title_play(state->navigation, title) != DVDNAV_STATUS_OK) {
@@ -530,22 +583,7 @@ static int iso_rewind(void *opaque)
             return -1;
         }
     }
-    if (state->buffer_sync_initialized) {
-        pthread_mutex_lock(&state->buffer_lock);
-        state->buffer_read = 0;
-        state->buffer_write = 0;
-        state->buffer_fill = 0;
-        state->buffer_stop = 0;
-        state->buffer_end_of_stream = 0;
-        state->buffer_error = 0;
-        state->buffer_produced = 0;
-        state->buffer_consumed = 0;
-        state->buffer_stall_events = 0;
-        state->buffer_stall_us = 0;
-        state->buffer_stall_max_us = 0;
-        state->test_stall_injected = 0;
-        pthread_mutex_unlock(&state->buffer_lock);
-    }
+    iso_reset_buffer(state, 1);
     state->block_offset = 0;
     state->block_size = 0;
     state->title_active = 0;
@@ -580,7 +618,6 @@ static int parse_test_u64(const char *name, uint64_t *value)
 static int iso_prepare(void *opaque)
 {
     struct iso_source_state *state = opaque;
-    uint64_t prefill_start;
     int lock_ready = 0;
     int read_ready = 0;
 
@@ -613,27 +650,7 @@ static int iso_prepare(void *opaque)
         }
     }
 #endif
-    prefill_start = monotonic_microseconds();
-    if (pthread_create(&state->buffer_thread, NULL, iso_buffer_producer,
-                       state) != 0)
-        return -1;
-    state->buffer_thread_started = 1;
-    pthread_mutex_lock(&state->buffer_lock);
-    while (state->buffer_fill < DVD_BUFFER_PREFILL &&
-           !state->buffer_end_of_stream && !state->buffer_error)
-        pthread_cond_wait(&state->buffer_can_read, &state->buffer_lock);
-    if (state->buffer_error || (!state->buffer_fill &&
-                                state->buffer_end_of_stream)) {
-        pthread_mutex_unlock(&state->buffer_lock);
-        return -1;
-    }
-    fprintf(stderr,
-            "media_source: DVD buffer ready reserve=%zu capacity=%u "
-            "prefill_us=%llu\n",
-            state->buffer_fill, DVD_BUFFER_CAPACITY,
-            (unsigned long long)(monotonic_microseconds() - prefill_start));
-    pthread_mutex_unlock(&state->buffer_lock);
-    return 0;
+    return iso_start_buffer(state);
 
 init_failed:
     if (read_ready)
@@ -643,6 +660,60 @@ init_failed:
     free(state->buffer);
     state->buffer = NULL;
     return -1;
+}
+
+static int iso_change_chapter(struct iso_source_state *state, int direction)
+{
+    int32_t title = 0;
+    int32_t part = 0;
+    int32_t target;
+    int restart_buffer = state->buffer_thread_started;
+    size_t discarded = 0;
+
+    if (direction != -1 && direction != 1)
+        return -1;
+    iso_stop_buffer(state);
+    if (state->buffer_sync_initialized) {
+        pthread_mutex_lock(&state->buffer_lock);
+        discarded = state->buffer_fill;
+        pthread_mutex_unlock(&state->buffer_lock);
+    }
+    if (dvdnav_current_title_info(state->navigation, &title, &part) !=
+            DVDNAV_STATUS_OK || title != state->title) {
+        state->error = 1;
+        return -1;
+    }
+    if (part < 1)
+        part = state->title_part > 0 ? state->title_part : 1;
+    target = part + direction;
+    if (target < 1)
+        target = 1;
+    if ((uint32_t)target > state->chapters)
+        target = (int32_t)state->chapters;
+    if (dvdnav_part_play(state->navigation, state->title, target) !=
+            DVDNAV_STATUS_OK) {
+        state->error = 1;
+        return -1;
+    }
+    state->block_offset = 0;
+    state->block_size = 0;
+    state->title_active = 0;
+    state->title_part = 0;
+    state->cell_part = 0;
+    state->cell_number = 0;
+    state->end_of_stream = 0;
+    state->error = 0;
+    iso_reset_buffer(state, 0);
+    fprintf(stderr,
+            "media_source: %s chapter control current=%d target=%d of %u "
+            "discarded_buffer=%zu\n",
+            state->direct_device ? "DVD" : "ISO", (int)part, (int)target,
+            state->chapters, discarded);
+    if (restart_buffer && iso_start_buffer(state) < 0) {
+        state->error = 1;
+        return -1;
+    }
+    return target;
 }
 
 static int iso_seek(void *opaque, int64_t offset,
@@ -676,15 +747,7 @@ static void iso_close(void *opaque)
 
     if (!state)
         return;
-    if (state->buffer_thread_started) {
-        pthread_mutex_lock(&state->buffer_lock);
-        state->buffer_stop = 1;
-        pthread_cond_broadcast(&state->buffer_can_write);
-        pthread_cond_broadcast(&state->buffer_can_read);
-        pthread_mutex_unlock(&state->buffer_lock);
-        pthread_join(state->buffer_thread, NULL);
-        state->buffer_thread_started = 0;
-    }
+    iso_stop_buffer(state);
     if (state->buffer_sync_initialized) {
         fprintf(stderr,
                 "media_source: DVD buffer summary produced=%llu consumed=%llu "
@@ -888,6 +951,13 @@ int media_source_seek(struct media_source *source, int64_t offset,
 int media_source_error(struct media_source *source)
 {
     return source && source->ops ? source->ops->has_error(source->state) : 1;
+}
+
+int media_source_change_chapter(struct media_source *source, int direction)
+{
+    if (!source || source->ops != &iso_ops || !source->state)
+        return -1;
+    return iso_change_chapter(source->state, direction);
 }
 
 void media_source_close(struct media_source *source)

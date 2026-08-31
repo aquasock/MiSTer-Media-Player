@@ -15,7 +15,8 @@ The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.
 
 - raw MPEG-2 Video elementary-stream playback, a bounded H.222.0 MPEG-2 Program Stream path for `.mpg` and `.mpeg` files, and audio-only `.mp3`, `.wav` or `.flac` playback;
 - decrypted or CSS-encrypted DVD ISO and direct USB optical-disc main-feature
-  playback, selecting the longest described title without menus or navigation;
+  playback, selecting the longest described title with previous/next chapter
+  and pause/resume controls but without authored menus;
 - a matching ARM helper that demultiplexes Program Streams, decodes MPEG Layers II/III, WAV, FLAC or AC-3 audio to signed stereo PCM, and transports video, picture PTS, and PCM or passthrough bursts to the FPGA;
 - byte-exact raw `.m2v` pass-through with a synthetic 90 kHz fallback timeline;
 - Program Stream picture PTS driving the FPGA 90 kHz presentation timeline;
@@ -69,6 +70,15 @@ The helper authenticates and selects the title once, reuses that navigation
 session during preflight, then fills a 4 MiB launch reserve inside an 8 MiB
 HPS-RAM ring before playback begins. The ring is direct-disc-only and does not
 consume FPGA M10K memory.
+
+For `.iso` and `.dvd` playback, player-one Left and Right select the previous
+or next chapter and Start toggles pause/resume while the MiSTer OSD is closed.
+A chapter change preserves the authenticated libdvdnav session, flushes every
+old HPS/Main byte, resets the existing FPGA download session, and begins from
+the selected chapter's random-access boundary. Pause intentionally holds the
+Main-to-FPGA transport; a long pause can still raise the current FPGA audio
+FIFO-underrun telemetry because this ARM-only boundary cannot add an explicit
+pause state to the core.
 
 ## Release qualification
 
@@ -240,7 +250,7 @@ The build script pins minimp3, miniaudio, liba52, MiSTer Main, dependency hashes
 
 ## Known limitations
 
-- Program Stream support is bounded; MPEG Transport Stream, interactive DVD/VOB navigation, menus, DVD LPCM, subpictures, and arbitrary systems-layer layouts are not supported. ISO and direct `/dev/sr0` playback select the longest title and use statically linked libdvdcss for encrypted sectors. DVD private stream 1 supports AC-3 decode/passthrough and DTS passthrough.
+- Program Stream support is bounded; MPEG Transport Stream, authored DVD menus, DVD LPCM, subpictures, angles and arbitrary systems-layer layouts are not supported. ISO and direct `/dev/sr0` playback select the longest title, support previous/next chapter control, and use statically linked libdvdcss for encrypted sectors. DVD private stream 1 supports AC-3 decode/passthrough and DTS passthrough.
 - Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV and FLAC from 8 through 192 kHz converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III remain rejected; AAC and Ogg Vorbis are not yet enabled. Only the first Program Stream audio track is played; track switching needs a control channel that protocol one does not implement.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
@@ -250,7 +260,7 @@ The build script pins minimp3, miniaudio, liba52, MiSTer Main, dependency hashes
 - On material whose peak coded picture is large enough, one or two display slots are missed at that picture, shown as a repeated frame rather than a dropped one. This is a property of input buffer depth against peak picture size, not of the stream; the qualified full-length fixture hits it once, at a scene cut.
 - The framework scaler has little timing margin: seed 16 missed setup by 0.070 ns after audio routing changed; the seed-17 release has +0.243 ns worst setup. Future logic changes may expose the path again, and 93% M10K usage limits buffering headroom.
 - H.262 frame-rate codes 6 through 8 (50, 59.94, and 60 fps) are rejected.
-- Seeking, scrubbing, pause/resume, interactive DVD navigation, drive discovery beyond `/dev/sr0`, and software-controlled ejection are not implemented.
+- General seeking and scrubbing, authored DVD menus, drive discovery beyond `/dev/sr0`, and software-controlled ejection are not implemented. ARM-side pause/resume is a transport hold; until an FPGA pause state is added, a long pause may set the existing audio-underrun telemetry before playback resumes.
 - Output offers two interlaced tiers. Normal processed HDMI sends native 480i timing into MiSTer's scaler and lets the `HDMI scaler deinterlacer` menu choose Weave or Bob. The external-processing tier preserves native 480i fields; truly unscaled HDMI additionally requires MiSTer's separate `direct_video` setting, which the core menu cannot enable.
 - Files should be opened through the normal MiSTer file menu; MGL injection is not a qualified loading method.
 
@@ -295,7 +305,7 @@ tools/mister.sh screenshot-stream 60 playback-frames
 
 ## Development roadmap
 
-Future work can extend the qualified envelope toward 50/59.94/60 fps, field-picture structures, `repeat_first_field` and 576i, broader Program Stream handling, additional audio codecs and multi-track selection, qualification of playback pixel accuracy against a software decoder, improved chroma presentation, playback controls, seeking, DVD navigation, optical-drive integration, and qualification of native 480i through external HDMI-to-SDI hardware.
+Future work can extend the qualified envelope toward 50/59.94/60 fps, field-picture structures, `repeat_first_field` and 576i, broader Program Stream handling, additional audio codecs and multi-track selection, qualification of playback pixel accuracy against a software decoder, improved chroma presentation, an FPGA-native pause state, seeking, authored DVD menus and subpictures, optical-drive discovery, and qualification of native 480i through external HDMI-to-SDI hardware.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 

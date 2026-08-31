@@ -1,9 +1,11 @@
 # Applies to Main_MiSTer commit 0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f.
 diff --git a/file_io.cpp b/file_io.cpp
-index 2c9f406..0000000 100644
+index 2c9f406..29fdcc3 100644
 --- a/file_io.cpp
 +++ b/file_io.cpp
-@@ -1791,4 +1791,12 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
+@@ -1789,6 +1789,14 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
+ 							}
+ 
  							e[3] = 0;
 +							if (!strcasecmp(e, "FLC"))
 +							{
@@ -128,7 +130,7 @@ index b912439..447b56d 100644
  
  void fpga_spi_fast_block_write(const uint16_t *buf, uint32_t length);
 diff --git a/menu.cpp b/menu.cpp
-index 0c74e21..473cfb0 100644
+index 0c74e21..cb3376e 100644
 --- a/menu.cpp
 +++ b/menu.cpp
 @@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
@@ -139,7 +141,7 @@ index 0c74e21..473cfb0 100644
  
  /*menu states*/
  enum MENU
-@@ -319,7 +320,7 @@ static const char *info_top = "\x80\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x82";
+@@ -319,7 +320,7 @@ static const char *info_top = "\x80\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\
  static const char *info_bottom = "\x85\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x84";
  
  // file selection menu variables
@@ -158,7 +160,7 @@ index 0c74e21..473cfb0 100644
  		while (*(p + strlen(p) - 1) == ' ') *(p + strlen(p) - 1) = 0;
  		if (strlen(ext) <= 3) break;
  		ext += 3;
-@@ -458,10 +459,11 @@ void SelectFile(const char* path, const char* pFileExt, int Options, unsigned ch
+@@ -458,10 +460,11 @@ void SelectFile(const char* path, const char* pFileExt, int Options, unsigned ch
  	}
  	else
  	{
@@ -172,7 +174,7 @@ index 0c74e21..473cfb0 100644
  		home_dir = strrchr(home, '/');
  		if (home_dir) home_dir++;
  		else home_dir = home;
-@@ -2423,6 +2425,7 @@ void HandleUI(void)
+@@ -2423,6 +2426,7 @@ void HandleUI(void)
  
  						if (p[idx] >= '0' && p[idx] <= '9') ioctl_index = p[idx] - '0';
  						substrcpy(ext, p, 1);
@@ -180,7 +182,7 @@ index 0c74e21..473cfb0 100644
  						if (is_gba() && FileExists(user_io_make_filepath(HomeDir(), "goomba.rom"))) strcat(ext, "GB GBC");
  						while (strlen(ext) % 3) strcat(ext, " ");
  
-@@ -2443,7 +2446,9 @@ void HandleUI(void)
+@@ -2443,7 +2447,9 @@ void HandleUI(void)
  						}
  
  						if (!mgl->done) menustate = MENU_GENERIC_FILE_SELECTED;
@@ -191,7 +193,7 @@ index 0c74e21..473cfb0 100644
  						else if (recent_init(ioctl_index)) menustate = MENU_RECENT1;
  					}
  					else if (p[0] == 'S' && (select || recent))
-@@ -2738,11 +2743,18 @@ void HandleUI(void)
+@@ -2738,11 +2744,18 @@ void HandleUI(void)
  					}
  					else
  					{
@@ -214,7 +216,7 @@ index 0c74e21..473cfb0 100644
  						}
  					}
  				}
-@@ -5811,6 +5823,7 @@ void HandleUI(void)
+@@ -5811,6 +5824,7 @@ void HandleUI(void)
              }
  			else
  			{
@@ -224,10 +226,10 @@ index 0c74e21..473cfb0 100644
  				printf("Saving config to %s\n", filename);
 diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
 new file mode 100644
-index 0000000..663f7b0
+index 0000000..921ae5e
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,451 @@
+@@ -0,0 +1,629 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -239,6 +241,7 @@ index 0000000..663f7b0
 +#include <string.h>
 +#include <strings.h>
 +#include <string>
++#include <sys/socket.h>
 +#include <sys/types.h>
 +#include <sys/wait.h>
 +#include <time.h>
@@ -251,6 +254,7 @@ index 0000000..663f7b0
 +static const char *helper_path = "/media/fat/linux/MediaPlayer_Helper";
 +static const char *diagnostic_path = "/tmp/MediaPlayer_ARM.log";
 +static int helper_fd = -1;
++static int control_fd = -1;
 +static int diagnostic_fd = -1;
 +static pid_t helper_pid = -1;
 +static int download_active = 0;
@@ -260,6 +264,19 @@ index 0000000..663f7b0
 +static uint64_t session_start_us = 0;
 +static uint64_t download_assert_us = 0;
 +static int first_byte_seen = 0;
++static bool playback_paused = false;
++static bool chapter_barrier = false;
++static bool chapter_controls = false;
++static unsigned char playback_index = 0;
++
++enum
++{
++	MEDIA_CONTROL_PREVIOUS_CHAPTER = 0x01,
++	MEDIA_CONTROL_NEXT_CHAPTER = 0x02,
++	MEDIA_CONTROL_GO = 0x03,
++	MEDIA_CONTROL_READY = 0x81,
++	MEDIA_CONTROL_ERROR = 0xff
++};
 +
 +struct media_transfer_profile
 +{
@@ -423,12 +440,20 @@ index 0000000..663f7b0
 +		close(helper_fd);
 +		helper_fd = -1;
 +	}
++	if (control_fd >= 0)
++	{
++		close(control_fd);
++		control_fd = -1;
++	}
 +	if (download_active)
 +	{
 +		user_io_set_download(0);
 +		download_active = 0;
 +		diagnostic_write("download released\n");
 +	}
++	playback_paused = false;
++	chapter_barrier = false;
++	chapter_controls = false;
 +}
 +
 +static void stop_with_reason(const char *reason)
@@ -474,6 +499,7 @@ index 0000000..663f7b0
 +int mediaplayer_start_source(const char *source_spec, unsigned char index)
 +{
 +	int pipefd[2];
++	int control_pair[2];
 +	pid_t pid;
 +	const char *audio_out;
 +
@@ -494,6 +520,15 @@ index 0000000..663f7b0
 +		diagnostic_close();
 +		return 0;
 +	}
++	if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, control_pair) < 0)
++	{
++		diagnostic_write("control socket failed errno=%d message=%s\n", errno, strerror(errno));
++		printf("MediaPlayer: control socket failed: %s\n", strerror(errno));
++		close(pipefd[0]);
++		close(pipefd[1]);
++		diagnostic_close();
++		return 0;
++	}
 +	pid = fork();
 +	if (pid < 0)
 +	{
@@ -501,32 +536,44 @@ index 0000000..663f7b0
 +		printf("MediaPlayer: fork failed: %s\n", strerror(errno));
 +		close(pipefd[0]);
 +		close(pipefd[1]);
++		close(control_pair[0]);
++		close(control_pair[1]);
 +		diagnostic_close();
 +		return 0;
 +	}
 +	if (pid == 0)
 +	{
++		char control_fd_text[32];
++
 +		(void)setpgid(0, 0);
 +		(void)dup2(pipefd[1], STDOUT_FILENO);
 +		if (diagnostic_fd >= 0) (void)dup2(diagnostic_fd, STDERR_FILENO);
 +		close(pipefd[0]);
 +		close(pipefd[1]);
++		close(control_pair[0]);
++		snprintf(control_fd_text, sizeof(control_fd_text), "%d", control_pair[1]);
 +		if (diagnostic_fd >= 0 && diagnostic_fd != STDERR_FILENO)
 +			close(diagnostic_fd);
 +		execl(helper_path, "MediaPlayer_Helper", "--protocol", "1",
-+		      "--audio-out", audio_out, "--source", source_spec, (char *)NULL);
++		      "--audio-out", audio_out, "--control-fd", control_fd_text,
++		      "--source", source_spec, (char *)NULL);
 +		fprintf(stderr, "MediaPlayer: cannot start %s: %s\n", helper_path, strerror(errno));
 +		_exit(127);
 +	}
 +
 +	close(pipefd[1]);
++	close(control_pair[1]);
 +	(void)setpgid(pid, pid);
-+	diagnostic_write("helper forked pid=%d read_fd=%d\n", (int)pid, pipefd[0]);
-+	if (fcntl(pipefd[0], F_SETFL, fcntl(pipefd[0], F_GETFL) | O_NONBLOCK) < 0)
++	diagnostic_write("helper forked pid=%d read_fd=%d control_fd=%d\n",
++	                 (int)pid, pipefd[0], control_pair[0]);
++	if (fcntl(pipefd[0], F_SETFL, fcntl(pipefd[0], F_GETFL) | O_NONBLOCK) < 0 ||
++	    fcntl(control_pair[0], F_SETFL,
++	          fcntl(control_pair[0], F_GETFL) | O_NONBLOCK) < 0)
 +	{
 +		diagnostic_write("nonblocking failed errno=%d message=%s\n", errno, strerror(errno));
 +		printf("MediaPlayer: nonblocking pipe failed: %s\n", strerror(errno));
 +		close(pipefd[0]);
++		close(control_pair[0]);
 +		kill(-pid, SIGTERM);
 +		(void)waitpid(pid, NULL, 0);
 +		diagnostic_close();
@@ -534,7 +581,13 @@ index 0000000..663f7b0
 +	}
 +
 +	helper_fd = pipefd[0];
++	control_fd = control_pair[0];
 +	helper_pid = pid;
++	playback_index = index;
++	playback_paused = false;
++	chapter_barrier = false;
++	chapter_controls = !strncasecmp(source_spec, "dvd:", 4) ||
++	                   !strncasecmp(source_spec, "iso:", 4);
 +	user_io_set_index(index);
 +	user_io_file_info(".M2V");
 +	user_io_set_download(1);
@@ -544,6 +597,131 @@ index 0000000..663f7b0
 +	                 (unsigned)index, (int)helper_pid);
 +	printf("MediaPlayer: streaming %s through ARM helper\n", source_spec);
 +	return 1;
++}
++
++static int send_control(uint8_t command)
++{
++	ssize_t count;
++
++	if (control_fd < 0) return 0;
++	do count = write(control_fd, &command, sizeof(command));
++	while (count < 0 && errno == EINTR);
++	if (count == 1) return 1;
++	diagnostic_write("control write command=%u count=%d errno=%d message=%s\n",
++	                 command, (int)count, count < 0 ? errno : 0,
++	                 count < 0 ? strerror(errno) : "short write");
++	return 0;
++}
++
++static int discard_helper_output(uint64_t *discarded)
++{
++	uint8_t scratch[16384];
++
++	*discarded += pending_size - pending_offset;
++	pending_size = pending_offset = 0;
++	pending_eof = false;
++	for (;;)
++	{
++		ssize_t count = read(helper_fd, scratch, sizeof(scratch));
++		if (count > 0) { *discarded += (uint64_t)count; continue; }
++		if (!count) return 0;
++		if (errno == EINTR) continue;
++		if (errno == EAGAIN || errno == EWOULDBLOCK) return 1;
++		diagnostic_write("chapter discard failed errno=%d message=%s\n",
++		                 errno, strerror(errno));
++		return 0;
++	}
++}
++
++static void chapter_barrier_poll()
++{
++	uint8_t event = 0;
++	ssize_t count;
++	uint64_t discarded = 0;
++
++	if (!chapter_barrier || control_fd < 0 || helper_fd < 0) return;
++	count = read(control_fd, &event, sizeof(event));
++	if (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
++	{
++		diagnostic_write("control read failed errno=%d message=%s\n", errno, strerror(errno));
++		stop_with_reason("control-read-error");
++		return;
++	}
++	if (count == 1 && event == MEDIA_CONTROL_ERROR)
++	{
++		diagnostic_write("chapter barrier helper error\n");
++		stop_with_reason("chapter-error");
++		return;
++	}
++	if (!discard_helper_output(&discarded))
++	{
++		stop_with_reason("chapter-helper-eof");
++		return;
++	}
++	if (count != 1 || event != MEDIA_CONTROL_READY)
++	{
++		if (discarded)
++			diagnostic_write("chapter discard bytes=%llu waiting=1\n",
++			                 (unsigned long long)discarded);
++		return;
++	}
++	burst_state = {};
++	user_io_set_index(playback_index);
++	user_io_file_info(".M2V");
++	user_io_set_download(1);
++	download_active = 1;
++	download_assert_us = monotonic_us();
++	if (!send_control(MEDIA_CONTROL_GO))
++	{
++		stop_with_reason("chapter-go-error");
++		return;
++	}
++	chapter_barrier = false;
++	diagnostic_write("chapter barrier released discarded=%llu paused=%d\n",
++	                 (unsigned long long)discarded, playback_paused);
++}
++
++void mediaplayer_joystick(unsigned char joystick, uint32_t map, int osd_visible)
++{
++	static uint32_t previous_map = 0;
++	uint32_t pressed;
++
++	if (joystick != 0) return;
++	pressed = map & ~previous_map;
++	previous_map = map;
++	if (helper_fd < 0 || osd_visible || !pressed) return;
++	if ((pressed & JOY_START) && !chapter_barrier)
++	{
++		playback_paused = !playback_paused;
++		diagnostic_write("playback %s submitted=%llu\n",
++		                 playback_paused ? "paused" : "resumed",
++		                 (unsigned long long)submitted_bytes);
++		printf("MediaPlayer: %s\n", playback_paused ? "paused" : "resumed");
++	}
++	if (!(pressed & (JOY_LEFT | JOY_RIGHT)) || chapter_barrier ||
++	    playback_paused || !chapter_controls)
++		return;
++	uint8_t command = (pressed & JOY_LEFT) ?
++	                  MEDIA_CONTROL_PREVIOUS_CHAPTER :
++	                  MEDIA_CONTROL_NEXT_CHAPTER;
++	if (download_active)
++	{
++		user_io_set_download(0);
++		download_active = 0;
++	}
++	pending_size = pending_offset = 0;
++	pending_eof = false;
++	chapter_barrier = true;
++	if (!send_control(command))
++	{
++		stop_with_reason("chapter-command-error");
++		return;
++	}
++	diagnostic_write("chapter command=%s submitted=%llu\n",
++	                 command == MEDIA_CONTROL_PREVIOUS_CHAPTER ? "previous" : "next",
++	                 (unsigned long long)submitted_bytes);
++	printf("MediaPlayer: %s chapter\n",
++	       command == MEDIA_CONTROL_PREVIOUS_CHAPTER ? "previous" : "next");
 +}
 +
 +static void mediaplayer_poll_inner()
@@ -661,6 +839,8 @@ index 0000000..663f7b0
 +void mediaplayer_poll()
 +{
 +	if (helper_fd < 0) return;
++	if (chapter_barrier) { chapter_barrier_poll(); return; }
++	if (playback_paused) return;
 +	if (diagnostic_fd >= 0)
 +	{
 +		media_transfer_profile &p = transfer_profile;
@@ -681,12 +861,14 @@ index 0000000..663f7b0
 +}
 diff --git a/support/mediaplayer/mediaplayer.h b/support/mediaplayer/mediaplayer.h
 new file mode 100644
-index 0000000..ca9fba0
+index 0000000..163515a
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.h
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,14 @@
 +#ifndef MEDIAPLAYER_ARM_LOADER_H
 +#define MEDIAPLAYER_ARM_LOADER_H
++
++#include <stdint.h>
 +
 +int mediaplayer_is_core();
 +int mediaplayer_handles_file(const char *path);
@@ -694,10 +876,11 @@ index 0000000..ca9fba0
 +int mediaplayer_start_source(const char *source_spec, unsigned char index);
 +void mediaplayer_poll();
 +void mediaplayer_stop();
++void mediaplayer_joystick(unsigned char joystick, uint32_t map, int osd_visible);
 +
 +#endif
 diff --git a/user_io.cpp b/user_io.cpp
-index 511c7a4..661b045 100644
+index 511c7a4..a01924e 100644
 --- a/user_io.cpp
 +++ b/user_io.cpp
 @@ -42,6 +42,7 @@
@@ -708,7 +891,15 @@ index 511c7a4..661b045 100644
  
  static char core_path[1024] = {};
  static char rbf_path[1024] = {};
-@@ -2076,6 +2077,185 @@ void user_io_file_tx_data(const uint8_t *addr, uint32_t len)
+@@ -1817,6 +1818,7 @@ void user_io_r_analog_joystick(unsigned char joystick, char valueX, char valueY)
+ 
+ void user_io_digital_joystick(unsigned char joystick, uint32_t map, int newdir)
+ {
++	mediaplayer_joystick(joystick, map, user_io_osd_is_visible());
+ 	uint8_t joy = (joystick>1 || !joyswap) ? joystick : joystick ^ 1;
+ 
+ 	static int use32 = 0;
+@@ -2076,6 +2078,185 @@ void user_io_file_tx_data(const uint8_t *addr, uint32_t len)
  	DisableFpga();
  }
  
@@ -894,7 +1085,7 @@ index 511c7a4..661b045 100644
  void user_io_set_upload(unsigned char enable, int addr)
  {
  	EnableFpga();
-@@ -3160,6 +3340,7 @@ void user_io_poll()
+@@ -3160,6 +3341,7 @@ void user_io_poll()
  	// this is reduce risk of screenshot occurring while the scaler
  	// is being updated and getting a corrupted image.
  	add_frame_callback(screenshot_cb);
@@ -902,8 +1093,7 @@ index 511c7a4..661b045 100644
  
  	if ((core_type != CORE_TYPE_SHARPMZ) &&
  		(core_type != CORE_TYPE_8BIT))
-@@ -4379,7 +4560,8 @@ unsigned char user_io_ext_idx(char *name, char* ext)
- 	char *p = strrchr(name, '.');
+@@ -4380,6 +4562,7 @@ unsigned char user_io_ext_idx(char *name, char* ext)
  	if (p)
  	{
  		p++;
@@ -911,7 +1101,7 @@ index 511c7a4..661b045 100644
  		char e[4] = "   ";
  		for (int i = 0; i < 3; i++)
  		{
-@@ -4389,11 +4571,19 @@ unsigned char user_io_ext_idx(char *name, char* ext)
+@@ -4389,11 +4572,19 @@ unsigned char user_io_ext_idx(char *name, char* ext)
  
  		while (*ext)
  		{
@@ -936,7 +1126,7 @@ index 511c7a4..661b045 100644
  
  			if (found)
 diff --git a/user_io.h b/user_io.h
-index 648736f..f91969d 100644
+index 648736f..e1ff15c 100644
 --- a/user_io.h
 +++ b/user_io.h
 @@ -229,6 +229,30 @@ void user_io_set_index(unsigned char index);

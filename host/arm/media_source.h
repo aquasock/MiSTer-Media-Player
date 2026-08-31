@@ -40,6 +40,7 @@ int media_source_prepare(struct media_source *source);
 int media_source_seek(struct media_source *source, int64_t offset,
                       enum media_source_seek_origin origin);
 int media_source_error(struct media_source *source);
+int media_source_change_chapter(struct media_source *source, int direction);
 void media_source_close(struct media_source *source);
 const char *media_source_kind_name(enum media_source_kind kind);
 

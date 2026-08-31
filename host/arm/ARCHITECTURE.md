@@ -16,6 +16,13 @@ MediaPlayer_Helper --protocol 1 --source file:/absolute/path/movie.mpg
 remain accepted for transition and local verification, but Main uses the
 versioned form.
 
+Main optionally passes `--control-fd FD`, a private version-one
+`SOCK_SEQPACKET` channel separate from standard output.  Player-one Left and
+Right request previous or next chapter and a ready/go barrier prevents any
+pre-jump byte from crossing the reset download session. Start pause/resume is
+owned by Main as a stdout transport hold, so no pause byte enters the FPGA
+protocol.
+
 The helper writes one annotated transport to standard output. Reserved H.262
 codes distinguish picture timestamps, fixed signed 16-bit PCM samples, and a
 clean audio-end token. Main brokers those bytes through its existing file path
@@ -61,9 +68,9 @@ remain synchronous and byte-identical, and none of this buffer consumes FPGA
 memory.
 
 Future work may add optical-device discovery beyond the explicit `/dev/sr0`
-launcher and a versioned interactive navigation control channel without
-changing Program Stream parsing. Those responsibilities do not belong in the
-FPGA.
+launcher. Previous and next chapter controls now use the private Main/helper
+channel and retain the authenticated libdvdnav handle; menu navigation, angles,
+track selection and general seeking remain separate work.
 
 ## Pipeline boundaries
 
@@ -78,8 +85,9 @@ share a compilation unit:
    helper recognizes only a material backward jump, rebases the new ISO epoch
    onto the preceding maximum, and sends one continuous title clock to both
    its audio scheduler and the FPGA.  Ordinary MPEG decode-order timestamp
-   reordering and every non-ISO source remain unchanged.  Future direct-disc
-   navigation and seeking will need explicit discontinuity events.
+   reordering and every non-ISO source remain unchanged. Chapter changes reset
+   helper demux, audio, scheduler and PTS state behind a Main download-session
+   barrier; general seeking will need the same explicit discontinuity contract.
 4. Audio codec: MPEG Layer II on stream ids 0xC0-0xDF, standalone MPEG-1
    Layer III, RIFF WAVE and FLAC files, and AC-3 on private stream 1 substreams 0x80-0x87, all
    behind codec selection rather than output-specific decode paths. MPEG audio
@@ -130,16 +138,17 @@ FLAC decoder through the same bounded `media_source` callbacks. Sixteen- and
 The decoder is compiled directly into the static helper and adds no runtime
 library or FPGA dependency.
 
-Future play, pause, seek, title, chapter, angle, audio-track and subtitle-track
-commands require a versioned control channel. They are intentionally not
-implemented in protocol one; adding that channel must not change the source,
-container, codec or output ownership above.
+Previous and next chapter commands use the private control protocol while Start
+pause/resume is a Main-side transport hold. General seek, title, angle,
+audio-track and subtitle-track commands remain deferred. The ARM-only pause
+does not suppress the FPGA audio FIFO underrun after its existing reserve
+drains; that product polish requires an explicit future core pause state.
 
 ## Deferred DVD scope
 
 The `iso:` and `dvd:` backends deliberately share a main-feature playback
-subset: they select the longest title and do not provide menus, user navigation,
-chapter control, angles, DVD LPCM, subpictures or track switching. Broader
+subset: they select the longest title and provide previous/next chapter control
+without menus, angles, DVD LPCM, subpictures or track switching. Broader
 DVD-Video filesystem and navigation conformance is not claimed because the
 project's retained normative references do not cover those specifications.
 Those deferred features require separately approved development scopes.
