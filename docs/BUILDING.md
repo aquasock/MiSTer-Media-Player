@@ -56,8 +56,9 @@ ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host main
 
 The outputs are `host/build/media_player_helper.native`, `host/build/MediaPlayer_Helper`, and `host/build/MiSTer`. The script pins minimp3, miniaudio, stb_vorbis, liba52, libdvdcss, libdvdread, libdvdnav and upstream Main and verifies fetched dependencies. The DVD libraries are linked statically into the helper; encrypted ISO support does not use a target-installed `libdvdcss.so`. Check each command's exit status before using an output: the presence of an older binary or the absence of the word "error" in a log does not prove a successful build. Keep the toolchain in a persistent location.
 
-The deterministic menu boundary tests are `tools/test_dvd_spu.c` plus the
-three `tools/test_dvd_overlay_*.sv` benches. With an authorized local image,
+The deterministic menu boundary tests are `tools/test_dvd_spu.c`,
+`tools/test_dvd_random_access.c` plus the three
+`tools/test_dvd_overlay_*.sv` benches. With an authorized local image,
 `tools/test_dvd_menu_navigation.py HELPER IMAGE.iso` additionally exercises
 real first-play/root navigation, highlight motion, activation, ready/go
 barriers and complete overlay-plane transport without accessing the MiSTer.

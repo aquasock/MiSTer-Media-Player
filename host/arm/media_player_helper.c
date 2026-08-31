@@ -6,6 +6,7 @@
 #include "a52.h"
 #include "mm_accel.h"
 #include "consumer_audio.h"
+#include "dvd_random_access.h"
 #include "dvd_spu.h"
 #include "media_player_protocol.h"
 #include "media_source.h"
@@ -850,36 +851,14 @@ static int queue_video(struct output_state *output, const uint8_t *data,
     return 0;
 }
 
-/*
- * A DVD title may begin at an open GOP.  Pictures between its first I picture
- * and the following I/P reference are decode-order leading B pictures: they
- * need the preceding title/cell reference, which an independently selected
- * selected DVD title cannot provide.  Hold the bounded scheduler queue until
- * the next reference proves their complete extent, then turn every start code
- * in those pictures into user data.  This preserves every byte position and
- * timestamp while making the unavailable pictures invisible to the decoder.
- */
-static void neutralize_start_codes(uint8_t *data, size_t begin, size_t end)
-{
-    size_t i;
-
-    for (i = begin; i + 3u < end; ++i) {
-        if (data[i] == 0 && data[i + 1u] == 0 && data[i + 2u] == 1)
-            data[i + 3u] = 0xb2;
-    }
-}
-
 static int iso_filter_initial_random_access(struct output_state *output)
 {
     struct video_chunk *chunk;
+    struct dvd_random_access_result filter_result;
     uint8_t *video;
     size_t video_size = 0;
     size_t copied = 0;
-    size_t orphan_start = SIZE_MAX;
-    size_t i;
-    int first_reference_seen = 0;
-    int resolved = 0;
-    unsigned discarded = 0;
+    int filtered;
 
     if (!output->iso_start_filter_active)
         return 1;
@@ -907,42 +886,10 @@ static int iso_filter_initial_random_access(struct output_state *output)
         copied += count;
     }
 
-    for (i = 0; i + 5u < video_size; ++i) {
-        unsigned coding_type;
-
-        if (video[i] != 0 || video[i + 1u] != 0 ||
-            video[i + 2u] != 1 || video[i + 3u] != 0)
-            continue;
-        coding_type = (video[i + 5u] >> 3) & 7u;
-        if (orphan_start != SIZE_MAX) {
-            neutralize_start_codes(video, orphan_start, i);
-            orphan_start = SIZE_MAX;
-            discarded++;
-        }
-        if (!first_reference_seen) {
-            if (coding_type == 3u) {
-                orphan_start = i;
-            } else if (coding_type == 1u) {
-                first_reference_seen = 1;
-            } else if (coding_type == 2u) {
-                fprintf(stderr,
-                        "media_player_helper: DVD title starts without an "
-                        "intra picture\n");
-                free(video);
-                return -1;
-            }
-            continue;
-        }
-        if (coding_type == 3u) {
-            orphan_start = i;
-        } else if (coding_type == 1u || coding_type == 2u) {
-            resolved = 1;
-            break;
-        }
-    }
-    if (!resolved) {
+    filtered = dvd_random_access_filter(video, video_size, &filter_result);
+    if (filtered <= 0) {
         free(video);
-        return 0;
+        return filtered;
     }
 
     copied = 0;
@@ -956,8 +903,13 @@ static int iso_filter_initial_random_access(struct output_state *output)
     free(video);
     output->iso_start_filter_active = 0;
     fprintf(stderr,
-            "media_player_helper: DVD random access discarded %u leading "
-            "B picture(s)\n", discarded);
+            "media_player_helper: DVD random access sequence_offset=%zu "
+            "intra_offset=%zu next_reference_offset=%zu discarded=%u "
+            "pre-context picture(s), %u leading B picture(s)\n",
+            filter_result.sequence_offset, filter_result.intra_offset,
+            filter_result.next_reference_offset,
+            filter_result.pre_context_pictures,
+            filter_result.leading_b_pictures);
     return 1;
 }
 

@@ -62,12 +62,14 @@ duration remains selection and diagnostic metadata rather than a byte-cutoff:
 some authored program chains legitimately deliver their terminal VOBU after
 the chapter-description duration. All three dependencies are linked into the
 static helper, so
-target-installed libraries cannot change this behavior. At the selected
-title's initial random-access boundary, the helper discards only
-open-GOP leading B pictures that require a reference from before that boundary;
-the first two available I/P references and every later authored picture remain
-unchanged. This delegates CSS access to libdvdcss and is not a claim of CSS
-conformance.
+target-installed libraries cannot change this behavior. At every initial or
+reset-causing DVD random-access boundary, the helper withholds video until a
+sequence header, an I reference and the following I/P reference are all
+present. Contextless pictures before that sequence and open-GOP B pictures
+between the I and following reference have their start codes neutralized while
+all byte positions and timestamp records remain stable; the complete sequence
+context and every later authored picture remain unchanged. This delegates CSS
+access to libdvdcss and is not a claim of CSS conformance.
 
 The direct optical backend retains one authenticated libdvdnav session across
 signature and stream preflight rewinds. Only after preflight, a producer thread
