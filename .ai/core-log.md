@@ -1,3 +1,61 @@
+## 813 COMMIT Unreleased a9899e0 2026-08-31T05:35:17-07:00
+
+#### Coming From:
+
+Unreleased a9899e0
+
+#### Purpose:
+
+Capture and isolate the first hardware failure when an authored physical DVD receives the root-menu command during first-play trailers.
+
+#### Outcome:
+
+The source-`a9899e0` installation plays the physical disc's Viacom Paramount intro, four-language selection and three first-play trailers until its authored menu is eventually reached, proving sustained first-play video and audio before the navigation test.  After a fresh launch, keyboard `M` with the OSD closed submits root-menu command `0x09` at diagnostic time 4.138167 seconds; Main closes the download, discards 190,463 pending bytes, receives the helper's ready barrier and releases the new session, while the helper reports that the navigation barrier completes and its rearmed random-access filter discards zero leading B pictures.  The screen then freezes in the 800-by-600 diagnostic raster.  The 31,886-byte scaled screenshot `/tmp/entry813_root_menu_freeze.png`, SHA-256 `e5d61e8a547183b92a58ed5ccbd17eb73a439bd232294efdb73d02979856cc68`, contains all 64 schema-20 rows with valid headers, indices and parity and matching checksum `d80518c4`; its fatal snapshot occurs only 24,043 accepted video bytes and 443,132 decoder clocks after the navigation reset, on a 30000/1001 B picture with temporal reference 12, and reports exactly error `0x0200`, the B-picture presentation error, with the overlay extractor, overlay engine, syntax, reconstruction, writer, cache and audio error bits clear.  The matching 1,843,639-byte log `/tmp/entry813_root_menu_freeze_arm_helper.log`, SHA-256 `bb145d181f90e3642b4ac8a746067bdf6f4b2d83d1bee5e1f511e36f1997762b`, shows Main and helper continuing to transfer hundreds of megabytes after the fatal FPGA snapshot, so this is neither a Main barrier deadlock nor a helper stall.  Static inspection localizes the unsafe boundary to `iso_menu_command`: unlike accepted chapter changes, it calls the shared libdvdnav handle while the optical producer thread is active and neither stops nor discards its prefetched navigation ring before the FPGA download reset, allowing stale or concurrently spliced pre-hop bytes to open the new decoder session.  No target file, playback option or repository source changes during collection.
+
+#### Next Steps:
+
+Keep the seed-20 RBF and Main frozen and do not invoke another root-menu or activation hop on this running session.  Before implementation, approve a helper-only navigation-buffer correction that serializes libdvdnav hop commands with the optical producer, discards the pre-hop ring and partial block, restarts and prefills from the new authored position, and logs the discarded byte count; exercise it with a host concurrency regression and existing menu-navigation tests, then deploy only the helper and repeat the same early-trailer `M` test while requiring native 480i to remain active and all FPGA error flags to stay clear.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
+## 812 COMMIT Unreleased a9899e0 2026-08-31T05:08:01-07:00
+
+#### Coming From:
+
+Unreleased a9899e0
+
+#### Purpose:
+
+Install the exact timing-clean source-`a9899e0` authored-menu RBF with its matching Main and ARM helper while preserving the accepted source-`6e44472` system for rollback.
+
+#### Outcome:
+
+At the user's explicit authorization, the build PC at exact source `a9899e0` produces a 904,564-byte static ARMv7 helper at SHA-256 `a00173f62ec4a8b0d126ef48695e299b2fecf4e836bff28abdc1107fe62eac7c` and a 1,174,492-byte patched ARMv7 Main at `a276aadcdc5aad4034bc40ee2dff52596fd44876156e24f16289d5a339411636`; the Raspberry Pi independently receives and verifies both artifacts together with entry 811's 4,511,756-byte seed-20 RBF at `02928bff70b25eb0e0b1a6b8f24afec0dfe687f2524754b33fe13f4ed3014e9d`.  Predeployment absolute-path FTP readback identifies the accepted active Main as 1,174,492 bytes at `d91b570057d6cf314f5f98d7d637a8607f59fe5b61a193a40e6a615a6bab8c98`, helper as 896,372 bytes at `156917b7a165905f3cc73adf995886d05fc3f60aa301a4a31574f36ac0b06202` and source-`6e44472` RBF as 4,441,756 bytes at `5d6fc43700d935edac4e14e2f26895aed33db5fe917dd5092128a5cc18a97c20`.  In accordance with entry 811's explicit rollback requirement, independent uploads and readbacks preserve those exact predecessors as `/media/fat/MiSTer.pre_a9899e0_d91b5700`, `/media/fat/linux/MediaPlayer_Helper.pre_a9899e0_156917b7` and `/media/fat/_MediaPlayer_Backups/MediaPlayer_a9899e0_pre_6e44472_5d6fc437.rbf`.  Unique candidate uploads are independently read back byte-for-byte before same-directory renames activate all three exact source-`a9899e0` artifacts at `/media/fat/MiSTer`, `/media/fat/linux/MediaPlayer_Helper` and `/media/fat/MediaPlayer_20260829_b9c2657.rbf`; final absolute-path readbacks reproduce all three complete candidate hashes.  The running Main and FPGA remain the previous versions until a normal reboot and core reload, so hardware acceptance is pending.
+
+#### Next Steps:
+
+Perform one normal MiSTer reboot, load MediaPlayer, and begin with an authored DVD ISO or physical disc whose menus are known to work in a conventional player.  Require first-play or root-menu entry, animated menu video and audio, visible subpicture graphics and selection highlight, directional movement to distinct buttons, activation of a selected title, return to root menu, and unchanged play, pause and chapter controls; stop and report the exact observed step if a fatal telemetry flag, missing overlay, incorrect highlight or navigation failure occurs.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 811 COMMIT Unreleased a9899e0 2026-08-31T04:19:24-07:00
 
 #### Coming From:
@@ -1168,67 +1226,6 @@ Keep the currently accepted core installed and do not deploy the archived source
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 773 COMMIT Unreleased 9f10b55 2026-08-30T07:19:22-07:00
-
-#### Coming From:
-
-Unreleased 0a9d48a
-
-#### Purpose:
-
-Use simulation-only B-picture stall attribution to select one direct zero-M10K throughput correction and one final FPGA build.
-
-#### Outcome:
-
-Source `9f10b55` implements an ordered lookup-issue cursor in the B raster engine and a throughput-one mode in the retained-footprint fetcher while preserving registered lookup addresses and data and adding no M10Ks.  The exact Coming-to-America and Lebowski three-second natural-content windows complete in 128,169,632 cycles and 136,495,456 cycles, or 43.65 and 46.72 cycles per input byte, improving total throughput by 22.8 and 20.5 percent over the registered baseline and clearing the calculated 49.7-cycle real-time boundary with all decoder, reconstruction, writer, presentation and cursor-order error flags clear.  Exact motion, field-DCT, cadence, reorder, timestamp, overlap and native-480i regressions pass; the mixed pixel oracle checks 423,936 samples with zero mismatches outside its established two-level bound and preserves 69,556 DDR reads.  Exactly one clean Quartus Prime 17.0.2 build is attempted at pinned seed 19.  Analysis, fitting, assembly and timing-report extraction complete, using 34,051 of 41,910 ALMs, 52,664 registers, 4,181,443 memory bits in 532 of 553 RAM blocks and 67 DSP blocks, but the build gate rejects the RBF because the 60 MHz decoder setup slack is negative 0.176 ns with 23 violated paths; hold, recovery, removal and minimum-pulse-width margins remain positive 0.242, 3.847, 0.528 and 0.925 ns, and the 54 MHz video setup margin is positive 2.654 ns.  The leading path runs from `block_fetcher1|descriptor_count[2]` to `block_fetcher1|word_data[20][24]`; a second violated family runs from `b_probe|blk[1]` into `fetch_launch_phase1_base_addr`.  The rejected 4,452,080-byte RBF has SHA-256 `95b109a92aec3b2c39304997c72fa51a391fbbdcbe05e811c307b497f1f1b136`; it is not installed, and no reseed or second compile is performed.
-
-#### Next Steps:
-
-Keep the accepted artifact installed on the test MiSTer and do not deploy this timing-failed RBF.  Use the extracted seed-19 path reports and RTL simulation to prepare a narrowly bounded timing correction that breaks the descriptor-control-to-`word_data` path and simplifies the `blk`-to-launch-address path without reducing the measured throughput, changing reconstruction semantics, adding M10Ks or changing the seed.  Present that source boundary for approval before any further implementation or Quartus compile; the next approved candidate must repeat the exact functional and natural-window simulation gates before one timing build is considered.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 772 COMMIT Unreleased 0a9d48a 2026-08-30T07:15:38-07:00
-
-#### Coming From:
-
-Unreleased 0a9d48a
-
-#### Purpose:
-
-Capture the controlled Coming to America MPD-D2 failure and distinguish audio starvation from visible video-cadence failure and from insufficient buffering.
-
-#### Outcome:
-
-The user leaves the completed uninterrupted S/PDIF run of `/media/fat/games/MediaPlayer/coming_to_america_mpd_d2_5min.vob` untouched for collection and reiterates that only audio stutters while video remains rock solid.  The 796,193-byte screenshot `/tmp/entry772_coming_mpd_d2_telemetry.png`, SHA-256 `250135e768052a0ccc58f951c1322fa361375f02a65d5e812929fe1c0fbdb05b`, has 64 valid schema-20 headers, indices and parity bits and matching checksum `c4aeaacf`; its sticky first-underrun snapshot occurs at 56.079121 seconds after accepting 55,768,576 clean-video bytes, with 1,671 displayed pictures and 1,670 swaps, consistent with real-time video cadence at the audible failure.  The decoder input is intrinsically stalled for 94.498 percent of session cycles, divided into 6.363 percent I, 22.237 percent P and 65.899 percent B-picture stall, while presentation hold contributes only 3.777 percent, destination hold is zero and presentation hold has scratch availability for only 668 cycles.  This differs from Lebowski's 85.208-percent intrinsic and 13.042-percent presentation split but preserves the common approximately 98.3-percent total inability to accept transport bytes and dominant B-picture contribution, disproving a third presentation scratch frame as a general correction.  The matching 7,598,795-byte helper log `/tmp/entry772_coming_mpd_d2_telemetry.log`, SHA-256 `ec8bb543428ab4f4b8f920e287b65dfad64ec622b23264ec67a3caf275a02c95`, names the exact VOB and S/PDIF path, eventually emits all 14,400,000 samples and submits all 362,080,761 bytes through the fast path, but requires 308.544 seconds; its worst 10-, 20- and 30-second transport windows are only 1.112, 1.120 and 1.122 MB/s against the approximately 1.207 MB/s real-time requirement.  The 16,384-frame audio FIFO already provides approximately 341 milliseconds of reserve, so more buffering would postpone rather than remove sustained starvation; the accepted fit uses 532 of 553 M10Ks, leaving 21, and no additional M10Ks are indicated.  This corrects entry 771's overly broad wording: decoder-side shared-transport backpressure starves ordered audio ingress, but the hardware evidence does not show visible video cadence loss.
-
-#### Next Steps:
-
-Keep the accepted seed-19 RBF, host binaries, ISO deployment and all existing FIFO depths unchanged.  The smallest useful correction cycle should target B-picture intrinsic decode throughput with zero new M10Ks, preserve reconstruction arithmetic and presentation behavior, and use the unused schema-20 telemetry words to attribute B stalls among compressed-bit parsing, residual replay, prediction and row-retirement waits if static analysis cannot justify a direct scheduling overlap.  Record and obtain approval for that source boundary before implementation, then run exact simulation regressions, one clean seed-19 Quartus build with full timing and resource gates, and the NARA control plus both natural-content VOBs through five-minute HDMI and S/PDIF validation.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
