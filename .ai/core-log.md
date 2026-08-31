@@ -1,3 +1,32 @@
+## 810 COMMIT Unreleased 6e44472 2026-08-31T04:13:58-07:00
+
+#### Coming From:
+
+Unreleased 2738e99
+
+#### Purpose:
+
+Capture and qualify the on-screen telemetry after the user's perfect full-disc DVD playback on the accepted source-`6e44472` installation.
+
+#### Outcome:
+
+The user reports that the DVD finished perfectly after extensive chapter skipping and leaves the completed session's telemetry visible for collection.  The 285,090-byte 1920-by-1080 scaled screenshot `/tmp/entry810_completed_dvd_telemetry.png`, SHA-256 `3c3a184eb5df0e8c6fe31bdddf4bd8956debbe2320dfc796bdd89787156c7dc4`, has all 64 schema-20 headers, row indices and parity bits valid and checksum `eb7a78f8` matching.  The visible raster is the sticky first-error snapshot at STC second 1,795 rather than an end-of-file snapshot: it records 1,085,445,320 accepted video bytes, 42,919 displayed pictures, 42,918 swaps, exactly one audio FIFO underrun, FIFO floor zero, zero transport blocks and no error flag other than the corresponding `0x0400` audio-underrun bit; its three retained largest gaps are each 66.733 milliseconds, with 42,917 deadline-gap events and 21,465 cadence outliers.  The matching 194,633,412-byte helper log `/tmp/entry810_completed_dvd_arm_helper.log`, SHA-256 `e0db52dc8a47949209a3574b93d5b81c359c3b0ec6cfeb9cfa3cfcacf86efa8c`, identifies direct optical title 1 with 24 chapters and HDMI decoded stereo PCM, later reaches DVD EOF and exits zero after approximately 7,014 seconds of a session that included the user's navigation; it processes 4,239,456,995 video bytes and 219,032 AC-3 frames, produces and consumes 5,096,290,304 DVD-buffer bytes with zero consumer waits, and Main submits 5,690,325,341 bytes entirely through the fast path.  The single latched underrun remains within the previously accepted isolated-underrun allowance and produced no user-perceived defect; no repository source, installed file, RBF, Main, helper, media, playback option or target configuration changes during collection.
+
+#### Next Steps:
+
+Keep accepted source `6e44472` and its installed artifacts unchanged as the hardware baseline, retain source `2738e99` as the uninstalled authored-menu candidate, and continue to pause implementation and build work until the user explicitly approves or declines the separately proposed bounded eight-seed fit-and-timing search.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 809 COMMIT Unreleased 2738e99 2026-08-31T03:31:31-07:00
 
 #### Coming From:
@@ -1200,43 +1229,6 @@ Keep the accepted seed-19 RBF and all installed host binaries unchanged and do n
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 770 COMMIT Unreleased 0a9d48a 2026-08-30T06:28:45-07:00
-
-#### Coming From:
-
-Unreleased 1e8c44f
-
-#### Purpose:
-
-Add a bounded unencrypted DVD ISO source that automatically plays the longest title through the existing Program Stream pipeline.
-
-#### Outcome:
-
-The user explicitly authorizes image-file playback while the final Coming to America VOB hardware run proceeds and supplies three full images on the authorized build PC.  Source `6af108f` adds `.iso` selection and `iso:` routing in Main, a rewindable helper source that uses pinned VideoLAN `libdvdread` 7.1.1 and `libdvdnav` 7.0.0 to read UDF and IFO metadata and expose the longest title in program-chain order, explicit scrambled-PES rejection, architecture documentation and a tracked patch that forces libdvdread's builtin unencrypted reader instead of linked or dynamically discovered libdvdcss.  The first native build exposed only a malformed upstream-patch hunk count, corrected by `0128efe`; debugger evidence then showed that libdvdnav 7.0.0 drops caller stream callbacks in `dvdnav_reset`, so `85ca285` safely reopens the same image and title on rewind.  Final source `0a9d48a` narrowly suppresses libdvdread's ignored x86-only `gcc_struct` attribute warning at the ARM helper boundary.  Native validation fully processes The Big Lebowski title 1, 7,036.1 seconds, 5,529,130,715 video bytes and 220,760 AC-3 frames with exit zero; bounded probes start clean decoding of Coming to America title 1 and correctly select Blazing Saddles title 2.  Exact-commit native, static ARM and pinned Main builds pass; the 817,700-byte helper hashes `b7ccc160`, has no dynamic section and no undefined `dlopen`, `dlsym` or dvdcss symbol, while the 1,170,340-byte Main hashes `01229bc5` and contains both the ISO selector vector and `iso:` route.  Menus, navigation controls, subtitles, track switching, direct optical-disc access and CSS remain unsupported, and no FPGA source, RBF or target installation changes.
-
-#### Next Steps:
-
-First capture and record the user's completed Coming to America VOB result without disturbing its target evidence.  Then preserve the installed helper and Main, install the exact `b7ccc160` helper and `01229bc5` Main with byte-identical readback, reboot to activate Main, place one supplied unencrypted ISO on MiSTer-accessible storage, and run the first hardware gate in Native 480i with HDMI before checking S/PDIF.  Do not rebuild or replace the accepted seed-19 FPGA artifact.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/Makefile
-- host/arm/libdvdread-disable-css.patch
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/arm/media_source.c
-- host/arm/media_source.h
-- host/build_arm_stack.sh
-- host/main_mister/0001-mediaplayer-arm-loader.patch
 
 #### Status:
 
