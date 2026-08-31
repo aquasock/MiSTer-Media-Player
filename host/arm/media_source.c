@@ -14,8 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define ISO_TITLE_TIME_REGRESSION_TICKS (10u * 90000u)
-
 struct media_source_ops {
     size_t (*read)(void *state, void *data, size_t size);
     int (*get_character)(void *state);
@@ -41,8 +39,8 @@ struct iso_source_state {
     uint64_t duration;
     int title_active;
     int32_t title_part;
-    int32_t payload_part;
-    int64_t payload_time;
+    int32_t cell_part;
+    int32_t cell_number;
     int end_of_stream;
     int error;
 };
@@ -161,8 +159,8 @@ static int iso_select_title(struct iso_source_state *state)
     state->duration = longest_duration;
     state->title_active = 0;
     state->title_part = 0;
-    state->payload_part = 0;
-    state->payload_time = -1;
+    state->cell_part = 0;
+    state->cell_number = 0;
     state->block_offset = 0;
     state->block_size = 0;
     state->end_of_stream = 0;
@@ -176,9 +174,6 @@ static int iso_guard_selected_title(struct iso_source_state *state,
     int32_t title = 0;
     int32_t part = 0;
     int64_t current_time;
-    int payload =
-        (event == DVDNAV_BLOCK_OK || event == DVDNAV_NAV_PACKET) &&
-        length == DVD_VIDEO_LB_LEN;
     const char *reason = NULL;
 
     if (dvdnav_current_title_info(state->navigation, &title, &part) !=
@@ -187,6 +182,11 @@ static int iso_guard_selected_title(struct iso_source_state *state,
         return -1;
     }
     current_time = dvdnav_get_current_time(state->navigation);
+    if (event == DVDNAV_CELL_CHANGE &&
+        length != (int32_t)sizeof(dvdnav_cell_change_event_t)) {
+        state->error = 1;
+        return -1;
+    }
     if (!state->title_active) {
         if (title != state->title)
             return 1;
@@ -196,21 +196,13 @@ static int iso_guard_selected_title(struct iso_source_state *state,
         reason = "title exit";
     } else if (part < state->title_part) {
         reason = "title replay";
-    } else if (payload && part == state->payload_part && current_time >= 0 &&
-               state->payload_time >= 0 && current_time < state->payload_time &&
-               (uint64_t)(state->payload_time - current_time) >
-                   ISO_TITLE_TIME_REGRESSION_TICKS) {
-        /*
-         * dvdnav reports transitional time values before CELL_CHANGE has
-         * settled.  Compare only payload-bearing events, ignore small
-         * implementation jitter, and treat a material same-part rewind as a
-         * navigation replay rather than exposing a second title traversal.
-         */
-        reason = "title time replay";
-    } else if (payload && (uint32_t)part == state->chapters &&
-               current_time >= 0 &&
-               (uint64_t)current_time >= state->duration) {
-        reason = "declared duration";
+    } else if (event == DVDNAV_CELL_CHANGE) {
+        const dvdnav_cell_change_event_t *cell =
+            (const dvdnav_cell_change_event_t *)state->block;
+
+        if (state->cell_part == part && state->cell_number != 0 &&
+            cell->cellN <= state->cell_number)
+            reason = "title cell replay";
     }
     if (reason) {
         fprintf(stderr,
@@ -226,12 +218,16 @@ static int iso_guard_selected_title(struct iso_source_state *state,
     }
     if (part > state->title_part)
         state->title_part = part;
-    if (payload && part > state->payload_part) {
-        state->payload_part = part;
-        state->payload_time = current_time;
-    } else if (payload && part == state->payload_part &&
-               current_time > state->payload_time) {
-        state->payload_time = current_time;
+    if (event == DVDNAV_CELL_CHANGE) {
+        const dvdnav_cell_change_event_t *cell =
+            (const dvdnav_cell_change_event_t *)state->block;
+
+        if (part != state->cell_part) {
+            state->cell_part = part;
+            state->cell_number = cell->cellN;
+        } else if (cell->cellN > state->cell_number) {
+            state->cell_number = cell->cellN;
+        }
     }
     return 1;
 }
@@ -328,8 +324,8 @@ static int iso_rewind(void *opaque)
     state->block_size = 0;
     state->title_active = 0;
     state->title_part = 0;
-    state->payload_part = 0;
-    state->payload_time = -1;
+    state->cell_part = 0;
+    state->cell_number = 0;
     state->end_of_stream = 0;
     state->error = 0;
     return 0;
@@ -446,8 +442,9 @@ int media_source_open(struct media_source *source, const char *specification,
         }
         fprintf(stderr,
                 "media_source: ISO selected longest title %d "
-                "duration90k=%llu\n",
+                "chapters=%u duration90k=%llu\n",
                 (int)iso_state->title,
+                iso_state->chapters,
                 (unsigned long long)iso_state->duration);
         source->ops = &iso_ops;
         source->state = iso_state;

@@ -36,12 +36,12 @@ and, when necessary, decrypt UDF/IFO and VOB sectors, choose the longest
 described DVD-Video title, and expose its cells in program-chain playback order
 as one sequential Program Stream. The source retains the selected title,
 chapter count and declared duration and converts a title exit, replay or
-duration exhaustion into clean end-of-stream before libdvdnav can expose a
-following navigation domain or second traversal. Because libdvdnav exposes
-transitional time values around cell events, only payload-bearing events take
-part in the material same-part rewind check; more than ten seconds is the
-implementation guard for a replay, not a DVD standard limit. All three
-dependencies are linked into the static helper, so
+backward chapter or cell transition into clean end-of-stream before libdvdnav
+can expose a following navigation domain or second traversal. The declared
+duration remains selection and diagnostic metadata rather than a byte-cutoff:
+some authored program chains legitimately deliver their terminal VOBU after
+the chapter-description duration. All three dependencies are linked into the
+static helper, so
 target-installed libraries cannot change this behavior. At the selected
 title's initial random-access boundary, the helper discards only
 open-GOP leading B pictures that require a reference from before that boundary;
