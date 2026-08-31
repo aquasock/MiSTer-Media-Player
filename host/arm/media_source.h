@@ -36,6 +36,7 @@ int media_source_open(struct media_source *source, const char *specification,
 size_t media_source_read(struct media_source *source, void *data, size_t size);
 int media_source_getc(struct media_source *source);
 int media_source_rewind(struct media_source *source);
+int media_source_prepare(struct media_source *source);
 int media_source_seek(struct media_source *source, int64_t offset,
                       enum media_source_seek_origin origin);
 int media_source_error(struct media_source *source);

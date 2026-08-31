@@ -61,6 +61,12 @@ path `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`. Patched Main maps that
 file to `dvd:/dev/sr0`; the helper requires the source path to be absolute and
 opens the block device directly through libdvdnav. A filesystem mount is not a
 prerequisite. Verify `/dev/sr0` exists and is readable before testing.
+Direct-disc playback reuses the authenticated navigation session across
+preflight and then starts an 8 MiB asynchronous RAM ring with a 4 MiB initial
+reserve. `MMP_DVD_TEST_STALL_AFTER_BYTES` and `MMP_DVD_TEST_STALL_MS` are
+native-test fault-injection controls; production launchers must leave them
+unset. This is a helper-only facility and does not require a Main or Quartus
+build.
 
 ## Acceptance checklist for active RTL changes
 

@@ -23,6 +23,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Direct USB-DVD playback now reuses its authenticated libdvdnav session across
+  helper preflight rewinds instead of reopening and rescanning CSS keys. After
+  preflight it reads through an 8 MiB asynchronous HPS-RAM ring with a 4 MiB
+  launch reserve, insulating playback from transient optical-read stalls
+  without consuming FPGA memory or changing file and ISO paths.
 - Opened the production P/B admission path for interlaced frame pictures and kept native 480i output ownership asserted across admitted I, P and B pictures. Quartus fit/timing and MiSTer playback qualification remain pending.
 - Reconciled current release, build, architecture and test guidance with the published v0.8.0 package; labelled older design and regression instructions as historical.
 - Corrected v0.8.0 tag provenance, compressed ZIP size, the role of patched Main, and the distinction between a targeted hardware pixel comparison and comprehensive playback qualification. Runtime code, the release tag and packaged binaries are unchanged.

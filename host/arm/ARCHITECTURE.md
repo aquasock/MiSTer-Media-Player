@@ -51,6 +51,15 @@ the first two available I/P references and every later authored picture remain
 unchanged. This delegates CSS access to libdvdcss and is not a claim of CSS
 conformance.
 
+The direct optical backend retains one authenticated libdvdnav session across
+signature and stream preflight rewinds. Only after preflight, a producer thread
+fills an 8 MiB HPS-RAM byte ring and playback starts with at least 4 MiB queued
+unless the title is shorter. Consumer order is exact; end-of-stream and read
+errors cross the same synchronized boundary. Waits of at least 100 ms and final
+producer/consumer totals are diagnostic output. ISO and ordinary file sources
+remain synchronous and byte-identical, and none of this buffer consumes FPGA
+memory.
+
 Future work may add optical-device discovery beyond the explicit `/dev/sr0`
 launcher and a versioned interactive navigation control channel without
 changing Program Stream parsing. Those responsibilities do not belong in the

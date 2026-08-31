@@ -9,15 +9,23 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+#define DVD_BUFFER_CAPACITY (8u * 1024u * 1024u)
+#define DVD_BUFFER_PREFILL (4u * 1024u * 1024u)
+#define DVD_BUFFER_READ_SIZE (64u * 1024u)
+#define DVD_BUFFER_LOG_WAIT_US 100000u
 
 struct media_source_ops {
     size_t (*read)(void *state, void *data, size_t size);
     int (*get_character)(void *state);
     int (*rewind_source)(void *state);
+    int (*prepare_source)(void *state);
     int (*seek_source)(void *state, int64_t offset,
                        enum media_source_seek_origin origin);
     int (*has_error)(void *state);
@@ -45,7 +53,38 @@ struct iso_source_state {
     int32_t cell_number;
     int end_of_stream;
     int error;
+    pthread_t buffer_thread;
+    pthread_mutex_t buffer_lock;
+    pthread_cond_t buffer_can_read;
+    pthread_cond_t buffer_can_write;
+    uint8_t *buffer;
+    size_t buffer_read;
+    size_t buffer_write;
+    size_t buffer_fill;
+    int buffer_sync_initialized;
+    int buffer_thread_started;
+    int buffer_stop;
+    int buffer_end_of_stream;
+    int buffer_error;
+    uint64_t buffer_produced;
+    uint64_t buffer_consumed;
+    uint64_t buffer_stall_events;
+    uint64_t buffer_stall_us;
+    uint64_t buffer_stall_max_us;
+    uint64_t test_stall_after_bytes;
+    unsigned test_stall_ms;
+    int test_stall_injected;
 };
+
+static uint64_t monotonic_microseconds(void)
+{
+    struct timespec now;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+        return 0;
+    return (uint64_t)now.tv_sec * 1000000u +
+           (uint64_t)now.tv_nsec / 1000u;
+}
 
 static size_t file_read(void *opaque, void *data, size_t size)
 {
@@ -63,6 +102,12 @@ static int file_rewind(void *opaque)
 {
     struct file_source_state *state = opaque;
     return fseek(state->stream, 0, SEEK_SET);
+}
+
+static int file_prepare(void *opaque)
+{
+    (void)opaque;
+    return 0;
 }
 
 static int file_seek(void *opaque, int64_t offset,
@@ -94,6 +139,7 @@ static const struct media_source_ops file_ops = {
     file_read,
     file_get_character,
     file_rewind,
+    file_prepare,
     file_seek,
     file_has_error,
     file_close
@@ -294,9 +340,9 @@ static int iso_next_payload_block(struct iso_source_state *state)
     return -1;
 }
 
-static size_t iso_read(void *opaque, void *data, size_t size)
+static size_t iso_read_navigation(struct iso_source_state *state, void *data,
+                                  size_t size)
 {
-    struct iso_source_state *state = opaque;
     uint8_t *output = data;
     size_t total = 0;
 
@@ -317,6 +363,131 @@ static size_t iso_read(void *opaque, void *data, size_t size)
     return total;
 }
 
+static void sleep_milliseconds(unsigned milliseconds)
+{
+    struct timespec delay = {
+        (time_t)(milliseconds / 1000u),
+        (long)(milliseconds % 1000u) * 1000000L
+    };
+
+    while (nanosleep(&delay, &delay) != 0 && errno == EINTR)
+        ;
+}
+
+static void *iso_buffer_producer(void *opaque)
+{
+    struct iso_source_state *state = opaque;
+    uint8_t scratch[DVD_BUFFER_READ_SIZE];
+
+    for (;;) {
+        size_t count;
+        size_t first;
+
+        pthread_mutex_lock(&state->buffer_lock);
+        while (!state->buffer_stop &&
+               DVD_BUFFER_CAPACITY - state->buffer_fill < sizeof(scratch))
+            pthread_cond_wait(&state->buffer_can_write, &state->buffer_lock);
+        if (state->buffer_stop) {
+            pthread_mutex_unlock(&state->buffer_lock);
+            break;
+        }
+        pthread_mutex_unlock(&state->buffer_lock);
+
+        if (!state->test_stall_injected && state->test_stall_ms &&
+            state->buffer_produced >= state->test_stall_after_bytes) {
+            fprintf(stderr,
+                    "media_source: injecting DVD producer stall after %llu "
+                    "bytes for %u ms\n",
+                    (unsigned long long)state->buffer_produced,
+                    state->test_stall_ms);
+            state->test_stall_injected = 1;
+            sleep_milliseconds(state->test_stall_ms);
+        }
+        count = iso_read_navigation(state, scratch, sizeof(scratch));
+
+        pthread_mutex_lock(&state->buffer_lock);
+        if (state->buffer_stop) {
+            pthread_mutex_unlock(&state->buffer_lock);
+            break;
+        }
+        if (!count) {
+            state->buffer_error = state->error;
+            state->buffer_end_of_stream = !state->error;
+            pthread_cond_broadcast(&state->buffer_can_read);
+            pthread_mutex_unlock(&state->buffer_lock);
+            break;
+        }
+        first = DVD_BUFFER_CAPACITY - state->buffer_write;
+        if (first > count)
+            first = count;
+        memcpy(state->buffer + state->buffer_write, scratch, first);
+        memcpy(state->buffer, scratch + first, count - first);
+        state->buffer_write = (state->buffer_write + count) %
+                              DVD_BUFFER_CAPACITY;
+        state->buffer_fill += count;
+        state->buffer_produced += count;
+        pthread_cond_broadcast(&state->buffer_can_read);
+        pthread_mutex_unlock(&state->buffer_lock);
+    }
+    return NULL;
+}
+
+static size_t iso_read(void *opaque, void *data, size_t size)
+{
+    struct iso_source_state *state = opaque;
+    uint8_t *output = data;
+    size_t total = 0;
+
+    if (!state->buffer_thread_started)
+        return iso_read_navigation(state, data, size);
+    while (total < size) {
+        size_t count;
+        size_t first;
+        uint64_t wait_start = 0;
+
+        pthread_mutex_lock(&state->buffer_lock);
+        while (!state->buffer_fill && !state->buffer_end_of_stream &&
+               !state->buffer_error) {
+            if (!wait_start)
+                wait_start = monotonic_microseconds();
+            pthread_cond_wait(&state->buffer_can_read, &state->buffer_lock);
+        }
+        if (wait_start) {
+            uint64_t now = monotonic_microseconds();
+            uint64_t wait_us = now >= wait_start ? now - wait_start : 0;
+
+            if (wait_us >= DVD_BUFFER_LOG_WAIT_US) {
+                ++state->buffer_stall_events;
+                state->buffer_stall_us += wait_us;
+                if (wait_us > state->buffer_stall_max_us)
+                    state->buffer_stall_max_us = wait_us;
+                fprintf(stderr,
+                        "media_source: DVD buffer consumer waited %llu us\n",
+                        (unsigned long long)wait_us);
+            }
+        }
+        if (!state->buffer_fill) {
+            pthread_mutex_unlock(&state->buffer_lock);
+            break;
+        }
+        count = size - total < state->buffer_fill ?
+                size - total : state->buffer_fill;
+        first = DVD_BUFFER_CAPACITY - state->buffer_read;
+        if (first > count)
+            first = count;
+        memcpy(output + total, state->buffer + state->buffer_read, first);
+        memcpy(output + total + first, state->buffer, count - first);
+        state->buffer_read = (state->buffer_read + count) %
+                             DVD_BUFFER_CAPACITY;
+        state->buffer_fill -= count;
+        state->buffer_consumed += count;
+        pthread_cond_broadcast(&state->buffer_can_write);
+        pthread_mutex_unlock(&state->buffer_lock);
+        total += count;
+    }
+    return total;
+}
+
 static int iso_get_character(void *opaque)
 {
     uint8_t value;
@@ -329,15 +500,51 @@ static int iso_rewind(void *opaque)
     struct iso_source_state *state = opaque;
     int32_t title = state->title;
 
-    dvdnav_close(state->navigation);
-    state->navigation = NULL;
-    if (state->stream)
-        clearerr(state->stream);
-    if ((state->stream && fseeko(state->stream, 0, SEEK_SET) != 0) ||
-        dvd_navigation_open(state) < 0 ||
-        dvdnav_title_play(state->navigation, title) != DVDNAV_STATUS_OK) {
-        state->error = 1;
-        return -1;
+    if (state->buffer_thread_started) {
+        pthread_mutex_lock(&state->buffer_lock);
+        state->buffer_stop = 1;
+        pthread_cond_broadcast(&state->buffer_can_write);
+        pthread_cond_broadcast(&state->buffer_can_read);
+        pthread_mutex_unlock(&state->buffer_lock);
+        pthread_join(state->buffer_thread, NULL);
+        state->buffer_thread_started = 0;
+    }
+    if (state->direct_device) {
+        if (dvdnav_reset(state->navigation) != DVDNAV_STATUS_OK ||
+            dvdnav_title_play(state->navigation, title) != DVDNAV_STATUS_OK) {
+            state->error = 1;
+            return -1;
+        }
+        fprintf(stderr,
+                "media_source: DVD reset authenticated navigation title %d\n",
+                (int)title);
+    } else {
+        dvdnav_close(state->navigation);
+        state->navigation = NULL;
+        if (state->stream)
+            clearerr(state->stream);
+        if ((state->stream && fseeko(state->stream, 0, SEEK_SET) != 0) ||
+            dvd_navigation_open(state) < 0 ||
+            dvdnav_title_play(state->navigation, title) != DVDNAV_STATUS_OK) {
+            state->error = 1;
+            return -1;
+        }
+    }
+    if (state->buffer_sync_initialized) {
+        pthread_mutex_lock(&state->buffer_lock);
+        state->buffer_read = 0;
+        state->buffer_write = 0;
+        state->buffer_fill = 0;
+        state->buffer_stop = 0;
+        state->buffer_end_of_stream = 0;
+        state->buffer_error = 0;
+        state->buffer_produced = 0;
+        state->buffer_consumed = 0;
+        state->buffer_stall_events = 0;
+        state->buffer_stall_us = 0;
+        state->buffer_stall_max_us = 0;
+        state->test_stall_injected = 0;
+        pthread_mutex_unlock(&state->buffer_lock);
     }
     state->block_offset = 0;
     state->block_size = 0;
@@ -348,6 +555,94 @@ static int iso_rewind(void *opaque)
     state->end_of_stream = 0;
     state->error = 0;
     return 0;
+}
+
+#ifndef __arm__
+static int parse_test_u64(const char *name, uint64_t *value)
+{
+    const char *text = getenv(name);
+    char *end;
+    unsigned long long parsed;
+
+    if (!text || !*text)
+        return 0;
+    errno = 0;
+    parsed = strtoull(text, &end, 10);
+    if (errno || *end) {
+        fprintf(stderr, "media_source: ignoring invalid %s=%s\n", name, text);
+        return 0;
+    }
+    *value = (uint64_t)parsed;
+    return 1;
+}
+#endif
+
+static int iso_prepare(void *opaque)
+{
+    struct iso_source_state *state = opaque;
+    uint64_t prefill_start;
+    int lock_ready = 0;
+    int read_ready = 0;
+
+    if (!state->direct_device || state->buffer_thread_started)
+        return 0;
+    if (!state->buffer_sync_initialized) {
+        state->buffer = malloc(DVD_BUFFER_CAPACITY);
+        if (!state->buffer)
+            return -1;
+        if (pthread_mutex_init(&state->buffer_lock, NULL) != 0)
+            goto init_failed;
+        lock_ready = 1;
+        if (pthread_cond_init(&state->buffer_can_read, NULL) != 0)
+            goto init_failed;
+        read_ready = 1;
+        if (pthread_cond_init(&state->buffer_can_write, NULL) != 0)
+            goto init_failed;
+        state->buffer_sync_initialized = 1;
+    }
+#ifndef __arm__
+    {
+        uint64_t stall_ms = 0;
+
+        parse_test_u64("MMP_DVD_TEST_STALL_AFTER_BYTES",
+                       &state->test_stall_after_bytes);
+        if (parse_test_u64("MMP_DVD_TEST_STALL_MS", &stall_ms)) {
+            if (stall_ms > UINT_MAX)
+                stall_ms = UINT_MAX;
+            state->test_stall_ms = (unsigned)stall_ms;
+        }
+    }
+#endif
+    prefill_start = monotonic_microseconds();
+    if (pthread_create(&state->buffer_thread, NULL, iso_buffer_producer,
+                       state) != 0)
+        return -1;
+    state->buffer_thread_started = 1;
+    pthread_mutex_lock(&state->buffer_lock);
+    while (state->buffer_fill < DVD_BUFFER_PREFILL &&
+           !state->buffer_end_of_stream && !state->buffer_error)
+        pthread_cond_wait(&state->buffer_can_read, &state->buffer_lock);
+    if (state->buffer_error || (!state->buffer_fill &&
+                                state->buffer_end_of_stream)) {
+        pthread_mutex_unlock(&state->buffer_lock);
+        return -1;
+    }
+    fprintf(stderr,
+            "media_source: DVD buffer ready reserve=%zu capacity=%u "
+            "prefill_us=%llu\n",
+            state->buffer_fill, DVD_BUFFER_CAPACITY,
+            (unsigned long long)(monotonic_microseconds() - prefill_start));
+    pthread_mutex_unlock(&state->buffer_lock);
+    return 0;
+
+init_failed:
+    if (read_ready)
+        pthread_cond_destroy(&state->buffer_can_read);
+    if (lock_ready)
+        pthread_mutex_destroy(&state->buffer_lock);
+    free(state->buffer);
+    state->buffer = NULL;
+    return -1;
 }
 
 static int iso_seek(void *opaque, int64_t offset,
@@ -363,7 +658,16 @@ static int iso_seek(void *opaque, int64_t offset,
 static int iso_has_error(void *opaque)
 {
     struct iso_source_state *state = opaque;
-    return state->error || (state->stream && ferror(state->stream));
+    int source_error;
+
+    if (state->buffer_thread_started) {
+        pthread_mutex_lock(&state->buffer_lock);
+        source_error = state->buffer_error;
+        pthread_mutex_unlock(&state->buffer_lock);
+        return source_error;
+    }
+    return state->error ||
+           (state->stream && ferror(state->stream));
 }
 
 static void iso_close(void *opaque)
@@ -372,10 +676,33 @@ static void iso_close(void *opaque)
 
     if (!state)
         return;
+    if (state->buffer_thread_started) {
+        pthread_mutex_lock(&state->buffer_lock);
+        state->buffer_stop = 1;
+        pthread_cond_broadcast(&state->buffer_can_write);
+        pthread_cond_broadcast(&state->buffer_can_read);
+        pthread_mutex_unlock(&state->buffer_lock);
+        pthread_join(state->buffer_thread, NULL);
+        state->buffer_thread_started = 0;
+    }
+    if (state->buffer_sync_initialized) {
+        fprintf(stderr,
+                "media_source: DVD buffer summary produced=%llu consumed=%llu "
+                "waits=%llu wait_us=%llu wait_max_us=%llu\n",
+                (unsigned long long)state->buffer_produced,
+                (unsigned long long)state->buffer_consumed,
+                (unsigned long long)state->buffer_stall_events,
+                (unsigned long long)state->buffer_stall_us,
+                (unsigned long long)state->buffer_stall_max_us);
+        pthread_cond_destroy(&state->buffer_can_write);
+        pthread_cond_destroy(&state->buffer_can_read);
+        pthread_mutex_destroy(&state->buffer_lock);
+    }
     if (state->navigation)
         dvdnav_close(state->navigation);
     if (state->stream)
         fclose(state->stream);
+    free(state->buffer);
     free(state->device_path);
     free(state);
 }
@@ -384,6 +711,7 @@ static const struct media_source_ops iso_ops = {
     iso_read,
     iso_get_character,
     iso_rewind,
+    iso_prepare,
     iso_seek,
     iso_has_error,
     iso_close
@@ -540,6 +868,11 @@ int media_source_getc(struct media_source *source)
 int media_source_rewind(struct media_source *source)
 {
     return source && source->ops ? source->ops->rewind_source(source->state) : -1;
+}
+
+int media_source_prepare(struct media_source *source)
+{
+    return source && source->ops ? source->ops->prepare_source(source->state) : -1;
 }
 
 int media_source_seek(struct media_source *source, int64_t offset,

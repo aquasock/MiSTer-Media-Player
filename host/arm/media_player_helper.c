@@ -2380,6 +2380,12 @@ int main(int argc, char **argv)
                preflight_input(&input, is_program_stream) < 0) {
         goto done;
     }
+    if (media_source_prepare(&input) < 0) {
+        fprintf(stderr,
+                "media_player_helper: cannot prepare %s source for playback\n",
+                media_source_kind_name(input.kind));
+        goto done;
+    }
     output.scheduler_enabled = is_program_stream && !output.pcm;
     output.iso_pts_normalization =
         input.kind == MEDIA_SOURCE_ISO || input.kind == MEDIA_SOURCE_DVD;

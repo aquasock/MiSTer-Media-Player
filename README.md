@@ -65,6 +65,10 @@ Current development builds can also place `assets/USB DVD Drive.dvd` at the
 absolute path `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`. Selecting that
 launcher opens the inserted optical disc through `dvd:/dev/sr0`; the marker's
 contents are not media data. The drive does not need to be mounted.
+The helper authenticates and selects the title once, reuses that navigation
+session during preflight, then fills a 4 MiB launch reserve inside an 8 MiB
+HPS-RAM ring before playback begins. The ring is direct-disc-only and does not
+consume FPGA M10K memory.
 
 ## Release qualification
 
