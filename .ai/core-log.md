@@ -1,4 +1,4 @@
-## 795 COMMIT Unreleased ??? 2026-08-30T21:34:22-07:00
+## 795 COMMIT Unreleased 151e10a 2026-08-30T21:34:22-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add ARM-side previous chapter, next chapter and play/pause controls without chan
 
 #### Outcome:
 
-The user approves completing every practical control on the ARM side before returning to FPGA work.  The proposed boundary maps player-one Left and Right to previous and next chapter and Start to pause or resume only while MediaPlayer playback is active and the MiSTer OSD is closed.  Main will use a private bidirectional control socket to the helper, bracket each libdvdnav chapter change by releasing and reasserting the existing download session, discard all pre-jump Main and pipe bytes, and reset the transport-credit state before admitting the new chapter.  The helper will retain the authenticated DVD navigation handle, stop and flush the direct-device HPS ring, use libdvdnav to restart the requested chapter, reset its Program Stream, audio and scheduler state at the discontinuity, then wait at an explicit ready/go barrier so old and new bytes cannot cross the FPGA reset boundary.  Pause will be an intentional Main-side transport hold that preserves the helper and navigation session; it can freeze and resume playback without an RBF change, but the current FPGA may report its existing audio FIFO underrun after a long pause because it has no explicit pause state.  Controls will apply to `dvd:` and `iso:` sources, ordinary file playback will remain unchanged, and no RTL, QSF, Quartus build, RBF or MiSTer deployment is in this commit boundary.
+Source `151e10a` maps player-one Left and Right to previous and next chapter and Start to pause or resume only during active playback with the MiSTer OSD closed.  Main creates a private nonblocking `SOCK_SEQPACKET` control channel, releases the current download for a chapter request, drains every old pending and pipe byte, resets transport-credit state, then reasserts download only after the helper's ready event and releases the helper with an explicit go command.  The helper retains the authenticated libdvdnav handle, stops and flushes the direct-device HPS ring, restarts the requested chapter with `dvdnav_part_play`, resets Program Stream, audio, scheduler, random-access and PTS state, and waits at that barrier before producing the new chapter.  Start pause/resume is an intentional Main-side transport hold that preserves the process and navigation session; the documented limitation remains that a long hold can trigger the current FPGA audio-underrun telemetry because this boundary adds no core pause state.  A native socket harness proves a two-second pause and resumed byte flow, next-chapter and previous-chapter barriers on both `iso:` and direct-device-compatible `dvd:` input; the direct run discards and refills the 8 MiB ring at each jump without reopening navigation.  The unchanged five-minute Coming to America VOB repeats 299,980,757 video bytes, 601 timestamps, 9,375 AC-3 frames and 14,400,000 PCM samples, and the MPG smoke completes normally.  A complete buffered Blazing Saddles direct run performs one CSS scan, two authenticated resets, zero consumer waits, repeats 3,823,399,998 video bytes, 11,150 timestamps, 174,142 AC-3 frames, 267,482,112 PCM samples and one expected PTS discontinuity, and reproduces the exact accepted transport SHA-256 `d407c03833d0b2e2326037b0a7f9041c2292eb23d6d75ac37dc08df8c0d95553`.  ARM GNU 10.2 builds the 863,540-byte static ARMv7 helper at SHA-256 `ceef50a6c2d706ae40c4992ee6d47d687a3ea0eced4e61567032b9599d14d2a7` and the 1,174,492-byte patched Main at SHA-256 `b98af001791800647b8ae4c6c0850d19061fe8b24edbe8cad307bbb9c2759990`; the strict native helper is 1,589,632 bytes at SHA-256 `bfd8222eeb43857420dcfcb086802c4e258d7ba1e178b852f6c3f4530d55958b`.  No RTL, QSF, Quartus command, RBF, MiSTer file or running physical-disc test changes.
 
 #### Next Steps:
 
-Implement protocol validation and nonblocking control handling, chapter discontinuity flushing, edge-triggered controller mapping and deterministic diagnostics.  Native-test previous and next chapter barriers on both ISO and direct-device-compatible navigation, verify pause backpressure and resume byte continuity, repeat the existing DVD, ISO, VOB and MPG regressions, then build only the static ARM helper and patched Main on the build PC.  Do not deploy either binary until exact hashes and rollback paths are recorded and the user's current physical-disc tests have stopped.
+Await the user's completion of the current physical-disc qualification and explicit deployment authorization.  Then preserve and independently verify the installed Main and helper as unique absolute-path rollbacks, stage and read back exact source-`151e10a` candidate hashes, activate both binaries, reboot because Main changes, and leave the seed-19 RBF untouched.  Hardware-test Start pause/resume first with the known underrun-telemetry caveat, then Right to chapter two and Left back to chapter one on an inserted DVD; require clean download-session resets, valid video and synchronized HDMI or S/PDIF audio after each barrier.
 
 #### Files Modified:
 
@@ -29,7 +29,7 @@ Implement protocol validation and nonblocking control handling, chapter disconti
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
