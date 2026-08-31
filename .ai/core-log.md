@@ -1,4 +1,4 @@
-## 830 COMMIT Unreleased ??? 2026-08-31T11:13:16-07:00
+## 830 COMMIT Unreleased f515341 2026-08-31T11:13:16-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Distinguish a real DVD subpicture-plane defect from a downstream transport or re
 
 #### Outcome:
 
-The user approves the helper-only known-pattern probe after source `673b6d7` proves the real menu state contains 267 through 279 drawable pixels but the unchanged hardware displays none, while exact installed-RTL simulation renders a complete bottom-menu rectangle correctly under an idle DDR model.  The proposed source remains behavior-identical in ordinary builds and gates the diagnostic behind a compile-time definition used only for a separately named ARM artifact.  That artifact will dump the complete real 86,400-byte two-bit plane in bounded row records for exact replay, then retain the authored visible and menu flags plus moving selection rectangle while transmitting an all-index-one plane, transparent normal palette and opaque magenta highlight entry.  No decoder, scheduler, navigation, record framing, Main, RTL, QSF, RBF or installed target file is changed by the implementation itself.
+The user approves and source `f515341` implements the helper-only known-pattern probe after source `673b6d7` proves the real menu state contains 267 through 279 drawable pixels but the unchanged hardware displays none, while exact installed-RTL simulation renders a complete bottom-menu rectangle correctly under an idle DDR model.  Ordinary builds remain behavior-identical, and compile-time definition `MMP_DVD_OVERLAY_PROBE` alone enables a separately named artifact that logs all 480 rows of each real 86,400-byte two-bit plane with its FNV-1a hash, retains the authored visible and menu flags plus moving selection rectangle, and transmits an all-index-one plane with a transparent normal palette and opaque magenta highlight index one.  Strict default and probe compilation, capability smoke tests, focused subpicture, random-access and menu-hop regressions, and a byte-level probe framing test all pass locally.  On the exact detached build-PC checkout, the authored-menu harness passes root, all four directions, activation, visible-highlight and control-acknowledgment coverage; it observes 17 complete overlay commits, 1,303 visible highlight events and the expected 6,528-pixel solid selected rectangle.  The normal and probe ARM outputs both build with MiSTer's GNU 10.2 toolchain; the uniquely named probe is a 908,660-byte stripped static ARMv7 hard-float executable with no dynamic section at SHA-256 `2b7de20983d9b9f2b2fe561d5ca78e33b94d3f099f6bdd0a88b31c3980118ef5`.  No decoder, scheduler, navigation, record framing, Main, RTL, QSF, RBF or installed target file is changed by the implementation itself.
 
 #### Next Steps:
 
-Implement and review the compile-time helper probe, compile both ordinary and probe variants with strict warnings, run the focused subpicture, random-access and menu regressions plus available authored-menu coverage, then commit only if the ordinary build's behavior remains unchanged.  Build a uniquely named static ARM probe helper from the exact committed source on the build PC and provide its path and hash for manual replacement; the physical result is decisive if a solid magenta rectangle follows the authored selection, while another completely absent rectangle moves the next non-RBF investigation to Main's helper-to-ioctl forwarding.
+Exit the MediaPlayer core or otherwise stop its running helper, then replace only `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-f515341/host/build/MediaPlayer_Helper_OverlayProbe` from the build PC, restore executable permission if needed, and verify the destination is 908,660 bytes with SHA-256 `2b7de20983d9b9f2b2fe561d5ca78e33b94d3f099f6bdd0a88b31c3980118ef5`.  Preserve Main and the installed seed-20 RBF.  Restart the physical DVD, reach its menu, move the selected item several times and capture a fresh helper log plus screenshot; the log must contain `probe=solid-index1-magenta` and the bounded real-plane dump.  A solid magenta rectangle following the selection localizes the defect to the real plane or its delivery pattern, while another completely absent rectangle moves the next non-RBF investigation to Main's helper-to-ioctl forwarding.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Implement and review the compile-time helper probe, compile both ordinary and pr
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
