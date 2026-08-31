@@ -1,3 +1,32 @@
+## 788 COMMIT Unreleased eb7bed6 2026-08-30T20:08:02-07:00
+
+#### Coming From:
+
+Unreleased 531f741
+
+#### Purpose:
+
+Capture and qualify the deployed ISO PTS epoch correction across the prior Blazing Saddles long-title audio failure boundary.
+
+#### Outcome:
+
+The uninterrupted `/media/fat/games/MediaPlayer/Blazing Saddles.iso` run on the installed source-`eb7bed6` helper uses S/PDIF decoded PCM and remains visibly clean, audibly perfect and synchronized by the user's direct observation beyond 51 minutes and again at approximately 53 minutes.  The helper records exactly one ISO epoch correction, mapping raw PTS 32,764 to normalized PTS 261,466,438 after the preceding maximum, then immediately advances through 261,601,573 and continues with zero held audio backlog instead of freezing at the old 139,443,456-sample target.  At the 3,114.412548-second captured horizon it has emitted 149,546,496 samples against a 149,491,802-sample wall-clock expectation, remains 54,694 samples ahead, advances its audio target to 149,537,536 and its video PTS to 280,392,846, and reports no transport, read or process fault.  The complete 582,704-byte scaled capture `/tmp/entry788_blazing_saddles_51min_boundary.png` has SHA-256 `981c8476`; the 407,765-byte native capture `/tmp/entry788_blazing_saddles_53min_boundary_raw.png` has SHA-256 `fe944f1e` and preserves a clean active frame.  All 64 schema-20 records in the native capture have valid prefix, row index and parity and checksum `94f83f3a` matches; its sticky first-error snapshot occurs at STC second 3,004 rather than the prior failing second 2,906, accepts 2,053,638,876 clean-video bytes, and contains only hardware error `0x0400`, exactly one audio FIFO underrun and FIFO floor zero, with zero transport blocks and no decoder, PCM-protocol, presentation, cache-overlap or video error.  The user previously accepted one isolated audio FIFO underrun, and unlike the old failure this event causes no audible degradation, accumulating starvation or A/V drift.  The 82,683,392-byte read-only helper-log capture `/tmp/entry788_blazing_saddles_51min_boundary_arm_helper.log` has SHA-256 `ce13db73`.  This hardware result accepts the source-`eb7bed6` PTS epoch correction across its required long-title boundary without changing the running movie, FPGA, seed-19 RBF, Main, helper, media or configuration.
+
+#### Next Steps:
+
+Allow the current movie to continue without agent interaction for as long as the user wants; no further capture is required for this boundary.  After the user finishes or explicitly authorizes interruption, preserve the installed Main and helper and deploy the already built source-`531f741` USB DVD artifacts through unique candidate uploads, independent absolute-path readbacks, same-directory renames and final readbacks, install the launcher only at `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`, reboot, and begin the bounded physical Coming to America disc gate from `dvd:/dev/sr0`.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 787 COMMIT Unreleased 531f741 2026-08-30T19:40:26-07:00
 
 #### Coming From:
@@ -1164,34 +1193,5 @@ None.
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 748 COMMIT Unreleased 6196869 2026-08-29T20:47:36-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Record the user's exact spatial localization of the first P81 corruption.
-
-#### Outcome:
-
-While the captured P81 terminal frame remains displayed, the user identifies the first corruption precisely as the thin horizontal line crossing the mouth of the man on the right.  This is the onset within P81, not merely a later consequence elsewhere in the frame.  The location is visible in the preserved `/tmp/entry747_p81_first_corrupt.png` evidence and replaces the broader earlier description of a central disturbance.  Combined with clean P80 and the exact byte-preserved P81 checkpoint, this provides both temporal and spatial bounds for offline comparison: the first affected authored picture is P81 and its first visible damaged region is the right-hand subject's mouth-level horizontal strip.  The clean schema-20 lifecycle and zero fault counters from entry 747 remain unchanged.  No new capture, source, FPGA, RBF, Main, helper, installed media or configuration change occurs.
-
-#### Next Steps:
-
-Do not request another hardware checkpoint.  Replay exact P81 after its clean P80 reference in the production-path RTL simulation and compare against the software oracle, prioritizing the mouth-level macroblock row and finding the first differing luma or chroma sample within that row.  Correlate the first mismatch with the owning macroblock's prediction mode, vectors, quantiser scale, coded-block pattern, DCT type, coefficient values and reconstruction saturation.  Require a bounded reproduction and pixel-exact regression before any RTL correction or Quartus build; the next user test should be a corrected RBF only after those gates pass.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
