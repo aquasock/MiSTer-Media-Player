@@ -1,4 +1,4 @@
-## 809 COMMIT Unreleased ??? 2026-08-31T03:31:31-07:00
+## 809 COMMIT Unreleased 2738e99 2026-08-31T03:31:31-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Correct the authored-menu overlay clock-crossing timing boundary without weakeni
 
 #### Outcome:
 
-The user explicitly approves the narrow follow-on boundary proposed by entry 808 after the first seed-19 build localized every negative setup and hold path to the first sampling registers of the overlay's intentional stable-bus and toggle handshakes between the 60 MHz memory domain and 54 MHz video domain.  The planned correction will add endpoint-specific timing exceptions only from the overlay source registers to those first synchronizer stages, preserve timing through each second stage and every same-clock path, and make the two reported overlay width conversions explicit.  It will not declare the full clocks asynchronous, alter DDR arbitration or pixel composition, rebuild unrelated host binaries, install the rejected RBF, or disturb the accepted source-`6e44472` MiSTer playback session.
+Source `2738e99` adds endpoint-specific timing exceptions only from the authored-menu overlay's stable buses and event toggles to their explicit first sampling stages in the opposite 54 MHz or 60 MHz domain, leaving every second stage, same-clock path and the clock relationship timed, and makes both overlay width conversions explicit without changing the packed-pixel address or alpha result.  TimeQuest resolves every new exception to real keepers with no ignored overlay filter, the two overlay width warnings disappear, all three focused overlay simulations pass, and eight retained mixed-raster, interlaced-I/P, field-motion, field-DCT, B-field and exhaustive B-motion regressions pass.  The one authorized clean seed-19 compile completes synthesis, fitting and assembly with zero errors; decoder setup is positive 0.975 ns, video setup is positive 1.680 ns, hold is positive 0.246 ns, recovery is positive 4.072 ns, removal is positive 0.508 ns and minimum-pulse-width is positive 0.925 ns.  The global setup gate nevertheless rejects the RBF at negative 0.107 ns with negative 0.839 ns TNS across sixteen ordinary same-clock HDMI scaler paths from `ascal|o_h_poly_t.r0` to `ascal|o_h_poly_pix.r`; this is one logic level, not an overlay crossing, and is not false-pathed.  The fit uses 35,834 of 41,910 ALMs, 535 of 553 M10Ks and 70 of 112 DSPs; the rejected 4,506,492-byte RBF hashes `9550bd2a`, is not fetched or installed, and the MiSTer remains on accepted source-`6e44472` artifacts.
 
 #### Next Steps:
 
-Inspect the exact failing endpoints and existing project constraint conventions, implement only the endpoint-scoped first-stage exceptions and explicit width conversions, then rerun focused overlay tests, the retained native-480i regression and constraint coverage checks before one clean seed-19 Quartus build.  Accept the artifact only if global setup, hold, recovery, removal and minimum-pulse-width are all positive and same-clock analysis remains intact; otherwise stop with the new evidence and leave the MiSTer unchanged.
+Keep source `2738e99` and the accepted source-`6e44472` MiSTer installation unchanged while obtaining approval for a separate placement-only timing boundary.  The smallest next action is a bounded fit-and-timing seed search reusing the exact synthesized `2738e99` netlist, with no RTL or constraint change, followed by pinning the first seed whose global setup, hold, recovery, removal and minimum-pulse-width margins are all positive and verifying it once in a clean full build; do not weaken the HDMI constraint or pipeline the MiSTer scaler unless the bounded seed search fails.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Inspect the exact failing endpoints and existing project constraint conventions,
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
