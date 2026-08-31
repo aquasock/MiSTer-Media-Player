@@ -33,7 +33,10 @@ libdvdnav_version=7.0.0
 libdvdnav_url=https://download.videolan.org/pub/videolan/libdvdnav/last/libdvdnav-7.0.0.tar.xz
 libdvdnav_sha=a2a18f5ad36d133c74bf9106b6445806fa253b09141a46392550394b647b221e
 main_commit=0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f
-main_patch="$root_dir/host/main_mister/0001-mediaplayer-arm-loader.patch"
+main_patches=(
+    "$root_dir/host/main_mister/0001-mediaplayer-arm-loader.patch"
+    "$root_dir/host/main_mister/0002-mediaplayer-overlay-trace.patch"
+)
 
 mkdir -p "$deps_dir" "$build_dir"
 
@@ -208,12 +211,15 @@ build_arm_helper() {
 build_main() {
         find_arm_cc
         local temporary
+        local main_patch
         temporary=$(mktemp -d -t mediaplayer_main_build.XXXXXX)
         trap 'rm -r "$temporary"' EXIT
         git clone --quiet https://github.com/MiSTer-devel/Main_MiSTer.git "$temporary/Main_MiSTer"
         git -C "$temporary/Main_MiSTer" checkout --quiet "$main_commit"
-        git -C "$temporary/Main_MiSTer" apply --check "$main_patch"
-        git -C "$temporary/Main_MiSTer" apply "$main_patch"
+        for main_patch in "${main_patches[@]}"; do
+            git -C "$temporary/Main_MiSTer" apply --check "$main_patch"
+            git -C "$temporary/Main_MiSTer" apply "$main_patch"
+        done
         PATH="$(dirname -- "$(command -v "$arm_cc")"):$PATH" \
             make -C "$temporary/Main_MiSTer" -j"$(nproc)"
         cp "$temporary/Main_MiSTer/bin/MiSTer" "$build_dir/MiSTer"

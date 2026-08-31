@@ -1,0 +1,408 @@
+diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
+--- a/support/mediaplayer/mediaplayer.cpp
++++ b/support/mediaplayer/mediaplayer.cpp
+@@ -1,4 +1,5 @@
+ #include "mediaplayer.h"
++#include "overlay_trace.h"
+ 
+ #include <errno.h>
+ #include <fcntl.h>
+@@ -75,6 +76,7 @@ static uint32_t pending_size = 0, pending_offset = 0;
+ static uint32_t pending_size = 0, pending_offset = 0;
+ static bool pending_eof = false;
+ static unsigned transfer_events = 0;
++static media_overlay_trace overlay_trace = {};
+ static const unsigned media_poll_budget_us = 2000;
+ static const unsigned media_poll_step_limit = 8;
+ 
+@@ -108,6 +110,70 @@ static void diagnostic_write(const char *format, ...)
+ 	(void)write(diagnostic_fd, message, (size_t)prefix + (size_t)length);
+ }
+ 
++static unsigned overlay_payload_u16(const media_overlay_trace_event *event,
++                                    unsigned offset)
++{
++	return ((unsigned)event->payload[offset] << 8) |
++	       event->payload[offset + 1];
++}
++
++static void overlay_trace_event(void *, const media_overlay_trace_event *event)
++{
++	switch (event->kind)
++	{
++	case MEDIA_OVERLAY_TRACE_INVALID_LENGTH:
++		diagnostic_write("overlay_submit invalid_length offset=%llu length=%u\n",
++		                 (unsigned long long)event->offset,
++		                 (unsigned)event->length);
++		break;
++	case MEDIA_OVERLAY_TRACE_CONFIG:
++	case MEDIA_OVERLAY_TRACE_STYLE:
++		if (event->payload_size == 41)
++			diagnostic_write("overlay_submit %s sequence=%u offset=%llu length=%u "
++			                 "flags=%u rect=%u,%u,%u,%u highlight1=%02x%02x%02x%02x "
++			                 "probe_payload=%u order_errors=%u\n",
++			                 event->kind == MEDIA_OVERLAY_TRACE_CONFIG ? "config" : "style",
++			                 event->sequence, (unsigned long long)event->offset,
++			                 (unsigned)event->length, (unsigned)event->payload[0],
++			                 overlay_payload_u16(event, 33),
++			                 overlay_payload_u16(event, 35),
++			                 overlay_payload_u16(event, 37),
++			                 overlay_payload_u16(event, 39),
++			                 (unsigned)event->payload[21], (unsigned)event->payload[22],
++			                 (unsigned)event->payload[23], (unsigned)event->payload[24],
++			                 event->probe_payload, event->frame_order_errors);
++		else
++			diagnostic_write("overlay_submit %s sequence=%u offset=%llu length=%u "
++			                 "payload_bytes=%u order_errors=%u\n",
++			                 event->kind == MEDIA_OVERLAY_TRACE_CONFIG ? "config" : "style",
++			                 event->sequence, (unsigned long long)event->offset,
++			                 (unsigned)event->length, (unsigned)event->payload_size,
++			                 event->frame_order_errors);
++		break;
++	case MEDIA_OVERLAY_TRACE_COMMIT:
++		diagnostic_write("overlay_submit commit sequence=%u offset=%llu length=%u "
++		                 "data_records=%u data_bytes=%u fnv1a=%08x non55=%u "
++		                 "order_errors=%u probe_complete=%u\n",
++		                 event->sequence, (unsigned long long)event->offset,
++		                 (unsigned)event->length, event->data_records,
++		                 event->data_bytes, event->fnv1a, event->non_55_bytes,
++		                 event->frame_order_errors, event->probe_complete);
++		break;
++	case MEDIA_OVERLAY_TRACE_CLEAR:
++		diagnostic_write("overlay_submit clear offset=%llu length=%u order_errors=%u\n",
++		                 (unsigned long long)event->offset,
++		                 (unsigned)event->length, event->frame_order_errors);
++		break;
++	case MEDIA_OVERLAY_TRACE_UNKNOWN:
++		diagnostic_write("overlay_submit unknown offset=%llu length=%u command=%02x "
++		                 "order_errors=%u\n",
++		                 (unsigned long long)event->offset,
++		                 (unsigned)event->length, (unsigned)event->command,
++		                 event->frame_order_errors);
++		break;
++	}
++}
++
+ static void profile_poll_finish()
+ {
+ 	media_transfer_profile &p = transfer_profile;
+@@ -151,6 +217,17 @@ static void diagnostic_close()
+ 	if (diagnostic_fd >= 0)
+ 	{
+ 		profile_poll_finish();
++		diagnostic_write("overlay_submit summary bytes=%llu markers=%u configs=%u "
++		                 "data_records=%u data_bytes=%u commits=%u styles=%u "
++		                 "style_changes=%u clears=%u invalid_lengths=%u "
++		                 "unknown=%u order_errors=%u\n",
++		                 (unsigned long long)overlay_trace.offset,
++		                 overlay_trace.markers, overlay_trace.configs,
++		                 overlay_trace.data_records, overlay_trace.data_bytes,
++		                 overlay_trace.commits, overlay_trace.styles,
++		                 overlay_trace.style_changes, overlay_trace.clears,
++		                 overlay_trace.invalid_lengths,
++		                 overlay_trace.unknown_commands, overlay_trace.order_errors);
+ 		profile_summary();
+ 		(void)fsync(diagnostic_fd);
+ 		close(diagnostic_fd);
+@@ -165,6 +242,7 @@ static void diagnostic_open(const char *source_spec, unsigned char index)
+ 	pending_size = pending_offset = 0;
+ 	pending_eof = false;
+ 	transfer_events = 0;
++	media_overlay_trace_reset(&overlay_trace, overlay_trace_event, NULL);
+ 	diagnostic_fd = open(diagnostic_path,
+ 	                     O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC,
+ 	                     0644);
+@@ -738,6 +816,8 @@ static void mediaplayer_poll_inner()
+ 			stop_with_reason("transport-fault"); return;
+ 		}
+ 		if (!consumed) return; // No credits: leave the exact pending bytes for next poll.
++		media_overlay_trace_feed(&overlay_trace,
++		                         pending_buffer + pending_offset, consumed);
+ 		pending_offset += consumed; submitted_bytes += consumed; ++transfer_events;
+ 		if (!first_byte_seen)
+ 		{
+diff --git a/support/mediaplayer/overlay_trace.h b/support/mediaplayer/overlay_trace.h
+new file mode 100644
+--- /dev/null
++++ b/support/mediaplayer/overlay_trace.h
+@@ -0,0 +1,280 @@
++#ifndef MEDIAPLAYER_OVERLAY_TRACE_H
++#define MEDIAPLAYER_OVERLAY_TRACE_H
++
++#include <stddef.h>
++#include <stdint.h>
++#include <string.h>
++
++enum media_overlay_trace_event_kind
++{
++	MEDIA_OVERLAY_TRACE_INVALID_LENGTH,
++	MEDIA_OVERLAY_TRACE_CONFIG,
++	MEDIA_OVERLAY_TRACE_COMMIT,
++	MEDIA_OVERLAY_TRACE_STYLE,
++	MEDIA_OVERLAY_TRACE_CLEAR,
++	MEDIA_OVERLAY_TRACE_UNKNOWN
++};
++
++struct media_overlay_trace_event
++{
++	media_overlay_trace_event_kind kind;
++	uint64_t offset;
++	uint32_t sequence;
++	uint32_t data_records;
++	uint32_t data_bytes;
++	uint32_t fnv1a;
++	uint32_t non_55_bytes;
++	uint32_t frame_order_errors;
++	uint16_t length;
++	uint8_t command;
++	uint8_t payload[41];
++	uint8_t payload_size;
++	bool probe_payload;
++	bool probe_complete;
++};
++
++typedef void (*media_overlay_trace_callback)(
++	void *opaque, const media_overlay_trace_event *event);
++
++struct media_overlay_trace
++{
++	enum phase_type { SEARCH, LENGTH_HIGH, LENGTH_LOW, PAYLOAD } phase;
++	uint32_t window;
++	uint64_t offset;
++	uint16_t length;
++	uint16_t remaining;
++	uint8_t command;
++	uint8_t payload[41];
++	uint8_t payload_size;
++	uint8_t last_style[41];
++	bool last_style_valid;
++	bool frame_active;
++	bool frame_probe_config;
++	uint32_t frame_sequence;
++	uint32_t frame_data_records;
++	uint32_t frame_data_bytes;
++	uint32_t frame_fnv1a;
++	uint32_t frame_non_55_bytes;
++	uint32_t frame_order_errors;
++	uint32_t markers;
++	uint32_t configs;
++	uint32_t data_records;
++	uint32_t data_bytes;
++	uint32_t commits;
++	uint32_t styles;
++	uint32_t style_changes;
++	uint32_t clears;
++	uint32_t invalid_lengths;
++	uint32_t unknown_commands;
++	uint32_t order_errors;
++	media_overlay_trace_callback callback;
++	void *callback_opaque;
++};
++
++static inline bool media_overlay_trace_probe_payload(const uint8_t *payload,
++	                                                   size_t size)
++{
++	if (size != 41 || payload[0] != 3)
++		return false;
++	for (size_t index = 1; index <= 32; ++index)
++	{
++		const uint8_t expected = index == 21 || index == 23 || index == 24 ?
++		                         0xff : 0x00;
++		if (payload[index] != expected)
++			return false;
++	}
++	const unsigned x1 = ((unsigned)payload[33] << 8) | payload[34];
++	const unsigned y1 = ((unsigned)payload[35] << 8) | payload[36];
++	const unsigned x2 = ((unsigned)payload[37] << 8) | payload[38];
++	const unsigned y2 = ((unsigned)payload[39] << 8) | payload[40];
++	return x1 <= x2 && y1 <= y2 && x2 < 720 && y2 < 480;
++}
++
++static inline void media_overlay_trace_reset(media_overlay_trace *trace,
++	                                          media_overlay_trace_callback callback,
++	                                          void *opaque)
++{
++	memset(trace, 0, sizeof(*trace));
++	trace->phase = media_overlay_trace::SEARCH;
++	trace->callback = callback;
++	trace->callback_opaque = opaque;
++}
++
++static inline void media_overlay_trace_emit(media_overlay_trace *trace,
++	                                         media_overlay_trace_event_kind kind,
++	                                         bool probe_complete)
++{
++	if (!trace->callback)
++		return;
++	media_overlay_trace_event event = {};
++	event.kind = kind;
++	event.offset = trace->offset;
++	event.sequence = trace->frame_sequence;
++	event.data_records = trace->frame_data_records;
++	event.data_bytes = trace->frame_data_bytes;
++	event.fnv1a = trace->frame_fnv1a;
++	event.non_55_bytes = trace->frame_non_55_bytes;
++	event.frame_order_errors = trace->frame_order_errors;
++	event.length = trace->length;
++	event.command = trace->command;
++	event.payload_size = trace->payload_size;
++	memcpy(event.payload, trace->payload, trace->payload_size);
++	event.probe_payload = media_overlay_trace_probe_payload(
++		trace->payload, trace->payload_size);
++	event.probe_complete = probe_complete;
++	trace->callback(trace->callback_opaque, &event);
++}
++
++static inline void media_overlay_trace_order_error(media_overlay_trace *trace)
++{
++	++trace->order_errors;
++	++trace->frame_order_errors;
++}
++
++static inline void media_overlay_trace_record_complete(media_overlay_trace *trace)
++{
++	bool probe_complete = false;
++	switch (trace->command)
++	{
++	case 0x00:
++		++trace->clears;
++		if (trace->length != 1)
++			media_overlay_trace_order_error(trace);
++		media_overlay_trace_emit(trace, MEDIA_OVERLAY_TRACE_CLEAR, false);
++		break;
++	case 0x01:
++		{
++		const bool interrupted = trace->frame_active;
++		if (interrupted)
++			++trace->order_errors;
++		trace->frame_active = true;
++		++trace->frame_sequence;
++		trace->frame_data_records = 0;
++		trace->frame_data_bytes = 0;
++		trace->frame_fnv1a = 2166136261u;
++		trace->frame_non_55_bytes = 0;
++		trace->frame_order_errors = (interrupted ? 1u : 0u) +
++		                            (trace->length == 42 ? 0u : 1u);
++		if (trace->length != 42)
++			++trace->order_errors;
++		trace->frame_probe_config = media_overlay_trace_probe_payload(
++			trace->payload, trace->payload_size);
++		++trace->configs;
++		media_overlay_trace_emit(trace, MEDIA_OVERLAY_TRACE_CONFIG, false);
++		}
++		break;
++	case 0x02:
++		++trace->data_records;
++		trace->data_bytes += trace->length > 0 ? trace->length - 1 : 0;
++		if (!trace->frame_active || trace->length < 2)
++			media_overlay_trace_order_error(trace);
++		++trace->frame_data_records;
++		break;
++	case 0x03:
++		++trace->commits;
++		if (!trace->frame_active || trace->length != 1)
++			media_overlay_trace_order_error(trace);
++		probe_complete = trace->frame_active && trace->frame_probe_config &&
++			trace->frame_data_records == 22 &&
++			trace->frame_data_bytes == 86400 &&
++			trace->frame_fnv1a == 0xf8555d45u &&
++			trace->frame_non_55_bytes == 0 &&
++			trace->frame_order_errors == 0;
++		media_overlay_trace_emit(trace, MEDIA_OVERLAY_TRACE_COMMIT,
++		                         probe_complete);
++		trace->frame_active = false;
++		break;
++	case 0x04:
++		++trace->styles;
++		if (trace->length != 42)
++			media_overlay_trace_order_error(trace);
++		if (!trace->last_style_valid || trace->payload_size != 41 ||
++		    memcmp(trace->last_style, trace->payload, 41))
++		{
++			++trace->style_changes;
++			media_overlay_trace_emit(trace, MEDIA_OVERLAY_TRACE_STYLE, false);
++			if (trace->payload_size == 41)
++			{
++				memcpy(trace->last_style, trace->payload, 41);
++				trace->last_style_valid = true;
++			}
++		}
++		break;
++	default:
++		++trace->unknown_commands;
++		media_overlay_trace_order_error(trace);
++		media_overlay_trace_emit(trace, MEDIA_OVERLAY_TRACE_UNKNOWN, false);
++		break;
++	}
++}
++
++static inline void media_overlay_trace_feed(media_overlay_trace *trace,
++	                                         const uint8_t *data, size_t size)
++{
++	for (size_t index = 0; index < size; ++index)
++	{
++		const uint8_t byte = data[index];
++		++trace->offset;
++		switch (trace->phase)
++		{
++		case media_overlay_trace::SEARCH:
++			trace->window = (trace->window << 8) | byte;
++			if (trace->window == 0x000001b9u)
++			{
++				++trace->markers;
++				trace->window = 0;
++				trace->phase = media_overlay_trace::LENGTH_HIGH;
++			}
++			break;
++		case media_overlay_trace::LENGTH_HIGH:
++			trace->length = (uint16_t)byte << 8;
++			trace->phase = media_overlay_trace::LENGTH_LOW;
++			break;
++		case media_overlay_trace::LENGTH_LOW:
++			trace->length |= byte;
++			if (!trace->length || trace->length > 4097)
++			{
++				++trace->invalid_lengths;
++				trace->command = 0xff;
++				trace->payload_size = 0;
++				media_overlay_trace_emit(trace,
++				                         MEDIA_OVERLAY_TRACE_INVALID_LENGTH,
++				                         false);
++				trace->phase = media_overlay_trace::SEARCH;
++				trace->window = 0;
++			}
++			else
++			{
++				trace->remaining = trace->length;
++				trace->payload_size = 0;
++				trace->phase = media_overlay_trace::PAYLOAD;
++			}
++			break;
++		case media_overlay_trace::PAYLOAD:
++			if (trace->remaining == trace->length)
++				trace->command = byte;
++			else
++			{
++				if (trace->payload_size < sizeof(trace->payload))
++					trace->payload[trace->payload_size++] = byte;
++				if (trace->command == 0x02)
++				{
++					trace->frame_fnv1a ^= byte;
++					trace->frame_fnv1a *= 16777619u;
++					++trace->frame_data_bytes;
++					if (byte != 0x55)
++						++trace->frame_non_55_bytes;
++				}
++			}
++			if (!--trace->remaining)
++			{
++				media_overlay_trace_record_complete(trace);
++				trace->phase = media_overlay_trace::SEARCH;
++				trace->window = 0;
++			}
++			break;
++		}
++	}
++}
++
++#endif
