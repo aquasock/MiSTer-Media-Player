@@ -1,3 +1,34 @@
+## 786 COMMIT Unreleased ??? 2026-08-30T19:13:48-07:00
+
+#### Coming From:
+
+Unreleased eb7bed6
+
+#### Purpose:
+
+Bound longest-title ISO playback to one declared title traversal so post-title navigation cannot restart or enter another DVD domain.
+
+#### Outcome:
+
+The user authorizes continued development while the deployed source-`eb7bed6` Blazing Saddles boundary soak runs and separately prepares a genuinely encrypted ISO for the following qualification gate.  The proposed host-only source change will retain libdvdnav's selected-title identity, chapter description and 90 kHz duration, accept normal forward cell and chapter progression, and translate a verified title exit, title replay or exhausted duration into clean end-of-stream before any following-domain payload is exposed to the Program Stream parser.  Rewind will restore the same one-traversal boundary.  The implementation will use the pinned libdvdnav API's title and time state rather than infer a DVD limit from file bytes or MPEG decoder behavior; MPG, VOB and every non-ISO source, Main, the FPGA and the accepted seed-19 RBF will remain unchanged.
+
+#### Next Steps:
+
+Implement the boundary inside `media_source.c`, document the ownership and limitation, and run exact native regressions proving that each available decrypted ISO ends once, that the accepted ISO opening remains byte-identical, and that ordinary MPG and VOB output remain byte-identical.  Build one exact static ARM helper only after those checks pass.  Do not deploy it while the current Blazing Saddles 48:25 soak is running; first accept that result, then preserve and stage-deploy the one-traversal helper with exact readback.  When the user supplies the encrypted ISO, independently prove it contains CSS-scrambled sectors before using it for native and MiSTer qualification.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_source.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 785 COMMIT Unreleased eb7bed6 2026-08-30T19:08:17-07:00
 
 #### Coming From:
@@ -1154,34 +1185,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 746 COMMIT Unreleased 6196869 2026-08-29T20:45:04-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Complete the user's requested consecutive P80, P81, P82 and P83 terminal-frame comparison set.
-
-#### Outcome:
-
-The user explicitly requests comparison of P80, P81, P82 and P83.  P80 and P82 were already installed and independently verified.  Using unchanged source `6196869` and the exact original authored stream, generate the two missing endpoints.  P81 ends on byte-identical zero-based source P81, removes 38 complete B units and preserves 7 I plus 37 P units unchanged; its 942,600 bytes have SHA-256 `37fa9030c1d209e7c13721b6f4a1dbf28b793f8aebc3d163fc268c824cd417a0`.  P83 ends on byte-identical source P83, removes the same 38 B units and preserves 7 I plus 39 P units unchanged; its 1,024,516 bytes have SHA-256 `fe97fed338493e668e4de2553322af25f991ca08067823fd2bd9420127da7b00`.  Independent FFprobe enumeration confirms respectively 44 and 46 720x480 pictures at 30000/1001 with no B picture; both end with the required single `00 00 01 b7` sequence-end code and complete full FFmpeg software decode without error.  Absolute FTP inventory proves both new names absent; installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p81_checkpoint.m2v` and `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p83_checkpoint.m2v`, followed by independent absolute-path FTP readback, reproduces each exact byte count, SHA-256 and terminal sequence end.  The MiSTer now holds the complete verified consecutive P80-through-P83 comparison set.  No source, FPGA, RBF, Main, helper, existing media or configuration changes.
-
-#### Next Steps:
-
-In `800x600 Diagnostic` with Weave selected, play the four checkpoints in exact order P80, P81, P82 and P83, inspecting each stable terminal frame for the first faint strip or flicker.  Report each one as clean or affected.  This direct consecutive comparison identifies the first corrupted authored P picture and the next-frame propagation without inference from motion during a longer run.  Do not capture telemetry unless the user leaves a newly identified boundary frame displayed, and do not change or rebuild the FPGA.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
