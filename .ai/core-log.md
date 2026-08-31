@@ -1,4 +1,4 @@
-## 815 COMMIT Unreleased ??? 2026-08-31T05:45:08-07:00
+## 815 COMMIT Unreleased 0e70319 2026-08-31T05:45:08-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Prevent stale bytes from the current DVD block from crossing successful authored
 
 #### Outcome:
 
-The user approves the corrected helper-only boundary from entry 814.  The planned source change will centralize successful root-menu and button-activation hop cleanup in `media_source.c`, discard the unread tail of the current 2,048-byte navigation block, clear terminal and still state, retain the existing Main/helper ready barrier, and log the exact discarded tail length.  A focused native unit will prove the state transition at nonempty and empty block boundaries, while the real-image menu harness will require both root and activation hop cleanup alongside its existing ready, direction, overlay and commit checks.  Main, RTL, QSF, RBF and Quartus will remain untouched, and only the exact resulting ARM helper will be built for the user's manual transfer.
+Successful root-menu and button-activation calls now share a bounded cleanup that discards the unread tail of the current 2,048-byte libdvdnav block, clears stale terminal and still state, preserves the hop notification for the existing Main/helper ready barrier, and logs the command plus exact discarded-tail length.  The focused native regression proves both a 1,535-byte unread tail and an empty boundary are invalidated correctly, and the retained subtitle/highlight decoder test passes.  The enhanced authored-DVD navigation harness waits for active libdvdnav state rather than CSS preflight, accepts ISO files or DVD directories, and passes against the Blazing Saddles directory with one root hop, one activation hop, two ready/go barriers, directional input, two overlay configurations, 44 data records carrying 172,800 bytes, two commits and 496 style updates.  Exact detached source `0e70319` builds both the native helper and a 904,564-byte static ARMv7 hard-float `MediaPlayer_Helper` at `/home/vash/MiSTer-Media-Player-0e70319/host/build/MediaPlayer_Helper` on the build PC, SHA-256 `c8a39413c5131ddfa26947013986e2088f0e72fa618f2ff6dd85fdb4bc7d3baf`; Main, RTL, QSF, RBF and Quartus remain untouched.
 
 #### Next Steps:
 
-Implement the bounded helper change, run the focused hop unit and retained native menu tests, commit and push the source, then build and hash the exact ARMv7 helper on the build PC without installing it.  Hardware acceptance will require the user to upload only that helper and repeat keyboard `M` during the early trailers, with native 480i remaining active and telemetry free of B-presentation or other errors.
+The user should manually transfer only the exact ARM helper from the recorded build-PC path to `/media/fat/linux/MediaPlayer_Helper`, retain the installed Main and seed-20 RBF, then restart the core and press keyboard `M` during the early first-play trailers.  Hardware acceptance requires the root menu to appear without a freeze or 800-by-600 diagnostic raster, menu direction and activation to remain interactive, native 480i to remain active, and terminal telemetry to report no B-presentation or other errors; leave the terminal telemetry visible for collection after the run.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Implement the bounded helper change, run the focused hop unit and retained nativ
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
