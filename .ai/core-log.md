@@ -1,3 +1,32 @@
+## 797 COMMIT Unreleased 151e10a 2026-08-30T22:02:27-07:00
+
+#### Coming From:
+
+Unreleased 627b329
+
+#### Purpose:
+
+Deploy the ARM-side DVD pause and chapter-control binaries with verified rollback preservation while leaving the accepted FPGA image unchanged.
+
+#### Outcome:
+
+After accepting entry 796's single imperceptible audio FIFO underrun, the user explicitly authorizes trying the source-`151e10a` controls.  The synchronized build-PC checkout supplies the recorded 863,540-byte static ARMv7 helper at SHA-256 `ceef50a6c2d706ae40c4992ee6d47d687a3ea0eced4e61567032b9599d14d2a7` and 1,174,492-byte dynamically linked ARMv7 Main at `b98af001791800647b8ae4c6c0850d19061fe8b24edbe8cad307bbb9c2759990`; independent Raspberry Pi staging reproduces both hashes and sizes.  Absolute-path predeployment readback identifies the active helper as the 859,444-byte source-`627b329` binary at `ff3b4f41d81a070ad4ef5226dd3380ab12bb409118b1e6981af4c95b3138f7a6`, the active Main as the 1,170,396-byte source-`531f741` binary at `e428c8b097b70f15e9452781433bd9afbf84c33d4b94da575dea8fe127ccc9d6`, and `/media/fat/MediaPlayer_20260829_b9c2657.rbf` as the accepted 4,440,192-byte seed-19 image at `7f60ec43cfffa75108c39c7d21fff727c0f1dddccd844a318e1b7cc5795c6970`.  Unique candidate uploads at `/media/fat/linux/MediaPlayer_Helper.candidate_151e10a_ceef50a6` and `/media/fat/MiSTer.candidate_151e10a_b98af001` are independently read back and verified before activation.  Same-directory FTP renames preserve the active predecessors as `/media/fat/linux/MediaPlayer_Helper.pre_151e10a_ff3b4f41` and `/media/fat/MiSTer.pre_151e10a_e428c8b0`, activate both candidates, and remove both staging names.  A normal MiSTer reboot loads the new Main; post-reboot absolute-path readback again reproduces exact active helper `ceef50a6`, active Main `b98af001` and unchanged seed-19 RBF `7f60ec43`, while directory inventory retains both exact rollback names.  No RTL, QSF, RBF, FPGA configuration, launcher, media or menu option changes.
+
+#### Next Steps:
+
+Load MediaPlayer and launch `/media/fat/games/MediaPlayer/USB DVD Drive.dvd` with a physical DVD, keep the OSD closed, and allow normal synchronized playback to establish.  Press player-one Start once, hold the pause for about two seconds, press Start again and require clean resumed video and HDMI or S/PDIF audio; then press Right once and require a clean move to the next chapter, followed by Left once and require a clean return to the previous chapter.  Report whether each control acts once, reaches the intended chapter, resumes synchronized playback and avoids a lockup; one sticky audio-underrun event remains acceptable, but any stale pre-jump frame, wrong chapter, missing response or sustained audio defect requires immediate capture before another command.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 796 COMMIT Unreleased 627b329 2026-08-30T21:55:20-07:00
 
 #### Coming From:
@@ -1175,34 +1204,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 757 COMMIT Unreleased 4e54e9d 2026-08-30T03:26:58-07:00
-
-#### Coming From:
-
-Unreleased 4e54e9d
-
-#### Purpose:
-
-Reproduce the Coming to America first-GOP failure offline, identify its exact decoder prerequisite, and propose the narrow production correction without changing the repository RTL or installed core.
-
-#### Outcome:
-
-The preserved 202,450,560-byte elementary video is cut only at authored picture boundaries and terminated with `sequence_end_code`: the exact first-I control is 71,636 bytes with SHA-256 `cb100a65df844a372376b30e4dcf0ef5b960fb1c4200300a35b6b0b4522e4914`, and the exact first-I/P reproducer is 91,436 bytes with SHA-256 `7530a3ce8a89ea29bf93188894a07c1e3f8af6958f4c48e87627b8c7f150b4a2`.  The unchanged RTL replay of the I/P prefix fails after exactly 73,774 accepted bytes, identical to hardware.  It has parsed all 45 macroblocks of P slice row 1 but enters the P raster with `reference_valid=0`, raising raster-engine source 9 and top-level phase-one source 2 before any P row or picture publishes.  This proves that neither dense slice syntax nor the P macroblock parser is the initiating defect.  The opening reference I picture has `progressive_sequence=0`, `progressive_frame=1`, `chroma_420_type=1` and `frame_pred_frame_dct=0`.  Although the existing I parser and raster already implement the resulting macroblock `dct_type`, `mpeg2_h262_frontend.sv` admits a progressive film I picture in an interlaced sequence only when `frame_pred_frame_dct=1`; consequently this legal reference I is skipped, and the following P picture exposes the missing reference.  This is consistent with project references H262-028, H262-032 and H262-033: an interlaced sequence may contain a progressive frame picture, `frame_pred_frame_dct=1` is a restriction to frame DCT/prediction rather than a validity requirement here, and 4:2:0 requires `chroma_420_type` to equal `progressive_frame`.  In an isolated build-PC worktree only, removing `frame_pred_frame_dct` from `phase1_native_film_i_frame` changes no parser, raster, prediction or presentation logic.  The same exact I/P prefix then accepts all 91,436 bytes, applies 1,565,007 cycles of decoder backpressure while the I reference completes, retires all 30 P rows, publishes two reference pictures, presents one swap and finishes with zero decoder, raster, writer or presentation errors.  The 2,248-byte baseline log `/tmp/entry757_baseline_first_ip.log` has SHA-256 `199716d784264291cd5ba707f90691e38a8e5e2dd421f060eaf7559e1281ca0a`; the 4,190-byte diagnostic-gate log `/tmp/entry757_gate_probe_first_ip.log` has SHA-256 `80a6390b02173d61bd1645726efa13b9595217d1a8d3d1cbb7ca1ac9b5841732`.  Production source, the installed RBF, helper, target files and target mode remain unchanged.
-
-#### Next Steps:
-
-After user approval, remove only the erroneous `frame_pred_frame_dct` conjunct from `phase1_native_film_i_frame`.  Add a deterministic, source-generated progressive-film field-DCT I/P regression that proves the I reference publishes before P-row execution, then run it alongside the existing progressive-film frame-DCT control, interlaced field-DCT, P/B field-motion plus field-DCT, cadence, reference-overlap and presentation regressions.  If those pass, commit the RTL and regression change, perform one clean Quartus build plus full timing analysis on the build PC, install the timing-passing RBF with rollback preserved, and hardware-test the unchanged Coming to America five-minute file followed by a Big Lebowski control.  Do not deploy the temporary diagnostic worktree or ask the user to replay either file before a timing-clean production build exists.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
