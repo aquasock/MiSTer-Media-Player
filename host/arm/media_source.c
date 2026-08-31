@@ -45,6 +45,8 @@ struct iso_source_state {
     uint8_t block[DVD_VIDEO_LB_LEN];
     size_t block_offset;
     size_t block_size;
+    pci_t menu_pci;
+    int menu_pci_valid;
     int32_t title;
     uint32_t chapters;
     uint64_t duration;
@@ -262,16 +264,39 @@ static void iso_refresh_menu_state(struct iso_source_state *state)
     }
 }
 
+static void iso_invalidate_menu_pci(struct iso_source_state *state)
+{
+    memset(&state->menu_pci, 0, sizeof(state->menu_pci));
+    state->menu_pci_valid = 0;
+}
+
+static void iso_capture_menu_pci(struct iso_source_state *state)
+{
+    pci_t *pci = dvdnav_get_current_nav_pci(state->navigation);
+
+    if (!pci) {
+        iso_invalidate_menu_pci(state);
+        return;
+    }
+    memcpy(&state->menu_pci, pci, sizeof(state->menu_pci));
+    state->menu_pci_valid = 1;
+}
+
+static pci_t *iso_menu_pci(struct iso_source_state *state)
+{
+    return state->menu_pci_valid ? &state->menu_pci : NULL;
+}
+
 static void iso_refresh_highlight(struct iso_source_state *state,
-                                  int display, int button, int mode)
+                                  int display, int button)
 {
     dvdnav_highlight_area_t area;
     pci_t *pci;
 
     memset(&area, 0, sizeof(area));
-    pci = dvdnav_get_current_nav_pci(state->navigation);
+    pci = iso_menu_pci(state);
     if (!display || button <= 0 || !pci ||
-        dvdnav_get_highlight_area(pci, button, mode, &area) !=
+        dvdnav_get_highlight_area(pci, button, 0, &area) !=
             DVDNAV_STATUS_OK) {
         state->dvd_state.highlight_display = 0;
     } else {
@@ -398,7 +423,7 @@ static int iso_next_payload_block(struct iso_source_state *state)
                 break;
             highlight = (const dvdnav_highlight_event_t *)state->block;
             iso_refresh_highlight(state, highlight->display,
-                                  (int)highlight->buttonN, 1);
+                                  (int)highlight->buttonN);
             continue;
         }
         if (event == DVDNAV_HOP_CHANNEL) {
@@ -412,10 +437,11 @@ static int iso_next_payload_block(struct iso_source_state *state)
             if (event == DVDNAV_NAV_PACKET) {
                 int32_t button = 0;
 
+                iso_capture_menu_pci(state);
                 iso_refresh_menu_state(state);
                 if (dvdnav_get_current_highlight(state->navigation, &button) ==
                         DVDNAV_STATUS_OK)
-                    iso_refresh_highlight(state, button > 0, (int)button, 1);
+                    iso_refresh_highlight(state, button > 0, (int)button);
             }
             state->block_offset = 0;
             state->block_size = (size_t)length;
@@ -669,6 +695,7 @@ static int iso_rewind(void *opaque)
     int32_t title = state->title;
 
     iso_stop_buffer(state);
+    iso_invalidate_menu_pci(state);
     if (state->direct_device) {
         if (dvdnav_reset(state->navigation) != DVDNAV_STATUS_OK ||
             (!state->menu_mode &&
@@ -792,6 +819,7 @@ static int iso_change_chapter(struct iso_source_state *state, int direction)
     if (direction != -1 && direction != 1)
         return -1;
     iso_stop_buffer(state);
+    iso_invalidate_menu_pci(state);
     if (state->buffer_sync_initialized) {
         pthread_mutex_lock(&state->buffer_lock);
         discarded = state->buffer_fill;
@@ -857,6 +885,7 @@ static size_t iso_reset_after_menu_hop(struct iso_source_state *state)
     state->error = 0;
     state->still_active = 0;
     state->still_seconds = 0;
+    iso_invalidate_menu_pci(state);
     state->dvd_state.hop = 1;
     return discarded;
 }
@@ -872,58 +901,158 @@ static int iso_complete_menu_hop(struct iso_source_state *state,
     return 1;
 }
 
+static const char *iso_menu_command_name(enum media_source_dvd_command command)
+{
+    switch (command) {
+    case MEDIA_SOURCE_DVD_MENU_UP:
+        return "up";
+    case MEDIA_SOURCE_DVD_MENU_DOWN:
+        return "down";
+    case MEDIA_SOURCE_DVD_MENU_LEFT:
+        return "left";
+    case MEDIA_SOURCE_DVD_MENU_RIGHT:
+        return "right";
+    case MEDIA_SOURCE_DVD_MENU_ACTIVATE:
+        return "activate";
+    case MEDIA_SOURCE_DVD_ROOT_MENU:
+        return "root";
+    default:
+        return "unknown";
+    }
+}
+
+static int iso_menu_direction_target(pci_t *pci, int32_t button,
+                                     enum media_source_dvd_command command)
+{
+    const btni_t *definition;
+
+    if (!pci || button <= 0 || button > pci->hli.hl_gi.btn_ns)
+        return 0;
+    definition = &pci->hli.btnit[button - 1];
+    switch (command) {
+    case MEDIA_SOURCE_DVD_MENU_UP:
+        return (int)definition->up;
+    case MEDIA_SOURCE_DVD_MENU_DOWN:
+        return (int)definition->down;
+    case MEDIA_SOURCE_DVD_MENU_LEFT:
+        return (int)definition->left;
+    case MEDIA_SOURCE_DVD_MENU_RIGHT:
+        return (int)definition->right;
+    case MEDIA_SOURCE_DVD_MENU_ACTIVATE:
+        return (int)button;
+    default:
+        return 0;
+    }
+}
+
+static void iso_log_menu_command(struct iso_source_state *state,
+                                 enum media_source_dvd_command command,
+                                 pci_t *pci, int32_t before, int target,
+                                 int32_t after, const char *status)
+{
+    dvdnav_highlight_area_t area;
+    int button = after > 0 ? (int)after : (int)before;
+    int highlight = 0;
+
+    memset(&area, 0, sizeof(area));
+    if (pci && button > 0 &&
+        dvdnav_get_highlight_area(pci, button, 0, &area) ==
+            DVDNAV_STATUS_OK)
+        highlight = 1;
+    fprintf(stderr,
+            "media_source: %s menu command=%s pci_lbn=%u buttons=%u "
+            "before=%d target=%d after=%d status=%s highlight=%d "
+            "rect=%u,%u,%u,%u palette=%08x\n",
+            state->direct_device ? "DVD" : "ISO",
+            iso_menu_command_name(command),
+            pci ? (unsigned)pci->pci_gi.nv_pck_lbn : 0u,
+            pci ? (unsigned)pci->hli.hl_gi.btn_ns : 0u,
+            (int)before, target, (int)after, status, highlight,
+            (unsigned)area.sx, (unsigned)area.sy,
+            (unsigned)area.ex, (unsigned)area.ey,
+            (unsigned)area.palette);
+}
+
 static int iso_menu_command(struct iso_source_state *state,
                             enum media_source_dvd_command command)
 {
     dvdnav_status_t status = DVDNAV_STATUS_ERR;
     pci_t *pci;
-    int32_t button = 0;
+    int32_t before = 0;
+    int32_t after = 0;
+    int target;
 
     if (!state->menu_mode)
         return -1;
     iso_refresh_menu_state(state);
-    pci = dvdnav_get_current_nav_pci(state->navigation);
+    pci = iso_menu_pci(state);
+    if (dvdnav_get_current_highlight(state->navigation, &before) !=
+            DVDNAV_STATUS_OK)
+        before = 0;
+    target = iso_menu_direction_target(pci, before, command);
     switch (command) {
     case MEDIA_SOURCE_DVD_MENU_UP:
         if (!state->dvd_state.menu_active || !pci)
-            return 0;
+            goto ignored;
         status = dvdnav_upper_button_select(state->navigation, pci);
         break;
     case MEDIA_SOURCE_DVD_MENU_DOWN:
         if (!state->dvd_state.menu_active || !pci)
-            return 0;
+            goto ignored;
         status = dvdnav_lower_button_select(state->navigation, pci);
         break;
     case MEDIA_SOURCE_DVD_MENU_LEFT:
         if (!state->dvd_state.menu_active || !pci)
-            return 0;
+            goto ignored;
         status = dvdnav_left_button_select(state->navigation, pci);
         break;
     case MEDIA_SOURCE_DVD_MENU_RIGHT:
         if (!state->dvd_state.menu_active || !pci)
-            return 0;
+            goto ignored;
         status = dvdnav_right_button_select(state->navigation, pci);
         break;
     case MEDIA_SOURCE_DVD_MENU_ACTIVATE:
         if (!state->dvd_state.menu_active || !pci)
-            return 0;
+            goto ignored;
         status = dvdnav_button_activate(state->navigation, pci);
-        if (status == DVDNAV_STATUS_OK)
+        if (status == DVDNAV_STATUS_OK) {
+            if (dvdnav_get_current_highlight(state->navigation, &after) !=
+                    DVDNAV_STATUS_OK)
+                after = 0;
+            iso_log_menu_command(state, command, pci, before, target, after,
+                                 "ok");
             return iso_complete_menu_hop(state, "activate");
+        }
         break;
     case MEDIA_SOURCE_DVD_ROOT_MENU:
         status = dvdnav_menu_call(state->navigation, DVD_MENU_Root);
-        if (status == DVDNAV_STATUS_OK)
+        if (status == DVDNAV_STATUS_OK) {
+            if (dvdnav_get_current_highlight(state->navigation, &after) !=
+                    DVDNAV_STATUS_OK)
+                after = 0;
+            iso_log_menu_command(state, command, pci, before, target, after,
+                                 "ok");
             return iso_complete_menu_hop(state, "root");
+        }
         break;
     default:
         return -1;
     }
-    if (status != DVDNAV_STATUS_OK)
+    if (status != DVDNAV_STATUS_OK) {
+        iso_log_menu_command(state, command, pci, before, target, before,
+                             "error");
         return -1;
-    if (dvdnav_get_current_highlight(state->navigation, &button) ==
+    }
+    if (dvdnav_get_current_highlight(state->navigation, &after) !=
             DVDNAV_STATUS_OK)
-        iso_refresh_highlight(state, button > 0, (int)button, 1);
+        after = 0;
+    iso_refresh_highlight(state, after > 0, (int)after);
+    iso_log_menu_command(state, command, pci, before, target, after, "ok");
+    return 0;
+
+ignored:
+    iso_log_menu_command(state, command, pci, before, target, before,
+                         "ignored");
     return 0;
 }
 

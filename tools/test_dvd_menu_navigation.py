@@ -17,12 +17,22 @@ MENU_ENTER = 0x82
 MENU_LEAVE = 0x83
 GO = 0x03
 MENU_DOWN = 0x05
+MENU_LEFT = 0x06
 MENU_RIGHT = 0x07
 MENU_ACTIVATE = 0x08
 ROOT_MENU = 0x09
+MENU_UP = 0x04
 HOP_RE = re.compile(
     rb"media_source: (?:DVD|ISO) menu hop (root|activate) "
     rb"discarded_block_tail=([0-9]+)"
+)
+COMMAND_RE = re.compile(
+    rb"media_source: (?:DVD|ISO) menu command="
+    rb"(up|down|left|right|activate|root) pci_lbn=([0-9]+) "
+    rb"buttons=([0-9]+) before=([0-9]+) target=([0-9]+) "
+    rb"after=([0-9]+) status=(ok|error|ignored) highlight=([01]) "
+    rb"rect=([0-9]+),([0-9]+),([0-9]+),([0-9]+) "
+    rb"palette=([0-9a-fA-F]{8})"
 )
 
 
@@ -79,7 +89,7 @@ def main():
     started = time.monotonic()
     root_due = None
     action_due = None
-    actions = [MENU_RIGHT, MENU_DOWN, MENU_ACTIVATE]
+    actions = [MENU_RIGHT, MENU_DOWN, MENU_LEFT, MENU_UP, MENU_ACTIVATE]
     action_index = 0
     root_sent = False
     menu_events = 0
@@ -91,6 +101,9 @@ def main():
     error_scan = b""
     hop_counts = {"root": 0, "activate": 0}
     hop_discarded = {"root": [], "activate": []}
+    command_counts = {name: 0 for name in
+                      ("up", "down", "left", "right", "activate", "root")}
+    direction_transitions = []
 
     try:
         while time.monotonic() < deadline:
@@ -107,7 +120,10 @@ def main():
             if (ready_events >= 2 and action_index == len(actions) and
                     hop_counts["root"] and hop_counts["activate"] and
                     menu_events and counts[1] and
-                    counts[2] and counts[3] and counts[5] >= 86400):
+                    counts[2] and counts[3] and counts[5] >= 86400 and
+                    all(command_counts[name] >= 1 for name in
+                        ("up", "down", "left", "right", "activate", "root")) and
+                    direction_transitions):
                 break
             for key, _ in selector.select(0.1):
                 if key.data == "control":
@@ -160,6 +176,19 @@ def main():
                                 hop_counts[name] += 1
                                 hop_discarded[name].append(
                                     int(match.group(2)))
+                            match = COMMAND_RE.search(line)
+                            if match:
+                                name = match.group(1).decode("ascii")
+                                before = int(match.group(4))
+                                target = int(match.group(5))
+                                after = int(match.group(6))
+                                status = match.group(7).decode("ascii")
+                                command_counts[name] += 1
+                                if (name in ("up", "down", "left", "right") and
+                                        status == "ok" and before > 0 and
+                                        target > 0 and after != before):
+                                    direction_transitions.append(
+                                        (name, before, target, after))
             if process.poll() is not None:
                 break
     finally:
@@ -177,7 +206,10 @@ def main():
               action_index == len(actions) and ready_events >= 2 and
               menu_events >= 1 and counts[1] >= 1 and counts[2] >= 1 and
               counts[3] >= 1 and counts[5] >= 86400 and
-              hop_counts["root"] >= 1 and hop_counts["activate"] >= 1)
+              hop_counts["root"] >= 1 and hop_counts["activate"] >= 1 and
+              all(command_counts[name] >= 1 for name in
+                  ("up", "down", "left", "right", "activate", "root")) and
+              direction_transitions)
     print("dvd menu navigation: "
           f"enter={menu_events} leave={leave_events} ready={ready_events} "
           f"config={counts[1]} data_records={counts[2]} "
@@ -186,6 +218,7 @@ def main():
           f"root_discarded={hop_discarded['root']} "
           f"activate_hops={hop_counts['activate']} "
           f"activate_discarded={hop_discarded['activate']} "
+          f"commands={command_counts} transitions={direction_transitions} "
           f"root_sent={int(root_sent)} helper_rc={return_code} "
           f"elapsed={time.monotonic() - started:.2f}s")
     if not passed:

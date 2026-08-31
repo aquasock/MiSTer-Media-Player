@@ -28,6 +28,8 @@ int main(void)
     state.error = 1;
     state.still_active = 1;
     state.still_seconds = 0xffu;
+    state.menu_pci_valid = 1;
+    state.menu_pci.pci_gi.nv_pck_lbn = 1234u;
     discarded = iso_reset_after_menu_hop(&state);
 
     failed |= require(discarded == DVD_VIDEO_LB_LEN - 513u,
@@ -40,16 +42,48 @@ int main(void)
                       "still state survived the hop");
     failed |= require(state.dvd_state.hop,
                       "hop notification was not retained");
+    failed |= require(!state.menu_pci_valid &&
+                      state.menu_pci.pci_gi.nv_pck_lbn == 0,
+                      "displayed NAV PCI survived the hop");
 
     memset(&state, 0, sizeof(state));
     state.block_offset = DVD_VIDEO_LB_LEN;
     state.block_size = DVD_VIDEO_LB_LEN;
+    state.menu_pci_valid = 1;
     discarded = iso_reset_after_menu_hop(&state);
     failed |= require(discarded == 0,
                       "empty block boundary reported discarded bytes");
     failed |= require(state.block_offset == 0 && state.block_size == 0 &&
                       state.dvd_state.hop,
                       "empty block boundary did not complete the hop");
+    failed |= require(!state.menu_pci_valid,
+                      "empty-boundary hop retained displayed NAV PCI");
+
+    memset(&state, 0, sizeof(state));
+    state.menu_pci_valid = 1;
+    state.menu_pci.hli.hl_gi.hli_ss = 1;
+    state.menu_pci.hli.hl_gi.btn_ns = 2;
+    state.menu_pci.hli.btnit[0].btn_coln = 1;
+    state.menu_pci.hli.btnit[0].x_start = 10;
+    state.menu_pci.hli.btnit[0].y_start = 20;
+    state.menu_pci.hli.btnit[0].x_end = 30;
+    state.menu_pci.hli.btnit[0].y_end = 40;
+    state.menu_pci.hli.btnit[0].right = 2;
+    state.menu_pci.hli.btn_colit.btn_coli[0][0] = 0x12345678u;
+    state.menu_pci.hli.btn_colit.btn_coli[0][1] = 0x87654321u;
+    iso_refresh_highlight(&state, 1, 1);
+    failed |= require(state.dvd_state.highlight_display &&
+                      state.dvd_state.highlight_palette == 0x12345678u,
+                      "selected button used the activation palette");
+    failed |= require(state.dvd_state.highlight_x1 == 10 &&
+                      state.dvd_state.highlight_y1 == 20 &&
+                      state.dvd_state.highlight_x2 == 30 &&
+                      state.dvd_state.highlight_y2 == 40,
+                      "retained NAV PCI highlight rectangle was not used");
+    failed |= require(iso_menu_direction_target(
+                          &state.menu_pci, 1,
+                          MEDIA_SOURCE_DVD_MENU_RIGHT) == 2,
+                      "authored directional target was not retained");
 
     if (failed)
         return 1;
