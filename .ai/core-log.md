@@ -1,3 +1,32 @@
+## 798 COMMIT Unreleased 151e10a 2026-08-30T22:12:01-07:00
+
+#### Coming From:
+
+Unreleased 151e10a
+
+#### Purpose:
+
+Record the first hardware control test and identify why pause receives no keyboard or controller input while chapter navigation works.
+
+#### Outcome:
+
+The user reports that previous and next chapter appear to work correctly but play/pause does nothing after trying the keyboard and every controller button.  The live 8,152,023-byte diagnostic log `/tmp/entry798_pause_input_failure.log`, SHA-256 `604f3ffcf18bb3acc61cb4636e02799b4513554bb043f47d57af1b7724abdd85`, independently records 23 next-chapter commands and nine previous-chapter commands, all followed by successful helper-ready and Main release barriers with no chapter, control-channel or helper-EOF fault; it records zero `playback paused` and zero `playback resumed` events.  Static comparison against the exact pinned Main source identifies the binding defect: `JOY_START` is an alias for virtual core button four, not the physical controller Start control, while MediaPlayer's `CONF_STR` declares no joystick buttons.  Closed-OSD Main therefore forwards directional bits to `user_io_digital_joystick`, which explains the working Left and Right controls, but does not assign any physical keyboard or controller button to virtual button four, so the pause branch can never observe its requested bit.  The official VLC 3.0 hotkey documentation identifies Space as Play/Pause, N as Next and P as Previous; the user explicitly limits the requested VLC alignment to those keyboard assignments rather than any VLC playback behavior, architecture or library.  Main can translate those three raw keyboard events and the physical controller Start event into the existing transport actions without changing `CONF_STR`, the helper or RBF.  This accepts the deployed previous and next chapter path, rejects only the pause binding, and changes no source, installed file, RBF, helper, Main, playback option or running process during diagnosis.
+
+#### Next Steps:
+
+Add only Main-side input translations with the existing OSD-closed and active-playback guards: keyboard Space toggles play/pause, P requests the previous chapter and N requests the next chapter, while physical controller Start toggles play/pause and controller D-pad Left and Right retain their accepted chapter actions.  Do not adopt any other VLC behavior or change `CONF_STR`, helper, RTL or RBF.  Build and host-test patched Main, preserve the currently deployed source-`151e10a` Main as rollback, activate the new Main, reboot once, then require each keyboard and controller command to act exactly once and resume synchronized physical-DVD playback.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 797 COMMIT Unreleased 151e10a 2026-08-30T22:02:27-07:00
 
 #### Coming From:
@@ -1175,34 +1204,5 @@ Stop after the completed seed-19 build as instructed.  Do not install the RBF, r
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 758 COMMIT Unreleased 4e54e9d 2026-08-30T03:31:07-07:00
-
-#### Coming From:
-
-Unreleased 4e54e9d
-
-#### Purpose:
-
-Capture the completed five-minute Big Lebowski HDMI control and record the user's separate S/PDIF result on the unchanged timing-clean core.
-
-#### Outcome:
-
-The user authorizes capture after the complete HDMI run of `/media/fat/games/MediaPlayer/the_big_lebowski_first_5min.mpg` and explicitly reports that S/PDIF also works perfectly.  The 550,558-byte scaled capture `/tmp/entry758_big_lebowski_5min_hdmi_pass.png`, SHA-256 `fba8e5c8bb85fba397ea29883fa789e461592bf70edf685f4cb6fdab6466731e`, visibly preserves the clean intended final toilet scene without corruption.  The matching 7,647,957-byte helper log `/tmp/entry758_big_lebowski_5min_hdmi_pass.log`, SHA-256 `b5ab8d05ef08507b7688ac764aea6433549f3b93f5434b645cd686a9df2917c7`, names the exact five-minute file, selects HDMI decoded stereo PCM and AC-3 private substream `0x80`, emits all 9,375 AC-3 frames and 14,400,000 PCM samples, carries 244,700,748 video bytes with 616 timestamps, reaches helper EOF and exits zero after submitting all 306,800,752 in-band transport bytes with every byte on the fast path.  The native 720x480 capture `/tmp/entry758_big_lebowski_5min_hdmi_raw.png` is 381,718 bytes with SHA-256 `77b6f4d082444683401c38af7f75762f5dcd54c76b3d4ef645c558c98e30939b`.  Its checksum-valid schema-20 telemetry is an earlier sticky fatal snapshot rather than a terminal snapshot: at approximately 173 seconds it records exactly one PCM FIFO underrun, error flag `0x0400`, and freezes its counters at 151,212,826 accepted clean-video bytes even though the visible video and helper continue through the five-minute end.  Before that event it records no syntax, phase-one, prediction, inverse-quantization, IDCT, reconstruction, DDR store/cache, presentation, PCM-protocol or cache-overlap error and no transport block.  The user reports no audible HDMI defect, while the independent S/PDIF run is explicitly perfect, and explicitly accepts a single HDMI FIFO underrun for now.  This accepts the complete five-minute Big Lebowski video, HDMI and S/PDIF playback boundary; the one-count FIFO event remains documented without blocking the current video-compatibility work.  No source, RBF, helper, media or mode changes during either run or capture.
-
-#### Next Steps:
-
-Do not replay Big Lebowski solely to reconfirm video or audio.  Keep the explicitly accepted one-count HDMI FIFO-underrun observation separate from the proven Coming to America video admission defect and off the current critical path.  After user approval, implement entry 757's one-line `phase1_native_film_i_frame` correction and deterministic progressive-film field-DCT I/P regression, run the focused and existing regression sets, then perform a clean Quartus build and full timing analysis before any target deployment.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
