@@ -1,3 +1,39 @@
+## 824 COMMIT Unreleased 3e4f54c 2026-08-31T09:00:09-07:00
+
+#### Coming From:
+
+Unreleased 53ccc04
+
+#### Purpose:
+
+Require complete MPEG-2 sequence and reference-picture context before releasing video after a DVD random-access hop.
+
+#### Outcome:
+
+Source `3e4f54c` moves the helper's initial DVD random-access logic into a focused filter that withholds each initial or reset-causing stream until it has a complete sequence header, an I reference and the following I/P reference, neutralizes every start code in contextless pictures before that sequence plus pre-I and open-GOP leading-B pictures while preserving byte positions and timestamp records, and logs the retained offsets and discarded-picture counts.  The deterministic regression proves a prior contextless P picture, a post-sequence pre-I P picture and a leading B picture are hidden while the qualifying sequence/I/P group is retained, and rejects an incomplete group without a following reference.  The exact native helper builds with `-Werror`; the focused random-access, subpicture and menu-hop tests pass; and the strengthened Coming to America authored-directory harness completes root navigation, all four directional commands and menu continuation while requiring and observing a post-root restart group at sequence, I and following-reference offsets 0, 296 and 7,892, with 17 overlay commits, 1,468,899 plane bytes, 1,335 visible highlighted states and a 4,637-pixel selected region.  Exact detached source `3e4f54c902dbb27a89c3d32eb25df2954bf43a88` produces a 904,564-byte stripped static ARMv7 EABI5 helper at `/home/vash/MiSTer-Media-Player-3e4f54c/host/build/MediaPlayer_Helper`, SHA-256 `c4c47141205c99ade8a9ed266574beb9d072dce827d508efbff47694bb2ce197`, with no dynamic section; Main, RTL, QSF, the frozen seed-20 RBF and Quartus are unchanged.
+
+#### Next Steps:
+
+Stop the running MediaPlayer helper or exit the core, manually replace only `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-3e4f54c/host/build/MediaPlayer_Helper`, restore executable mode if the transfer client clears it, and verify the exact size and SHA-256 before restarting.  Preserve the installed source-`53ccc04` Main and frozen seed-20 RBF, load the physical Coming to America disc, press `M` during first-play and require the root menu to replace the black screen without a decoder diagnostic; if it appears, leave the menu visible for a capture before separately returning to entry 822's fragmented `SET UP` highlight defect.
+
+#### Files Modified:
+
+- docs/BUILDING.md
+- host/arm/ARCHITECTURE.md
+- host/arm/Makefile
+- host/arm/dvd_random_access.c
+- host/arm/dvd_random_access.h
+- host/arm/media_player_helper.c
+- tools/test_dvd_menu_navigation.py
+- tools/test_dvd_random_access.c
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 823 COMMIT Unreleased 53ccc04 2026-08-31T08:34:42-07:00
 
 #### Coming From:
@@ -1197,102 +1233,6 @@ Reload MediaPlayer and play the Blazing Saddles ISO from the beginning over HDMI
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 784 COMMIT Unreleased eb7bed6 2026-08-30T18:21:34-07:00
-
-#### Coming From:
-
-Unreleased 0711d3d
-
-#### Purpose:
-
-Normalize DVD ISO presentation timestamps across VOB or cell discontinuities so long-title audio scheduling remains continuous.
-
-#### Outcome:
-
-Source `eb7bed6` adds an ISO-only PTS epoch normalizer with an explicitly documented ten-second implementation guard: ordinary decode-order reversals pass through unchanged, while a material backward reset is translated before both scheduler admission and FPGA timestamp-record generation so its first timestamp follows the preceding maximum by one 90 kHz tick.  A focused exact-source native harness preserves a 45,000-tick reorder, maps a synthetic large reset to one new epoch and leaves non-ISO timestamps unchanged.  The accelerated real Blazing Saddles scheduler test reaches the captured boundary, maps raw PTS 32,764 to normalized PTS 261,466,438 immediately after the prior 261,466,437 maximum, and continues growing its PCM target from 139,227,264 through 255,009,280 frames with zero held backlog rather than freezing at entry 783's 139,443,456-frame target.  The unchanged five-minute MPG again produces exactly 224,185,582 bytes with SHA-256 `45401ab3`, and the first 16 MiB of scheduled ISO transport compares byte-for-byte with the accepted CSS-enabled opening capture.  One static ARM GNU 10.2 build from exact full source `eb7bed668f39c97b79a691b2c721fe42283e19f0` produces an 847,156-byte stripped EABI5 helper with SHA-256 `f16e83fa` and no dynamic section; the expected static-libdvdcss `getpwuid` link warning remains.  The accelerated run separately shows that after the declared 501,030,000-tick title duration libdvdnav follows post-title protection or navigation commands into another epoch and eventually exceeds the two-MiB video lookahead; that end-of-title behavior predates this correction and is reserved for a later host-only boundary rather than expanding the timestamp fix.  No Quartus build or MiSTer deployment occurs.
-
-#### Next Steps:
-
-After explicit user authorization, preserve the installed helper and deploy exact candidate SHA-256 `f16e83fa` by candidate upload, readback, same-directory rename and final readback.  Replay Blazing Saddles past the 2,905-second boundary over HDMI and S/PDIF and accept this correction only if video remains stable, audio remains continuous and telemetry records no underrun.  Then separately bound the selected ISO source to its declared longest-title duration so post-title protection or navigation commands cannot loop into a second traversal, and resume genuinely scrambled-ISO qualification only after both long-title gates pass.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 783 COMMIT Unreleased 0711d3d 2026-08-30T16:25:29-07:00
-
-#### Coming From:
-
-Unreleased 0711d3d
-
-#### Purpose:
-
-Reject the provisional full-title Blazing Saddles ISO soak and localize its late audio-only failure without disturbing the running movie.
-
-#### Outcome:
-
-During the uninterrupted complete `/media/fat/games/MediaPlayer/Blazing Saddles.iso` run on the installed source-`0711d3d` helper, the user reports that video remains clean and running but HDMI audio begins crackling after the earlier five-minute acceptance.  The matching live helper log names longest title 2 and decoded HDMI PCM, while its scheduler stays real-time and ahead of the sink until elapsed 2,904.822639 seconds; there `max_video_pts` reaches 261,466,437 ticks or 2,905.182633 seconds and never advances again even though admitted video grows from 1,993,452,669 to 2,107,305,716 bytes.  Over the following 181 seconds the fixed PCM target remains 139,443,456 frames, held decoded PCM grows from 3,072 to 5,106,816 frames and emitted PCM falls 5,069,458 frames or 105.614 seconds behind the 48 kHz wall-clock expectation.  The 720x480 raw capture `/tmp/entry783_iso_audio_crackle_raw.png`, 371,166 bytes and SHA-256 `8c86977c`, has 64 valid schema-20 rows, parity and checksum `0e6258d6`; its sticky first-error state occurs at STC second 2,906 with hardware error `0x0400`, audio FIFO floor zero and exactly one recorded underrun, while decoder, PCM protocol, presentation, cache-overlap and transport-block errors remain clear.  The 1,920x1,080 visible capture `/tmp/entry783_iso_audio_crackle.png`, 573,794 bytes and SHA-256 `eafe7684`, preserves an undamaged active movie frame, and the 75,163,498-byte live helper log has SHA-256 `538bed37`.  Independent read-only FFprobe inspection of the same title finds its DVD packet position resetting from 3,368,974 to 14 at normalized PTS 2,904.623278 seconds, immediately bounding the frozen raw-PTS horizon to a VOB or cell transition.  The evidence therefore identifies an ISO-only host scheduler timestamp-discontinuity defect: the helper rejects every post-transition raw PTS as older than its permanent maximum, so its byte-guard fallback cannot sustain audio even though video continues.  This does not implicate the MPEG-2 decoder, FPGA resources, S/PDIF framing, CSS support or the undeployed source-`81a1002` candidate, and it overturns entry 781's provisional full-ISO acceptance without changing any installed file or repository source.
-
-#### Next Steps:
-
-Keep the accepted seed-19 RBF, Main and decoder unchanged, and do not deploy the encrypted-ISO candidate yet.  Add an ISO-scoped PTS epoch normalizer that recognizes a large backward discontinuity while tolerating ordinary decode-order reordering, advances both scheduler and in-band video timestamps monotonically across the DVD boundary and leaves MPG/VOB behavior byte-identical.  Reproduce the boundary with a compact native discontinuity fixture, run the existing native MPG and decrypted-ISO regressions, rebuild only the ARM helper, then preserve and stage-deploy it for a Blazing Saddles replay through at least the 2,905-second boundary on HDMI and S/PDIF.  Resume genuinely scrambled-ISO validation only after that long-run gate passes.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 782 COMMIT Unreleased 81a1002 2026-08-30T15:41:39-07:00
-
-#### Coming From:
-
-Unreleased 0711d3d
-
-#### Purpose:
-
-Add encrypted DVD ISO main-feature playback through a pinned host-side libdvdcss dependency without expanding into physical discs or menus.
-
-#### Outcome:
-
-The user selects encrypted ISO files as the next target and agrees that technical decryption and licensing or distribution policy remain separate concerns.  Source `81a1002` replaces the deliberate unencrypted-only libdvdread patch with reproducibly pinned libdvdcss 1.6.0 native and ARM builds, configures libdvdread with CSS support, directly links the static library beneath the existing callback-backed `iso:` source and clears inherited Meson compiler arguments so a reused build directory cannot silently retain `MMP_DISABLE_DVDCSS`.  Official VideoLAN material identifies the dependency as transparent encrypted DVD block access under GPLv2; its 83,640-byte source archive is independently verified at SHA-256 `7ea556c8`.  Exact native regression proves the decrypted Blazing Saddles ISO opening remains byte-identical at 1,123,504 bytes and SHA-256 `66b84e51`, including its two discarded open-GOP leading B pictures, while the ordinary five-minute MPG remains byte-identical at 224,185,582 bytes and SHA-256 `45401ab3`.  The exact ARM build succeeds as an 847,156-byte stripped, statically linked EABI5 helper with SHA-256 `620c8af3` and no dynamic section.  A raw sector scan finds no scrambled PES sectors in any available Coming To America, Blazing Saddles or The Big Lebowski ISO, so those already-decrypted images cannot validate the new decryption path and the candidate is intentionally not deployed.  This remains an implementation dependency rather than a substitute for the unavailable authorized DVD CCA specification, and no CSS-conformance claim is made.
-
-#### Next Steps:
-
-Provide an authorized genuinely CSS-scrambled raw ISO fixture, confirm that it contains nonzero scrambled PES sectors, prove native sector decryption and a complete valid opening, and compare against an independently decrypted control when feasible.  If that gate passes, preserve the installed helper, deploy this exact candidate by verified staging and same-directory rename, and qualify the same encrypted ISO on HDMI and S/PDIF without changing Main, the seed-19 RBF or FPGA source.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- README.md
-- docs/BUILDING.md
-- host/arm/ARCHITECTURE.md
-- host/arm/Makefile
-- host/arm/libdvdread-disable-css.patch
-- host/arm/media_source.c
-- host/build_arm_stack.sh
 
 #### Status:
 
