@@ -1,3 +1,35 @@
+## 799 COMMIT Unreleased 6de2778 2026-08-30T22:23:36-07:00
+
+#### Coming From:
+
+Unreleased 151e10a
+
+#### Purpose:
+
+Bind the requested keyboard and physical controller controls to the existing ARM-side DVD playback actions without changing the helper or FPGA image.
+
+#### Outcome:
+
+Source `6de2778` adds only Main input translations: keyboard Space maps to play/pause, P maps to previous chapter, N maps to next chapter, and physical player-one Start maps to play/pause, while the accepted player-one D-pad Left and Right chapter path remains unchanged.  Main consumes recognized press, release and repeat events only while MediaPlayer playback is active and the MiSTer OSD is closed, and triggers an action only on the initial press so one held or repeated input cannot toggle or jump multiple times.  The shared semantic action handler removes the unreachable virtual `JOY_START` dependency and retains the existing pause hold and helper ready/go chapter barrier without changing `CONF_STR`, helper protocol, helper source, RTL, QSF or RBF.  The regenerated patch applies cleanly to pinned Main commit `0a8fb44`, and exact project source `6de2778de2b2b6cd1cea81ae4784c0457fadd36a` builds successfully with pinned ARM GNU 10.2 into a stripped 1,174,492-byte ARMv7 Main at SHA-256 `3443716313e4f7eb5ed58ea97d785f0d788471ef66f23151c6405b2ac4455f04`.  No Quartus build, helper build, MiSTer deployment, RBF, media, playback option or running process changes at this build boundary.
+
+#### Next Steps:
+
+Preserve the active 1,174,492-byte source-`151e10a` Main at SHA-256 `b98af001791800647b8ae4c6c0850d19061fe8b24edbe8cad307bbb9c2759990` as a unique absolute-path rollback, stage and independently verify the source-`6de2778` Main, activate Main only, reboot once and prove that the helper and accepted seed-19 RBF remain byte-identical.  Then launch physical-DVD playback with the OSD closed and require keyboard Space and controller Start each to pause and resume exactly once, keyboard P/N and controller Left/Right each to change one chapter in the requested direction, and resumed HDMI or S/PDIF audio and video to remain synchronized.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 798 COMMIT Unreleased 151e10a 2026-08-30T22:12:01-07:00
 
 #### Coming From:
@@ -1169,36 +1201,6 @@ Reload MediaPlayer from the MiSTer menu so the newly installed RBF configures th
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 759 COMMIT Unreleased cee1a9e 2026-08-30T03:36:32-07:00
-
-#### Coming From:
-
-Unreleased 4e54e9d
-
-#### Purpose:
-
-Admit legal progressive-film pictures using field DCT, simplify the product menu, remove the obsolete 800x600 diagnostic mode, and produce a timing-clean Quartus build.
-
-#### Outcome:
-
-Source `cee1a9e` removes only the erroneous `frame_pred_frame_dct` prerequisite from progressive-film admission and documents that a clear flag admits macroblock-level field DCT and prediction handled by the existing downstream parser.  The menu now exposes `Aspect Ratio` as `4:3` or `16:9`, `Deinterlacer Mode` as `Bob` or `Weave`, the unchanged `Audio Test` choices, and `Audio Output` as `HDMI` or `S/PDIF`; Bob and 4:3 are the zero/default selections.  The obsolete 800x600, native timing-pattern and pattern-motion controls and top-level pattern mux are removed, Native 480i no longer depends on their saved status bits, and no hidden stale selection can reactivate them.  The exact 91,436-byte Coming to America first-I/P prefix accepts every byte, retires all 30 P rows, publishes both references and one swap, and completes with zero decoder, raster, writer or presentation errors.  Film cadence, reorder timestamps, reference-overlap ownership, native field order, all repeated-field cache cases, combined P/B field motion plus field DCT, interlaced P/B field-DCT residuals, B field motion, progressive mixed-raster pixels, native timing, startup, cache refill, generation, presentation integration, deadline and cadence-profiler regressions all pass.  A clean GitHub worktree build with the pinned `260829` build ID compiles at 34,156 of 41,910 ALMs, 52,529 registers, 4,181,443 memory bits and 67 DSP blocks.  Default fitter seed 17 misses only thirteen generic MiSTer `ascal` HDMI paths by at most 0.084 ns while decoder and video setup remain positive 0.986 and 3.164 ns; command-line seed 18 improves the global miss to 0.042 ns but is rejected.  At the user's instruction to stop after the current reseed and build, seed 19 is the final attempt and passes the complete gate with setup, hold, recovery, removal and minimum-pulse-width margins of positive 0.124, 0.231, 3.936, 0.541 and 0.925 ns; decoder and video setup are positive 0.462 and 2.378 ns.  The 4,461,996-byte timing-clean RBF has SHA-256 `162c788d2fa121f340ab6649ef94b25e97f31a44ee552928bb89e32b147059a6`; its 253,929-byte STA report has SHA-256 `b3fe3cd5f8b8a71dac42df1cfdf63387fd7fa4120713550a5caa789bf28c4b38`.  The prior `bc79d56a` RBF is preserved locally as `output_files/MediaPlayer-bc79d56a-known-good.rbf`.  No RBF is installed on the MiSTer, no further reseed or source cleanup is attempted, and the repository QSF remains at seed 17 because the user stops work after this seed-19 artifact.
-
-#### Next Steps:
-
-Stop after the completed seed-19 build as instructed.  Do not install the RBF, reseed again, edit shared MiSTer scaler RTL, remove stale SDC lines or change the QSF without a new user instruction.  When work resumes, decide explicitly whether to deploy the fully identified seed-19 `162c788d` artifact as built or first pin seed 19 in `MediaPlayer.qsf` and repeat a clean full build for source-controlled placement reproducibility.  The first hardware validation of this functional change should use the unchanged five-minute Coming to America program stream in Native 480i, verify the requested menu labels and both aspect/deinterlacer choices, and leave the known-good `bc79d56a` rollback intact; do not repeat Big Lebowski unless Coming succeeds and a control is materially needed.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
 
 #### Status:
 
