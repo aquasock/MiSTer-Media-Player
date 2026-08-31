@@ -1,4 +1,4 @@
-## 791 COMMIT Unreleased ??? 2026-08-30T20:42:55-07:00
+## 791 COMMIT Unreleased 627b329 2026-08-30T20:42:55-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Remove redundant physical-DVD CSS rescans and mask bounded optical read stalls w
 
 #### Outcome:
 
-The user extends the first Coming to America physical-disc run to approximately 40 minutes and reports rock-solid synchronized video and audio after the single captured startup pause, confirms both HDMI and S/PDIF output, both `4:3` and `16:9` aspect ratios, and both Bob and Weave deinterlacing, and hears no further drive speed transition.  No additional capture is required.  The user explicitly authorizes correcting both the long launch and initial stutter.  The planned helper-only boundary will preserve one authenticated direct-device libdvdnav session across the signature and program-stream preflight rewinds instead of repeating the approximately 30-second CSS scan three times, while leaving ISO rewind behavior unchanged.  After preflight, a direct-device-only producer thread will fill an 8 MiB HPS-RAM Program Stream ring and require a 4 MiB initial reserve before playback; the consumer will retain ordered blocking semantics, exact end and error propagation, and clean recovery if a future optical pause exceeds the reserve.  The observed disc rate makes the full ring approximately eight to nine seconds of coverage, materially beyond the measured 2.471110-second pause, while consuming no FPGA M10K, changing no RBF and requiring no Quartus build.  File and ISO backends, selected-title navigation guards, CSS ownership, PTS normalization, audio scheduling and Main remain outside the functional change.
+The user extended the first Coming to America physical-disc run to approximately 40 minutes and reported rock-solid synchronized video and audio after the single captured startup pause, confirmed HDMI, S/PDIF, `4:3`, `16:9`, Bob and Weave, and heard no further drive speed transition; no additional capture was required.  Source `627b32961567d60e3f4ac85a22a60faaea9559c3` implements the approved helper-only boundary: direct `dvd:` sources retain one authenticated libdvdnav session across both signature and Program Stream preflight rewinds, then start an asynchronous 8 MiB HPS-RAM byte ring with a 4 MiB launch reserve, synchronized end and error propagation, bounded-wait diagnostics and orderly producer shutdown.  ISO and ordinary file sources remain synchronous, the native-only environment fault injection is compiled out of ARM, and no Main, FPGA, RBF or M10K changes occur.  The strict native build succeeds and produces a 1,585,280-byte binary at SHA-256 `c38e79a1`; the direct full-title Blazing Saddles regression performs exactly one CSS key scan, two authenticated resets and a 10,411-microsecond image prefill, completes with the prior exact 3,823,399,998 video bytes, 11,150 picture timestamps, 174,142 audio frames, 267,482,112 PCM samples and one expected PTS discontinuity, and reports 4,648,355,840 produced and consumed source bytes with zero waits.  A second complete run injects a 3,000-millisecond producer pause after 8 MiB while the first 16 MiB drains at approximately 1 MiB per second; the reserve hides the pause with zero waits and both runs emit the identical 4,976,916,975-byte transport at SHA-256 `d407c038`.  The unchanged ISO backend repeats the exact full-title video, timestamp, audio and PCM counts; an ordinary 100,059,136-byte MPG completes with 84,428,687 video bytes, 598 timestamps, 24,851 audio frames and 28,628,352 PCM samples; and the existing Coming to America five-minute VOB completes with the expected 299,980,757 video bytes, 601 timestamps, 9,375 AC-3 frames and 14,400,000 PCM samples.  ARM GNU 10.2 cross-build succeeds with `-Werror` and produces one 859,444-byte static ARMv7 helper at SHA-256 `ff3b4f41d81a070ad4ef5226dd3380ab12bb409118b1e6981af4c95b3138f7a6`; the build PC's full `/tmp` tmpfs was bypassed safely by routing compiler temporaries into ignored `host/build/tmp` on the GIT volume.
 
 #### Next Steps:
 
-Implement authenticated direct-device reset without reopen, the bounded producer and consumer lifecycle, explicit prefill and starvation diagnostics, orderly rewind and close handling, and native-only deterministic optical-stall injection.  Require the direct backend to preserve byte output across an injected pause longer than the captured event while a real-time consumer drains the reserve, repeat complete direct-title, ISO, MPG and VOB regressions, and cross-build one static ARM helper from exact source.  Do not rebuild Main or the FPGA.  After exact candidate verification and explicit deployment authorization, preserve the installed helper, deploy by absolute-path candidate readback and same-directory rename, and repeat the Coming to America physical launch gate to compare CSS scan count, first-byte latency and continuous playback through the former initial-stall window.
+Await explicit deployment authorization.  Then preserve the installed helper, transfer source-`627b329` helper SHA-256 `ff3b4f41` as a unique absolute-path candidate, independently read it back, activate it by same-directory rename with final absolute-path readback, and leave Main, the seed-19 RBF and launcher unchanged.  Repeat the Coming to America physical-disc launch gate and compare CSS scan count, time from selection to picture, logged 4 MiB reserve and continuous playback through the former first-minute pause; accept this entry only after stable hardware video and HDMI or S/PDIF audio are observed.
 
 #### Files Modified:
 
@@ -28,7 +28,7 @@ Implement authenticated direct-device reset without reopen, the bounded producer
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
