@@ -43,6 +43,11 @@ This project is still in active pre-release development. Published milestone rel
   private audio substream. AC-3 decode performs a bounded 64 KiB rescan and
   decoder reinitialization after a rejected boundary frame instead of exiting
   playback or selecting a different track because its PES arrived first.
+- Native 480i ownership now remains active when an interlaced sequence moves
+  between ordinary interlaced and progressive film frame pictures. Per-picture
+  field order and repeat metadata drive film scheduling after that transition;
+  field pictures and existing syntax, timing and decoder-error gates remain
+  rejected.
 - Direct USB-DVD playback now reuses its authenticated libdvdnav session across
   helper preflight rewinds instead of reopening and rescanning CSS keys. After
   preflight it reads through an 8 MiB asynchronous HPS-RAM ring with a 4 MiB

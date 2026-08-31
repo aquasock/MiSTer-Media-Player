@@ -987,7 +987,7 @@ mpeg2_h262_native_field_order mpeg2_h262_native_field_order
 wire mpeg2_new_native_480i_request =
     (mpeg2_new_phase1_supported ||
      mpeg2_new_native_480i_supported ||
-     (mpeg2_new_native_film_mode && mpeg2_new_native_film_supported)) &&
+     mpeg2_new_native_film_supported) &&
 	!mpeg2_new_progressive_sequence &&
 	mpeg2_new_native_field_order_locked &&
 	!mpeg2_new_native_field_order_mismatch;
