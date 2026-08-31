@@ -23,6 +23,7 @@ Implement the shared ISO/direct-device navigation source with absolute-device va
 - assets/USB DVD Drive.dvd
 - docs/BUILDING.md
 - host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
 - host/arm/media_source.c
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 
