@@ -1,4 +1,4 @@
-## 827 COMMIT Unreleased ??? 2026-08-31T10:20:37-07:00
+## 827 COMMIT Unreleased 673b6d7 2026-08-31T10:20:37-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Prove the exact DVD highlight style and selected-region plane indices emitted by
 
 #### Outcome:
 
-The user approves the helper-only observability boundary after the physical menu regresses from sparse distorted selection pixels to no visible indicator.  Independent absolute-path FTP readback now proves the installed artifacts are exactly the intended 904,564-byte source-`3e4f54c` helper at SHA-256 `c4c47141205c99ade8a9ed266574beb9d072dce827d508efbff47694bb2ce197`, the 1,174,492-byte source-`53ccc04` Main at `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496`, and the unchanged 4,511,756-byte seed-20 RBF at `02928bff70b25eb0e0b1a6b8f24afec0dfe687f2524754b33fe13f4ed3014e9d`.  The proposed source change adds no transport, decoder, scheduler, menu-selection or overlay behavior: it will report every emitted overlay configuration and style record with the visible and menu flags, highlight rectangle, four decoded RGBA entries and exact two-bit pixel-index histogram inside that rectangle, with a focused native test covering the histogram boundary.
+The user approved and source `673b6d7` implements the helper-only observability boundary after the physical menu regressed from sparse distorted selection pixels to no visible indicator.  Independent absolute-path FTP readback first proved the installed artifacts were exactly the intended 904,564-byte source-`3e4f54c` helper at SHA-256 `c4c47141205c99ade8a9ed266574beb9d072dce827d508efbff47694bb2ce197`, the 1,174,492-byte source-`53ccc04` Main at `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496`, and the unchanged 4,511,756-byte seed-20 RBF at `02928bff70b25eb0e0b1a6b8f24afec0dfe687f2524754b33fe13f4ed3014e9d`.  Every successfully emitted overlay configuration or style record now reports its visible and menu flags, inclusive highlight rectangle, four decoded RGBA entries, exact two-bit plane-index histogram inside the selected rectangle, total selected pixels and the subset whose mapped highlight alpha is nonzero; the transport bytes, decoder, scheduler, menu selection and overlay behavior are unchanged.  The strict focused subpicture test proves the exact `0,2,2,0` histogram plus invalid-bound and persistence cases, and the existing random-access and menu-hop regressions pass.  The complete native helper compiles and its capability smoke test passes after demoting only the pinned DVD headers' pre-existing ignored-`gcc_struct` attribute warning on the local AArch64 GCC 15 host; no authorized non-archived DVD image is locally available for the real-menu harness.  An exact detached build-PC checkout of `673b6d7819a666b3b3387be3b594085ff6776b12` builds only `/home/vash/MiSTer-Media-Player-673b6d7/host/build/MediaPlayer_Helper`, a 908,660-byte stripped static ARMv7 hard-float executable with no dynamic section at SHA-256 `e0960b0fb2dcd95cb7c759803ba5e3c6a873a8feb57c5e9ab2c1e23e8af36050`; Main, RTL, QSF, RBF and Quartus remain untouched.
 
 #### Next Steps:
 
-Implement and review the bounded helper diagnostics, run the strict native helper build plus focused DVD subpicture, random-access and menu regressions, commit the source only if every existing result remains unchanged, then build only the static ARM helper from the exact committed source on the build PC.  Preserve Main, RTL, QSF and the seed-20 RBF; hardware acceptance will require a fresh physical menu log whose emitted style is visible and nontransparent and whose selected rectangle contains nonzero plane indices, thereby deciding whether later work remains in the helper plane or may proceed to FPGA overlay composition.
+Exit the MediaPlayer core or otherwise stop its running helper, replace only `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-673b6d7/host/build/MediaPlayer_Helper` from the build PC, restore executable permission if needed, and verify the destination SHA-256 is `e0960b0fb2dcd95cb7c759803ba5e3c6a873a8feb57c5e9ab2c1e23e8af36050`.  Restart the physical DVD, reach the menu, move the selected item at least once and capture a fresh helper log containing the new `DVD overlay record=` lines; the emitted style is capable of drawing a marker only when it reports `visible=1`, at least one nonzero-alpha RGBA entry maps to a populated histogram bin, and `selected_nontransparent_pixels` is nonzero.  Preserve Main and the seed-20 RBF because this result will decide whether the missing indicator originates before or after FPGA overlay composition.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Implement and review the bounded helper diagnostics, run the strict native helpe
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
