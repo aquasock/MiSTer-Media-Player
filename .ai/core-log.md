@@ -1,3 +1,32 @@
+## 832 COMMIT Unreleased ??? 2026-08-31T14:59:02-07:00
+
+#### Coming From:
+
+Unreleased f515341
+
+#### Purpose:
+
+Prove whether Main submits each complete helper-generated DVD overlay record to successful FPGA ioctl transfers without changing the submitted stream or the RBF.
+
+#### Outcome:
+
+The user approves the Main-only observability boundary after the known opaque helper probe produces two complete synthetic overlay frames and 152 moving style records but the physical menu displays no magenta pixels.  The proposed diagnostic adds a bounded streaming verifier after, and only after, each successful `user_io_file_tx_data_step` consumption so it observes the exact byte sequence Main reports as submitted while leaving its contents, chunking, credit protocol, pacing and control behavior unchanged.  The verifier will recognize overlay markers and declared lengths across arbitrary pipe and ioctl boundaries, retain only bounded configuration and style state, validate frame command order, count data records and bytes, calculate FNV-1a over the submitted plane, count non-`0x55` probe bytes, and log changed selection payloads plus each commit.  The helper, kernel, ioctl implementation, FPGA source, QSF and seed-20 RBF remain untouched.
+
+#### Next Steps:
+
+Implement the verifier in the pinned Main patch with a self-contained state machine suitable for focused host testing, reset it at each MediaPlayer session, and feed it only the exact `consumed` bytes after a successful transport step.  Exercise markers and lengths split at every boundary, invalid records, repeated style suppression, command-order faults, a complete 22-record 86,400-byte `0x55` plane with FNV-1a `f8555d45`, and a corrupted plane, then apply the patch cleanly to pinned Main source `0a8fb44` and complete the normal ARM Main build.  Commit only the passive diagnostic, build a uniquely named Main artifact from the exact commit on the build PC, and provide its path and hash while preserving the installed diagnostic helper and RBF.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 831 COMMIT Unreleased f515341 2026-08-31T14:51:34-07:00
 
 #### Coming From:
@@ -1187,35 +1216,6 @@ The user reports that the source-`531f741` Coming to America physical-disc contr
 #### Next Steps:
 
 Stop any playback that began before this deployment, then launch `/media/fat/games/MediaPlayer/USB DVD Drive.dvd` once with the same Coming to America disc.  Expect one CSS key scan, two `DVD reset authenticated navigation` lines and one `DVD buffer ready` line before first transport; report selection-to-picture time and whether audio or video pauses around 55 seconds after playback begins.  If any pause occurs, leave playback and telemetry running for immediate helper-log capture so the candidate's reserve and consumer-wait diagnostics can measure it directly.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 792 COMMIT Unreleased 531f741 2026-08-30T21:12:55-07:00
-
-#### Coming From:
-
-Unreleased 627b329
-
-#### Purpose:
-
-Capture the repeated first-minute physical-DVD pause and verify which helper produced the run.
-
-#### Outcome:
-
-The user reports that a new Coming to America physical-disc run takes about the same time to start, pauses at the same playback point for perceptibly less time without an audible drive spin-down, and then resumes perfect video and audio; the user leaves playback and telemetry running for immediate capture.  Absolute-path FTP readback proves that this run is not using source `627b329`: `/media/fat/linux/MediaPlayer_Helper` remains the prior 847,156-byte source-`531f741` helper at SHA-256 `d5067fa1d924f066b9a48ec581e34a392616fef39268df811622621a2a92bb25`, rather than the built 859,444-byte buffered candidate at `ff3b4f41`.  The live log independently confirms the old path by recording three complete CSS key scans and none of the candidate's authenticated-reset, prefill or buffer-wait diagnostics.  First verified transport arrives 56.942903 seconds after launch, then the only producer gap over 500 milliseconds spans 2.608982 seconds from pipe-read event 3,171 at diagnostic time 112.246762 seconds to event 3,172 at 114.855744 seconds, or 55.301187 seconds after first transport; this closely repeats entry 790's 2.471110-second interruption at approximately the same playback point and shows that the optical pause is deterministic enough to qualify the candidate against.  The 752,307-byte scaled screenshot `/tmp/entry792_coming_to_america_usb_buffer_pause.png` has SHA-256 `a0d0203b6cb3d1e15db77663c67cfa4a4de2bb004e836959c0f94c9af5995583` and visibly preserves a clean active frame after recovery.  The 6,032,092-byte helper log `/tmp/entry792_coming_to_america_usb_buffer_pause_arm_helper.log` has SHA-256 `d12f0813efdfebb4ab0ed3f6ca4e117a7e0c57834679418cff70b5daa99a0b6f`.  Because the buffered helper was never installed, this result neither supports the theory that its launch changes cancel each other nor tests whether its ring shortens the pause; no repository, MiSTer file, RBF, Main, launcher or playback configuration changes during collection.
-
-#### Next Steps:
-
-Let the user's current recovered movie continue without interruption.  After the user stops playback and explicitly authorizes deployment, preserve the installed `d5067fa1` helper, stage and independently read back exact candidate `ff3b4f41` at absolute MiSTer paths, activate it by same-directory rename, and verify the final active hash.  Then launch the same physical disc once and require one CSS key scan, two authenticated resets, a logged 4 MiB prefill and uninterrupted audio and video across approximately 55 seconds after first transport; compare the candidate's measured launch and any consumer wait directly with this valid old-helper control.
 
 #### Files Modified:
 
