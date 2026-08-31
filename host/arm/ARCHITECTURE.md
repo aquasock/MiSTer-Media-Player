@@ -55,8 +55,13 @@ share a compilation unit:
 1. Source: `file:` and decrypted or CSS-encrypted `iso:` now; direct `dvd:`
    later.
 2. Container: raw M2V pass-through or MPEG Program Stream/PES demultiplexing.
-3. Timeline: PTS extraction and FPGA in-band timestamp records, with future
-   discontinuity events for title, cell and seek transitions.
+3. Timeline: PTS extraction and FPGA in-band timestamp records.  An `iso:`
+   title may cross VOB or cell boundaries whose raw PES clock restarts; the
+   helper recognizes only a material backward jump, rebases the new ISO epoch
+   onto the preceding maximum, and sends one continuous title clock to both
+   its audio scheduler and the FPGA.  Ordinary MPEG decode-order timestamp
+   reordering and every non-ISO source remain unchanged.  Future direct-disc
+   navigation and seeking will need explicit discontinuity events.
 4. Audio codec: MPEG Layer II on stream ids 0xC0-0xDF, standalone MPEG-1
    Layer III, RIFF WAVE and FLAC files, and AC-3 on private stream 1 substreams 0x80-0x87, all
    behind codec selection rather than output-specific decode paths. MPEG audio

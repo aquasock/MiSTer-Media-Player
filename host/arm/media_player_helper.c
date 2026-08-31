@@ -38,6 +38,7 @@
 #define VIDEO_SLICE_BYTES           256u
 #define MP3_PROBE_BYTES             (64u * 1024u)
 #define ID3V2_TAG_LIMIT             (64u * 1024u * 1024u)
+#define ISO_PTS_DISCONTINUITY_TICKS (10u * 90000u)
 
 /*
  * Entry 429: the FPGA gates its whole in-band byte path on the PCM sink, so a
@@ -178,6 +179,12 @@ struct output_state {
     int scheduler_enabled;
     int scheduler_started;
     int iso_start_filter_active;
+    int iso_pts_normalization;
+    int have_iso_video_pts;
+    uint64_t iso_pts_epoch_offset;
+    uint64_t iso_pts_raw_max;
+    uint64_t iso_pts_normalized_max;
+    unsigned iso_pts_discontinuities;
     uint32_t pts_window;      /* start-code scanner across queued payloads */
     unsigned pictures_since_pts;
     int pts_boundary_seen;    /* sequence or group header since last record */
@@ -387,6 +394,72 @@ static uint64_t decode_pts(const uint8_t *p)
            ((uint64_t)(p[2] & 0xfe) << 14) |
            ((uint64_t)p[3] << 7) |
            ((uint64_t)p[4] >> 1);
+}
+
+/*
+ * The libdvdnav title stream observed here can cross a cell or VOB boundary
+ * whose PES clock restarts even though the selected title continues.  The
+ * scheduler and FPGA need one continuous title clock, while ordinary MPEG
+ * decode-order PTS reordering must remain visible.  The ten-second backward
+ * threshold is an implementation guard, not a DVD or MPEG limit.  Translate
+ * a detected new ISO epoch so its first timestamp follows the prior maximum
+ * by one 90 kHz tick; encoded cadence still supplies the minimum picture
+ * interval.
+ */
+static int normalize_video_pts(struct output_state *output, uint64_t raw_pts,
+                               uint64_t *normalized_pts)
+{
+    uint64_t normalized;
+
+    if (!output->iso_pts_normalization) {
+        *normalized_pts = raw_pts;
+        return 0;
+    }
+    if (!output->have_iso_video_pts) {
+        output->have_iso_video_pts = 1;
+        output->iso_pts_raw_max = raw_pts;
+        output->iso_pts_normalized_max = raw_pts;
+        *normalized_pts = raw_pts;
+        return 0;
+    }
+    if (raw_pts < output->iso_pts_raw_max &&
+        output->iso_pts_raw_max - raw_pts > ISO_PTS_DISCONTINUITY_TICKS) {
+        uint64_t next;
+
+        if (output->iso_pts_normalized_max == UINT64_MAX) {
+            fprintf(stderr,
+                    "media_player_helper: ISO PTS epoch overflow\n");
+            return -1;
+        }
+        next = output->iso_pts_normalized_max + 1u;
+        if (raw_pts > next) {
+            fprintf(stderr,
+                    "media_player_helper: invalid ISO PTS epoch\n");
+            return -1;
+        }
+        output->iso_pts_epoch_offset = next - raw_pts;
+        output->iso_pts_raw_max = raw_pts;
+        output->iso_pts_discontinuities++;
+        fprintf(stderr,
+                "media_player_helper: ISO PTS discontinuity raw=%llu "
+                "normalized=%llu offset=%llu count=%u\n",
+                (unsigned long long)raw_pts,
+                (unsigned long long)next,
+                (unsigned long long)output->iso_pts_epoch_offset,
+                output->iso_pts_discontinuities);
+    }
+    if (raw_pts > UINT64_MAX - output->iso_pts_epoch_offset) {
+        fprintf(stderr,
+                "media_player_helper: normalized ISO PTS overflow\n");
+        return -1;
+    }
+    normalized = raw_pts + output->iso_pts_epoch_offset;
+    if (raw_pts > output->iso_pts_raw_max)
+        output->iso_pts_raw_max = raw_pts;
+    if (normalized > output->iso_pts_normalized_max)
+        output->iso_pts_normalized_max = normalized;
+    *normalized_pts = normalized;
+    return 0;
 }
 
 static void encode_video_pts(uint8_t record[9], uint64_t pts)
@@ -1780,8 +1853,13 @@ static int process_pes(struct media_source *input, uint8_t code,
         goto done;
     }
     if ((code & 0xf0) == 0xe0) {
-        int has_record = has_pts && pts_record_wanted(output);
-        size_t video_size = length - payload_offset;
+        int has_record;
+        size_t video_size;
+
+        if (has_pts && normalize_video_pts(output, pts, &pts) < 0)
+            goto done;
+        has_record = has_pts && pts_record_wanted(output);
+        video_size = length - payload_offset;
 
         if (output->scheduler_enabled && !output->iso_start_filter_active &&
             !output->audio_pes_seen &&
@@ -2303,6 +2381,7 @@ int main(int argc, char **argv)
         goto done;
     }
     output.scheduler_enabled = is_program_stream && !output.pcm;
+    output.iso_pts_normalization = input.kind == MEDIA_SOURCE_ISO;
     output.iso_start_filter_active =
         input.kind == MEDIA_SOURCE_ISO && output.scheduler_enabled;
     if (is_mp3) {
@@ -2351,6 +2430,10 @@ int main(int argc, char **argv)
                 "pcm_peak=%zu samples, pcm_emitted=%llu samples\n",
                 output.video_peak_bytes, output.pcm_peak_frames,
                 (unsigned long long)output.pcm_emitted_frames);
+    if (output.iso_pts_normalization)
+        fprintf(stderr,
+                "media_player_helper: ISO PTS discontinuities=%u\n",
+                output.iso_pts_discontinuities);
 done:
     if (audio.a52)
         a52_free(audio.a52);
