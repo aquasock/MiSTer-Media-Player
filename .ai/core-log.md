@@ -1,4 +1,4 @@
-## 786 COMMIT Unreleased ??? 2026-08-30T19:13:48-07:00
+## 786 COMMIT Unreleased b71cc8b 2026-08-30T19:13:48-07:00
 
 #### Coming From:
 
@@ -6,15 +6,15 @@ Unreleased eb7bed6
 
 #### Purpose:
 
-Bound longest-title ISO playback to one declared title traversal so post-title navigation cannot restart or enter another DVD domain.
+Bound longest-title ISO playback to one selected-title traversal so post-title navigation cannot restart or enter another DVD domain.
 
 #### Outcome:
 
-The user authorizes continued development while the deployed source-`eb7bed6` Blazing Saddles boundary soak runs and separately prepares a genuinely encrypted ISO for the following qualification gate.  The proposed host-only source change will retain libdvdnav's selected-title identity, chapter description and 90 kHz duration, accept normal forward cell and chapter progression, and translate a verified title exit, title replay or exhausted duration into clean end-of-stream before any following-domain payload is exposed to the Program Stream parser.  Rewind will restore the same one-traversal boundary.  The implementation will use the pinned libdvdnav API's title and time state rather than infer a DVD limit from file bytes or MPEG decoder behavior; MPG, VOB and every non-ISO source, Main, the FPGA and the accepted seed-19 RBF will remain unchanged.
+The user authorizes continued development while the deployed source-`eb7bed6` Blazing Saddles boundary soak runs and separately prepares a genuinely encrypted ISO for the following qualification gate.  Native testing rejects source `ef2a7e9` because libdvdnav reports a legitimate large time regression at each new chapter, and rejects the narrower source `bee9541` duration cutoff because Coming to America reaches its described 606,390,000-tick duration on a payload block, continues authored title cells through approximately 630,129,000 ticks and otherwise leaves a 1,565-byte AC-3 tail.  Final source `b71cc8b` therefore treats duration as selection and diagnostic metadata, retains the selected title plus monotonic chapter and cell structure, and converts only a title exit or backward chapter or cell replay into clean end-of-stream before following-domain payload is exposed; rewind restores the boundary.  Accelerated complete native runs end once and drain cleanly for Blazing Saddles at 3,823,399,998 video bytes, 11,150 timestamps and 267,482,112 PCM samples, Coming to America at 4,239,456,995 bytes, 14,807 timestamps and 336,433,152 samples, and The Big Lebowski at 5,509,816,546 bytes, 14,558 timestamps and 338,021,376 samples.  The accepted 2,097,152-byte ISO opening remains byte-identical at SHA-256 `396b0db1`, the five-minute MPG remains exactly 224,185,582 bytes at `45401ab3`, and a 299,980,757-byte VOB decode compares byte-for-byte at `677ce1bb`.  One ARM GNU 10.2 build from exact full source `b71cc8bedc112444b79a1d4af2e8b185b6bf0373` produces an 847,156-byte stripped static EABI5 helper with SHA-256 `603f4c05fd6ca687b6dc33c70e97b19fe34a96a320d6a91042f41bd78fb584e7` and no dynamic section; the expected static-libdvdcss `getpwuid` warning remains.  No Quartus build, MiSTer deployment, Main, FPGA, RBF, media or configuration change occurs.
 
 #### Next Steps:
 
-Implement the boundary inside `media_source.c`, document the ownership and limitation, and run exact native regressions proving that each available decrypted ISO ends once, that the accepted ISO opening remains byte-identical, and that ordinary MPG and VOB output remain byte-identical.  Build one exact static ARM helper only after those checks pass.  Do not deploy it while the current Blazing Saddles 48:25 soak is running; first accept that result, then preserve and stage-deploy the one-traversal helper with exact readback.  When the user supplies the encrypted ISO, independently prove it contains CSS-scrambled sectors before using it for native and MiSTer qualification.
+Let the currently deployed `eb7bed6` Blazing Saddles soak pass the prior 48:25 audio boundary and capture its terminal telemetry before changing the running helper.  Then preserve the installed helper and stage-deploy exact candidate `603f4c05` with candidate readback, same-directory rename and final readback; qualify one complete selected title through its clean end so the title-exit boundary itself is hardware-proven.  When the user supplies the encrypted ISO, first independently prove it contains CSS-scrambled sectors, then require a clean complete native opening and a representative HDMI and S/PDIF MiSTer run without changing Main, the seed-19 RBF or FPGA source.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Implement the boundary inside `media_source.c`, document the ownership and limit
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
