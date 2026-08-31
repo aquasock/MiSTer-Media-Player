@@ -1,3 +1,36 @@
+## 834 COMMIT Unreleased ??? 2026-08-31T15:36:39-07:00
+
+#### Coming From:
+
+Unreleased 0e89c73
+
+#### Purpose:
+
+Localize the physically absent known-pattern DVD highlight inside the FPGA after its byte-exact ingress FIFO acceptance.
+
+#### Outcome:
+
+The user approves the first RBF modification after source `0e89c73` proves the complete all-index-one plane, opaque-magenta palette, visible menu configuration, commit and moving style records enter the FPGA FIFO with matching accepted-word count and rolling digest but produce no magenta screen pixels.  The planned change is observability only: retain the exact helper, Main, in-band protocol, DDR addresses, rendering logic and fitter seed while adding saturating stage counters and retained state for extracted overlay commands and bytes, engine data acceptance and DDR writes, successful or rejected commit conditions, line-cache fills, memory-domain style publication, video-domain style arrival, row-tag matches, highlighted samples, nonzero-alpha samples and magenta blend samples.  A schema-21 diagnostic snapshot will defer the unrelated early audio-underrun capture, arm on overlay activity, allow the plane commit and video-domain pipeline to settle, and fall back after a bounded session interval so zero downstream activity is still observable.
+
+#### Next Steps:
+
+Implement the passive counters with explicit clock-domain synchronization, extend the focused engine test to require the known all-`0x55` frame and highlight to advance every relevant stage, add a focused snapshot-trigger regression, and run the existing overlay metadata, engine and arbiter tests plus retained native-video regressions.  If they pass, commit the source, pull that exact commit onto build PC `10.10.0.42`, perform one clean Quartus Prime 17.0.2 seed-20 build, require positive setup, hold, recovery, removal and minimum-pulse-width timing, and provide a uniquely named diagnostic RBF while preserving the installed target files until the user replaces the RBF.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+- rtl/mpeg2_new/mpeg2_h262_dvd_overlay.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/test_dvd_overlay_engine.sv
+- tools/test_dvd_overlay_snapshot.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 833 COMMIT Unreleased 0e89c73 2026-08-31T15:30:28-07:00
 
 #### Coming From:
@@ -1192,35 +1225,6 @@ Await the user's completion of the current physical-disc qualification and expli
 - host/arm/media_source.c
 - host/arm/media_source.h
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 794 COMMIT Unreleased 627b329 2026-08-30T21:27:52-07:00
-
-#### Coming From:
-
-Unreleased 627b329
-
-#### Purpose:
-
-Determine whether standard authored DVD-Video menus can be added through the existing static VideoLAN helper stack without changing the FPGA image.
-
-#### Outcome:
-
-The user defines the target as each disc's authored DVD-Video menus, including chapter selection, directional navigation, activation and return-to-menu, while requiring that any feature needing an `.rbf` change be held.  The pinned static libdvdnav 7.0.0 already implements the DVD virtual machine, first-play and menu calls, directional button selection, activation, chapter searches and NAV-packet button definitions, so neither libVLC nor another navigation library is needed.  The existing helper deliberately selects the longest title, skips still and wait events, discards menu navigation events and sends only MPEG-2 video plus audio through a one-way Main pipe.  A Main-to-helper control pipe can carry controller commands without FPGA work, and authored menu background video can use the current decoder, but the visible selected-button state is a DVD SPU bitmap/highlight layer.  The current core has no SPU decoder or overlay plane, the HPS never receives decoded FPGA frames for software composition, and Main's available OSD is a text-row interface rather than a DVD bitmap compositor.  A complete authored-menu implementation therefore requires an FPGA overlay change; no source, Main, helper, RBF, installed file or running physical-disc test is changed.
-
-#### Next Steps:
-
-Hold authored DVD menus until the user explicitly permits an RBF feature boundary.  Preserve libdvdnav 7.0.0 as the navigation engine when that work resumes, add the bidirectional controller path and SPU decoder together with a bounded overlay design, and avoid any claim of DVD-Video menu conformance until the applicable authorized specification is available.  In the meantime, continue the current physical-disc compatibility qualification or choose a separate helper/Main-only feature such as direct previous and next chapter controls if desired.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
