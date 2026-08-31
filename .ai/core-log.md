@@ -1,3 +1,32 @@
+## 811 COMMIT Unreleased ??? 2026-08-31T04:19:24-07:00
+
+#### Coming From:
+
+Unreleased 6e44472
+
+#### Purpose:
+
+Find and pin a timing-clean fitter placement for the source-`2738e99` authored-menu design without changing its logic or constraints.
+
+#### Outcome:
+
+The user authorizes reseeding and another build after source `2738e99` removed the authored-menu overlay crossing failures but seed 19 exposed negative 0.107 ns global setup slack on sixteen ordinary same-clock HDMI scaler paths.  The approved boundary performs a bounded search of at most eight new fitter seeds against the exact synthesized source-`2738e99` netlist, stopping at the first placement whose setup, hold, recovery, removal and minimum-pulse-width margins are all positive; it changes no RTL, SDC, interface, memory allocation or MiSTer installation.  The winning seed alone will be pinned in `MediaPlayer.qsf`, committed as the source boundary, and subjected to one clean full Quartus build and complete timing/resource extraction before any artifact can be considered for later deployment.
+
+#### Next Steps:
+
+Synchronize the build PC to this proposal and exact source `2738e99`, preserve the completed seed-19 reports, and search seeds 20 through 27 using placement, assembly and timing only while reusing the exact synthesized netlist.  Stop immediately at the first five-category timing-clean result, pin only that seed, commit and push the QSF change, then perform one clean full build from the resulting exact source commit; if no searched seed passes, leave source and MiSTer unchanged and request approval before any scaler pipeline or constraint change.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 810 COMMIT Unreleased 6e44472 2026-08-31T04:13:58-07:00
 
 #### Coming From:
@@ -1196,35 +1225,6 @@ The user leaves the completed uninterrupted S/PDIF run of `/media/fat/games/Medi
 #### Next Steps:
 
 Keep the accepted seed-19 RBF, host binaries, ISO deployment and all existing FIFO depths unchanged.  The smallest useful correction cycle should target B-picture intrinsic decode throughput with zero new M10Ks, preserve reconstruction arithmetic and presentation behavior, and use the unused schema-20 telemetry words to attribute B stalls among compressed-bit parsing, residual replay, prediction and row-retirement waits if static analysis cannot justify a direct scheduling overlap.  Record and obtain approval for that source boundary before implementation, then run exact simulation regressions, one clean seed-19 Quartus build with full timing and resource gates, and the NARA control plus both natural-content VOBs through five-minute HDMI and S/PDIF validation.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 771 COMMIT Unreleased 0a9d48a 2026-08-30T06:57:06-07:00
-
-#### Coming From:
-
-Unreleased 0a9d48a
-
-#### Purpose:
-
-Reject the natural-content MPD-D2 VOB gate and identify the repeatable S/PDIF collapse as sustained real-time decoder-throughput loss.
-
-#### Outcome:
-
-The user corrects the preliminary VOB acceptance: the NARA qualification VOB and existing MPG fixtures play perfectly, but `the_big_lebowski_mpd_d2_5min.vob` begins severe S/PDIF stutter with telemetry near 33 seconds and `coming_to_america_mpd_d2_5min.vob` near 56 seconds.  A controlled uninterrupted Lebowski rerun reproduces collapse to near silence, temporary full recovery, a second collapse and another recovery without reload or reboot.  The exact helper log names the correct VOB and S/PDIF path; by 205.999972 seconds it has emitted 9,460,224 samples against 9,887,998 wall-clock samples, a 427,774-sample or 8.91-second deficit, while its maximum video PTS represents only 197.397 seconds of media.  At 206.58 seconds Main has submitted 238,139,400 bytes, about 1.153 MB/s, entirely through the verified fast path.  Reanalysis of the earlier apparent Lebowski HDMI pass shows that it required 309.292 seconds to transport 300.038 seconds of media and accumulated the same approximately 426,000-sample scheduler deficit; schema-20 error `0x0400` is a sticky first-underrun indication, not a count proving only one isolated underrun.  In contrast, NARA remained about 21,000 samples ahead and completed in 300.006 seconds.  Independent FFprobe comparison finds matching continuous timestamps and required 8,000,000-bit/s, 720x480, 30000/1001 TFF properties across all three MPD-D2 VOBs, while the two passing natural-content MPG video payloads are only 5,398,682 and 6,525,205 bits/s.  The evidence therefore localizes the failure to content-dependent clean-video ingest or decoder drain throughput below real time on sustained natural-content 8 Mbps input, with the ordered helper scheduler then starving audio; it does not support file corruption, permanent FIFO fill, S/PDIF framing failure or authored timestamp discontinuity.  Captures `/tmp/entry771_lebowski_mpd_d2_spdif_stutter.png`, `/tmp/entry771_lebowski_mpd_d2_spdif_recovered.png` and `/tmp/entry771_lebowski_mpd_d2_spdif_second_collapse.png` hash `1a251f44`, `2adcdf3c` and `b6dd0351`; their corresponding helper-log snapshots hash `73638139`, `17344fcb` and `ddab1a0b`.  No installed file, repository source or target configuration changes, and ISO deployment is paused at the user's direction.
-
-#### Next Steps:
-
-Keep the accepted seed-19 RBF and all installed host binaries unchanged and do not proceed with ISO installation.  Use the retained natural-content streams and logs for an offline stage-throughput analysis, then propose the smallest measurable correction that raises sustained frame-picture MPD-D2 decode above real time without reducing the adopted constant 8 Mbps qualification requirement.  Any new diagnostic media, RTL instrumentation, timing-sensitive optimization or Quartus rebuild requires a separately recorded and approved commit boundary.
 
 #### Files Modified:
 
