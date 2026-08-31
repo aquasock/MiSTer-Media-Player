@@ -1,3 +1,43 @@
+## 803 COMMIT Unreleased ??? 2026-08-30T22:48:28-07:00
+
+#### Coming From:
+
+Unreleased 6de2778
+
+#### Purpose:
+
+Correct host-side chapter audio recovery and reorganize the MediaPlayer menu with functional Ogg Vorbis playback before the separately approved FPGA mixed-mode boundary.
+
+#### Outcome:
+
+The user approves entry 802's two-boundary recovery plan and additionally directs the first host boundary to present `Run DVD-Video`, `Open MPEG-2 Video`, and `Open WAV, MP3, FLAC, OGG`, followed by Aspect Ratio with `16:9` as the default and `4:3` second, Deinterlacer Mode with Bob and Weave, and the existing Audio Test and Audio Output choices unchanged.  The planned Main selector change will preserve separate DVD, MPEG-2 and audio extension filters rather than replacing every MediaPlayer selector with one combined list.  Because an Open OGG entry must not advertise a rejected file type, this boundary also plans pinned Ogg Vorbis decoding through the existing consumer-audio conversion and transport path.  Chapter changes will retain the initially established Program Stream audio codec and substream identity, reset decoder buffers without forgetting that selection, honor the first complete private-stream access unit after navigation, and resynchronize past a bounded invalid AC-3 candidate frame instead of terminating valid playback.  Main input bindings and transport barriers remain unchanged, and no RTL, QSF, Quartus build or RBF change belongs to this commit.
+
+#### Next Steps:
+
+Implement the helper, dependency, Main patch, menu and documentation changes; add focused host fixtures for chapter-boundary AC-3 ordering and recovery plus WAV, MP3, FLAC and Ogg Vorbis selector and decode paths; preserve ordinary Program Stream, ISO, direct-DVD, HDMI and S/PDIF behavior; build the strict native helper, static ARM helper and patched Main; and deploy only the verified helper and Main under the user's no-backup replacement policy for a chapter-one-through-three and menu hardware gate.  After that host boundary passes, proceed without another scope expansion to the separately approved native mixed film/interlaced FPGA commit and seed-19 build.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer.sv
+- README.md
+- docs/BUILDING.md
+- host/arm/ARCHITECTURE.md
+- host/arm/Makefile
+- host/arm/consumer_audio.c
+- host/arm/consumer_audio.h
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/build_arm_stack.sh
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 802 COMMIT Unreleased 6de2778 2026-08-30T22:43:15-07:00
 
 #### Coming From:
@@ -1177,34 +1217,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 763 COMMIT Unreleased cee1a9e 2026-08-30T05:05:10-07:00
-
-#### Coming From:
-
-Unreleased cee1a9e
-
-#### Purpose:
-
-Install and verify the approved five-minute Blazing Saddles main-feature compatibility stream for hardware testing.
-
-#### Outcome:
-
-FFmpeg's DVD-video demuxer selects title 2, the 5,567-second Blazing Saddles main feature, from `/home/vash/Videos/Blazing Saddles/VIDEO_TS` and stream-copies its first five minutes through the VOB/MPEG-2 program-stream muxer without transcoding.  The resulting `/tmp/blazing_saddles_first_5min.mpg` is 244,019,200 bytes, 300.149844 seconds and SHA-256 `e045ec4d52f5fee6bb2e57d887341697244c0886d35b734131ff171101535879`; it contains exactly 7,195 original 720x480 anamorphic 16:9 MPEG-2 pictures and 9,375 original 48 kHz six-channel English AC-3 frames.  Complete software video and audio decode exits zero; FFmpeg's null-output muxer reports repeated equal AC-3 timestamps at several DVD cell boundaries without any codec decode failure, so that authored timing remains intentionally present for the hardware compatibility test.  Absolute FTP inventory proves `/media/fat/games/MediaPlayer/blazing_saddles_first_5min.mpg` absent before upload, and independent absolute-path download reproduces all 244,019,200 bytes, the exact `e045ec4d` hash and a byte-identical comparison.  The pre-existing `blazing_saddles_main_av_15min.mpg` remains untouched, as do both earlier five-minute files, the DVD sources, repository source, FPGA, seed-19 RBF, Main, helper and Native 480i configuration.
-
-#### Next Steps:
-
-Keep the installed seed-19 RBF and Native 480i mode unchanged, select `16:9`, begin with HDMI audio, and play `/media/fat/games/MediaPlayer/blazing_saddles_first_5min.mpg` once from beginning to end.  During that same run, verify S/PDIF for a representative portion if convenient, then report whether launch, picture integrity, cadence, audio and synchronization remain perfect for the full five minutes and whether playback returns normally at EOF.  Leave the completed screen untouched for immediate screenshot, telemetry and helper-log capture.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
