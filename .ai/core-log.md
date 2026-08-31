@@ -1,4 +1,4 @@
-## 805 COMMIT Unreleased ??? 2026-08-31T00:16:48-07:00
+## 805 COMMIT Unreleased 6e44472 2026-08-31T00:16:48-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Move the expanded MediaPlayer configuration string into exactly one M10K so the 
 
 #### Outcome:
 
-The user approves the correction only on the condition that it consumes exactly one additional M10K.  The planned source change will enable the existing synchronous `CONF_STR_BRAM` implementation on the sole `hps_io` instance, preserving every configuration byte, selector, status bit, menu label, scaler function, decoder path, clock and fitter seed while replacing the expanded configuration string's distributed ALM mux with one small block-memory ROM.  The source-`4525ae4` build used 532 of 553 M10Ks, so the resource gate requires the correction to use exactly 533 and rejects any artifact that consumes more.
+Source `6e44472` changes only the sole `hps_io` instantiation to enable its existing synchronous `CONF_STR_BRAM` implementation, preserving every configuration byte, selector, status bit, menu label, scaler function, decoder path, clock and fitter seed.  A focused ROM test returns the complete byte sequence with the designed one-cycle latency, the mixed field-order test passes, and the complete native-480i startup, cache, TFF/BFF timing, Bob/Weave, pattern, overlap, PTS, presentation, fingerprint, generation, deadline and cadence suite passes after the user's build-PC reboot interrupted and invalidated the first run.  Exactly one clean Quartus Prime 17.0.2 build from the exact source commit at pinned seed 19 completes successfully using 34,034 of 41,910 ALMs, 52,553 registers, 4,184,067 memory bits in exactly 533 of 553 M10Ks and 67 of 112 DSP blocks, satisfying the user's condition of one and only one additional M10K.  Every timing category is positive with zero setup TNS: setup 0.119 ns, hold 0.246 ns, recovery 3.684 ns, removal 0.587 ns and minimum pulse width 0.925 ns; the 60 MHz decoder and 54 MHz video setup domains are positive 0.533 and 2.673 ns.  The 4,441,756-byte RBF has SHA-256 `5d6fc43700d935edac4e14e2f26895aed33db5fe917dd5092128a5cc18a97c20`, is installed at `/media/fat/MediaPlayer_20260829_b9c2657.rbf`, reproduces the exact hash by readback and is loaded on the MiSTer; hardware menu and playback acceptance remain open.
 
 #### Next Steps:
 
-Change only the `MediaPlayer.sv` `hps_io` parameter, verify the synchronous configuration-string path and rerun the focused field-order plus complete native-480i regression boundary, then commit and push the source and pull that exact commit on the build PC.  Perform exactly one clean Quartus Prime 17.0.2 build at pinned seed 19, require exactly 533 M10Ks and positive setup, hold, recovery, removal and minimum-pulse-width margins, and install only a readback-verified passing RBF before the pending chapter, menu and Ogg hardware tests.
+Open the MiSTer OSD and verify the three requested file actions, 16:9 default, 4:3 choice, Bob/Weave choices and unchanged audio sections.  Launch the physical DVD, confirm unchanged play/pause, advance beyond chapter 2 and then through chapters 8, 11, 15, 17 and 23 without a black screen, legacy 800x600 raster or vertical corruption, and test one Ogg Vorbis file; preserve the helper log and telemetry before accepting entries 803 through 805 as hardware-passed.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Change only the `MediaPlayer.sv` `hps_io` parameter, verify the synchronous conf
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
