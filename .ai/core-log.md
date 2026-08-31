@@ -1,3 +1,32 @@
+## 820 COMMIT Unreleased e99cb28 2026-08-31T07:37:10-07:00
+
+#### Coming From:
+
+Unreleased e99cb28
+
+#### Purpose:
+
+Capture the source-`e99cb28` physical-menu result and isolate invisible selection and black submenu activation from DVD navigation itself.
+
+#### Outcome:
+
+Absolute-path readback verifies that the installed 904,564-byte helper is the exact source-`e99cb28` candidate at SHA-256 `330502577a28200ad97ead837408e34dbaf04018fe510a0006ecdb7e0f3bb7df`, and its unique command diagnostics prove the running helper receives every keyboard arrow.  Across two runs the physical disc reports four authored buttons and repeatedly performs real transitions among buttons 1 through 4 with valid changing rectangles and selection palette `000feb80`; the final activation occurs on button 4 at rectangle 439,389 through 574,436, then completes a zero-tail ready barrier, emits a new subpicture and enters an indefinite still without a decoder fatal.  The 890,796-byte menu capture `/tmp/entry820_menu_no_highlight.png`, SHA-256 `d50b24341f0e0bd222608ba28c5e3261498b485e4a061e10c4fea6d235adc09b`, visibly identifies button 4 as Scene Selection while showing no selected-button highlight; its matching 2,840,191-byte log has SHA-256 `232052663a079b1a20db76d4b76416f940222f1c0417b324fa2bf2143c3e20de`.  Native read-only analysis of the same Coming to America authored fixture proves the helper's decoded plane contains nonzero pixels inside every changing button rectangle, but the root-menu configuration is published with menu set and visible clear because the subpicture decoder applies a later scheduled stop command immediately; the highlight pixels therefore cannot be composited.  The 31,888-byte post-activation capture `/tmp/entry820_same_menu_result.png`, SHA-256 `a36561c61b8a985cf20d67457a5ddf07bc65a925ea629ecea512ac324c89c84f`, and matching 3,259,439-byte log at SHA-256 `f713f582018d492013318f394f13f4159a61bc68b6632348b8a8fd343c21ce25` show the separate black submenu result.  Main currently deasserts download and resets the decoder before every activation command, so button 4's overlay-only Scene Selection transition loses the menu background frame that the authored indefinite still expects to retain.  Static RTL inspection confirms the white and black lower-left block is the existing always-on cadence telemetry overlay after a snapshot, not a DVD overlay corruption or post-Enter fatal.  Source `e99cb28` is rejected on hardware for visible menu interaction; no source, target file, Main, RBF or configuration is changed during collection.
+
+#### Next Steps:
+
+Keep RTL, QSF, RBF and Quartus frozen.  After user approval, make a bounded helper-and-Main change: a displayed libdvdnav highlight must force the decoded menu overlay visible despite a later unscheduled stop command, and activation must be classified before Main resets download so menu-to-menu overlay-only transitions preserve the resident video frame while title exits retain the existing clean decoder barrier.  Add native regressions that require visible root-menu style, nonzero highlighted pixels and distinct menu-continue versus stream-hop acknowledgments, then rebuild only the helper and patched Main for physical testing; removing or hiding the cadence telemetry block remains a deferred RBF concern.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 819 COMMIT Unreleased e99cb28 2026-08-31T07:01:17-07:00
 
 #### Coming From:
@@ -1202,35 +1231,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 780 COMMIT Unreleased 0711d3d 2026-08-30T15:15:47-07:00
-
-#### Coming From:
-
-Unreleased 205bbd7
-
-#### Purpose:
-
-Make decrypted DVD ISO title starts safe when an authored open GOP begins with B pictures whose earlier reference lies outside the selected title boundary.
-
-#### Outcome:
-
-The first hardware launch of the complete 6,501,636,096-byte Blazing Saddles image opened the unencrypted ISO, selected longest title 2 at 5,567 seconds and identified AC-3 substream `0x80`, but schema-20 telemetry stopped after the initial I picture with prediction error `0x0004`; native comparison then proved the ISO retained decode-order B0 and B1 pictures whose earlier reference lies before the selected title, while the hardware-passed remux begins I2, P5, B3 and B4.  Source `0711d3d` adds a bounded ISO-only initial random-access filter that holds the existing scheduler queue through the second I/P reference and neutralizes only those unavailable leading B pictures without changing byte positions, timestamps, ordinary files, Main or FPGA logic.  The native build reports exactly two discarded pictures and produces I2, P5, B3 and B4 at its opening, a complete-GOP FFmpeg decode has no errors, and the ordinary five-minute Blazing Saddles MPG output remains byte-identical at SHA-256 `45401ab3`.  The exact 817,700-byte static ARM helper from `0711d3d`, SHA-256 `536250b8`, is installed by verified staging and same-directory rename with matching final readback; the previous `73d2f507` helper is preserved in both the backup directory and `/media/fat/linux/MediaPlayer_Helper.pre_0711d3d_73d2f507`.  The accepted source-`205bbd7` seed-19 RBF and ISO-capable Main remain unchanged, and hardware replay of the corrected helper is pending.
-
-#### Next Steps:
-
-Relaunch the same Blazing Saddles ISO in Native 480i at 16:9, Bob and HDMI and confirm that picture and audio begin normally without fatal telemetry; if that startup gate passes, let the title run long enough to confirm sustained playback and then check S/PDIF without rebuilding the core.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
