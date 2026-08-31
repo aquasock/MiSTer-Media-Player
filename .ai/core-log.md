@@ -1,4 +1,4 @@
-## 819 COMMIT Unreleased ??? 2026-08-31T07:01:17-07:00
+## 819 COMMIT Unreleased e99cb28 2026-08-31T07:01:17-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Synchronize DVD menu commands and selected-button highlighting to the displayed 
 
 #### Outcome:
 
-The approved boundary is helper-only.  Retain a decoded copy of the most recently emitted DVD NAV PCI in the media source, invalidate it across rewinds and successful hops, and use that stable displayed packet for directional selection, activation and highlight-area lookup rather than libdvdnav's potentially ahead current PCI.  Selected buttons will use the selection palette rather than the activation palette.  Every menu command will report its command name, packet logical-block number, available-button count, before and after button numbers, authored directional target, status and resulting highlight rectangle, allowing physical-disc logs to distinguish missing keyboard delivery, an authored self-link and an actual selection transition.  The focused native test and real-DVD harness will be strengthened to require retained-PCI reset behavior and at least one logged nontrivial directional transition.  Main, RTL, QSF, RBF and Quartus remain unchanged.
+Source `e99cb28` retains a decoded copy of each delivered DVD NAV PCI, invalidates it across rewinds, chapter changes and successful menu hops, and uses that stable packet for directional selection, activation and highlight lookup instead of libdvdnav's potentially ahead current PCI.  Ordinary selected buttons now use the selection palette rather than the activation palette, and every root, direction and activation command logs the packet logical-block number, button count, before, authored target and after button numbers, status, highlight rectangle and palette.  The strict native helper builds with `-Werror`; the focused stale-tail test additionally proves retained-PCI invalidation, selection-palette choice, rectangle recovery and authored-target lookup; and the retained fragmented subpicture, palette, alpha, highlight and rejection test passes.  The strengthened Blazing Saddles authored-DVD harness records all six commands and real transitions Right 1-to-2 and Left 1-to-4 while preserving two ready barriers, both clean zero-tail hops and the overlay stream.  The closer Coming to America authored fixture also passes with Down 1-to-2, Left 2-to-1 and Up 1-to-4, twenty overlay configurations, 443 data records carrying 1,728,196 bytes and 1,574 style updates.  Exact detached source `e99cb28` reproducibly builds a 904,564-byte static stripped ARMv7 EABI5 helper at `/home/vash/MiSTer-Media-Player-e99cb28/host/build/MediaPlayer_Helper`, SHA-256 `330502577a28200ad97ead837408e34dbaf04018fe510a0006ecdb7e0f3bb7df`; Main, RTL, QSF, RBF and Quartus are unchanged.
 
 #### Next Steps:
 
-Implement only the recorded helper and test changes, run the strict native helper suite and focused regressions locally, commit the source, then reproduce the native and static ARM builds from the exact source commit on the build PC.  Qualify the real-DVD navigation harness against an authored fixture with a provable button transition before giving the user the single replacement helper path and digest for physical-disc testing.
+The user should manually replace only `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-e99cb28/host/build/MediaPlayer_Helper`, verify the destination SHA-256 is `330502577a28200ad97ead837408e34dbaf04018fe510a0006ecdb7e0f3bb7df`, restart MediaPlayer and press `M` during first-play.  At the root menu, exercise all four arrows before Enter and leave the resulting screen visible; hardware acceptance requires visible selection movement wherever the logged authored target differs, command logs whose before and after values match that movement, clean root and activation hops, and no black dead end, diagnostic raster or decoder error.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Implement only the recorded helper and test changes, run the strict native helpe
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
