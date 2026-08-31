@@ -1,3 +1,32 @@
+## 822 COMMIT Unreleased 53ccc04 2026-08-31T08:18:13-07:00
+
+#### Coming From:
+
+Unreleased 53ccc04
+
+#### Purpose:
+
+Capture the first physical-disc selected-button result from the source-`53ccc04` helper and identify the exact installed artifact combination that produced it.
+
+#### Outcome:
+
+The user enters the Coming to America root menu with keyboard `M`, moves the selection to `SET UP` and reports that the barely visible indicator appears distorted.  The 795,417-byte 1920-by-1080 scaled capture `/tmp/entry822_setup_selected_distorted.png`, SHA-256 `3da0f2580528471e099035487beba1a2d0258d5cca4584b26633f055539dbc20`, preserves the menu background and shows a cyan-green selection rendered as sparse horizontal fragments across `SET UP`; the large black-and-white lower-left cadence telemetry block is the previously identified diagnostic overlay rather than the selected-button bitmap.  Its matching 2,679,653-byte helper log at SHA-256 `aad53eecef30d4b3e78ed114a5b15c05469e3073813f5506ab50d9f6f46b5df8` records a successful authored Right transition from button 1 to button 2 with exact rectangle 212,397 through 302,436 and selection palette `000feb80`, two menu commands, two subpicture overlay updates and no fatal or helper exit.  Absolute-path readback identifies a mixed deployment: the 904,564-byte installed helper is the exact source-`53ccc04` candidate at SHA-256 `29665e7dbe7790872988d0f0d05e26487f95550128f6719f148fab2d1114c09f`, and the 4,511,756-byte RBF remains the expected frozen seed-20 image at `02928bff70b25eb0e0b1a6b8f24afec0dfe687f2524754b33fe13f4ed3014e9d`, but the 1,174,492-byte installed Main is the older source-`a9899e0` binary at `a276aadcdc5aad4034bc40ee2dff52596fd44876156e24f16289d5a339411636` rather than source `53ccc04` Main at `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496`.  The valid button transition and correctly bounded but visibly fragmented highlight reject the visible-indicator hardware gate for this helper-and-RBF combination, while the mixed Main means menu-continuation activation and background preservation are not tested.
+
+#### Next Steps:
+
+Do not use this mixed installation to test submenu activation because the older Main retains the unconditional reset that can black the resident menu frame.  After user approval, replace only `/media/fat/MiSTer` with `/home/vash/MiSTer-Media-Player-53ccc04/host/build/MiSTer`, require SHA-256 `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496`, reboot and verify the running artifact combination before repeating the `SET UP` selection capture; if the same bounded horizontal fragmentation remains, keep Main and the helper frozen and isolate the overlay plane packing, line-cache addressing and authored SPU field layout before considering any FPGA change.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 821 COMMIT Unreleased 53ccc04 2026-08-31T07:45:34-07:00
 
 #### Coming From:
