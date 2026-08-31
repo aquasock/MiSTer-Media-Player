@@ -1,3 +1,34 @@
+## 815 COMMIT Unreleased ??? 2026-08-31T05:45:08-07:00
+
+#### Coming From:
+
+Unreleased a9899e0
+
+#### Purpose:
+
+Prevent stale bytes from the current DVD block from crossing successful authored-menu navigation hops into a reset decoder session.
+
+#### Outcome:
+
+The user approves the corrected helper-only boundary from entry 814.  The planned source change will centralize successful root-menu and button-activation hop cleanup in `media_source.c`, discard the unread tail of the current 2,048-byte navigation block, clear terminal and still state, retain the existing Main/helper ready barrier, and log the exact discarded tail length.  A focused native unit will prove the state transition at nonempty and empty block boundaries, while the real-image menu harness will require both root and activation hop cleanup alongside its existing ready, direction, overlay and commit checks.  Main, RTL, QSF, RBF and Quartus will remain untouched, and only the exact resulting ARM helper will be built for the user's manual transfer.
+
+#### Next Steps:
+
+Implement the bounded helper change, run the focused hop unit and retained native menu tests, commit and push the source, then build and hash the exact ARMv7 helper on the build PC without installing it.  Hardware acceptance will require the user to upload only that helper and repeat keyboard `M` during the early trailers, with native 480i remaining active and telemetry free of B-presentation or other errors.
+
+#### Files Modified:
+
+- host/arm/media_source.c
+- tools/test_dvd_menu_hop.c
+- tools/test_dvd_menu_navigation.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 814 COMMIT Unreleased a9899e0 2026-08-31T05:41:30-07:00
 
 #### Coming From:
@@ -1199,34 +1230,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 775 COMMIT Unreleased 205bbd7 2026-08-30T14:09:33-07:00
-
-#### Coming From:
-
-Unreleased 205bbd7
-
-#### Purpose:
-
-Install the timing-clean source-`205bbd7` seed-19 RBF with an independently verified rollback and leave hardware acceptance pending.
-
-#### Outcome:
-
-At the user's explicit authorization, the archived 4,440,192-byte source-`205bbd7` seed-19 RBF is staged from the build PC and independently reconfirmed at SHA-256 `7f60ec43cfffa75108c39c7d21fff727c0f1dddccd844a318e1b7cc5795c6970`.  Absolute FTP inventory finds exactly one installed core, `/media/fat/MediaPlayer_20260829_b9c2657.rbf`; independent readback proves that it contains the accepted 4,461,996-byte source-`cee1a9e` build at SHA-256 `162c788d2fa121f340ab6649ef94b25e97f31a44ee552928bb89e32b147059a6`.  That exact readback is preserved as `/media/fat/_MediaPlayer_Backups/MediaPlayer_205bbd7_pre_cee1a9e_162c788d.rbf`, and a separate absolute-path download compares byte-for-byte.  The single installed filename is then replaced in place with the source-`205bbd7` candidate; both the install helper's verification and a second independent absolute-path readback reproduce all 4,440,192 bytes and the complete `7f60ec43` hash.  No Main, helper, media, menu configuration or repository source changes, and the running FPGA remains unchanged until the user reloads the core.
-
-#### Next Steps:
-
-Reload MediaPlayer from the MiSTer menu so the installed source-`205bbd7` RBF configures the FPGA, retain native 480i mode, and begin with the NARA MPD-D2 five-minute control over HDMI while also checking S/PDIF for a representative interval.  If the control remains clean, test the Coming to America and Big Lebowski MPD-D2 VOBs in separate uninterrupted five-minute runs and preserve telemetry after each; accept the candidate only if video is stable, audio is continuous apart from the previously accepted allowance of one isolated FIFO underrun, and telemetry is clean.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
