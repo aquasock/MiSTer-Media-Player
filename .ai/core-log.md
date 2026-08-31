@@ -1,4 +1,4 @@
-## 808 COMMIT Unreleased ??? 2026-08-31T01:28:52-07:00
+## 808 COMMIT Unreleased 8d1a5d0 2026-08-31T01:28:52-07:00
 
 #### Coming From:
 
@@ -10,20 +10,20 @@ Implement authored DVD-Video menu navigation and subpicture highlights through t
 
 #### Outcome:
 
-The user explicitly approves the full menu-support boundary outlined in entry 794 while continuing ordinary DVD playback observation against the accepted source-`6e44472` baseline.  The planned source keeps pinned libdvdnav as the DVD virtual-machine and button-navigation owner, starts ISO and direct optical playback through authored first-play behavior, extends the private Main/helper channel for directional selection, activation and return-to-menu, preserves finite and indefinite still-menu interaction, and retains the accepted title, chapter, pause, audio and CSS paths.  The helper will assemble and decode the selected DVD subpicture stream into packed two-bit pixels, carry palette, alpha and highlight state over a length-bounded in-band record, and the FPGA will store the 720-by-480 overlay in a dedicated unused DDR region, read it through an explicit arbiter client and composite it at native video coordinates before the existing cadence diagnostic overlay.  This avoids an impossible full-screen M10K allocation and does not repurpose decoder frame banks.  The authorized DVD-Video application books remain unavailable in `core-reference.md`, so implementation will use the exact pinned VideoLAN APIs and retained-disc behavior without claiming formal DVD-Video conformance.
+Source `8d1a5d0` implements authored first-play, directional selection, activation and return-to-menu for ISO and optical DVD sources while preserving the accepted title, chapter, pause, audio and CSS paths.  The helper assembles fragmented DVD subpictures into a packed 720-by-480 two-bit plane with palette, alpha and highlight state; bounded in-band records feed an inactive FPGA DDR plane, an atomic commit publishes it, and a native-480i line cache composites it before the cadence diagnostic overlay without using decoder frame banks.  Focused malformed-SPU, fragmentation, palette, alpha, highlight, metadata-backpressure, overlay-engine and arbiter tests pass, the complete retained native-480i regression passes, ordinary MPG and legacy `iso:` candidate output is byte-identical to the accepted helper, and a real authored ISO navigation harness observes menu entry, menu exit, two ready barriers, two overlay commits and successful root, direction and activation behavior.  Exact-source ARM helper, Main and strict native helper builds succeed.  The one authorized clean seed-19 Quartus compile completes synthesis, fitting and assembly with same-clock setup margins of positive 0.675 ns at 60 MHz and positive 1.946 ns at 54 MHz, but final timing rejects the RBF because the new explicit two-stage overlay clock crossings lack source-to-first-stage exceptions: global setup is negative 1.951 ns, hold is negative 0.281 ns, while recovery, removal and minimum-pulse-width are positive.  The rejected RBF is not installed and the MiSTer remains on accepted source `6e44472` artifacts.
 
 #### Next Steps:
 
-Implement the host navigation, SPU decoder, protocol, Main input bindings, in-band overlay records, DDR writer and display compositor as one hardware-useful boundary.  Prove malformed and fragmented SPU rejection, palette and alpha mapping, button-highlight changes, still-menu control, title entry and return-to-menu, overlay clearing across hops and session resets, byte-identical ordinary file and main-title playback, and DDR arbitration without decoder starvation; then run the complete accepted host and RTL regressions before one clean pinned-seed-19 Quartus build.  Install only an RBF with positive setup, hold, recovery, removal and minimum-pulse-width margins together with matching Main and helper binaries, then qualify authored menus, chapters, audio and video on retained ISO and physical-disc sources.
+Keep accepted source `6e44472` and its installed artifacts unchanged on the MiSTer.  Before any further source edit or Quartus build, obtain approval for a separate narrowly scoped timing-correction boundary that cuts only the stable overlay handshake buses and toggles from their source registers to the first synchronizer stages, retains timing through the second stages, and cleans the two reported overlay width-truncation warnings; then rerun focused clock-crossing and retained regressions and one clean seed-19 build, accepting an RBF only if setup, hold, recovery, removal and minimum-pulse-width are all positive.
 
 #### Files Modified:
 
 - CHANGELOG.md
-- MediaPlayer.qsf
 - MediaPlayer.sv
 - README.md
 - docs/ARCHITECTURE.md
 - docs/BUILDING.md
+- files.qip
 - host/arm/ARCHITECTURE.md
 - host/arm/Makefile
 - host/arm/dvd_spu.c
@@ -36,10 +36,15 @@ Implement the host navigation, SPU decoder, protocol, Main input bindings, in-ba
 - rtl/mpeg2_new/mpeg2_dvd_overlay.sv
 - rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
 - rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
+- tools/test_dvd_menu_navigation.py
+- tools/test_dvd_overlay_arbiter.sv
+- tools/test_dvd_overlay_engine.sv
+- tools/test_dvd_overlay_metadata.sv
+- tools/test_dvd_spu.c
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
