@@ -1,3 +1,39 @@
+## 795 COMMIT Unreleased ??? 2026-08-30T21:34:22-07:00
+
+#### Coming From:
+
+Unreleased 627b329
+
+#### Purpose:
+
+Add ARM-side previous chapter, next chapter and play/pause controls without changing the FPGA image.
+
+#### Outcome:
+
+The user approves completing every practical control on the ARM side before returning to FPGA work.  The proposed boundary maps player-one Left and Right to previous and next chapter and Start to pause or resume only while MediaPlayer playback is active and the MiSTer OSD is closed.  Main will use a private bidirectional control socket to the helper, bracket each libdvdnav chapter change by releasing and reasserting the existing download session, discard all pre-jump Main and pipe bytes, and reset the transport-credit state before admitting the new chapter.  The helper will retain the authenticated DVD navigation handle, stop and flush the direct-device HPS ring, use libdvdnav to restart the requested chapter, reset its Program Stream, audio and scheduler state at the discontinuity, then wait at an explicit ready/go barrier so old and new bytes cannot cross the FPGA reset boundary.  Pause will be an intentional Main-side transport hold that preserves the helper and navigation session; it can freeze and resume playback without an RBF change, but the current FPGA may report its existing audio FIFO underrun after a long pause because it has no explicit pause state.  Controls will apply to `dvd:` and `iso:` sources, ordinary file playback will remain unchanged, and no RTL, QSF, Quartus build, RBF or MiSTer deployment is in this commit boundary.
+
+#### Next Steps:
+
+Implement protocol validation and nonblocking control handling, chapter discontinuity flushing, edge-triggered controller mapping and deterministic diagnostics.  Native-test previous and next chapter barriers on both ISO and direct-device-compatible navigation, verify pause backpressure and resume byte continuity, repeat the existing DVD, ISO, VOB and MPG regressions, then build only the static ARM helper and patched Main on the build PC.  Do not deploy either binary until exact hashes and rollback paths are recorded and the user's current physical-disc tests have stopped.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/arm/media_source.c
+- host/arm/media_source.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 794 COMMIT Unreleased 627b329 2026-08-30T21:27:52-07:00
 
 #### Coming From:
@@ -1168,35 +1204,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 755 COMMIT Unreleased 4e54e9d 2026-08-30T03:02:28-07:00
-
-#### Coming From:
-
-Unreleased 4e54e9d
-
-#### Purpose:
-
-Accept the corrected DVD opening over HDMI and S/PDIF in Native 480i, then prepare the requested five-minute feature tests.
-
-#### Outcome:
-
-The user plays `/media/fat/games/MediaPlayer/dvd_opening_original.mpg` on the exact installed `bc79d56a` candidate in Native 480i and reports that video and audio are both perfect over HDMI and S/PDIF.  At the user's explicit request, `/tmp/entry755_dvd_opening_hdmi_spdif_native480i_pass.png` captures the clean completed Universal frame at 432,337 bytes with SHA-256 `29e524999c6a26dbd437b07a8a5a13e56f6a72fb47996d43ef0de4ac74ce9a8d`.  This accepts the known DVD program-stream and AC-3 boundary on the corrected core without changing the RBF, Main, helper or Native 480i mode.  The user next requests five minutes each of The Big Lebowski and Coming to America.  FFmpeg's DVD-video demuxer auto-selects the confirmed 7,036.1-second Big Lebowski feature from `/home/vash/Videos/the_big_lebowski.iso` and the confirmed 6,737.667-second Coming to America feature from `/home/vash/Videos/Coming Toamerica Ac/VIDEO_TS`; each first-five-minute excerpt is remuxed by stream copy to an MPEG-2 VOB/program stream with its original 720x480 MPEG-2 video and six-channel AC-3 audio.  The resulting Big Lebowski file is 264,787,968 bytes, 300.149833 seconds and SHA-256 `8fe852c10630d989448e3fb6afedf9e48d82a255c58c02815be06ff0ca494afe`; the Coming to America file is 222,027,776 bytes, 300.099789 seconds and SHA-256 `687bd2ebb757d4b34faf0f531e1f2ddb4c4e4747b1f33cd1da9aeb05b646d4cc`.  Complete software video/audio decode exits zero for both.  Authenticated absolute FTP installs the two previously absent filenames shown below, and independent downloads compare byte-for-byte with their staged sources.  The user reports independently backing up and deleting every other file in `/media/fat/games/MediaPlayer`; treat that cleanup as intentional and do not restore removed media.
-
-#### Next Steps:
-
-Keep the exact installed RBF and Native 480i mode unchanged.  Select HDMI audio and play `/media/fat/games/MediaPlayer/the_big_lebowski_first_5min.mpg` once from beginning to end.  Report whether video motion and cadence remain clean for the full five minutes, whether audio remains clean and synchronized, and whether playback returns normally at the end.  Test `/media/fat/games/MediaPlayer/coming_to_america_first_5min.mpg` only after recording the first result so any failure remains attributable to one title.
-
-#### Files Modified:
-
-- /media/fat/games/MediaPlayer/the_big_lebowski_first_5min.mpg
-- /media/fat/games/MediaPlayer/coming_to_america_first_5min.mpg
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
