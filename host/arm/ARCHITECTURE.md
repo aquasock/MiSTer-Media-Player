@@ -30,11 +30,13 @@ can pass `dvd:` without changing process, pipe or FPGA-transfer ownership.
 ## Source boundary
 
 `media_source` is a pull interface with read, character-read, rewind, seek,
-error and close operations. The current backends implement `file:` and `iso:`.
-The ISO backend uses pinned libdvdcss, libdvdread and libdvdnav sources to read
-and, when necessary, decrypt UDF/IFO and VOB sectors, choose the longest
-described DVD-Video title, and expose its cells in program-chain playback order
-as one sequential Program Stream. The source retains the selected title,
+error and close operations. The current backends implement `file:`, `iso:` and
+`dvd:`. The ISO backend uses stream callbacks for an absolute image path. The
+direct backend requires an absolute device path such as `dvd:/dev/sr0` and lets
+libdvdnav/libdvdread/libdvdcss own optical-device access, CSS authentication and
+sector reads; no filesystem mount is required. Both DVD backends choose the
+longest described DVD-Video title and expose its cells in program-chain playback
+order as one sequential Program Stream. The source retains the selected title,
 chapter count and declared duration and converts a title exit, replay or
 backward chapter or cell transition into clean end-of-stream before libdvdnav
 can expose a following navigation domain or second traversal. The declared
@@ -47,20 +49,20 @@ title's initial random-access boundary, the helper discards only
 open-GOP leading B pictures that require a reference from before that boundary;
 the first two available I/P references and every later authored picture remain
 unchanged. This delegates CSS access to libdvdcss and is not a claim of CSS
-conformance. `dvd:` remains reserved and returns unsupported without opening,
-mounting or reading a device.
+conformance.
 
-Future direct-disc and interactive DVD backends may add optical-device discovery
-and a versioned navigation control channel without changing Program Stream
-parsing. Those responsibilities do not belong in Main or the FPGA.
+Future work may add optical-device discovery beyond the explicit `/dev/sr0`
+launcher and a versioned interactive navigation control channel without
+changing Program Stream parsing. Those responsibilities do not belong in the
+FPGA.
 
 ## Pipeline boundaries
 
 The current implementation contains these logical stages even where they still
 share a compilation unit:
 
-1. Source: `file:` and decrypted or CSS-encrypted `iso:` now; direct `dvd:`
-   later.
+1. Source: `file:`, decrypted or CSS-encrypted `iso:`, and direct optical
+   `dvd:/dev/sr0` now.
 2. Container: raw M2V pass-through or MPEG Program Stream/PES demultiplexing.
 3. Timeline: PTS extraction and FPGA in-band timestamp records.  An `iso:`
    title may cross VOB or cell boundaries whose raw PES clock restarts; the
@@ -126,10 +128,9 @@ container, codec or output ownership above.
 
 ## Deferred DVD scope
 
-Recognizing `dvd:` in protocol one remains an architectural reservation, not
-direct-disc support. The `iso:` backend is deliberately a main-feature playback
-subset: it selects the longest title and does not provide menus, user navigation,
-chapters, angles, encryption, DVD LPCM, subpictures or track switching. Broader
+The `iso:` and `dvd:` backends deliberately share a main-feature playback
+subset: they select the longest title and do not provide menus, user navigation,
+chapter control, angles, DVD LPCM, subpictures or track switching. Broader
 DVD-Video filesystem and navigation conformance is not claimed because the
 project's retained normative references do not cover those specifications.
 Those deferred features require separately approved development scopes.

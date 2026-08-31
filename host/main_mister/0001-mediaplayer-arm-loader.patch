@@ -144,7 +144,7 @@ index 0c74e21..473cfb0 100644
  
  // file selection menu variables
 -static char fs_pFileExt[13] = "xxx";
-+static char fs_pFileExt[16] = "xxx";
++static char fs_pFileExt[64] = "xxx";
  static uint32_t fs_ExtLen = 0;
  static uint32_t fs_Options;
  static uint32_t fs_MenuSelect;
@@ -176,7 +176,7 @@ index 0c74e21..473cfb0 100644
  
  						if (p[idx] >= '0' && p[idx] <= '9') ioctl_index = p[idx] - '0';
  						substrcpy(ext, p, 1);
-+						if (mediaplayer_is_core()) strcpy(ext, "M2VMPGVOBISOMP3WAVFLC");
++						if (mediaplayer_is_core()) strcpy(ext, "M2VMPGVOBISOMP3WAVFLCDVD");
  						if (is_gba() && FileExists(user_io_make_filepath(HomeDir(), "goomba.rom"))) strcat(ext, "GB GBC");
  						while (strlen(ext) % 3) strcat(ext, " ");
  
@@ -404,6 +404,7 @@ index 0000000..663f7b0
 +	                     !strcasecmp(extension, ".mpg") ||
 +	                     !strcasecmp(extension, ".mpeg") ||
 +	                     !strcasecmp(extension, ".vob") || !strcasecmp(extension, ".iso") ||
++	                     !strcasecmp(extension, ".dvd") ||
 +	                     !strcasecmp(extension, ".mp3") ||
 +	                     !strcasecmp(extension, ".wav") ||
 +	                     !strcasecmp(extension, ".flac"));
@@ -459,8 +460,14 @@ index 0000000..663f7b0
 +int mediaplayer_start(const char *path, unsigned char index)
 +{
 +	if (!mediaplayer_handles_file(path)) return 0;
-+	std::string source_spec = !strcasecmp(strrchr(path, '.'), ".iso") ? "iso:" : "file:";
-+	source_spec += getFullPath(path);
++	const char *extension = strrchr(path, '.');
++	std::string source_spec;
++	if (!strcasecmp(extension, ".dvd")) source_spec = "dvd:/dev/sr0";
++	else
++	{
++		source_spec = !strcasecmp(extension, ".iso") ? "iso:" : "file:";
++		source_spec += getFullPath(path);
++	}
 +	return mediaplayer_start_source(source_spec.c_str(), index);
 +}
 +

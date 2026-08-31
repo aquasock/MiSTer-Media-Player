@@ -397,12 +397,12 @@ static uint64_t decode_pts(const uint8_t *p)
 }
 
 /*
- * The libdvdnav title stream observed here can cross a cell or VOB boundary
+ * A libdvdnav ISO or direct-disc title can cross a cell or VOB boundary
  * whose PES clock restarts even though the selected title continues.  The
  * scheduler and FPGA need one continuous title clock, while ordinary MPEG
  * decode-order PTS reordering must remain visible.  The ten-second backward
  * threshold is an implementation guard, not a DVD or MPEG limit.  Translate
- * a detected new ISO epoch so its first timestamp follows the prior maximum
+ * a detected new DVD epoch so its first timestamp follows the prior maximum
  * by one 90 kHz tick; encoded cadence still supplies the minimum picture
  * interval.
  */
@@ -428,20 +428,20 @@ static int normalize_video_pts(struct output_state *output, uint64_t raw_pts,
 
         if (output->iso_pts_normalized_max == UINT64_MAX) {
             fprintf(stderr,
-                    "media_player_helper: ISO PTS epoch overflow\n");
+                    "media_player_helper: DVD PTS epoch overflow\n");
             return -1;
         }
         next = output->iso_pts_normalized_max + 1u;
         if (raw_pts > next) {
             fprintf(stderr,
-                    "media_player_helper: invalid ISO PTS epoch\n");
+                    "media_player_helper: invalid DVD PTS epoch\n");
             return -1;
         }
         output->iso_pts_epoch_offset = next - raw_pts;
         output->iso_pts_raw_max = raw_pts;
         output->iso_pts_discontinuities++;
         fprintf(stderr,
-                "media_player_helper: ISO PTS discontinuity raw=%llu "
+                "media_player_helper: DVD PTS discontinuity raw=%llu "
                 "normalized=%llu offset=%llu count=%u\n",
                 (unsigned long long)raw_pts,
                 (unsigned long long)next,
@@ -450,7 +450,7 @@ static int normalize_video_pts(struct output_state *output, uint64_t raw_pts,
     }
     if (raw_pts > UINT64_MAX - output->iso_pts_epoch_offset) {
         fprintf(stderr,
-                "media_player_helper: normalized ISO PTS overflow\n");
+                "media_player_helper: normalized DVD PTS overflow\n");
         return -1;
     }
     normalized = raw_pts + output->iso_pts_epoch_offset;
@@ -618,7 +618,7 @@ static int queue_video(struct output_state *output, const uint8_t *data,
  * A DVD title may begin at an open GOP.  Pictures between its first I picture
  * and the following I/P reference are decode-order leading B pictures: they
  * need the preceding title/cell reference, which an independently selected
- * ISO title cannot provide.  Hold the already bounded scheduler queue until
+ * selected DVD title cannot provide.  Hold the bounded scheduler queue until
  * the next reference proves their complete extent, then turn every start code
  * in those pictures into user data.  This preserves every byte position and
  * timestamp while making the unavailable pictures invisible to the decoder.
@@ -652,7 +652,7 @@ static int iso_filter_initial_random_access(struct output_state *output)
 
         if (chunk->offset || chunk->size < prefix) {
             fprintf(stderr,
-                    "media_player_helper: invalid ISO startup queue state\n");
+                    "media_player_helper: invalid DVD startup queue state\n");
             return -1;
         }
         video_size += chunk->size - prefix;
@@ -660,7 +660,7 @@ static int iso_filter_initial_random_access(struct output_state *output)
     video = malloc(video_size ? video_size : 1u);
     if (!video) {
         fprintf(stderr,
-                "media_player_helper: out of memory filtering ISO startup\n");
+                "media_player_helper: out of memory filtering DVD startup\n");
         return -1;
     }
     for (chunk = output->video_head; chunk; chunk = chunk->next) {
@@ -690,7 +690,7 @@ static int iso_filter_initial_random_access(struct output_state *output)
                 first_reference_seen = 1;
             } else if (coding_type == 2u) {
                 fprintf(stderr,
-                        "media_player_helper: ISO title starts without an "
+                        "media_player_helper: DVD title starts without an "
                         "intra picture\n");
                 free(video);
                 return -1;
@@ -720,7 +720,7 @@ static int iso_filter_initial_random_access(struct output_state *output)
     free(video);
     output->iso_start_filter_active = 0;
     fprintf(stderr,
-            "media_player_helper: ISO random access discarded %u leading "
+            "media_player_helper: DVD random access discarded %u leading "
             "B picture(s)\n", discarded);
     return 1;
 }
@@ -894,7 +894,7 @@ static int scheduler_release_silent_video(struct output_state *output)
 {
     if (output->iso_start_filter_active) {
         fprintf(stderr,
-                "media_player_helper: ISO title ended before a complete "
+                "media_player_helper: DVD title ended before a complete "
                 "initial random-access group\n");
         return -1;
     }
@@ -1019,7 +1019,7 @@ static int scheduler_drain(struct output_state *output, int at_eof)
     if (output->iso_start_filter_active) {
         if (at_eof)
             fprintf(stderr,
-                    "media_player_helper: ISO title ended before a complete "
+                    "media_player_helper: DVD title ended before a complete "
                     "initial random-access group\n");
         return at_eof ? -1 : 0;
     }
@@ -2381,9 +2381,11 @@ int main(int argc, char **argv)
         goto done;
     }
     output.scheduler_enabled = is_program_stream && !output.pcm;
-    output.iso_pts_normalization = input.kind == MEDIA_SOURCE_ISO;
+    output.iso_pts_normalization =
+        input.kind == MEDIA_SOURCE_ISO || input.kind == MEDIA_SOURCE_DVD;
     output.iso_start_filter_active =
-        input.kind == MEDIA_SOURCE_ISO && output.scheduler_enabled;
+        (input.kind == MEDIA_SOURCE_ISO || input.kind == MEDIA_SOURCE_DVD) &&
+        output.scheduler_enabled;
     if (is_mp3) {
         if (process_mp3_stream(&input, &audio, &output) < 0)
             goto done;
@@ -2432,7 +2434,7 @@ int main(int argc, char **argv)
                 (unsigned long long)output.pcm_emitted_frames);
     if (output.iso_pts_normalization)
         fprintf(stderr,
-                "media_player_helper: ISO PTS discontinuities=%u\n",
+                "media_player_helper: DVD PTS discontinuities=%u\n",
                 output.iso_pts_discontinuities);
 done:
     if (audio.a52)

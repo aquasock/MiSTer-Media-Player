@@ -30,6 +30,8 @@ struct file_source_state {
 
 struct iso_source_state {
     FILE *stream;
+    char *device_path;
+    int direct_device;
     dvdnav_t *navigation;
     uint8_t block[DVD_VIDEO_LB_LEN];
     size_t block_offset;
@@ -124,6 +126,28 @@ static int iso_stream_read(void *opaque, void *data, int size)
     return (int)count;
 }
 
+static int dvd_navigation_open(struct iso_source_state *state)
+{
+    dvdnav_stream_cb callbacks = {
+        iso_stream_seek,
+        iso_stream_read,
+        NULL
+    };
+    dvdnav_status_t status;
+
+    if (state->direct_device)
+        status = dvdnav_open(&state->navigation, state->device_path);
+    else
+        status = dvdnav_open_stream(&state->navigation, state, &callbacks);
+    if (status != DVDNAV_STATUS_OK)
+        return -1;
+    if (dvdnav_set_readahead_flag(state->navigation,
+                                  state->direct_device ? 1 : 0) !=
+            DVDNAV_STATUS_OK)
+        return -1;
+    return 0;
+}
+
 static int iso_select_title(struct iso_source_state *state)
 {
     int32_t title_count = 0;
@@ -206,8 +230,9 @@ static int iso_guard_selected_title(struct iso_source_state *state,
     }
     if (reason) {
         fprintf(stderr,
-                "media_source: ISO selected title %d complete (%s, "
+                "media_source: %s selected title %d complete (%s, "
                 "part=%d time90k=%lld duration90k=%llu)\n",
+                state->direct_device ? "DVD" : "ISO",
                 (int)state->title, reason, (int)part,
                 (long long)current_time,
                 (unsigned long long)state->duration);
@@ -302,20 +327,14 @@ static int iso_get_character(void *opaque)
 static int iso_rewind(void *opaque)
 {
     struct iso_source_state *state = opaque;
-    dvdnav_stream_cb callbacks = {
-        iso_stream_seek,
-        iso_stream_read,
-        NULL
-    };
     int32_t title = state->title;
 
     dvdnav_close(state->navigation);
     state->navigation = NULL;
-    clearerr(state->stream);
-    if (fseeko(state->stream, 0, SEEK_SET) != 0 ||
-        dvdnav_open_stream(&state->navigation, state, &callbacks) !=
-            DVDNAV_STATUS_OK ||
-        dvdnav_set_readahead_flag(state->navigation, 0) != DVDNAV_STATUS_OK ||
+    if (state->stream)
+        clearerr(state->stream);
+    if ((state->stream && fseeko(state->stream, 0, SEEK_SET) != 0) ||
+        dvd_navigation_open(state) < 0 ||
         dvdnav_title_play(state->navigation, title) != DVDNAV_STATUS_OK) {
         state->error = 1;
         return -1;
@@ -344,7 +363,7 @@ static int iso_seek(void *opaque, int64_t offset,
 static int iso_has_error(void *opaque)
 {
     struct iso_source_state *state = opaque;
-    return state->error || ferror(state->stream);
+    return state->error || (state->stream && ferror(state->stream));
 }
 
 static void iso_close(void *opaque)
@@ -357,6 +376,7 @@ static void iso_close(void *opaque)
         dvdnav_close(state->navigation);
     if (state->stream)
         fclose(state->stream);
+    free(state->device_path);
     free(state);
 }
 
@@ -397,19 +417,48 @@ int media_source_open(struct media_source *source, const char *specification,
     }
     memset(source, 0, sizeof(*source));
     if (starts_with(specification, MEDIA_PLAYER_DVD_PREFIX)) {
+        struct iso_source_state *dvd_state;
+
         source->kind = MEDIA_SOURCE_DVD;
-        set_error(error, error_size,
-                  "dvd source is reserved for a later development phase",
-                  specification + strlen(MEDIA_PLAYER_DVD_PREFIX));
-        return MEDIA_SOURCE_UNSUPPORTED;
+        location = specification + strlen(MEDIA_PLAYER_DVD_PREFIX);
+        if (!*location || location[0] != '/') {
+            set_error(error, error_size,
+                      "DVD source requires an absolute device path",
+                      *location ? location : NULL);
+            return MEDIA_SOURCE_INVALID;
+        }
+        dvd_state = calloc(1, sizeof(*dvd_state));
+        if (!dvd_state) {
+            set_error(error, error_size, "out of memory", NULL);
+            return MEDIA_SOURCE_IO_ERROR;
+        }
+        dvd_state->device_path = strdup(location);
+        dvd_state->direct_device = 1;
+        if (!dvd_state->device_path) {
+            set_error(error, error_size, "out of memory", NULL);
+            iso_close(dvd_state);
+            return MEDIA_SOURCE_IO_ERROR;
+        }
+        if (dvd_navigation_open(dvd_state) < 0 ||
+            iso_select_title(dvd_state) < 0) {
+            const char *detail = dvd_state->navigation ?
+                dvdnav_err_to_string(dvd_state->navigation) : location;
+            set_error(error, error_size, "cannot open DVD device", detail);
+            iso_close(dvd_state);
+            return MEDIA_SOURCE_IO_ERROR;
+        }
+        fprintf(stderr,
+                "media_source: DVD device %s selected longest title %d "
+                "chapters=%u duration90k=%llu\n",
+                dvd_state->device_path, (int)dvd_state->title,
+                dvd_state->chapters,
+                (unsigned long long)dvd_state->duration);
+        source->ops = &iso_ops;
+        source->state = dvd_state;
+        return MEDIA_SOURCE_OK;
     }
     if (starts_with(specification, MEDIA_PLAYER_ISO_PREFIX)) {
         struct iso_source_state *iso_state;
-        dvdnav_stream_cb callbacks = {
-            iso_stream_seek,
-            iso_stream_read,
-            NULL
-        };
 
         source->kind = MEDIA_SOURCE_ISO;
         location = specification + strlen(MEDIA_PLAYER_ISO_PREFIX);
@@ -428,10 +477,7 @@ int media_source_open(struct media_source *source, const char *specification,
             iso_close(iso_state);
             return MEDIA_SOURCE_IO_ERROR;
         }
-        if (dvdnav_open_stream(&iso_state->navigation, iso_state, &callbacks) !=
-                DVDNAV_STATUS_OK ||
-            dvdnav_set_readahead_flag(iso_state->navigation, 0) !=
-                DVDNAV_STATUS_OK ||
+        if (dvd_navigation_open(iso_state) < 0 ||
             iso_select_title(iso_state) < 0) {
             const char *detail = iso_state->navigation ?
                 dvdnav_err_to_string(iso_state->navigation) : location;

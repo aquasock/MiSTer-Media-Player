@@ -16,7 +16,7 @@
     (MEDIA_PLAYER_PCM_MODE_48K | MEDIA_PLAYER_PCM_MODE_STEREO)
 
 #define MEDIA_PLAYER_CAPABILITIES \
-    "protocol=1 sources=file,iso reserved_sources=dvd " \
+    "protocol=1 sources=file,iso,dvd " \
     "containers=m2v,mpeg-ps,mp3,wav,flac video=h262 " \
     "audio=mp2-s16le-44100,mp2-s16le-48000," \
     "mp3-s16le-44100,mp3-s16le-48000,wav-s16le-stereo-44100,wav-s16le-stereo-48000," \

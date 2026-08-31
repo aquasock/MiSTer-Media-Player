@@ -56,6 +56,12 @@ ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host main
 
 The outputs are `host/build/media_player_helper.native`, `host/build/MediaPlayer_Helper`, and `host/build/MiSTer`. The script pins minimp3, miniaudio, liba52, libdvdcss, libdvdread, libdvdnav and upstream Main and verifies fetched dependencies. The DVD libraries are linked statically into the helper; encrypted ISO support does not use a target-installed `libdvdcss.so`. Check each command's exit status before using an output: the presence of an older binary or the absence of the word "error" in a log does not prove a successful build. Keep the toolchain in a persistent location.
 
+Direct optical playback additionally requires the launcher at the exact target
+path `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`. Patched Main maps that
+file to `dvd:/dev/sr0`; the helper requires the source path to be absolute and
+opens the block device directly through libdvdnav. A filesystem mount is not a
+prerequisite. Verify `/dev/sr0` exists and is readable before testing.
+
 ## Acceptance checklist for active RTL changes
 
 Before considering a hardware phase complete:
