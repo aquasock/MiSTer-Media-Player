@@ -1,3 +1,32 @@
+## 800 COMMIT Unreleased 6de2778 2026-08-30T22:27:54-07:00
+
+#### Coming From:
+
+Unreleased 6de2778
+
+#### Purpose:
+
+Deploy the corrected Main input bindings with an exact rollback while leaving the accepted helper and FPGA image unchanged.
+
+#### Outcome:
+
+The exact build-PC artifact for source `6de2778` is independently staged on the Raspberry Pi and reproduced as a 1,174,492-byte stripped ARMv7 Main at SHA-256 `3443716313e4f7eb5ed58ea97d785f0d788471ef66f23151c6405b2ac4455f04`.  Absolute-path predeployment FTP readback proves the active Main is the expected 1,174,492-byte source-`151e10a` binary at `b98af001791800647b8ae4c6c0850d19061fe8b24edbe8cad307bbb9c2759990`, the helper is the expected 863,540-byte binary at `ceef50a6c2d706ae40c4992ee6d47d687a3ea0eced4e61567032b9599d14d2a7`, and `/media/fat/MediaPlayer_20260829_b9c2657.rbf` is the accepted 4,440,192-byte seed-19 image at `7f60ec43cfffa75108c39c7d21fff727c0f1dddccd844a318e1b7cc5795c6970`.  Independent readbacks verify the rollback and candidate before same-directory FTP renames preserve the exact predecessor as `/media/fat/MiSTer.pre_6de2778_b98af001` and activate the candidate at `/media/fat/MiSTer`; the staging name is consumed by the rename.  One normal MiSTer reboot loads the new Main, and post-reboot absolute-path readback reproduces active Main `34437163`, rollback Main `b98af001`, unchanged helper `ceef50a6` and unchanged seed-19 RBF `7f60ec43`.  No helper, RBF, RTL, QSF, FPGA configuration, launcher, media or playback option changes.
+
+#### Next Steps:
+
+Launch `/media/fat/games/MediaPlayer/USB DVD Drive.dvd` with a physical DVD and close the MiSTer OSD.  On the keyboard press Space once, wait about two seconds and press Space once again; require one clean pause and one clean synchronized resume, then press N once and P once and require exactly one next-chapter and one previous-chapter action.  Repeat pause/resume with physical player-one Start and confirm player-one D-pad Right and Left still perform one next and previous chapter action.  Report any missing, repeated or wrong-direction response and whether HDMI or S/PDIF audio and video remain synchronized after each resume or chapter barrier.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 799 COMMIT Unreleased 6de2778 2026-08-30T22:23:36-07:00
 
 #### Coming From:
@@ -1177,34 +1206,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 760 COMMIT Unreleased cee1a9e 2026-08-30T04:40:08-07:00
-
-#### Coming From:
-
-Unreleased cee1a9e
-
-#### Purpose:
-
-Install the timing-clean seed-19 RBF with an independently verified target rollback and begin the approved Coming to America hardware validation.
-
-#### Outcome:
-
-After the user instructs continuation because seed 19 passes timing, local artifact verification reconfirms the 4,461,996-byte `output_files/MediaPlayer.rbf` at SHA-256 `162c788d2fa121f340ab6649ef94b25e97f31a44ee552928bb89e32b147059a6`.  Absolute FTP inventory finds exactly one installed core, `/media/fat/MediaPlayer_20260829_b9c2657.rbf`; independent readback proves that it is the expected 4,456,984-byte `bc79d56a00c69188cd6dc3117944ccaa3a80fa5ba8cfc6dd45f451e4f1593837` timing-clean known-good build.  That exact readback is uploaded under the new rollback path `/media/fat/_MediaPlayer_Backups/MediaPlayer_cee1a9e_pre_seed19_bc79d56a.rbf`, and a second independent download reproduces the complete `bc79d56a` hash.  The single installed filename is then replaced in place with the seed-19 RBF, and the install helper's independent absolute-path readback reproduces all bytes and exact `162c788d` hash.  No Main, helper, media, configuration or source file changes, and the current FPGA remains unchanged until the user reloads the core.
-
-#### Next Steps:
-
-Reload MediaPlayer from the MiSTer menu so the newly installed RBF configures the FPGA.  Confirm the visible menu contains `Aspect Ratio` with `4:3` and `16:9`, `Deinterlacer Mode` with `Bob` and `Weave`, the existing `Audio Test` choices, and `Audio Output` with `HDMI` and `S/PDIF`, with no 800x600 or timing-pattern options.  Select `4:3`, `Bob` and `HDMI`, then play the unchanged `/media/fat/games/MediaPlayer/coming_to_america_first_5min.mpg` once for five minutes and report whether it launches immediately and whether video, cadence, HDMI audio and synchronization remain clean.  Leave the completed screen untouched for capture if any failure occurs; do not replay Big Lebowski unless this run succeeds and a control is materially needed.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
