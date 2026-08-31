@@ -431,9 +431,63 @@ static int emit_overlay_style(struct output_state *output,
                               uint8_t command)
 {
     uint8_t payload[41];
+    uint32_t histogram[4];
+    uint32_t selected_pixels = 0;
+    uint32_t selected_nontransparent_pixels = 0;
+    const char *name = command == MEDIA_PLAYER_OVERLAY_CONFIG ? "config" :
+                       command == MEDIA_PLAYER_OVERLAY_STYLE ? "style" :
+                       "unknown";
+    int result;
+    unsigned color;
 
     overlay_style_payload(overlay, payload);
-    return emit_overlay_record(output, command, payload, sizeof(payload));
+    result = emit_overlay_record(output, command, payload, sizeof(payload));
+    if (result < 0)
+        return result;
+    if (dvd_spu_selected_histogram(overlay, histogram) < 0) {
+        fprintf(stderr,
+                "media_player_helper: DVD overlay record=%s invalid "
+                "selected rectangle\n", name);
+        return 0;
+    }
+    for (color = 0; color < 4u; ++color) {
+        selected_pixels += histogram[color];
+        if (overlay->highlight_rgba[color][3] != 0)
+            selected_nontransparent_pixels += histogram[color];
+    }
+    fprintf(stderr,
+            "media_player_helper: DVD overlay record=%s visible=%d menu=%d "
+            "rect=%u,%u,%u,%u highlight_rgba="
+            "%02x%02x%02x%02x/%02x%02x%02x%02x/"
+            "%02x%02x%02x%02x/%02x%02x%02x%02x "
+            "selected_histogram=%u,%u,%u,%u selected_pixels=%u "
+            "selected_nontransparent_pixels=%u\n",
+            name, overlay->visible, overlay->menu,
+            (unsigned)overlay->highlight_x1,
+            (unsigned)overlay->highlight_y1,
+            (unsigned)overlay->highlight_x2,
+            (unsigned)overlay->highlight_y2,
+            (unsigned)overlay->highlight_rgba[0][0],
+            (unsigned)overlay->highlight_rgba[0][1],
+            (unsigned)overlay->highlight_rgba[0][2],
+            (unsigned)overlay->highlight_rgba[0][3],
+            (unsigned)overlay->highlight_rgba[1][0],
+            (unsigned)overlay->highlight_rgba[1][1],
+            (unsigned)overlay->highlight_rgba[1][2],
+            (unsigned)overlay->highlight_rgba[1][3],
+            (unsigned)overlay->highlight_rgba[2][0],
+            (unsigned)overlay->highlight_rgba[2][1],
+            (unsigned)overlay->highlight_rgba[2][2],
+            (unsigned)overlay->highlight_rgba[2][3],
+            (unsigned)overlay->highlight_rgba[3][0],
+            (unsigned)overlay->highlight_rgba[3][1],
+            (unsigned)overlay->highlight_rgba[3][2],
+            (unsigned)overlay->highlight_rgba[3][3],
+            (unsigned)histogram[0], (unsigned)histogram[1],
+            (unsigned)histogram[2], (unsigned)histogram[3],
+            (unsigned)selected_pixels,
+            (unsigned)selected_nontransparent_pixels);
+    return 0;
 }
 
 static int emit_overlay_frame(struct output_state *output,

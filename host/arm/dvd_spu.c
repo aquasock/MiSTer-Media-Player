@@ -411,3 +411,28 @@ const struct dvd_spu_overlay *dvd_spu_overlay(
 {
     return decoder ? &decoder->overlay : NULL;
 }
+
+int dvd_spu_selected_histogram(const struct dvd_spu_overlay *overlay,
+                               uint32_t histogram[4])
+{
+    unsigned x;
+    unsigned y;
+
+    if (!overlay || !overlay->pixels || !histogram ||
+        overlay->highlight_x1 > overlay->highlight_x2 ||
+        overlay->highlight_y1 > overlay->highlight_y2 ||
+        overlay->highlight_x2 >= DVD_SPU_WIDTH ||
+        overlay->highlight_y2 >= DVD_SPU_HEIGHT)
+        return -1;
+    memset(histogram, 0, 4u * sizeof(*histogram));
+    for (y = overlay->highlight_y1; y <= overlay->highlight_y2; ++y) {
+        for (x = overlay->highlight_x1; x <= overlay->highlight_x2; ++x) {
+            size_t pixel = (size_t)y * DVD_SPU_WIDTH + x;
+            unsigned shift = (3u - (unsigned)(pixel & 3u)) * 2u;
+            unsigned index = (overlay->pixels[pixel >> 2] >> shift) & 3u;
+
+            histogram[index]++;
+        }
+    }
+    return 0;
+}

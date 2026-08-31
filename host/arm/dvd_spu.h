@@ -35,5 +35,8 @@ int dvd_spu_set_highlight(struct dvd_spu_decoder *decoder, int display,
                           uint16_t x2, uint16_t y2);
 const struct dvd_spu_overlay *dvd_spu_overlay(
     const struct dvd_spu_decoder *decoder);
+/* Count the four packed two-bit plane indices in the inclusive highlight. */
+int dvd_spu_selected_histogram(const struct dvd_spu_overlay *overlay,
+                               uint32_t histogram[4]);
 
 #endif

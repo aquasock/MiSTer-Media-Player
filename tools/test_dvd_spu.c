@@ -44,6 +44,8 @@ int main(void)
     uint32_t clut[16] = {0};
     struct dvd_spu_decoder *decoder = dvd_spu_create();
     const struct dvd_spu_overlay *overlay;
+    struct dvd_spu_overlay invalid_overlay;
+    uint32_t histogram[4];
     size_t i;
 
     assert(decoder);
@@ -83,6 +85,14 @@ int main(void)
            overlay->highlight_x2 == 11 && overlay->highlight_y2 == 21);
     assert(overlay->highlight_rgba[1][0] == 0 &&
            overlay->highlight_rgba[1][3] == 136);
+    assert(dvd_spu_selected_histogram(overlay, histogram) == 0);
+    assert(histogram[0] == 0 && histogram[1] == 2 &&
+           histogram[2] == 2 && histogram[3] == 0);
+    invalid_overlay = *overlay;
+    invalid_overlay.highlight_x2 = DVD_SPU_WIDTH;
+    assert(dvd_spu_selected_histogram(&invalid_overlay, histogram) == -1);
+    assert(dvd_spu_selected_histogram(NULL, histogram) == -1);
+    assert(dvd_spu_selected_histogram(overlay, NULL) == -1);
 
     dvd_spu_reset(decoder);
     dvd_spu_set_stream(decoder, 0);
@@ -95,11 +105,14 @@ int main(void)
                                  10,20,11,21) == 1);
     assert(overlay->visible && overlay->menu);
     assert(pixel_at(overlay, 10, 20) == 1);
+    assert(dvd_spu_selected_histogram(overlay, histogram) == 0);
+    assert(histogram[0] == 0 && histogram[1] == 2 &&
+           histogram[2] == 2 && histogram[3] == 0);
 
     dvd_spu_reset(decoder);
     dvd_spu_set_stream(decoder, 0);
     assert(dvd_spu_feed(decoder, 0, malformed, sizeof(malformed)) == -1);
     dvd_spu_destroy(decoder);
-    puts("dvd_spu: fragmented decode, palette, scheduled stop, visible highlight and rejection pass");
+    puts("dvd_spu: fragmented decode, palette, selected histogram, scheduled stop, visible highlight and rejection pass");
     return 0;
 }
