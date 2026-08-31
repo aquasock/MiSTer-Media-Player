@@ -143,7 +143,7 @@ assign input_ready =
     (!stream_pending || stream_ready) &&
     (!pts_payload_final || metadata_ready) &&
     (!pcm_payload_final || pcm_ready) &&
-    ((state != S_OVERLAY_PAYLOAD) || !overlay_valid || overlay_ready);
+    ((state != S_OVERLAY_PAYLOAD) || !overlay_valid);
 
 wire [31:0] window_next = {window[23:0], input_data};
 // window_fill saturates at four; the window then always holds the true
@@ -200,8 +200,8 @@ always @(posedge clk) begin
         pcm_end        <= 1'b0;
         // Unlike the metadata and PCM event pulses, an overlay byte is a
         // conventional ready/valid transfer.  Retain its data and boundary
-        // flags throughout an engine stall; a simultaneous ready transfer
-        // may be replaced by the next accepted input byte below.
+        // flags throughout an engine stall.  Refill the slot on the following
+        // cycle instead of adding the engine ready path to upstream readiness.
         if (overlay_valid && overlay_ready)
             overlay_valid <= 1'b0;
 
