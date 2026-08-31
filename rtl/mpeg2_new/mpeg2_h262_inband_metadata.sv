@@ -84,7 +84,7 @@ module mpeg2_h262_inband_metadata
     output reg   [7:0] overlay_data,
     output reg         overlay_start,       // first command/payload byte
     output reg         overlay_last,        // final command/payload byte
-    output reg         overlay_valid,       // one-cycle pulse
+    output reg         overlay_valid,       // retained until ready transfer
     input  wire        overlay_ready,
     output reg         overlay_protocol_error
 );
@@ -143,7 +143,7 @@ assign input_ready =
     (!stream_pending || stream_ready) &&
     (!pts_payload_final || metadata_ready) &&
     (!pcm_payload_final || pcm_ready) &&
-    ((state != S_OVERLAY_PAYLOAD) || overlay_ready);
+    ((state != S_OVERLAY_PAYLOAD) || !overlay_valid || overlay_ready);
 
 wire [31:0] window_next = {window[23:0], input_data};
 // window_fill saturates at four; the window then always holds the true
@@ -198,9 +198,12 @@ always @(posedge clk) begin
         metadata_valid <= 1'b0;
         pcm_valid      <= 1'b0;
         pcm_end        <= 1'b0;
-        overlay_start  <= 1'b0;
-        overlay_last   <= 1'b0;
-        overlay_valid  <= 1'b0;
+        // Unlike the metadata and PCM event pulses, an overlay byte is a
+        // conventional ready/valid transfer.  Retain its data and boundary
+        // flags throughout an engine stall; a simultaneous ready transfer
+        // may be replaced by the next accepted input byte below.
+        if (overlay_valid && overlay_ready)
+            overlay_valid <= 1'b0;
 
         if (stream_pending && stream_ready)
             stream_pending <= 1'b0;
@@ -352,7 +355,9 @@ always @(posedge clk) begin
         // B9 records carry a big-endian byte count followed by exactly that
         // many bytes.  The first byte is the overlay command; subsequent bytes
         // are command data.  The extractor retains no record body, so the
-        // overlay engine's ready signal applies backpressure to ioctl_download.
+        // The retained output slot applies the overlay engine's backpressure
+        // to ioctl_download without losing the byte immediately following a
+        // completed 64-bit DDR word.
         S_OVERLAY_LEN_HI:
             if (input_valid && input_ready) begin
                 overlay_length <= {input_data, 8'd0};

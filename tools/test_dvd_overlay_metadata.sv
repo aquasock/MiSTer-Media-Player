@@ -18,13 +18,25 @@ wire pcm_error,overlay_error;
 reg [7:0] stream_seen [0:7];
 reg [7:0] overlay_seen [0:7];
 integer stream_count=0,overlay_count=0,cycles=0;
+reg overlay_stalled=0;
+reg [9:0] overlay_stalled_value=0;
 
 always #5 clk=~clk;
 always @(posedge clk) begin
     cycles<=cycles+1;
     overlay_ready<=cycles[0];
     if(stream_valid)begin stream_seen[stream_count]=stream_data;stream_count=stream_count+1;end
-    if(overlay_valid)begin
+    if(overlay_stalled)begin
+        if(!overlay_valid)$fatal(1,"overlay valid dropped during stall");
+        if({overlay_start,overlay_last,overlay_data}!==overlay_stalled_value)
+            $fatal(1,"overlay payload changed during stall");
+        if(overlay_ready)overlay_stalled=0;
+    end
+    if(overlay_valid&&!overlay_ready&&!overlay_stalled)begin
+        overlay_stalled=1;
+        overlay_stalled_value={overlay_start,overlay_last,overlay_data};
+    end
+    if(overlay_valid&&overlay_ready)begin
         overlay_seen[overlay_count]=overlay_data;
         if(overlay_count==0 && !overlay_start)$fatal(1,"missing overlay start");
         if(overlay_count!=0 && overlay_start)$fatal(1,"late overlay start");
