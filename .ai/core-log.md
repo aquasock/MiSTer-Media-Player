@@ -1,3 +1,32 @@
+## 830 COMMIT Unreleased ??? 2026-08-31T11:13:16-07:00
+
+#### Coming From:
+
+Unreleased 673b6d7
+
+#### Purpose:
+
+Distinguish a real DVD subpicture-plane defect from a downstream transport or rendering failure without modifying Main or the RBF.
+
+#### Outcome:
+
+The user approves the helper-only known-pattern probe after source `673b6d7` proves the real menu state contains 267 through 279 drawable pixels but the unchanged hardware displays none, while exact installed-RTL simulation renders a complete bottom-menu rectangle correctly under an idle DDR model.  The proposed source remains behavior-identical in ordinary builds and gates the diagnostic behind a compile-time definition used only for a separately named ARM artifact.  That artifact will dump the complete real 86,400-byte two-bit plane in bounded row records for exact replay, then retain the authored visible and menu flags plus moving selection rectangle while transmitting an all-index-one plane, transparent normal palette and opaque magenta highlight entry.  No decoder, scheduler, navigation, record framing, Main, RTL, QSF, RBF or installed target file is changed by the implementation itself.
+
+#### Next Steps:
+
+Implement and review the compile-time helper probe, compile both ordinary and probe variants with strict warnings, run the focused subpicture, random-access and menu regressions plus available authored-menu coverage, then commit only if the ordinary build's behavior remains unchanged.  Build a uniquely named static ARM probe helper from the exact committed source on the build PC and provide its path and hash for manual replacement; the physical result is decisive if a solid magenta rectangle follows the authored selection, while another completely absent rectangle moves the next non-RBF investigation to Main's helper-to-ioctl forwarding.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 829 COMMIT Unreleased 673b6d7 2026-08-31T11:01:48-07:00
 
 #### Coming From:
@@ -1202,34 +1231,5 @@ Await explicit deployment authorization.  Then preserve the installed helper, tr
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 790 COMMIT Unreleased 531f741 2026-08-30T20:28:46-07:00
-
-#### Coming From:
-
-Unreleased 531f741
-
-#### Purpose:
-
-Capture and qualify the first encrypted physical-DVD playback from the direct `/dev/sr0` source.
-
-#### Outcome:
-
-After the verified source-`531f741` deployment and reboot, selecting `/media/fat/games/MediaPlayer/USB DVD Drive.dvd` launches exact source `dvd:/dev/sr0`, authenticates the commercial Coming to America disc through libdvdcss, finds eight title sets, selects longest title 1 with 24 chapters and duration 606,390,000 ticks, identifies AC-3 substream `0x80`, and produces correct Native 480i HDMI video and decoded stereo audio.  The user reports a long initial black-screen wait, then working playback; the log measures first transport at 98.617794 seconds because the initial open and the helper's signature and program-stream preflight rewinds each reopen navigation and repeat the complete CSS key scan, taking approximately 30, 31 and 31 seconds.  About 55 seconds after transport begins, successful 16 KiB pipe production pauses once for 2.471110 seconds from diagnostic time 153.915751 to 156.386861, matching the user's report that the drive audibly changed state and the screen briefly froze before the unchanged stream recovered exactly.  No other producer gap exceeds 74.603 milliseconds through diagnostic time 339.254331, and the user reports perfect continued picture and synchronized audio with no further starvation at approximately ten minutes.  The 663,329-byte scaled capture `/tmp/entry790_coming_to_america_usb_dvd_first_hiccup.png` has SHA-256 `8f8b7f1f`; the 568,469-byte native capture `/tmp/entry790_coming_to_america_usb_dvd_first_hiccup_raw.png` has `3c70cdee` and preserves a clean active frame.  All 64 schema-20 rows have valid prefix, index and parity and checksum `b447fda2` matches; the STC-second-155 no-progress snapshot accepts 40,458,960 clean-video bytes and reports zero hardware error flags, zero audio underruns and zero transport blocks.  The 8,519,837-byte helper log has SHA-256 `dc318e6c` and contains no read, transport or process fault.  Read-only Linux state reports `/sys/class/block/sr0/device/power/control` as `on`, runtime status `active`, autosuspend delay `-1`, device state `running` and block readahead 128 KiB; pinned libdvdnav readahead is synchronous and adaptively ranges from four to 512 2,048-byte sectors.  The user and agent therefore treat the single recovered pause as an optical-drive firmware or synchronous cache-refill event outside the decoder and transport path, and no buffer change is justified without recurrence.  This accepts direct encrypted physical-DVD launch, CSS authentication, main-title selection, HDMI playback and starvation recovery without an FPGA, helper, Main, RBF, media or configuration change during the run.
-
-#### Next Steps:
-
-Keep the current direct-DVD implementation unchanged unless optical starvation recurs on this or another disc.  The user may continue the feature as an extended soak and should check representative S/PDIF output when convenient; no further capture is required unless another pause or fatal telemetry occurs.  Treat the slow initial launch separately from the recovered playback pause: after explicit approval, reuse the authenticated libdvdnav session across the two preflight rewinds so the same disc is not scanned for CSS keys three times, and require native ISO and direct-source byte regressions plus one helper-only build without Quartus.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
