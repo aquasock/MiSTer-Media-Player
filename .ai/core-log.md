@@ -1,3 +1,32 @@
+## 806 COMMIT Unreleased 6e44472 2026-08-31T01:17:02-07:00
+
+#### Coming From:
+
+Unreleased 6e44472
+
+#### Purpose:
+
+Record the user's hardware acceptance of transport controls, button mappings, audio and video playback, and all four consumer-audio formats on the installed source-`6e44472` system.
+
+#### Outcome:
+
+The user reports that previous chapter, next chapter, play and pause all work perfectly, every tested button control behaves correctly, audio and video are perfect, and WAV, MP3, FLAC and Ogg Vorbis files all play properly.  At the user's direction no screenshot or other target capture is taken, and no repository source, installed file, running playback, RBF, Main, helper, media or configuration changes during this acceptance report.  This accepts the transport-control and consumer-audio portions of entries 803 through 805; the report does not independently identify the requested menu-layout checks or the chapter-specific mixed-film sequence at chapters 8, 11, 15, 17 and 23, so those narrow gates remain open.
+
+#### Next Steps:
+
+Confirm whether the three file actions, `16:9` default, `4:3` choice, Bob and Weave choices and unchanged audio sections appear correctly in the OSD, then explicitly verify that chapter 2 advances into chapter 3 and chapters 8, 11, 15, 17 and 23 remain in native 480i without a black screen, legacy 800x600 raster or vertical corruption.  If those checks already formed part of this test, record that confirmation without taking a screenshot; otherwise leave source `6e44472` and the installed timing-clean RBF unchanged while completing only those remaining hardware gates.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 805 COMMIT Unreleased 6e44472 2026-08-31T00:16:48-07:00
 
 #### Coming From:
@@ -1190,34 +1219,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 766 COMMIT Unreleased 8623431 2026-08-30T05:41:38-07:00
-
-#### Coming From:
-
-Unreleased 65e8af3
-
-#### Purpose:
-
-Correct the incomplete MiSTer Main file-selector support that prevents installed `.vob` media from appearing in the MediaPlayer menu.
-
-#### Outcome:
-
-The exact 313,542,656-byte qualification file is installed as `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob` with byte-identical target readback and SHA-256 `a7eb4c2fff0a4e15bc4ad9b2b2a3b4cff63ec87d79a59e8ba99fef7b6193cc0b`.  The `.vob`-capable Main from source `65e8af3` is installed at `/media/fat/MiSTer` with byte-identical readback and SHA-256 `40e15ff2c89dc1580a0bcb746deeb8186ebfcc0ef1155f6ac9ce17cba8125d41`, while the replaced Main is independently preserved under `_MediaPlayer_Backups`.  The user's hardware gate reports that the menu cannot see the new VOB.  Static inspection identifies the exact omission: `mediaplayer_handles_file()` accepts `.vob` after selection, but the MediaPlayer-specific three-character extension vector passed into `SelectFile()` remained `M2VMPGMP3WAVFLC` and therefore filtered VOB files before selection.  Source `8623431` adds only the missing `VOB` token to that vector.  A clean pinned Main rebuild from exact commit `8623431` passes on the authorized build PC and produces a stripped 1,170,340-byte ARM EABI5 hard-float executable with SHA-256 `61766c5eae1817607d6700b6403b59af1d05964c23cc2c8572afbb2ba03e19d3`.  The generated media, helper, FPGA and Native 480i configuration remain unchanged.
-
-#### Next Steps:
-
-Preserve the currently installed `40e15ff2` Main before replacing it with the exact `61766c5e` candidate, require byte-identical target readback, reboot to activate the corrected Main, and first confirm that the exact qualification VOB is visible and launches before resuming the five-minute HDMI and S/PDIF playback gates.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
