@@ -1,3 +1,32 @@
+## 836 COMMIT Unreleased d4ed809 2026-08-31T16:15:48-07:00
+
+#### Coming From:
+
+Unreleased 43a1c22
+
+#### Purpose:
+
+Use the first physical schema-21 capture to localize the invisible known-pattern DVD highlight within the FPGA overlay pipeline.
+
+#### Outcome:
+
+The checksum-valid 883-byte schema-21 capture at SHA-256 `c146d2775a491c4ce8a652a9370a80fe718e0ff55109a546b40cc9d09b19c86b` proves that the extractor presents one config, 22 data records, one commit and two style records to the overlay engine, but only 82,162 of the required 86,400 plane bytes arrive.  The engine completes 10,270 DDR words and retains two further byte lanes instead of the required 10,800 complete words, sets its protocol-error flag, counts one rejected and zero accepted commits, leaves the display bank unchanged and publishes no plane.  It nevertheless publishes both styles with visible and menu flags, exact rectangle 135,397 through 208,436 and internal opaque-magenta entry one `ffff00ff`; the video domain receives three style or clear publications, saturates the row-tag counter, observes 5,989,983 row-matched samples and 51,800 samples inside the highlight rectangle, but sees exactly zero nonzero-alpha and zero opaque-magenta samples because the rejected commit leaves it reading the initial zero-valued plane bank.  Capture reason one fires after the intended 59,999,999 settle clocks.  The independently saved Main/helper log at SHA-256 `8ed4759ce04eee7794706239609a9fdfa134cdf5fe7c16211e534bbf77e02db0` still proves all 86,400 all-`0x55` bytes entered the FPGA ingress FIFO with FNV-1a `f8555d45`, zero order errors and `probe_complete=1`; the 1,920-by-1,080 screenshot at SHA-256 `b3606148234c83f7fe35d8b9f36d05fa3441b74a4ac3222db90720a629158d71` visibly confirms no magenta overlay.  Static inspection identifies the loss mechanism: `mpeg2_h262_inband_metadata` registers each overlay byte as a one-cycle pulse while gating its input with the overlay engine's current combinational ready signal, so on a cycle that the engine accepts the eighth byte and raises its registered DDR-write pending state, the extractor can already consume and schedule the following byte against the old ready value; that pulse is presented while the engine is not ready and has no retained-valid storage.  The fault is therefore the extractor-to-engine ready/valid boundary inside the FPGA, not Main, the ingress FIFO, DDR arbitration, row-cache publication or the final compositor.
+
+#### Next Steps:
+
+After user approval, replace the pulse-only overlay output with a conventional retained valid/data/start/last register whose valid bit clears only on an actual engine-ready transfer, derive extractor input readiness from the availability of that output slot, and add an integrated regression that drives the complete 86,400-byte plane through the extractor and engine while injecting DDR writer stalls.  Require exactly 86,400 engine plane bytes, 10,800 accepted DDR writes, one accepted and zero rejected commits, one plane publication, nonzero alpha and opaque-magenta video samples, then build a timing-clean RBF without changing Main, the helper, the record protocol or rendering semantics.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 835 COMMIT Unreleased d4ed809 2026-08-31T16:04:26-07:00
 
 #### Coming From:
@@ -1195,34 +1224,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 796 COMMIT Unreleased 627b329 2026-08-30T21:55:20-07:00
-
-#### Coming From:
-
-Unreleased 151e10a
-
-#### Purpose:
-
-Capture and qualify the unattended long-running physical-DVD telemetry event without disturbing playback.
-
-#### Outcome:
-
-The user reports no visible or audible issue during the long-running physical-DVD playback and leaves the still-advancing movie and telemetry untouched for collection.  The live helper log identifies `dvd:/dev/sr0`, selects longest title 1 with 23 chapters and duration 633,249,000 ticks, uses HDMI decoded stereo PCM and AC-3 substream `0x80`, performs one CSS key scan, two authenticated navigation resets and a 4 MiB reserve in the 8 MiB ring with 1.877412 seconds of prefill, then delivers first verified transport 13.224510 seconds after launch.  The checksum-valid schema-20 raw capture latches at STC second 118 after 91,592,308 clean-video bytes with exactly one audio FIFO underrun and FIFO floor zero; its only aggregate hardware error is the corresponding sticky `0x0400` bit, with zero cache overlap, PCM protocol, presentation or transport-block errors.  The saved snapshot also records 2,509 displayed pictures, 2,508 swaps, 2,507 deadline events, 1,256 gap outliers and largest retained gaps of 150.182, 116.815 and 83.448 milliseconds, so it is not a zero-cadence-event capture even though no presentation error latched and the user perceived no defect.  The helper remains healthy through 1,040.583821 seconds of scheduled playback, more than fifteen minutes beyond the sticky event, with 50,001,408 samples emitted versus 49,948,023 expected, 450,130 queued video bytes and 811,471,313 video bytes processed; Main remains live through diagnostic time 1,055.717654 seconds, has submitted 1,027,706,880 bytes, records no HPS-ring consumer wait, limits the largest 16 KiB pipe-read interval to 224.081 milliseconds and the slowest read call to 11.384 milliseconds, and has no EOF, exit or process fault.  The 805,468-byte scaled screenshot `/tmp/entry796_long_dvd_telemetry.png` has SHA-256 `df8a4592bce681485af1e299485d096e07608fef7e457f663949c25e1f65fa07`; the 470,557-byte native capture `/tmp/entry796_long_dvd_telemetry_raw.png` has SHA-256 `e93817cbe68ca5c424c2a5058c706722a3d0a0f495650b0e0a4a0ae43a6d35b7` and telemetry checksum `712abb32`; and the 26,395,877-byte helper log `/tmp/entry796_long_dvd_arm_helper.log` has SHA-256 `4f24638795eed54d0c1e88ebccb90d3765c8c587e3e1b01fc26f543f21396ca3`.  This is the previously accepted allowance of one isolated audio FIFO underrun rather than a reproduced optical starvation or sustained audio failure, and no source, installed file, RBF, Main, helper, media, playback option or running process changes during collection.
-
-#### Next Steps:
-
-Let the current movie continue without further capture because the event is fully characterized and playback remains healthy.  Treat source `627b329` as hardware-passed for buffered encrypted physical-DVD playback under the user's accepted single-underrun allowance; after playback ends and the user explicitly authorizes deployment, preserve and verify the active source-`627b329` Main and helper as unique absolute-path rollbacks, install the already built source-`151e10a` Main and helper together without changing the seed-19 RBF, reboot for Main, and qualify Start pause/resume plus Right and Left chapter navigation.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
