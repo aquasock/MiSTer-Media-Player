@@ -1,3 +1,32 @@
+## 818 COMMIT Unreleased 0e70319 2026-08-31T06:54:47-07:00
+
+#### Coming From:
+
+Unreleased 0e70319
+
+#### Purpose:
+
+Capture the exact source-`0e70319` physical-disc result after root-menu entry, directional input and Enter activation.
+
+#### Outcome:
+
+The user reports that keyboard `M` reaches the physical disc's menu, the arrow keys still cause no visible change, and Enter leaves a black screen.  The 30,212-byte matching capture `/tmp/entry818_menu_enter_black.png` has SHA-256 `7a50ed345aa27e73fef99d4a64f3704ef2752923cd58c82b553913631be70f82`, and the 11,543,671-byte helper log `/tmp/entry818_menu_enter_black_arm_helper.log` has SHA-256 `6d08df11102a2d437e062284d779af76a2fdb727ff1b877f2faefdcc8e9151b3`.  The capture is a black native active frame rather than an 800-by-600 telemetry raster, while the active source-`0e70319` helper records both root and activation hops with `discarded_block_tail=0`, completes both Main/helper ready barriers and remains alive without any fatal, decoder error or `0x0200` B-presentation failure.  The final activation does not produce a menu-leave transition; instead libdvdnav emits another overlay update and enters an indefinite authored still, so the stale-tail crash gate passes but full menu interaction does not.  Existing logs do not identify individual directional commands, selected button numbers or highlight rectangles, and the native harness only counted generic style events, so it cannot establish whether the helper used the NAV PCI synchronized to the displayed menu or merely returned a visually unchanged selection.
+
+#### Next Steps:
+
+Keep Main, RTL, QSF, RBF and Quartus frozen.  The next bounded helper-only cycle should log every direction and activation with the before and after button numbers, NAV logical-block number, authored neighbor and highlight rectangle, strengthen the native harness to require a real selection transition, and retain the NAV PCI associated with the displayed packet for button selection and activation instead of relying on libdvdnav's potentially ahead current PCI; rebuild and retest this same physical menu before expanding menu support.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 817 COMMIT Unreleased 0e70319 2026-08-31T06:43:56-07:00
 
 #### Coming From:
@@ -1192,35 +1221,6 @@ At the user's request, one screenshot and the matching helper log are collected 
 #### Next Steps:
 
 Keep source `205bbd7`, fitter seed 19, the installed RBF, native 480i mode and current decoder capability boundary unchanged.  All three adopted five-minute frame-picture MPD-D2 VOBs now have accepted results, and each captured run shows real-time completion with no audio starvation; field-picture MPEG-2 remains intentionally deferred.  If the user wants to resume the previously paused roadmap, scope decrypted ISO playback as a host-side input and navigation boundary first, without an FPGA rebuild unless later evidence proves one necessary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 778 COMMIT Unreleased 205bbd7 2026-08-30T14:27:08-07:00
-
-#### Coming From:
-
-Unreleased 205bbd7
-
-#### Purpose:
-
-Resolve the adopted NARA control filename and accept the complete three-file MPD-D2 decoder-throughput gate on source `205bbd7`.
-
-#### Outcome:
-
-The user clarifies that the NARA file named in the preceding positive report is exactly `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob`, so the earlier statement that it is good is assigned to that adopted control rather than to a separate Blazing Saddles fixture.  Together with entries 776 and 777, source `205bbd7` now passes the complete targeted native-480i MPD-D2 gate: NARA is user-reported clean, while the formerly worst-stuttering Coming to America and Big Lebowski VOBs both complete in approximately 299.93 seconds with perfect user-observed video and audio, all 362,080,761 transport bytes on the fast path, every AC-3 frame and PCM sample emitted, and checksum-valid schema-20 telemetry showing zero hardware errors, audio underruns, transport blocks, deadline gaps and cadence outliers.  This directly clears the sustained decoder-backpressure and ordered-audio-starvation failure that previously began near 56 seconds for Coming to America and 33 seconds for Big Lebowski.  The installed 4,440,192-byte seed-19 RBF remains SHA-256 `7f60ec43cfffa75108c39c7d21fff727c0f1dddccd844a318e1b7cc5795c6970`; no source, installed file, playback mode or configuration changes.
-
-#### Next Steps:
-
-Keep source `205bbd7`, fitter seed 19, the installed RBF, native 480i mode and current decoder capability boundary unchanged.  The frame-picture MPD-D2 VOB compatibility and real-time throughput gate is accepted; field-picture MPEG-2 remains intentionally deferred.  If the user wants to resume the previously paused roadmap, scope decrypted ISO playback as a host-side input and navigation boundary first, without an FPGA rebuild unless later evidence proves one necessary.
 
 #### Files Modified:
 
