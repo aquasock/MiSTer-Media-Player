@@ -1,3 +1,33 @@
+## 809 COMMIT Unreleased ??? 2026-08-31T03:31:31-07:00
+
+#### Coming From:
+
+Unreleased 8d1a5d0
+
+#### Purpose:
+
+Correct the authored-menu overlay clock-crossing timing boundary without weakening same-clock analysis or changing overlay behavior.
+
+#### Outcome:
+
+The user explicitly approves the narrow follow-on boundary proposed by entry 808 after the first seed-19 build localized every negative setup and hold path to the first sampling registers of the overlay's intentional stable-bus and toggle handshakes between the 60 MHz memory domain and 54 MHz video domain.  The planned correction will add endpoint-specific timing exceptions only from the overlay source registers to those first synchronizer stages, preserve timing through each second stage and every same-clock path, and make the two reported overlay width conversions explicit.  It will not declare the full clocks asynchronous, alter DDR arbitration or pixel composition, rebuild unrelated host binaries, install the rejected RBF, or disturb the accepted source-`6e44472` MiSTer playback session.
+
+#### Next Steps:
+
+Inspect the exact failing endpoints and existing project constraint conventions, implement only the endpoint-scoped first-stage exceptions and explicit width conversions, then rerun focused overlay tests, the retained native-480i regression and constraint coverage checks before one clean seed-19 Quartus build.  Accept the artifact only if global setup, hold, recovery, removal and minimum-pulse-width are all positive and same-clock analysis remains intact; otherwise stop with the new evidence and leave the MiSTer unchanged.
+
+#### Files Modified:
+
+- MediaPlayer.sdc
+- rtl/mpeg2_new/mpeg2_h262_dvd_overlay.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 808 COMMIT Unreleased 8d1a5d0 2026-08-31T01:28:52-07:00
 
 #### Coming From:
@@ -1211,35 +1241,6 @@ First capture and record the user's completed Coming to America VOB result witho
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 769 COMMIT Unreleased 1e8c44f 2026-08-30T06:12:22-07:00
-
-#### Coming From:
-
-Unreleased 8623431
-
-#### Purpose:
-
-Pin fitter seed 19 in the source-controlled Quartus project without changing decoder capability or rebuilding the accepted FPGA artifact.
-
-#### Outcome:
-
-The user directs that decoder capability remain at the accepted boundary and explicitly requests correction of the repository QSF to the established fitter seed.  Source `1e8c44f` changes the sole `MediaPlayer.qsf` `SEED` assignment from 17 to 19 so a future clean build selects the proven seed by default; the exact diff contains one replacement line and no decoder, timing-constraint or project-setting change.  The installed and hardware-accepted RBF was already produced by overriding the fitter to seed 19 and passed complete timing, so this source-control correction neither modifies nor reconfigures that artifact.  No Quartus build or target installation is performed, and Main, helper, media, Native 480i configuration and the active two-title VOB tests remain untouched.
-
-#### Next Steps:
-
-Continue the two installed MPD-D2 VOB hardware tests one title at a time and preserve their completed screens for capture.  Do not run Quartus or replace the accepted installed seed-19 RBF now; a clean build and regression are required only when a new release artifact is intentionally produced from this updated project.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
