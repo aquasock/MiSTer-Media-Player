@@ -39,6 +39,12 @@ COMMAND_RE = re.compile(
     rb"rect=([0-9]+),([0-9]+),([0-9]+),([0-9]+) "
     rb"palette=([0-9a-fA-F]{8})"
 )
+RANDOM_ACCESS_RE = re.compile(
+    rb"media_player_helper: DVD random access sequence_offset=([0-9]+) "
+    rb"intra_offset=([0-9]+) next_reference_offset=([0-9]+) "
+    rb"discarded=([0-9]+) pre-context picture\(s\), "
+    rb"([0-9]+) leading B picture\(s\)"
+)
 
 
 def highlighted_plane_pixels(style, plane):
@@ -155,6 +161,8 @@ def main():
     hop_discarded = {"root": [], "activate": []}
     continue_counts = {"activate": 0}
     continue_discarded = {"activate": []}
+    root_random_access = []
+    root_hop_seen = False
     command_counts = {name: 0 for name in
                       ("up", "down", "left", "right", "activate", "root")}
     direction_transitions = []
@@ -176,6 +184,7 @@ def main():
                 continue_counts["activate"] and continue_events)
             if (activation_done and action_index == len(actions) and
                     hop_counts["root"] and
+                    root_random_access and
                     menu_events and counts[1] and
                     counts[2] and counts[3] and counts[5] >= 86400 and
                     overlay_state["visible_highlights"] and
@@ -236,6 +245,8 @@ def main():
                                 hop_counts[name] += 1
                                 hop_discarded[name].append(
                                     int(match.group(2)))
+                                if name == "root":
+                                    root_hop_seen = True
                             match = CONTINUE_RE.search(line)
                             if match:
                                 name = match.group(1).decode("ascii")
@@ -255,6 +266,11 @@ def main():
                                         target > 0 and after != before):
                                     direction_transitions.append(
                                         (name, before, target, after))
+                            match = RANDOM_ACCESS_RE.search(line)
+                            if match and root_hop_seen:
+                                root_random_access.append(tuple(
+                                    int(match.group(index))
+                                    for index in range(1, 6)))
             if process.poll() is not None:
                 break
     finally:
@@ -282,6 +298,10 @@ def main():
               overlay_state["visible_highlights"] >= 1 and
               overlay_state["highlight_pixels"] >= 1 and
               hop_counts["root"] >= 1 and
+              root_random_access and
+              all(sequence < intra < following
+                  for sequence, intra, following, _, _
+                  in root_random_access) and
               all(command_counts[name] >= 1 for name in
                   ("up", "down", "left", "right", "activate", "root")) and
               direction_transitions)
@@ -292,6 +312,7 @@ def main():
           f"data_bytes={counts[5]} commit={counts[3]} style={counts[4]} "
           f"clear={counts[0]} root_hops={hop_counts['root']} "
           f"root_discarded={hop_discarded['root']} "
+          f"root_random_access={root_random_access} "
           f"activate_hops={hop_counts['activate']} "
           f"activate_discarded={hop_discarded['activate']} "
           f"activate_continues={continue_counts['activate']} "
