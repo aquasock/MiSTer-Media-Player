@@ -837,6 +837,41 @@ static int iso_change_chapter(struct iso_source_state *state, int direction)
     return target;
 }
 
+/*
+ * libdvdnav changes its VM position immediately, but iso_read_navigation()
+ * may still own an unread tail in state->block from the old position.  Main
+ * resets the FPGA download around an authored navigation hop, so allowing
+ * that tail to survive can assemble the first post-reset pack or PES from
+ * bytes on opposite sides of the hop.  Invalidate only the current payload
+ * block; the next read then asks libdvdnav for the first block at its new VM
+ * position.
+ */
+static size_t iso_reset_after_menu_hop(struct iso_source_state *state)
+{
+    size_t discarded = state->block_offset < state->block_size ?
+                       state->block_size - state->block_offset : 0;
+
+    state->block_offset = 0;
+    state->block_size = 0;
+    state->end_of_stream = 0;
+    state->error = 0;
+    state->still_active = 0;
+    state->still_seconds = 0;
+    state->dvd_state.hop = 1;
+    return discarded;
+}
+
+static int iso_complete_menu_hop(struct iso_source_state *state,
+                                 const char *command)
+{
+    size_t discarded = iso_reset_after_menu_hop(state);
+
+    fprintf(stderr,
+            "media_source: %s menu hop %s discarded_block_tail=%zu\n",
+            state->direct_device ? "DVD" : "ISO", command, discarded);
+    return 1;
+}
+
 static int iso_menu_command(struct iso_source_state *state,
                             enum media_source_dvd_command command)
 {
@@ -873,19 +908,13 @@ static int iso_menu_command(struct iso_source_state *state,
         if (!state->dvd_state.menu_active || !pci)
             return 0;
         status = dvdnav_button_activate(state->navigation, pci);
-        if (status == DVDNAV_STATUS_OK) {
-            state->still_active = 0;
-            state->dvd_state.hop = 1;
-            return 1;
-        }
+        if (status == DVDNAV_STATUS_OK)
+            return iso_complete_menu_hop(state, "activate");
         break;
     case MEDIA_SOURCE_DVD_ROOT_MENU:
         status = dvdnav_menu_call(state->navigation, DVD_MENU_Root);
-        if (status == DVDNAV_STATUS_OK) {
-            state->still_active = 0;
-            state->dvd_state.hop = 1;
-            return 1;
-        }
+        if (status == DVDNAV_STATUS_OK)
+            return iso_complete_menu_hop(state, "root");
         break;
     default:
         return -1;

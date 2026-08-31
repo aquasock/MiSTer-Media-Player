@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Exercise a real DVD image's menu control and overlay transport path."""
+"""Exercise a real DVD image or directory's menu and overlay path."""
 
 import argparse
 import os
+import re
 import selectors
 import socket
 import subprocess
@@ -19,6 +20,10 @@ MENU_DOWN = 0x05
 MENU_RIGHT = 0x07
 MENU_ACTIVATE = 0x08
 ROOT_MENU = 0x09
+HOP_RE = re.compile(
+    rb"media_source: (?:DVD|ISO) menu hop (root|activate) "
+    rb"discarded_block_tail=([0-9]+)"
+)
 
 
 def parse_overlay_records(buffer, counts):
@@ -49,15 +54,16 @@ def parse_overlay_records(buffer, counts):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("helper")
-    parser.add_argument("iso")
+    parser.add_argument("dvd")
     parser.add_argument("--timeout", type=float, default=35.0)
     args = parser.parse_args()
 
     parent, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+    dvd_path = os.path.abspath(args.dvd)
+    source = ("dvdmenu:" if os.path.isdir(dvd_path) else "isomenu:") + dvd_path
     process = subprocess.Popen(
         [os.path.abspath(args.helper), "--protocol", "1", "--source",
-         "isomenu:" + os.path.abspath(args.iso), "--control-fd",
-         str(child.fileno())],
+         source, "--control-fd", str(child.fileno())],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, pass_fds=(child.fileno(),)
     )
     child.close()
@@ -70,7 +76,8 @@ def main():
     selector.register(process.stderr, selectors.EVENT_READ, "error")
 
     deadline = time.monotonic() + args.timeout
-    root_due = time.monotonic() + 1.0
+    started = time.monotonic()
+    root_due = None
     action_due = None
     actions = [MENU_RIGHT, MENU_DOWN, MENU_ACTIVATE]
     action_index = 0
@@ -81,11 +88,14 @@ def main():
     counts = [0] * 6
     video_buffer = b""
     error_buffer = bytearray()
+    error_scan = b""
+    hop_counts = {"root": 0, "activate": 0}
+    hop_discarded = {"root": [], "activate": []}
 
     try:
         while time.monotonic() < deadline:
             now = time.monotonic()
-            if not root_sent and now >= root_due:
+            if not root_sent and root_due is not None and now >= root_due:
                 parent.send(bytes((ROOT_MENU,)))
                 root_sent = True
             if (menu_events and counts[3] and action_index < len(actions) and
@@ -94,7 +104,9 @@ def main():
                 action_index += 1
                 action_due = now + 0.35
 
-            if (ready_events >= 2 and menu_events and counts[1] and
+            if (ready_events >= 2 and action_index == len(actions) and
+                    hop_counts["root"] and hop_counts["activate"] and
+                    menu_events and counts[1] and
                     counts[2] and counts[3] and counts[5] >= 86400):
                 break
             for key, _ in selector.select(0.1):
@@ -131,6 +143,23 @@ def main():
                         error_buffer.extend(chunk)
                         if len(error_buffer) > 262144:
                             del error_buffer[:-262144]
+                        error_scan += chunk
+                        lines = error_scan.split(b"\n")
+                        error_scan = lines.pop()
+                        for line in lines:
+                            if (root_due is None and
+                                    (b"DVD menu " in line or
+                                     b"DVD still wait " in line)):
+                                # libdvdnav is now actively walking authored
+                                # playback.  Avoid queuing root-menu during
+                                # the helper's CSS/preflight scans.
+                                root_due = time.monotonic() + 0.25
+                            match = HOP_RE.search(line)
+                            if match:
+                                name = match.group(1).decode("ascii")
+                                hop_counts[name] += 1
+                                hop_discarded[name].append(
+                                    int(match.group(2)))
             if process.poll() is not None:
                 break
     finally:
@@ -143,14 +172,22 @@ def main():
                 process.wait()
         parent.close()
 
-    passed = (root_sent and action_index == len(actions) and ready_events >= 2 and
+    return_code = process.returncode
+    passed = (return_code in (0, -15) and root_sent and
+              action_index == len(actions) and ready_events >= 2 and
               menu_events >= 1 and counts[1] >= 1 and counts[2] >= 1 and
-              counts[3] >= 1 and counts[5] >= 86400)
+              counts[3] >= 1 and counts[5] >= 86400 and
+              hop_counts["root"] >= 1 and hop_counts["activate"] >= 1)
     print("dvd menu navigation: "
           f"enter={menu_events} leave={leave_events} ready={ready_events} "
           f"config={counts[1]} data_records={counts[2]} "
           f"data_bytes={counts[5]} commit={counts[3]} style={counts[4]} "
-          f"clear={counts[0]}")
+          f"clear={counts[0]} root_hops={hop_counts['root']} "
+          f"root_discarded={hop_discarded['root']} "
+          f"activate_hops={hop_counts['activate']} "
+          f"activate_discarded={hop_discarded['activate']} "
+          f"root_sent={int(root_sent)} helper_rc={return_code} "
+          f"elapsed={time.monotonic() - started:.2f}s")
     if not passed:
         sys.stderr.write(error_buffer.decode(errors="replace"))
         return 1
