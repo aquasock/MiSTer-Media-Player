@@ -1,4 +1,4 @@
-## 787 COMMIT Unreleased ??? 2026-08-30T19:40:26-07:00
+## 787 COMMIT Unreleased 531f741 2026-08-30T19:40:26-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add direct main-feature playback from the absolute USB optical-device path `/dev
 
 #### Outcome:
 
-The user reprioritizes direct USB DVD access because ripping and transferring ISO images dominates development time, keeps the deployed source-`eb7bed6` Blazing Saddles audio-boundary test running at 25 minutes, and connects the Coming to America DVD drive to the MiSTer.  Read-only absolute-path FTP inspection finds `/dev/sr0` and `/dev/cdrom -> sr0`; `/dev/sr0` is a removable root:`cdrom` block device with mode 0660 and 16,461,784 reported 512-byte sectors, backed by an HL-DT-ST DVDRAM GP63EX70 revision RF01.  Every `/media/usb0` through `/media/usb7` directory is empty, so the disc is not filesystem-mounted, but direct libdvdnav/libdvdread/libdvdcss access should use the block device and does not require a mount.  The proposed helper boundary will implement only the already reserved explicit source `dvd:/dev/sr0`, use libdvdnav's device-opening path so libdvdcss owns optical authentication and sector reads, and reuse the accepted longest-title, initial random-access, PTS epoch, scheduler and one-traversal behavior.  Patched Main will recognize a small `USB DVD Drive.dvd` launcher in the existing MediaPlayer file list and translate it to that exact source string.  Menus, chapter controls, track selection, subpictures, DVD LPCM and physical-disc ejection remain outside this commit; Main and helper change, but the FPGA, seed-19 RBF and Quartus project do not.
+The MiSTer drive is confirmed by read-only absolute-path inspection as the removable root:`cdrom` block device `/dev/sr0`, with `/dev/cdrom -> sr0`, 16,461,784 reported 512-byte sectors and model HL-DT-ST DVDRAM GP63EX70 revision RF01; no `/media/usb0` through `/media/usb7` filesystem mount is required.  Source `531f741` adds the explicit `dvd:` media-source backend, requires an absolute device path, opens it directly through libdvdnav so libdvdread and statically linked libdvdcss own optical authentication and sector reads, and reuses longest-title selection, initial random-access filtering, PTS epoch normalization, scheduling, rewind and one-traversal termination.  Patched Main recognizes the `USB DVD Drive.dvd` launcher under `/media/fat/games/MediaPlayer` and maps it only to `dvd:/dev/sr0`; capabilities now advertise `sources=file,iso,dvd`.  A full native direct-backend traversal against the existing Blazing Saddles image selects title 2, emits 3,823,399,998 video bytes, 11,150 timestamps and 267,482,112 PCM samples, handles one expected PTS discontinuity, and stops once at title exit with stream SHA-256 `58badf9c`.  The first Main attempt exposes a full 7.7 GiB `/tmp`; relocating `TMPDIR` to `/run/media/vash/GIT/.mmp-entry787-main-tmp` then exposes and corrects the new-file patch hunk count before a clean pinned-upstream build.  Exact outputs are a 1,580,488-byte native helper at SHA-256 `b63e2e46`, an 847,156-byte stripped static ARM EABI5 helper at `d5067fa1`, and a 1,170,396-byte stripped dynamically linked ARM EABI5 Main at `e428c8b0`; the expected upstream packed-attribute and static-libdvdcss `getpwuid` warnings remain.  Menus, chapters, track selection, subpictures, DVD LPCM and ejection remain outside this commit, and no FPGA, seed-19 RBF, Quartus, MiSTer executable, media or configuration change occurs.
 
 #### Next Steps:
 
-Implement the shared ISO/direct-device navigation source with absolute-device validation and rewind, add the launcher mapping and documentation, and require native ISO, MPG and VOB regressions before cross-building one helper and one patched Main from exact source.  Do not alter the MiSTer while the current Blazing Saddles run is active.  After its 48:25 gate passes and telemetry is captured, preserve both installed executables, deploy each through unique candidate upload and readback followed by same-directory rename and final readback, install only the tiny launcher under the absolute MediaPlayer directory, and reboot or reload as required.  The first physical-disc gate is a bounded Coming to America launch proving direct device open, CSS key acquisition, valid longest-title Program Stream output, continuous HDMI audio and video, and representative S/PDIF output; extend the run only after optical latency and read stability are demonstrated.
+Do not alter the MiSTer while the deployed source-`eb7bed6` Blazing Saddles test is active; let it pass the prior 48:25 boundary, preferably reach about 51 minutes, and capture its displayed telemetry first.  Then preserve both installed executables, deploy the exact helper and Main through unique candidate uploads and independent absolute-path readbacks followed by same-directory renames and final readbacks, and install the launcher only at `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`.  Reboot before the first bounded physical Coming to America disc launch, and require direct `/dev/sr0` open, CSS key acquisition, valid longest-title Program Stream output, continuous HDMI audio and video, and representative S/PDIF output before extending the run.
 
 #### Files Modified:
 
@@ -30,7 +30,7 @@ Implement the shared ISO/direct-device navigation source with absolute-device va
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
