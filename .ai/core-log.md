@@ -1,4 +1,4 @@
-## 832 COMMIT Unreleased ??? 2026-08-31T14:59:02-07:00
+## 832 COMMIT Unreleased 0e89c73 2026-08-31T14:59:02-07:00
 
 #### Coming From:
 
@@ -10,19 +10,20 @@ Prove whether Main submits each complete helper-generated DVD overlay record to 
 
 #### Outcome:
 
-The user approves the Main-only observability boundary after the known opaque helper probe produces two complete synthetic overlay frames and 152 moving style records but the physical menu displays no magenta pixels.  The proposed diagnostic adds a bounded streaming verifier after, and only after, each successful `user_io_file_tx_data_step` consumption so it observes the exact byte sequence Main reports as submitted while leaving its contents, chunking, credit protocol, pacing and control behavior unchanged.  The verifier will recognize overlay markers and declared lengths across arbitrary pipe and ioctl boundaries, retain only bounded configuration and style state, validate frame command order, count data records and bytes, calculate FNV-1a over the submitted plane, count non-`0x55` probe bytes, and log changed selection payloads plus each commit.  The helper, kernel, ioctl implementation, FPGA source, QSF and seed-20 RBF remain untouched.
+The user approves and source `0e89c73` implements the Main-only observability boundary after the known opaque helper probe produces two complete synthetic overlay frames and 152 moving style records but the physical menu displays no magenta pixels.  A second patch against pinned Main source `0a8fb44` adds a bounded streaming verifier after, and only after, each successful `user_io_file_tx_data_step` consumption so it observes the exact byte sequence Main reports as submitted while leaving its contents, chunking, credit protocol, pacing and control behavior unchanged.  The verifier recognizes overlay markers and declared lengths across arbitrary pipe and ioctl boundaries, retains only bounded configuration and style state, validates frame command order, counts data records and bytes, calculates FNV-1a over the submitted plane, counts non-`0x55` probe bytes, suppresses repeated identical style logs, and reports changed selections plus every commit and session summary.  A focused build of the exact patched header with C++11 strict warnings passes when every byte is fed separately and again in 37-byte chunks, recognizing the complete 22-record, 86,400-byte probe at FNV-1a `f8555d45`, rejecting a one-byte corruption, zero and oversized lengths, data and commit before config, an interrupted frame, an unknown command and a repeated style.  Both Main patches apply cleanly in order and the complete exact-source ARM Main build succeeds with MiSTer's GNU 10.2 toolchain.  `/home/vash/MiSTer-Media-Player-0e89c73/host/build/MiSTer_OverlayTrace` is a 1,178,588-byte stripped dynamically linked ARMv7 EABI5 hard-float executable at SHA-256 `872050d44266d74c28e302a54336f409426fbca235ce3384c3b1735eb1aa6356` and contains the required commit and summary markers.  The helper, kernel, ioctl implementation, FPGA source, QSF and seed-20 RBF remain untouched.
 
 #### Next Steps:
 
-Implement the verifier in the pinned Main patch with a self-contained state machine suitable for focused host testing, reset it at each MediaPlayer session, and feed it only the exact `consumed` bytes after a successful transport step.  Exercise markers and lengths split at every boundary, invalid records, repeated style suppression, command-order faults, a complete 22-record 86,400-byte `0x55` plane with FNV-1a `f8555d45`, and a corrupted plane, then apply the patch cleanly to pinned Main source `0a8fb44` and complete the normal ARM Main build.  Commit only the passive diagnostic, build a uniquely named Main artifact from the exact commit on the build PC, and provide its path and hash while preserving the installed diagnostic helper and RBF.
+Replace only `/media/fat/MiSTer` with `/home/vash/MiSTer-Media-Player-0e89c73/host/build/MiSTer_OverlayTrace` from the build PC, preserving the currently installed diagnostic helper and seed-20 RBF, verify the 1,178,588-byte destination and SHA-256 `872050d44266d74c28e302a54336f409426fbca235ce3384c3b1735eb1aa6356`, restore executable permission if needed, and perform a normal MiSTer reboot because Main changes.  Restart the physical DVD, enter the root menu, move through several buttons and capture the fresh `/tmp/MediaPlayer_ARM.log` plus screenshot.  A decisive successful submission has `overlay_submit config` with `probe_payload=1`, `overlay_submit commit` with 22 data records, 86,400 data bytes, FNV-1a `f8555d45`, zero non-`0x55` bytes, zero order errors and `probe_complete=1`, followed by moving style rectangles; if those exact lines coexist with no magenta rectangle, userspace Main is cleared and the remaining boundary is kernel-to-FPGA delivery or live FPGA processing.
 
 #### Files Modified:
 
-- host/main_mister/0001-mediaplayer-arm-loader.patch
+- host/build_arm_stack.sh
+- host/main_mister/0002-mediaplayer-overlay-trace.patch
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
