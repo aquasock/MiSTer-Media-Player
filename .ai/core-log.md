@@ -1,3 +1,32 @@
+## 817 COMMIT Unreleased 0e70319 2026-08-31T06:43:56-07:00
+
+#### Coming From:
+
+Unreleased 0e70319
+
+#### Purpose:
+
+Verify that the user's manual helper replacement installed and launched the exact source-`0e70319` candidate before renewed menu testing.
+
+#### Outcome:
+
+Absolute-path FTP readback now reproduces `/media/fat/linux/MediaPlayer_Helper` as the expected 904,564-byte static ARMv7 executable at SHA-256 `c8a39413c5131ddfa26947013986e2088f0e72fa618f2ff6dd85fdb4bc7d3baf`, exactly matching `/home/vash/MiSTer-Media-Player-0e70319/host/build/MediaPlayer_Helper` on the build PC rather than entry 816's identically sized old helper at `a00173f6`.  Read-only SSH inspection reports remote mode `755` and one active helper process, PID 767; hashing `/proc/767/exe` independently returns the same full `c8a39413` digest, proving the running process was launched from the replacement rather than retaining the deleted predecessor inode.  This verifies deployment only and makes no repository source, Main, RBF, playback option or target-file change by the agent; menu hardware acceptance remains pending.
+
+#### Next Steps:
+
+With the exact source-`0e70319` helper now active, press keyboard `M` during first-play, test Up, Down, Left and Right at the root menu before pressing Space, and leave any resulting screen visible.  Require `discarded_block_tail` logs for successful root and activation hops, visible highlight movement wherever the authored menu links adjacent buttons, successful activation without the `0x0200` B-presentation raster, and continued native 480i; capture the matching screen and helper log before accepting the candidate.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 816 COMMIT Unreleased 0e70319 2026-08-31T06:23:51-07:00
 
 #### Coming From:
@@ -1192,35 +1221,6 @@ The user clarifies that the NARA file named in the preceding positive report is 
 #### Next Steps:
 
 Keep source `205bbd7`, fitter seed 19, the installed RBF, native 480i mode and current decoder capability boundary unchanged.  The frame-picture MPD-D2 VOB compatibility and real-time throughput gate is accepted; field-picture MPEG-2 remains intentionally deferred.  If the user wants to resume the previously paused roadmap, scope decrypted ISO playback as a host-side input and navigation boundary first, without an FPGA rebuild unless later evidence proves one necessary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 777 COMMIT Unreleased 205bbd7 2026-08-30T14:25:12-07:00
-
-#### Coming From:
-
-Unreleased 205bbd7
-
-#### Purpose:
-
-Accept the formerly stuttering Big Lebowski MPD-D2 VOB on the installed source-`205bbd7` core and retain the user's separate control-file report without assuming an ambiguous filename.
-
-#### Outcome:
-
-The user reports that `/media/fat/games/MediaPlayer/the_big_lebowski_mpd_d2_5min.vob` runs perfectly and leaves its terminal telemetry visible for one requested capture; this file previously developed severe audio stutter near 33 seconds.  The matching helper log identifies S/PDIF decoded-PCM output and the exact VOB, submits all 362,080,761 bytes through the fast path in 299.931120 seconds at 1.207213 MB/s, emits all 9,375 AC-3 frames and 14,400,000 PCM samples, reaches EOF and exits zero; the earlier nominal HDMI run on the previous decoder required 309.292 seconds and accumulated the same starvation deficit.  The 561,604-byte screenshot `/tmp/entry777_lebowski_mpd_d2_5min_pass.png`, SHA-256 `17a66fd1e1e2b1b9be0db3a86378778061f75fefbdb23b026838a9b270372617`, visibly preserves the clean intended terminal toilet scene.  Its 64 schema-20 telemetry records have valid headers, row indices and parity, and checksum `9d09b149` matches; the terminal no-progress snapshot accepts 299,975,349 clean-video bytes, records 2,998 reference pictures, 8,991 displayed pictures and 8,990 swaps, and reports zero hardware error flags, audio underruns, PCM protocol errors, presentation errors, cache overlaps, transport blocks, deadline gaps, cadence outliers or timestamp conflicts.  The 12,195,247-byte helper log has SHA-256 `e22a4be8861fa1ab7274a4b5e7dcaecdac414590956d3b97986e74fb072a04f2`.  The user separately states that “Blazing Saddles is good (the NARA file)”; because Blazing Saddles and the NARA qualification VOB are distinct known fixtures, this exact positive report is retained without assigning it to one filename.  No further screenshot is requested, and no source, installed file, playback mode or configuration changes.
-
-#### Next Steps:
-
-Keep the installed source-`205bbd7` core and native 480i mode unchanged.  Confirm whether the user's “Blazing Saddles is good (the NARA file)” report refers to `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob`, a Blazing Saddles fixture, or both; run only any still-unverified adopted control and report its exact filename and result.  Coming to America and Big Lebowski have now both cleared their former sustained audio-starvation failures, so do not rebuild or alter the decoder.
 
 #### Files Modified:
 
