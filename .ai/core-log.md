@@ -1,3 +1,49 @@
+## 808 COMMIT Unreleased ??? 2026-08-31T01:28:52-07:00
+
+#### Coming From:
+
+Unreleased 6e44472
+
+#### Purpose:
+
+Implement authored DVD-Video menu navigation and subpicture highlights through the existing libdvdnav session and a bounded FPGA DDR overlay plane.
+
+#### Outcome:
+
+The user explicitly approves the full menu-support boundary outlined in entry 794 while continuing ordinary DVD playback observation against the accepted source-`6e44472` baseline.  The planned source keeps pinned libdvdnav as the DVD virtual-machine and button-navigation owner, starts ISO and direct optical playback through authored first-play behavior, extends the private Main/helper channel for directional selection, activation and return-to-menu, preserves finite and indefinite still-menu interaction, and retains the accepted title, chapter, pause, audio and CSS paths.  The helper will assemble and decode the selected DVD subpicture stream into packed two-bit pixels, carry palette, alpha and highlight state over a length-bounded in-band record, and the FPGA will store the 720-by-480 overlay in a dedicated unused DDR region, read it through an explicit arbiter client and composite it at native video coordinates before the existing cadence diagnostic overlay.  This avoids an impossible full-screen M10K allocation and does not repurpose decoder frame banks.  The authorized DVD-Video application books remain unavailable in `core-reference.md`, so implementation will use the exact pinned VideoLAN APIs and retained-disc behavior without claiming formal DVD-Video conformance.
+
+#### Next Steps:
+
+Implement the host navigation, SPU decoder, protocol, Main input bindings, in-band overlay records, DDR writer and display compositor as one hardware-useful boundary.  Prove malformed and fragmented SPU rejection, palette and alpha mapping, button-highlight changes, still-menu control, title entry and return-to-menu, overlay clearing across hops and session resets, byte-identical ordinary file and main-title playback, and DDR arbitration without decoder starvation; then run the complete accepted host and RTL regressions before one clean pinned-seed-19 Quartus build.  Install only an RBF with positive setup, hold, recovery, removal and minimum-pulse-width margins together with matching Main and helper binaries, then qualify authored menus, chapters, audio and video on retained ISO and physical-disc sources.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer.qsf
+- MediaPlayer.sv
+- README.md
+- docs/ARCHITECTURE.md
+- docs/BUILDING.md
+- host/arm/ARCHITECTURE.md
+- host/arm/Makefile
+- host/arm/dvd_spu.c
+- host/arm/dvd_spu.h
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/arm/media_source.c
+- host/arm/media_source.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- rtl/mpeg2_new/mpeg2_dvd_overlay.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 807 COMMIT Unreleased 6e44472 2026-08-31T01:20:21-07:00
 
 #### Coming From:
@@ -1189,35 +1235,6 @@ Continue the two installed MPD-D2 VOB hardware tests one title at a time and pre
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 768 COMMIT Unreleased 8623431 2026-08-30T06:08:24-07:00
-
-#### Coming From:
-
-Unreleased 8623431
-
-#### Purpose:
-
-Create, verify and install five-minute MPD-D2 qualification VOBs for Coming to America and The Big Lebowski.
-
-#### Outcome:
-
-The user requests that the two remaining DVD sources be tested exactly like the accepted Blazing Saddles MPD-D2 VOB.  FFmpeg's DVD-video demuxer identifies title 1 as the main feature for both `/home/vash/Videos/Coming Toamerica Ac/VIDEO_TS`, 6,737.666667 seconds, and `/home/vash/Videos/the_big_lebowski.iso`, 7,036.100000 seconds, with 720x480 MPEG-2 video and English six-channel AC-3 first.  Their first five minutes are stream-copied without transcoding into isolated staging files of 222,027,776 bytes at SHA-256 `687bd2ebb757d4b34faf0f531e1f2ddb4c4e4747b1f33cd1da9aeb05b646d4cc` and 264,787,968 bytes at SHA-256 `8fe852c10630d989448e3fb6afedf9e48d82a255c58c02815be06ff0ca494afe`.  The committed `mpd-d2-create` tool produces separate 300.038401-second VOBs; independent `mpd-d2-verify` runs accept all 8,992 720x480, 30000/1001, top-field-first MPEG-2 Main Profile/Main Level pictures at 8 Mbps, all 9,375 stereo 48 kHz AC-3 frames at 256 Kbps, manifest provenance and complete software decode for each file.  `/media/fat/games/MediaPlayer/coming_to_america_mpd_d2_5min.vob` is 313,421,824 bytes with SHA-256 `38289443906634ea9b499511bbad080e60a3960b418c3995e80c3da0e60d839a`; `/media/fat/games/MediaPlayer/the_big_lebowski_mpd_d2_5min.vob` is 313,421,824 bytes with SHA-256 `12a9c19c9f8be8ba06d36056fea8aebd99aa70e9bc3416b593af008e32a054a6`.  Absolute target inventory proves both names absent before upload, and independent downloads reproduce every byte and both exact hashes.  Repository source, the installed seed-19 RBF, Main, helper, existing media and Native 480i configuration remain unchanged.
-
-#### Next Steps:
-
-Test one file at a time in Native 480i with `16:9`, Bob and HDMI.  Play Coming to America through its full five-minute EOF, verify picture, cadence, audio and synchronization, check S/PDIF for a representative portion, and leave the completed screen untouched for telemetry and helper-log capture.  Only after that result is captured, repeat the same full run and audio-output checks for The Big Lebowski so evidence cannot be mixed between titles.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
