@@ -1,4 +1,36 @@
-## 803 COMMIT Unreleased ??? 2026-08-30T22:48:28-07:00
+## 804 COMMIT Unreleased ??? 2026-08-30T23:17:00-07:00
+
+#### Coming From:
+
+Unreleased de29d54
+
+#### Purpose:
+
+Keep native 480i presentation active when one interlaced-sequence chapter mixes ordinary interlaced and progressive film frame pictures.
+
+#### Outcome:
+
+The user already approved the separate FPGA boundary identified in entry 802 for chapters 8, 11, 15, 17 and 23, whose interlaced I-picture starts are followed by progressive film P and B frame pictures.  The planned change will make the native field-order tracker enter a sticky per-picture film scheduling mode when any progressive frame appears inside an otherwise supported 720x480-at-30000/1001 interlaced sequence, while retaining the existing fixed-order mismatch guard for a purely ordinary interlaced session before that transition.  Native request ownership will accept either supported ordinary-interlaced or supported film-frame pictures without requiring the first picture to classify the whole session.  Existing frontend capability checks remain authoritative, so field pictures, unsupported chroma, concealment motion vectors, timing faults, syntax errors and other decoder error gates remain rejected rather than being hidden by presentation ownership.
+
+#### Next Steps:
+
+Implement the narrow tracker and native-request changes, add focused simulations for interlaced-to-film, film-to-interlaced, changing per-picture top-field-first, pure-interlaced mismatch and reset behavior, and rerun the complete native-480i, mixed I/P/B, reconstruction, cadence and presentation regressions.  If all simulations pass, commit and push the source, pull that exact commit on the build PC, perform exactly one clean Quartus Prime 17.0.2 build at pinned seed 19, require all five timing categories and the resource gate to pass, then install the readback-verified RBF and hardware-test chapter navigation through the five reported mixed-mode chapters with stable native output and clean telemetry.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer.sv
+- README.md
+- rtl/mpeg2_new/mpeg2_h262_native_field_order.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 803 COMMIT Unreleased de29d54 2026-08-30T22:48:28-07:00
 
 #### Coming From:
 
@@ -10,11 +42,11 @@ Correct host-side chapter audio recovery and reorganize the MediaPlayer menu wit
 
 #### Outcome:
 
-The user approves entry 802's two-boundary recovery plan and additionally directs the first host boundary to present `Run DVD-Video`, `Open MPEG-2 Video`, and `Open WAV, MP3, FLAC, OGG`, followed by Aspect Ratio with `16:9` as the default and `4:3` second, Deinterlacer Mode with Bob and Weave, and the existing Audio Test and Audio Output choices unchanged.  The planned Main selector change will preserve separate DVD, MPEG-2 and audio extension filters rather than replacing every MediaPlayer selector with one combined list.  Because an Open OGG entry must not advertise a rejected file type, this boundary also plans pinned Ogg Vorbis decoding through the existing consumer-audio conversion and transport path.  Chapter changes will retain the initially established Program Stream audio codec and substream identity, reset decoder buffers without forgetting that selection, honor the first complete private-stream access unit after navigation, and resynchronize past a bounded invalid AC-3 candidate frame instead of terminating valid playback.  Main input bindings and transport barriers remain unchanged, and no RTL, QSF, Quartus build or RBF change belongs to this commit.
+Source `de29d54` reorganizes the core menu into separate DVD-Video, MPEG-2 and consumer-audio selectors, makes 16:9 the default aspect ratio, preserves the existing Bob/Weave and audio choices, teaches the pinned Main selector about `.flac`, `.mpeg` and `.ogg`, and adds functional Ogg Vorbis decode through pinned stb_vorbis source.  Chapter resets now retain the established Program Stream codec and AC-3 or DTS private substream; HDMI AC-3 decoding scans forward at most 64 KiB and rebuilds liba52 after a rejected boundary candidate instead of terminating.  Native WAV, MP3, FLAC and 44.1/48 kHz Ogg tests are deterministic, an intentionally damaged AC-3 Program Stream resynchronizes and completes, and the exact Coming Toamerica DVD folder passes chapter 1 to 2 and 2 to 3 with substream `0x80` retained and bounded recovery logged at both barriers.  Exact source builds reproduce a 896,372-byte static ARM helper at SHA-256 `156917b7a165905f3cc73adf995886d05fc3f60aa301a4a31574f36ac0b06202` and a 1,174,492-byte Main at SHA-256 `d91b570057d6cf314f5f98d7d637a8607f59fe5b61a193a40e6a615a6bab8c98`; both are directly installed without backups, independently read back, mode 755, and a verified reboot activates Main.  The installed RBF remains unchanged, so the new menu and mixed native-video behavior are not yet active and hardware playback acceptance remains open.
 
 #### Next Steps:
 
-Implement the helper, dependency, Main patch, menu and documentation changes; add focused host fixtures for chapter-boundary AC-3 ordering and recovery plus WAV, MP3, FLAC and Ogg Vorbis selector and decode paths; preserve ordinary Program Stream, ISO, direct-DVD, HDMI and S/PDIF behavior; build the strict native helper, static ARM helper and patched Main; and deploy only the verified helper and Main under the user's no-backup replacement policy for a chapter-one-through-three and menu hardware gate.  After that host boundary passes, proceed without another scope expansion to the separately approved native mixed film/interlaced FPGA commit and seed-19 build.
+Proceed with entry 804's separately approved mixed film/interlaced native-480i source and seed-19 FPGA boundary so one readback-verified RBF activates both the new menu and the presentation correction.  Hardware acceptance must then confirm chapter navigation beyond chapter 2, stable native presentation at chapters 8, 11, 15, 17 and 23, unchanged play/pause, correct 16:9 default and selector layout, and functional Ogg playback; capture the helper log and telemetry before settling either entry as passed.
 
 #### Files Modified:
 
@@ -33,7 +65,7 @@ Implement the helper, dependency, Main patch, menu and documentation changes; ad
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1188,34 +1220,5 @@ Generate the retained five-minute MPD-D2 qualification VOB from the validated Bl
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 764 COMMIT Unreleased cee1a9e 2026-08-30T05:14:01-07:00
-
-#### Coming From:
-
-Unreleased cee1a9e
-
-#### Purpose:
-
-Capture and accept the complete five-minute Blazing Saddles hardware run and begin exact NARA MPD-D2 qualification work.
-
-#### Outcome:
-
-The user completes `/media/fat/games/MediaPlayer/blazing_saddles_first_5min.mpg` on the installed timing-clean seed-19 RBF in Native 480i at `16:9` and reports that picture and audio remain perfect through EOF, completing the requested three-title five-minute commercial-DVD compatibility set.  The 614,629-byte scaled capture `/tmp/entry764_blazing_saddles_5min_pass.png`, SHA-256 `fe6dee37ca7ae821f24e6695a2c8d86a2ca5a41e35d14dee7ab56ae33e19c04e`, and the 391,623-byte native 720x480 capture `/tmp/entry764_blazing_saddles_5min_raw.png`, SHA-256 `b225eaf2a3b6a0e7f45f1d761fa2b331cf3d0746a6a31497d652cafee6753251`, visibly preserve the clean final scene.  All 64 schema-20 telemetry records have valid headers, row indices and parity, and checksum `dd0752bc` matches; the no-progress EOF snapshot accepts 224,180,164 clean-video bytes, records 2,400 reference pictures, 7,194 displayed pictures and 7,193 swaps, and reports zero aggregate hardware errors, zero transport blocks and zero audio FIFO underruns.  The 14,514,247-byte helper log `/tmp/entry764_blazing_saddles_5min_pass.log`, SHA-256 `35be1c1d31a76a28dd94d4573cd452eda4ee7013902584234e36bc7260cce144`, names the exact file, selects HDMI decoded stereo PCM, emits all 9,375 AC-3 frames and 14,400,000 PCM samples, reaches EOF, exits zero and submits all 286,285,586 transport bytes on the fast path.  The user authorizes the remaining adopted NARA MPD-D2 qualification steps; no source, RBF, helper, media or mode change occurs during this capture.
-
-#### Next Steps:
-
-Add deterministic media tooling that creates and strictly verifies a retained NARA MPD-D2 qualification VOB/Program Stream with MPEG-2 Main Profile/Main Level 720x480 constant-bit-rate 30000/1001 interlaced top-field-first video and two-channel 48 kHz 256 Kbps constant-bit-rate AC-3 from a documented 16-bit source.  Verify complete independent software decode and every machine-checkable profile property, retain exact hashes and provenance, install the resulting fixture with independent readback, and test it completely in Native 480i over HDMI decoded stereo and S/PDIF AC-3 passthrough.  Field pictures remain an explicit limitation and are outside this cycle.  After that hardware gate, pin fitter seed 19 in the QSF, perform the clean release build and timing analysis, and update stale release documentation.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
