@@ -1,3 +1,32 @@
+## 838 COMMIT Unreleased ??? 2026-08-31T16:39:27-07:00
+
+#### Coming From:
+
+Unreleased 6dbbaf6
+
+#### Purpose:
+
+Preserve the repaired DVD overlay handshake while restoring positive global setup timing after the first exact-source fit.
+
+#### Outcome:
+
+Exact source `4821744` remains functionally accepted by all five focused overlay simulations, but its clean Quartus Prime 17.0.2 seed-20 build is rejected by the project timing gate at global setup slack negative 0.441 nanoseconds.  The dedicated 60 MHz decoder and 54 MHz video domains remain violation-free at positive 0.557 and 2.529 nanoseconds, and hold, recovery, removal and minimum-pulse-width slacks remain positive.  A read-only fifty-path TimeQuest report proves every reported violation is the unrelated HDMI-domain scaler path from `ascal|o_vacpt` through its address DSP terminals, while the changed elastic extractor slot added a simultaneous ready-transfer replacement path into upstream readiness and perturbed packing.  The planned correction retains every overlay byte but makes the one-entry output slot non-elastic: upstream stops whenever the slot is occupied and resumes on the cycle after the engine accepts it, removing the new combinational ready path at the cost of one harmless decoder-clock bubble per overlay byte.
+
+#### Next Steps:
+
+Change only the overlay-payload input-ready term to require an empty retained output slot, rerun the strengthened extractor and complete stalled-DDR integrated regressions plus the retained engine, arbiter and snapshot tests, commit the correction, then perform a second clean seed-20 Quartus build from the exact corrected source.  Reject any RBF unless global setup, hold, recovery, removal and minimum-pulse-width timing are all positive and both dedicated decoder and video timing reports contain no violations.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 837 COMMIT Unreleased 4821744 2026-08-31T16:18:01-07:00
 
 #### Coming From:
@@ -1192,35 +1221,6 @@ Preserve the active 1,174,492-byte source-`151e10a` Main at SHA-256 `b98af001791
 - README.md
 - host/arm/ARCHITECTURE.md
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 798 COMMIT Unreleased 151e10a 2026-08-30T22:12:01-07:00
-
-#### Coming From:
-
-Unreleased 151e10a
-
-#### Purpose:
-
-Record the first hardware control test and identify why pause receives no keyboard or controller input while chapter navigation works.
-
-#### Outcome:
-
-The user reports that previous and next chapter appear to work correctly but play/pause does nothing after trying the keyboard and every controller button.  The live 8,152,023-byte diagnostic log `/tmp/entry798_pause_input_failure.log`, SHA-256 `604f3ffcf18bb3acc61cb4636e02799b4513554bb043f47d57af1b7724abdd85`, independently records 23 next-chapter commands and nine previous-chapter commands, all followed by successful helper-ready and Main release barriers with no chapter, control-channel or helper-EOF fault; it records zero `playback paused` and zero `playback resumed` events.  Static comparison against the exact pinned Main source identifies the binding defect: `JOY_START` is an alias for virtual core button four, not the physical controller Start control, while MediaPlayer's `CONF_STR` declares no joystick buttons.  Closed-OSD Main therefore forwards directional bits to `user_io_digital_joystick`, which explains the working Left and Right controls, but does not assign any physical keyboard or controller button to virtual button four, so the pause branch can never observe its requested bit.  The official VLC 3.0 hotkey documentation identifies Space as Play/Pause, N as Next and P as Previous; the user explicitly limits the requested VLC alignment to those keyboard assignments rather than any VLC playback behavior, architecture or library.  Main can translate those three raw keyboard events and the physical controller Start event into the existing transport actions without changing `CONF_STR`, the helper or RBF.  This accepts the deployed previous and next chapter path, rejects only the pause binding, and changes no source, installed file, RBF, helper, Main, playback option or running process during diagnosis.
-
-#### Next Steps:
-
-Add only Main-side input translations with the existing OSD-closed and active-playback guards: keyboard Space toggles play/pause, P requests the previous chapter and N requests the next chapter, while physical controller Start toggles play/pause and controller D-pad Left and Right retain their accepted chapter actions.  Do not adopt any other VLC behavior or change `CONF_STR`, helper, RTL or RBF.  Build and host-test patched Main, preserve the currently deployed source-`151e10a` Main as rollback, activate the new Main, reboot once, then require each keyboard and controller command to act exactly once and resume synchronized physical-DVD playback.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
