@@ -21,7 +21,8 @@ Main optionally passes `--control-fd FD`, a private version-one
 Right request previous or next chapter and a ready/go barrier prevents any
 pre-jump byte from crossing the reset download session. Start pause/resume is
 owned by Main as a stdout transport hold, so no pause byte enters the FPGA
-protocol.
+protocol. Keyboard P/N use the same previous/next actions and Space uses the
+same pause action while the MiSTer OSD is closed.
 
 The helper writes one annotated transport to standard output. Reserved H.262
 codes distinguish picture timestamps, fixed signed 16-bit PCM samples, and a

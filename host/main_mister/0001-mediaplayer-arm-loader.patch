@@ -129,6 +129,46 @@ index b912439..447b56d 100644
  uint16_t fpga_spi_fast(uint16_t word);
  
  void fpga_spi_fast_block_write(const uint16_t *buf, uint32_t length);
+diff --git a/input.cpp b/input.cpp
+index 50f1991..a4cc7c6 100644
+--- a/input.cpp
++++ b/input.cpp
+@@ -36,6 +36,7 @@
+ #include "frame_timer.h"
+ #include "scaler.h"
+ #include "file_io.h"
++#include "support/mediaplayer/mediaplayer.h"
+ 
+ #define NUMDEV 30
+ #define UINPUT_NAME "MiSTer virtual input"
+@@ -3709,6 +3710,12 @@ static void input_cb(struct input_event *ev, struct input_absinfo *absinfo, int
+ 				}
+ 				else
+ 				{
++					if (input[dev].num == 1 &&
++					    ev->code == input[dev].mmap[SYS_BTN_START] &&
++					    mediaplayer_input(MEDIAPLAYER_INPUT_PLAY_PAUSE,
++					                      ev->value == 1, 0))
++						return;
++
+ 					if (mouse_emu)
+ 					{
+ 						int use_analog = (input[dev].mmap[SYS_AXIS_MX] || input[dev].mmap[SYS_AXIS_MY]);
+@@ -3790,6 +3797,14 @@ static void input_cb(struct input_event *ev, struct input_absinfo *absinfo, int
+ 				int keyrah = (cfg.keyrah_mode && (((((uint32_t)input[dev].vid) << 16) | input[dev].pid) == cfg.keyrah_mode));
+ 				if (keyrah) ev->code = keyrah_trans(ev->code, ev->value);
+ 
++				unsigned media_input = ev->code == KEY_SPACE ? MEDIAPLAYER_INPUT_PLAY_PAUSE :
++				                       ev->code == KEY_P ? MEDIAPLAYER_INPUT_PREVIOUS :
++				                       ev->code == KEY_N ? MEDIAPLAYER_INPUT_NEXT : 0;
++				if (!menu_event && media_input &&
++				    mediaplayer_input(media_input, ev->value == 1,
++				                      user_io_osd_is_visible()))
++					return;
++
+ 				uint32_t ps2code = get_ps2_code(ev->code);
+ 				if (ev->value) modifier |= ps2code;
+ 				else modifier &= ~ps2code;
 diff --git a/menu.cpp b/menu.cpp
 index 0c74e21..cb3376e 100644
 --- a/menu.cpp
@@ -226,10 +266,10 @@ index 0c74e21..cb3376e 100644
  				printf("Saving config to %s\n", filename);
 diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
 new file mode 100644
-index 0000000..921ae5e
+index 0000000..4101221
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,629 @@
+@@ -0,0 +1,645 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -681,27 +721,28 @@ index 0000000..921ae5e
 +	                 (unsigned long long)discarded, playback_paused);
 +}
 +
-+void mediaplayer_joystick(unsigned char joystick, uint32_t map, int osd_visible)
++int mediaplayer_input(unsigned input, int pressed, int osd_visible)
 +{
-+	static uint32_t previous_map = 0;
-+	uint32_t pressed;
++	if (helper_fd < 0 || osd_visible || !mediaplayer_is_core()) return 0;
++	if (!pressed) return 1;
 +
-+	if (joystick != 0) return;
-+	pressed = map & ~previous_map;
-+	previous_map = map;
-+	if (helper_fd < 0 || osd_visible || !pressed) return;
-+	if ((pressed & JOY_START) && !chapter_barrier)
++	if (input == MEDIAPLAYER_INPUT_PLAY_PAUSE)
 +	{
++		if (chapter_barrier) return 1;
 +		playback_paused = !playback_paused;
 +		diagnostic_write("playback %s submitted=%llu\n",
 +		                 playback_paused ? "paused" : "resumed",
 +		                 (unsigned long long)submitted_bytes);
 +		printf("MediaPlayer: %s\n", playback_paused ? "paused" : "resumed");
++		return 1;
 +	}
-+	if (!(pressed & (JOY_LEFT | JOY_RIGHT)) || chapter_barrier ||
-+	    playback_paused || !chapter_controls)
-+		return;
-+	uint8_t command = (pressed & JOY_LEFT) ?
++
++	if (input != MEDIAPLAYER_INPUT_PREVIOUS &&
++	    input != MEDIAPLAYER_INPUT_NEXT)
++		return 0;
++	if (chapter_barrier || playback_paused || !chapter_controls) return 1;
++
++	uint8_t command = input == MEDIAPLAYER_INPUT_PREVIOUS ?
 +	                  MEDIA_CONTROL_PREVIOUS_CHAPTER :
 +	                  MEDIA_CONTROL_NEXT_CHAPTER;
 +	if (download_active)
@@ -715,13 +756,28 @@ index 0000000..921ae5e
 +	if (!send_control(command))
 +	{
 +		stop_with_reason("chapter-command-error");
-+		return;
++		return 1;
 +	}
 +	diagnostic_write("chapter command=%s submitted=%llu\n",
 +	                 command == MEDIA_CONTROL_PREVIOUS_CHAPTER ? "previous" : "next",
 +	                 (unsigned long long)submitted_bytes);
 +	printf("MediaPlayer: %s chapter\n",
 +	       command == MEDIA_CONTROL_PREVIOUS_CHAPTER ? "previous" : "next");
++	return 1;
++}
++
++void mediaplayer_joystick(unsigned char joystick, uint32_t map, int osd_visible)
++{
++	static uint32_t previous_map = 0;
++	uint32_t pressed;
++
++	if (joystick != 0) return;
++	pressed = map & ~previous_map;
++	previous_map = map;
++	if (pressed & JOY_LEFT)
++		mediaplayer_input(MEDIAPLAYER_INPUT_PREVIOUS, 1, osd_visible);
++	else if (pressed & JOY_RIGHT)
++		mediaplayer_input(MEDIAPLAYER_INPUT_NEXT, 1, osd_visible);
 +}
 +
 +static void mediaplayer_poll_inner()
@@ -861,10 +917,10 @@ index 0000000..921ae5e
 +}
 diff --git a/support/mediaplayer/mediaplayer.h b/support/mediaplayer/mediaplayer.h
 new file mode 100644
-index 0000000..163515a
+index 0000000..22a7e7e
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.h
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,23 @@
 +#ifndef MEDIAPLAYER_ARM_LOADER_H
 +#define MEDIAPLAYER_ARM_LOADER_H
 +
@@ -876,6 +932,15 @@ index 0000000..163515a
 +int mediaplayer_start_source(const char *source_spec, unsigned char index);
 +void mediaplayer_poll();
 +void mediaplayer_stop();
++
++enum
++{
++	MEDIAPLAYER_INPUT_PLAY_PAUSE = 1,
++	MEDIAPLAYER_INPUT_PREVIOUS,
++	MEDIAPLAYER_INPUT_NEXT
++};
++
++int mediaplayer_input(unsigned input, int pressed, int osd_visible);
 +void mediaplayer_joystick(unsigned char joystick, uint32_t map, int osd_visible);
 +
 +#endif

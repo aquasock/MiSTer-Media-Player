@@ -73,6 +73,8 @@ consume FPGA M10K memory.
 
 For `.iso` and `.dvd` playback, player-one Left and Right select the previous
 or next chapter and Start toggles pause/resume while the MiSTer OSD is closed.
+On a keyboard, P and N select the previous and next chapter, and Space toggles
+pause/resume under the same OSD-closed guard.
 A chapter change preserves the authenticated libdvdnav session, flushes every
 old HPS/Main byte, resets the existing FPGA download session, and begins from
 the selected chapter's random-access boundary. Pause intentionally holds the
