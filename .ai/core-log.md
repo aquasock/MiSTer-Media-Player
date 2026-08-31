@@ -1,3 +1,32 @@
+## 814 COMMIT Unreleased a9899e0 2026-08-31T05:41:30-07:00
+
+#### Coming From:
+
+Unreleased a9899e0
+
+#### Purpose:
+
+Correct entry 813's prefetch-thread diagnosis before implementing the approved root-menu navigation fix.
+
+#### Outcome:
+
+Complete inspection of `iso_prepare` proves that authored `isomenu:` and `dvdmenu:` playback intentionally bypasses the optical prefetch thread, so entry 813's statement that `iso_menu_command` races an active producer and leaves its ring undiscarded is incorrect and no source work is performed from that diagnosis.  The captured hardware evidence remains valid: root-menu command `0x09` and both control barriers complete, then the reset FPGA session trips only B-picture presentation error `0x0200` after 24,043 accepted bytes.  The actual unsafe helper boundary is narrower and directly visible in `iso_menu_command`: after successful `dvdnav_menu_call` or `dvdnav_button_activate`, it sets hop state but leaves `block_offset` and `block_size` pointing into the current 2,048-byte DVD block.  The next Program Stream pass can therefore consume a stale old-position block tail and assemble a pack or PES across the libdvdnav hop before reading the new authored position.  This corrects only the causal interpretation in entry 813; its screenshot, helper log, hashes and FPGA fault isolation are unchanged.
+
+#### Next Steps:
+
+Obtain approval for the corrected helper-only boundary before implementation: on successful root-menu or button-activation hops, invalidate the current DVD block, clear terminal and still state, and log the discarded block-tail byte count before returning to the existing Main/helper reset barrier.  Add a focused regression proving no pre-hop bytes survive either hop plus the existing real-image menu-navigation test, then build only the helper and repeat the early-trailer `M` hardware test without changing Main, the seed-20 RBF or Quartus source.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 813 COMMIT Unreleased a9899e0 2026-08-31T05:35:17-07:00
 
 #### Coming From:
@@ -1194,38 +1223,6 @@ Reload MediaPlayer from the MiSTer menu so the installed source-`205bbd7` RBF co
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 774 COMMIT Unreleased 205bbd7 2026-08-30T13:13:46-07:00
-
-#### Coming From:
-
-Unreleased 9f10b55
-
-#### Purpose:
-
-Repair the two seed-19 decoder setup-path families in the registered B-picture lookup implementation without changing its throughput, memory use or reconstruction behavior.
-
-#### Outcome:
-
-Source `205bbd7` cuts the two entry-773 timing cones without changing lookup latency or memory structures.  The fetcher now uses a synthesis-preserved one-bit descriptor occupancy register for response-side direct/pop selection while its multi-bit count remains only on request-capacity and accounting paths; zero-latency, delayed, backpressured and simultaneous issue/response protocol cases all pass.  The B engine captures field-DCT slot and destination-row geometry with the existing execution metadata and uses a constant luma plane for field-DCT launch addresses, removing live `blk[1]` from that failed address path.  Exhaustive B motion math, B field motion, field-motion plus field-DCT, interlaced field-DCT residual, interlaced field motion, mixed pixel oracle, cadence, reorder, timestamp, all reference-overlap cases and the complete native-480i suite pass.  The mixed oracle checks 423,936 samples with zero mismatches outside its established two-level bound, preserves 69,556 DDR reads and remains exactly 1,239,997 cycles.  Exact generic-content simulations complete Coming to America in 128,169,997 cycles or 43.6507 cycles per byte and The Big Lebowski in 136,499,997 cycles or 46.7185 cycles per byte; each completes all 24 P and 58 B pictures with every decoder, reconstruction, writer, presentation and publication error flag clear and remains below the 49.7-cycle real-time boundary.  At the user's explicit authorization, exactly one clean Quartus Prime 17.0.2 build of detached source `205bbd7` completes at pinned seed 19 with no reseed or second compile.  Analysis, fitting, assembly, TimeQuest and Phase-1P report extraction complete successfully using 33,760 of 41,910 ALMs, 52,284 registers, 4,181,443 memory bits in exactly 532 of 553 RAM blocks and 67 DSP blocks.  Every reported timing category is positive: worst setup 0.006 ns, hold 0.244 ns, recovery 4.342 ns, removal 0.500 ns and minimum pulse width 0.925 ns, with zero TNS; the targeted 60 MHz decoder setup domain improves to 1.463 ns with zero violated paths and the 54 MHz video domain is 1.792 ns with zero violated paths.  The preserved 4,440,192-byte RBF has SHA-256 `7f60ec43cfffa75108c39c7d21fff727c0f1dddccd844a318e1b7cc5795c6970`.  It remains archived only on the build PC and is not installed or launched on the MiSTer.
-
-#### Next Steps:
-
-Keep the currently accepted core installed and do not deploy the archived source-`205bbd7`, seed-19 RBF until the user separately authorizes installation.  After authorization, install and verify that exact hash, then run the NARA MPD-D2 control and the Coming to America and Big Lebowski MPD-D2 VOBs in native 480i, checking HDMI and S/PDIF and preserving telemetry after each uninterrupted five-minute run.  Accept the candidate only if video remains stable, audio remains continuous apart from the previously accepted allowance of one isolated FIFO underrun, and telemetry shows clean decoder, reconstruction, writer, presentation and publication state.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
 
 #### Status:
 
