@@ -424,7 +424,7 @@ reg [8:0] row_tag_visible [0:1];
 
 wire [8:0] overlay_byte_index = {1'b0,h_pos[9:2]} +
                                 (v_pos[0] ? 9'd4 : 9'd0);
-wire [4:0] overlay_word_index = overlay_byte_index[8:3];
+wire [4:0] overlay_word_index = overlay_byte_index[7:3];
 wire [2:0] overlay_byte_lane = overlay_byte_index[2:0];
 assign cache_rd_addr = (v_pos[0] ? 6'd23 : 6'd0) +
                        {1'b0,overlay_word_index};
@@ -472,6 +472,7 @@ function automatic [7:0] blend_channel;
     input [7:0] foreground;
     input [7:0] alpha;
     reg [16:0] total;
+    reg [16:0] rounded_total;
     begin
         if (alpha == 8'd0)
             blend_channel = background;
@@ -479,7 +480,8 @@ function automatic [7:0] blend_channel;
             blend_channel = foreground;
         else begin
             total = foreground * alpha + background * (8'hff-alpha) + 17'd128;
-            blend_channel = (total + {9'd0,total[16:8]}) >> 8;
+            rounded_total = total + {8'd0,total[16:8]};
+            blend_channel = rounded_total[15:8];
         end
     end
 endfunction

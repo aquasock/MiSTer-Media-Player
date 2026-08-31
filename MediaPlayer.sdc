@@ -51,6 +51,63 @@ set_false_path \
     -from [get_keepers {*|mpeg2_new_framebuffer_generation[*]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|framebuffer_generation_r1[*]}]
 
+# Entry 809: authored-menu overlay stable-bus/toggle handshakes cross between
+# the 60 MHz DDR service and 54 MHz video domains through explicit sampling
+# stages.  Cut only each source -> first-stage path.  The second sampling
+# stages, toggle detection, line-cache controls, compositor and all other
+# 54/60 MHz paths remain timed normally.
+#
+# 54 MHz video -> 60 MHz DDR row-request handshake.
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_request_value_video*}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_request_value_m1*}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_request_toggle_video[*]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_request_toggle_sync0[*]}]
+
+# 60 MHz DDR -> 54 MHz style publication handshake.
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|published_normal[*]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|normal_v1[*]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|published_highlight[*]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|highlight_v1[*]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|published_x1[*]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|x1_v1[*]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|published_y1[*]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|y1_v1[*]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|published_x2[*]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|x2_v1[*]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|published_y2[*]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|y2_v1[*]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|published_visible}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|visible_v1}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|published_menu}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|menu_v1}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|style_toggle_mem}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|style_toggle_sync[0]}]
+
+# 60 MHz DDR -> 54 MHz line-cache tag handshakes.
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_tag_mem[0][*]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_tag0_v1[*]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_tag_mem[1][*]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_tag1_v1[*]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_tag_toggle_mem[0]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_tag_toggle0_sync[0]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_tag_toggle_mem[1]}] \
+    -to   [get_keepers {*|mpeg2_h262_dvd_overlay:*|row_tag_toggle1_sync[0]}]
+
 # 54 MHz presentation -> 60 MHz memory/decoder line-consumed handshake.
 # kate - Phase 1S removed the old asynchronous 11-bit line-number bus.  Only the
 # event toggle now crosses domains; the 54 MHz side derives source-line identity
