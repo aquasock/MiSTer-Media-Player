@@ -1,3 +1,38 @@
+## 791 COMMIT Unreleased ??? 2026-08-30T20:42:55-07:00
+
+#### Coming From:
+
+Unreleased 531f741
+
+#### Purpose:
+
+Remove redundant physical-DVD CSS rescans and mask bounded optical read stalls with asynchronous HPS-side buffering.
+
+#### Outcome:
+
+The user extends the first Coming to America physical-disc run to approximately 40 minutes and reports rock-solid synchronized video and audio after the single captured startup pause, confirms both HDMI and S/PDIF output, both `4:3` and `16:9` aspect ratios, and both Bob and Weave deinterlacing, and hears no further drive speed transition.  No additional capture is required.  The user explicitly authorizes correcting both the long launch and initial stutter.  The planned helper-only boundary will preserve one authenticated direct-device libdvdnav session across the signature and program-stream preflight rewinds instead of repeating the approximately 30-second CSS scan three times, while leaving ISO rewind behavior unchanged.  After preflight, a direct-device-only producer thread will fill an 8 MiB HPS-RAM Program Stream ring and require a 4 MiB initial reserve before playback; the consumer will retain ordered blocking semantics, exact end and error propagation, and clean recovery if a future optical pause exceeds the reserve.  The observed disc rate makes the full ring approximately eight to nine seconds of coverage, materially beyond the measured 2.471110-second pause, while consuming no FPGA M10K, changing no RBF and requiring no Quartus build.  File and ISO backends, selected-title navigation guards, CSS ownership, PTS normalization, audio scheduling and Main remain outside the functional change.
+
+#### Next Steps:
+
+Implement authenticated direct-device reset without reopen, the bounded producer and consumer lifecycle, explicit prefill and starvation diagnostics, orderly rewind and close handling, and native-only deterministic optical-stall injection.  Require the direct backend to preserve byte output across an injected pause longer than the captured event while a real-time consumer drains the reserve, repeat complete direct-title, ISO, MPG and VOB regressions, and cross-build one static ARM helper from exact source.  Do not rebuild Main or the FPGA.  After exact candidate verification and explicit deployment authorization, preserve the installed helper, deploy by absolute-path candidate readback and same-directory rename, and repeat the Coming to America physical launch gate to compare CSS scan count, first-byte latency and continuous playback through the former initial-stall window.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/BUILDING.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- host/arm/media_source.c
+- host/arm/media_source.h
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 790 COMMIT Unreleased 531f741 2026-08-30T20:28:46-07:00
 
 #### Coming From:
@@ -1163,34 +1198,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 751 COMMIT Unreleased 4e54e9d 2026-08-30T02:38:19-07:00
-
-#### Coming From:
-
-Unreleased 7a25189
-
-#### Purpose:
-
-Qualify the cleaned field-motion correction with the known timing-clean placement and prepare its corrected RBF for hardware test.
-
-#### Outcome:
-
-Following repository cleanup at `9aeabac`, source `4e54e9d` pins build ID `260829`, the last timing-clean placement input, without changing decoder RTL.  A checksum-only comparison proves the complete functional local source identical to the clean build-PC tree except for later `.ai` metadata and generated build files.  Quartus Prime 17.0.2 completes successfully at 34,094 of 41,910 ALMs, 52,524 registers, 4,181,443 memory bits in 532 RAM blocks and 67 DSP blocks.  Full timing has zero negative slack and zero setup TNS: HDMI setup is positive 0.055 ns, decoder setup is positive 0.454 ns, video setup is positive 2.346 ns, and worst-case hold, recovery, removal and minimum-pulse-width margins are positive 0.243, 3.376, 0.526 and 0.925 ns.  Fresh isolated reruns of P field motion, bidirectional B field motion, combined field motion plus field-DCT, interlaced P/B field-DCT residuals and the progressive mixed-raster control check 4,052,736 reconstructed samples within their established exact or two-level bounds with zero decoder, raster, writer or presentation errors.  Film cadence, all reference-overlap and reorder cases, timestamps, native field order and all four TFF/BFF repeated-field cache cases also pass.  The resulting 4,456,984-byte `output_files/MediaPlayer.rbf` has SHA-256 `bc79d56a00c69188cd6dc3117944ccaa3a80fa5ba8cfc6dd45f451e4f1593837`; it is not installed on the MiSTer.
-
-#### Next Steps:
-
-Preserve this exact RBF and do not rebuild or reseed it.  After a separate installation authorization, back up the currently installed core, deploy this candidate with exact readback, reload it, and play the existing byte-exact P81 checkpoint in `800x600 Diagnostic` with Weave.  Inspect the held frame for the mouth-level horizontal corruption; if it is absent, continue with a longer authored I/P stream to confirm that later reference propagation is also corrected.
-
-#### Files Modified:
-
-- tools/build.sh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
