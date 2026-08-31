@@ -1,3 +1,32 @@
+## 802 COMMIT Unreleased 6de2778 2026-08-30T22:43:15-07:00
+
+#### Coming From:
+
+Unreleased 6de2778
+
+#### Purpose:
+
+Reject the first source-`6de2778` hardware control gate and isolate the chapter-three black-screen exit from the reported legacy-raster chapter starts.
+
+#### Outcome:
+
+The user confirms that play/pause now works correctly, but advancing from chapter 2 to chapter 3 leaves a black screen, and reports that earlier successful navigation made chapters 8, 11, 15, 17 and 23 render through the old 800x600 diagnostic raster with vertical downward corruption.  The live 708,865-byte helper log `/tmp/entry802_chapter2_black_arm_helper.log`, SHA-256 `74362cec8a0a54ea6938cf416e32479d83eaef36a490be8eed20ee096d1ac234`, proves that Main submits the next-chapter command, releases download, discards old bytes, and completes the helper ready/go barrier; libdvdnav reports current chapter 2, target chapter 3 of 24 and refills the direct-device ring to 4 MiB in 169,671 microseconds, but liba52 then reports `undecodable AC-3 block`, the helper closes stdout and exits with code 1, and Main completes the session after only 20,463,192 submitted bytes.  The 20,481-byte 1440x1080 scaled screenshot `/tmp/entry802_chapter2_black.png`, SHA-256 `bf55329fbfae9db50343401f8974a0b98bd19c53f39be228fa969159f26da000`, is completely black.  The same log shows a separate deterministic track-selection defect: initial playback chooses AC-3 substream `0x80`, while the chapter-one-to-two jump chooses `0x81` because the reset forgets the established track and reclaims whichever private substream arrives first.  Read-only FFprobe analysis of the matching build-PC title confirms three valid AC-3 tracks, finds `0x81` before `0x80` at the chapter-two boundary, and decodes all tracks in chapters 1 through 3 without error, localizing the fatal block to helper chapter-start synchronization rather than damaged authored audio.  The exact five reported legacy-raster chapters independently share a second signature absent from adjacent chapters: each starts with an interlaced I-picture and immediately continues with progressive film P and B pictures.  The FPGA native-field-order tracker explicitly rejects such mixed film/interlaced sessions by latching mismatch and withdrawing native 480i, which selects the 800x600 fallback; correcting that behavior requires an RBF boundary.  This rejects chapter navigation beyond chapter 2 while accepting the new play/pause binding, and changes no repository source, installed file, Main, helper, RBF, FPGA configuration, media, playback option or running process during collection.
+
+#### Next Steps:
+
+Stop the source-`6de2778` acceptance cycle and obtain approval for a revised two-boundary plan.  First make a helper-only correction that retains the established audio substream across chapter changes, resynchronizes cleanly at the first complete access unit and treats a bad candidate frame as a bounded resynchronization event rather than terminating otherwise valid playback; prove deterministic chapter-one-through-three control, all three authored AC-3 track boundaries, HDMI decode and S/PDIF passthrough without changing Main or the RBF.  Separately, after explicit RBF authorization, extend native field-order ownership to this observed mixed film/interlaced frame-picture sequence without accepting field pictures or weakening decoder error gates, run focused mixed-mode and complete native-480i simulations, perform one clean seed-19 Quartus build with full timing and resource gates, then hardware-test chapters 8, 11, 15, 17 and 23 for stable native output and clean telemetry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 801 COMMIT Unreleased 6de2778 2026-08-30T22:30:02-07:00
 
 #### Coming From:
@@ -1176,35 +1205,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 762 COMMIT Unreleased cee1a9e 2026-08-30T05:00:54-07:00
-
-#### Coming From:
-
-Unreleased cee1a9e
-
-#### Purpose:
-
-Prepare the remaining commercial-DVD five-minute compatibility test and record fitter seed 19 as the required setting for future builds.
-
-#### Outcome:
-
-The user confirms that the accepted RBF was built with fitter seed 19 and directs that seed 19 be used going forward, resolving the reproducibility choice left by entry 761; this decision does not require rebuilding or replacing the already accepted installed artifact during the present media-only test.  Read-only inventory on the build PC identifies Blazing Saddles as the sole remaining DVD source under `/home/vash/Videos`, and FFmpeg's DVD-video demuxer identifies title 2 as the 5,567-second main feature with 720x480 anamorphic 16:9 MPEG-2 video and English six-channel AC-3 as its primary audio.  The approved plan is to stream-copy only the first five minutes of that main feature into an MPEG program stream, verify its exact streams, duration and complete software decode, install it under a new absolute filename in `/media/fat/games/MediaPlayer`, and independently verify the installed bytes before requesting one Native 480i hardware run.  The DVD sources, repository, FPGA, installed RBF, Main, helper and existing media remain unchanged at this proposal boundary.
-
-#### Next Steps:
-
-Create `blazing_saddles_first_5min.mpg` on the build PC from DVD title 2 with only the primary MPEG-2 video and English AC-3 stream, without transcoding.  Require a duration of approximately 300 seconds, correct 720x480 anamorphic 16:9 metadata, a clean complete software decode and recorded size and SHA-256; then upload it to `/media/fat/games/MediaPlayer/blazing_saddles_first_5min.mpg` and prove an independent readback byte-for-byte before asking the user to play it once in Native 480i at 16:9.  Before any later Quartus build, change the repository QSF from seed 17 to the now-required seed 19 as part of that build's source boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
