@@ -1,3 +1,41 @@
+## 821 COMMIT Unreleased ??? 2026-08-31T07:45:34-07:00
+
+#### Coming From:
+
+Unreleased e99cb28
+
+#### Purpose:
+
+Make authored DVD-menu highlights visible and preserve the resident video frame across overlay-only menu transitions without changing the FPGA build.
+
+#### Outcome:
+
+The approved bounded implementation will make a displayed libdvdnav highlight authoritative over a prematurely applied scheduled subpicture stop, classify successful menu activation as either an in-menu continuation or a decoder stream hop, extend the helper-to-Main control protocol with that distinction, and delay Main's download reset until the helper reports which transition occurred.  In-menu continuations will preserve the resident decoded frame while refreshing menu state and overlay data; title exits and explicit root-menu requests will retain the existing ready, discard, reset and go barrier.  RTL, QSF, RBF and Quartus will remain unchanged.
+
+#### Next Steps:
+
+Implement the helper and patched-Main handshake, update its architecture description, and add native regressions requiring visible highlighted styles with nonzero pixels plus distinct continuation and stream-hop acknowledgments.  Build and test the native helper and Main patch on the build PC, then cross-build only the ARM helper and patched Main from the exact source commit for user-managed transfer and physical-menu validation.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/dvd_spu.c
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/arm/media_source.c
+- host/arm/media_source.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_dvd_menu_hop.c
+- tools/test_dvd_menu_navigation.py
+- tools/test_dvd_spu.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 820 COMMIT Unreleased e99cb28 2026-08-31T07:37:10-07:00
 
 #### Coming From:
@@ -1202,34 +1240,5 @@ Provide an authorized genuinely CSS-scrambled raw ISO fixture, confirm that it c
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 781 COMMIT Unreleased 0711d3d 2026-08-30T15:36:06-07:00
-
-#### Coming From:
-
-Unreleased 0711d3d
-
-#### Purpose:
-
-Accept the corrected Blazing Saddles ISO startup on hardware and define the next DVD feature boundary.
-
-#### Outcome:
-
-The user reports that the complete Blazing Saddles ISO now starts normally, continues beyond five minutes with clean visible playback and raises no fatal telemetry, explicitly accepts the ISO initial random-access correction as working and elects to leave the title playing to completion.  This clears the deterministic first-GOP failure fixed by source `0711d3d`: the installed helper safely discarded the two unavailable open-GOP leading B pictures and crossed far beyond the former 7,997-byte prediction-error stop without a core, Main or configuration change.  Full-title completion remains useful soak evidence but is not required to establish that the bounded startup correction passed its hardware gate.
-
-#### Next Steps:
-
-Let the current title continue and record its terminal result when available, then target encrypted ISO files within the existing main-feature `iso:` backend rather than physical discs or interactive menus.  Keep that work host-only and preserve longest-title selection, ordinary decrypted ISO playback, Main and FPGA behavior; first choose an acceptable CSS dependency and distribution boundary, add the controlled CSS reference required by project policy, prove native decryption against an authorized encrypted-image fixture, then build and deploy only the helper for HDMI and S/PDIF hardware qualification.  Interactive menus remain later because they additionally require navigation control, subpicture rendering, button highlights, still-frame behavior and remote-control input.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
