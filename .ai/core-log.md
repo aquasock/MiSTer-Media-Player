@@ -1,3 +1,32 @@
+## 826 COMMIT Unreleased 3e4f54c 2026-08-31T10:11:41-07:00
+
+#### Coming From:
+
+Unreleased 3e4f54c
+
+#### Purpose:
+
+Qualify the source-`3e4f54c` physical-disc root-menu recovery and selected-button visibility from the user's fresh helper log, screenshot and telemetry.
+
+#### Outcome:
+
+The fresh physical Coming to America run reaches and continuously renders the root menu after the root navigation hop, and its helper log uniquely exercises the candidate random-access path by retaining sequence, intra and following-reference offsets 0, 296 and 7,892 with no discarded context pictures.  The 10,602,943-byte log `.ai/current_results/MediaPlayer_ARM.log`, SHA-256 `c6d87b215ad361f91d75b072313e6c04db712ca538be42ac7320a0e7c217322a`, records nine complete subpicture overlay updates and 50 successful directional transitions with valid authored highlight data; its final selection is button 3 at rectangle 311,389 through 430,436 with nontransparent palette `000ffb80`, and the helper remains active beyond 427 seconds without a malformed subpicture, helper fatal or process exit.  The matching 696,371-byte screenshot, SHA-256 `5f86fae990c98f7a6d7c469784e9663c648a15413bdcf26291781f3bd37f863f`, shows the clean menu background but no selected-button indicator in that unobscured button-3 rectangle.  The checksum-valid schema-20 telemetry at SHA-256 `d0b7c79989b398cf5e59aab0d54e2801b820be41232c47a282e64639d7aec88c` is a sticky STC-second-4 snapshot caused by one isolated `0x0400` audio underrun before menu entry, so its clear overlay error bits cannot qualify later menu activity.  This run accepts the candidate's root-menu random-access recovery but rejects visible selected-button output; the log clears libdvdnav selection, button geometry and palette acquisition while leaving the emitted physical overlay plane/style record versus FPGA compositor boundary unresolved, and no source, Main, RBF or target configuration changes during collection.
+
+#### Next Steps:
+
+Keep the running menu, helper, Main and frozen seed-20 RBF unchanged until the installed helper, Main and RBF hashes are independently read back.  After user approval, make a helper-only observability change that logs each emitted overlay configuration or style record together with visibility, menu flag, rectangle, decoded highlight RGBA values and selected-region plane-index histogram, then require the physical disc to prove nonzero selected pixels and a nontransparent emitted style before considering any RTL or RBF change; preserve the current root-hop filter and ignore the separately identified one-second no-progress false trigger for this boundary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 825 COMMIT Unreleased 3e4f54c 2026-08-31T09:12:37-07:00
 
 #### Coming From:
@@ -1202,37 +1231,6 @@ Do not alter the MiSTer while the deployed source-`eb7bed6` Blazing Saddles test
 - host/arm/media_player_protocol.h
 - host/arm/media_source.c
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 786 COMMIT Unreleased b71cc8b 2026-08-30T19:13:48-07:00
-
-#### Coming From:
-
-Unreleased eb7bed6
-
-#### Purpose:
-
-Bound longest-title ISO playback to one selected-title traversal so post-title navigation cannot restart or enter another DVD domain.
-
-#### Outcome:
-
-The user authorizes continued development while the deployed source-`eb7bed6` Blazing Saddles boundary soak runs and separately prepares a genuinely encrypted ISO for the following qualification gate.  Native testing rejects source `ef2a7e9` because libdvdnav reports a legitimate large time regression at each new chapter, and rejects the narrower source `bee9541` duration cutoff because Coming to America reaches its described 606,390,000-tick duration on a payload block, continues authored title cells through approximately 630,129,000 ticks and otherwise leaves a 1,565-byte AC-3 tail.  Final source `b71cc8b` therefore treats duration as selection and diagnostic metadata, retains the selected title plus monotonic chapter and cell structure, and converts only a title exit or backward chapter or cell replay into clean end-of-stream before following-domain payload is exposed; rewind restores the boundary.  Accelerated complete native runs end once and drain cleanly for Blazing Saddles at 3,823,399,998 video bytes, 11,150 timestamps and 267,482,112 PCM samples, Coming to America at 4,239,456,995 bytes, 14,807 timestamps and 336,433,152 samples, and The Big Lebowski at 5,509,816,546 bytes, 14,558 timestamps and 338,021,376 samples.  The accepted 2,097,152-byte ISO opening remains byte-identical at SHA-256 `396b0db1`, the five-minute MPG remains exactly 224,185,582 bytes at `45401ab3`, and a 299,980,757-byte VOB decode compares byte-for-byte at `677ce1bb`.  One ARM GNU 10.2 build from exact full source `b71cc8bedc112444b79a1d4af2e8b185b6bf0373` produces an 847,156-byte stripped static EABI5 helper with SHA-256 `603f4c05fd6ca687b6dc33c70e97b19fe34a96a320d6a91042f41bd78fb584e7` and no dynamic section; the expected static-libdvdcss `getpwuid` warning remains.  No Quartus build, MiSTer deployment, Main, FPGA, RBF, media or configuration change occurs.
-
-#### Next Steps:
-
-Let the currently deployed `eb7bed6` Blazing Saddles soak pass the prior 48:25 audio boundary and capture its terminal telemetry before changing the running helper.  Then preserve the installed helper and stage-deploy exact candidate `603f4c05` with candidate readback, same-directory rename and final readback; qualify one complete selected title through its clean end so the title-exit boundary itself is hardware-proven.  When the user supplies the encrypted ISO, first independently prove it contains CSS-scrambled sectors, then require a clean complete native opening and a representative HDMI and S/PDIF MiSTer run without changing Main, the seed-19 RBF or FPGA source.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- host/arm/ARCHITECTURE.md
-- host/arm/media_source.c
 
 #### Status:
 
