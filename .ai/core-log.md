@@ -1,4 +1,4 @@
-## 837 COMMIT Unreleased ??? 2026-08-31T16:18:01-07:00
+## 837 COMMIT Unreleased 4821744 2026-08-31T16:18:01-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Prevent loss of DVD overlay plane bytes when the FPGA overlay engine backpressur
 
 #### Outcome:
 
-The user approves the RBF-only correction after physical schema 21 proves 4,238 of 86,400 known-pattern plane bytes disappear specifically between the extractor output and the overlay engine, causing one rejected commit, zero plane publications and zero alpha or magenta samples.  The planned change gives the extractor's overlay output a conventional retained valid, data, start and last slot that remains stable until an actual ready transfer, permits replacement in the same cycle only when the current byte is accepted, and leaves the upstream FIFO stopped whenever that slot cannot advance.  Main, the helper, the B9 record format, DDR addressing, cache policy, palette, rectangle, blend function and schema-21 observability remain unchanged.
+The user approves and source `4821744` implements the RBF-only correction after physical schema 21 proves 4,238 of 86,400 known-pattern plane bytes disappear specifically between the extractor output and the overlay engine, causing one rejected commit, zero plane publications and zero alpha or magenta samples.  The extractor's overlay output is now a conventional retained valid, data, start and last slot that remains stable until an actual ready transfer, permits replacement in the same cycle only when the current byte is accepted, and leaves the upstream FIFO stopped whenever that slot cannot advance.  The strengthened extractor regression proves all record fields remain stable across alternating ready stalls.  A new integrated regression drives the complete config, 22 data records, 86,400 all-`0x55` plane bytes and commit through the extractor and engine under deterministic DDR writer stalls; it requires exactly 10,800 accepted writes, byte-exact first and last DDR words, one accepted and zero rejected commits, one plane publication and opaque-magenta video output.  The integrated test and retained extractor, engine, DDR-arbiter and schema-21 snapshot tests all pass under Icarus Verilog on build PC `10.10.0.42`, with warnings limited to inherited timescales.  Main, the helper, the B9 record format, DDR addressing, cache policy, palette, rectangle, blend function and schema-21 observability remain unchanged.
 
 #### Next Steps:
 
-Implement the retained overlay transfer and strengthen the extractor test for stability throughout a ready stall.  Add an integrated extractor-to-engine regression that sends the complete 86,400-byte all-index-one plane through B9 records while injecting DDR writer backpressure, then require 86,400 received plane bytes, 10,800 accepted writes, one accepted and zero rejected commits, one plane publication and nonzero opaque-magenta video samples.  Run the retained metadata, engine, arbiter and snapshot regressions, commit the exact source, perform one clean Quartus Prime 17.0.2 seed-20 build with positive timing margins, and provide a uniquely named replacement RBF for physical testing.
+Check out exact source `4821744` on build PC `10.10.0.42`, rerun all five focused overlay regressions from that clean source, perform one clean Quartus Prime 17.0.2 seed-20 build, require positive setup, hold, recovery, removal and minimum-pulse-width timing, and preserve a uniquely named replacement RBF while leaving the installed Main, helper and source-`d4ed809` rollback unchanged.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Implement the retained overlay transfer and strengthen the extractor test for st
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
