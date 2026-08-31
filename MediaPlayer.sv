@@ -135,7 +135,7 @@ wire [32:0] mpeg2_new_extracted_pts_90k;
 wire        mpeg2_new_extracted_metadata_valid;
 wire        mpeg2_new_extracted_metadata_ready;
 
-hps_io #(.CONF_STR(CONF_STR), .WIDE(1), .MEDIA_BURST(1)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .CONF_STR_BRAM(1), .WIDE(1), .MEDIA_BURST(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
