@@ -165,7 +165,8 @@ def main():
             if not root_sent and root_due is not None and now >= root_due:
                 parent.send(bytes((ROOT_MENU,)))
                 root_sent = True
-            if (menu_events and counts[3] and action_index < len(actions) and
+            if (ready_events and menu_events and counts[3] and
+                    action_index < len(actions) and
                     (action_due is None or now >= action_due)):
                 parent.send(bytes((actions[action_index],)))
                 action_index += 1
