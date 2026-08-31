@@ -1,3 +1,38 @@
+## 787 COMMIT Unreleased ??? 2026-08-30T19:40:26-07:00
+
+#### Coming From:
+
+Unreleased b71cc8b
+
+#### Purpose:
+
+Add direct main-feature playback from the absolute USB optical-device path `/dev/sr0` without staging a DVD ISO.
+
+#### Outcome:
+
+The user reprioritizes direct USB DVD access because ripping and transferring ISO images dominates development time, keeps the deployed source-`eb7bed6` Blazing Saddles audio-boundary test running at 25 minutes, and connects the Coming to America DVD drive to the MiSTer.  Read-only absolute-path FTP inspection finds `/dev/sr0` and `/dev/cdrom -> sr0`; `/dev/sr0` is a removable root:`cdrom` block device with mode 0660 and 16,461,784 reported 512-byte sectors, backed by an HL-DT-ST DVDRAM GP63EX70 revision RF01.  Every `/media/usb0` through `/media/usb7` directory is empty, so the disc is not filesystem-mounted, but direct libdvdnav/libdvdread/libdvdcss access should use the block device and does not require a mount.  The proposed helper boundary will implement only the already reserved explicit source `dvd:/dev/sr0`, use libdvdnav's device-opening path so libdvdcss owns optical authentication and sector reads, and reuse the accepted longest-title, initial random-access, PTS epoch, scheduler and one-traversal behavior.  Patched Main will recognize a small `USB DVD Drive.dvd` launcher in the existing MediaPlayer file list and translate it to that exact source string.  Menus, chapter controls, track selection, subpictures, DVD LPCM and physical-disc ejection remain outside this commit; Main and helper change, but the FPGA, seed-19 RBF and Quartus project do not.
+
+#### Next Steps:
+
+Implement the shared ISO/direct-device navigation source with absolute-device validation and rewind, add the launcher mapping and documentation, and require native ISO, MPG and VOB regressions before cross-building one helper and one patched Main from exact source.  Do not alter the MiSTer while the current Blazing Saddles run is active.  After its 48:25 gate passes and telemetry is captured, preserve both installed executables, deploy each through unique candidate upload and readback followed by same-directory rename and final readback, install only the tiny launcher under the absolute MediaPlayer directory, and reboot or reload as required.  The first physical-disc gate is a bounded Coming to America launch proving direct device open, CSS key acquisition, valid longest-title Program Stream output, continuous HDMI audio and video, and representative S/PDIF output; extend the run only after optical latency and read stability are demonstrated.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- assets/USB DVD Drive.dvd
+- docs/BUILDING.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_source.c
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 786 COMMIT Unreleased b71cc8b 2026-08-30T19:13:48-07:00
 
 #### Coming From:
@@ -1147,35 +1182,6 @@ While the captured P81 terminal frame remains displayed, the user identifies the
 #### Next Steps:
 
 Do not request another hardware checkpoint.  Replay exact P81 after its clean P80 reference in the production-path RTL simulation and compare against the software oracle, prioritizing the mouth-level macroblock row and finding the first differing luma or chroma sample within that row.  Correlate the first mismatch with the owning macroblock's prediction mode, vectors, quantiser scale, coded-block pattern, DCT type, coefficient values and reconstruction saturation.  Require a bounded reproduction and pixel-exact regression before any RTL correction or Quartus build; the next user test should be a corrected RBF only after those gates pass.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 747 COMMIT Unreleased 6196869 2026-08-29T20:46:34-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Accept and preserve the exact first corrupted authored P picture at P81.
-
-#### Outcome:
-
-The user performs the requested consecutive comparison and reports P80 clean and P81 as the first picture where corruption begins, then leaves P81 displayed for capture.  The 382,785-byte screenshot `/tmp/entry747_p81_first_corrupt.png`, SHA-256 `80e3310aabae0571b087b7703f7452c6b829556b5f06fe849aa5efe0e6b04e75`, visibly preserves the first central horizontal disturbance in the shiny-hat passage.  Its checksum-valid schema-20 snapshot accepts all 942,600 bytes, displays all 44 retained reference pictures across 43 swaps, ends on P temporal reference 8, sees sequence end and presentation completion, reaches quiet state and drains the scheduler.  The 1.7376-second presentation reports zero error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  Because P80 and P81 are consecutive byte-exact authored P units in the same I/P-only reference chain, this establishes an exact hardware boundary with no intervening B picture, GOP or sequence transition: P80 is clean and P81 is the first affected reconstruction.  Later P82 through P115 progressively amplify the damage.  No source, FPGA, RBF, Main, helper, installed media or configuration changes during capture.
-
-#### Next Steps:
-
-Stop hardware checkpoint playback.  Use the exact P81-ending stream and clean P80 predecessor for an offline production-path RTL replay against a software oracle, requiring localization of the first differing macroblock, block and component before changing RTL.  Correlate that location with P81 motion vectors, quantiser changes, coded-block pattern, DCT type, coefficient magnitude and saturation behavior, specifically testing the user's observation that a bright highlight appears to poison the remainder of a block.  The next MiSTer test should occur only after a bounded source correction passes the exact P80/P81 pixel regression; do not rebuild Quartus merely to gather more evidence.
 
 #### Files Modified:
 
