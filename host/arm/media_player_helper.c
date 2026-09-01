@@ -44,6 +44,7 @@
 #define MP3_PROBE_BYTES             (64u * 1024u)
 #define ID3V2_TAG_LIMIT             (64u * 1024u * 1024u)
 #define ISO_PTS_DISCONTINUITY_TICKS (10u * 90000u)
+#define OVERLAY_COMPENSATED_SOURCE_BYTES 4095u
 
 /*
  * Entry 429: the FPGA gates its whole in-band byte path on the PCM sink, so a
@@ -585,12 +586,14 @@ static int emit_overlay_frame(struct output_state *output,
                               const struct dvd_spu_overlay *overlay)
 {
     size_t offset = 0;
-#ifdef MMP_DVD_OVERLAY_PROBE
+#if defined(MMP_DVD_OVERLAY_PROBE) || defined(MMP_DVD_OVERLAY_COMPENSATE)
     const size_t compensated_bytes = DVD_SPU_PLANE_BYTES + 22u;
-    uint8_t probe_plane[4096];
+    uint8_t transfer_plane[4096];
+#endif
+#ifdef MMP_DVD_OVERLAY_PROBE
 
     overlay_probe_dump_plane(overlay);
-    memset(probe_plane, 0x55, sizeof(probe_plane));
+    memset(transfer_plane, 0x55, sizeof(transfer_plane));
 #endif
 
     if (emit_overlay_style(output, overlay, MEDIA_PLAYER_OVERLAY_CONFIG) < 0)
@@ -602,7 +605,7 @@ static int emit_overlay_frame(struct output_state *output,
             count = 4096u;
         if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_DATA,
 #ifdef MMP_DVD_OVERLAY_PROBE
-                                probe_plane,
+                                transfer_plane,
 #else
                                 overlay->pixels + offset,
 #endif
@@ -613,31 +616,57 @@ static int emit_overlay_frame(struct output_state *output,
     if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_COMMIT, NULL, 0) < 0)
         return -1;
 
-#ifdef MMP_DVD_OVERLAY_PROBE
+#if defined(MMP_DVD_OVERLAY_PROBE) || defined(MMP_DVD_OVERLAY_COMPENSATE)
     /*
-     * Physical hardware either accepts the ordinary plane intact or drops 21
-     * bytes from it.  The first compensated candidate dropped 22 bytes and
-     * landed one byte short, so keep the ordinary candidate first and send 22
-     * additional all-index-one bytes in the second candidate.  A rejected
-     * commit leaves an already published plane intact.
+     * Keep the ordinary candidate first for the physically observed zero-loss
+     * path.  On the recurring loss path, hardware drops the final byte from
+     * each data record.  Split the authored plane into at most 4095-byte source
+     * spans and duplicate each span's final byte.  The 22 discarded duplicates
+     * then reconstruct the exact original 86400-byte plane.  A rejected second
+     * commit leaves an already published first candidate intact.
      */
+#ifdef MMP_DVD_OVERLAY_PROBE
     fprintf(stderr,
             "media_player_helper: DVD overlay compensation "
-            "standard_bytes=%u candidate_bytes=%u extra_bytes=22\n",
+            "mode=solid standard_bytes=%u candidate_bytes=%u "
+            "extra_bytes=22\n",
             (unsigned)DVD_SPU_PLANE_BYTES, (unsigned)compensated_bytes);
+#else
+    fprintf(stderr,
+            "media_player_helper: DVD overlay compensation "
+            "mode=authored standard_bytes=%u candidate_bytes=%u "
+            "source_bytes_per_record=%u duplicate_bytes=22\n",
+            (unsigned)DVD_SPU_PLANE_BYTES, (unsigned)compensated_bytes,
+            (unsigned)OVERLAY_COMPENSATED_SOURCE_BYTES);
+#endif
     if (emit_overlay_style(output, overlay, MEDIA_PLAYER_OVERLAY_CONFIG) < 0)
         return -1;
     offset = 0;
+#ifdef MMP_DVD_OVERLAY_PROBE
     while (offset < compensated_bytes) {
         size_t count = compensated_bytes - offset;
 
-        if (count > sizeof(probe_plane))
-            count = sizeof(probe_plane);
+        if (count > sizeof(transfer_plane))
+            count = sizeof(transfer_plane);
         if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_DATA,
-                                probe_plane, count) < 0)
+                                transfer_plane, count) < 0)
             return -1;
         offset += count;
     }
+#else
+    while (offset < DVD_SPU_PLANE_BYTES) {
+        size_t count = DVD_SPU_PLANE_BYTES - offset;
+
+        if (count > OVERLAY_COMPENSATED_SOURCE_BYTES)
+            count = OVERLAY_COMPENSATED_SOURCE_BYTES;
+        memcpy(transfer_plane, overlay->pixels + offset, count);
+        transfer_plane[count] = transfer_plane[count - 1u];
+        if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_DATA,
+                                transfer_plane, count + 1u) < 0)
+            return -1;
+        offset += count;
+    }
+#endif
     return emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_COMMIT, NULL, 0);
 #else
     return 0;
