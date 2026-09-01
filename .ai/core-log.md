@@ -1,3 +1,32 @@
+## 854 COMMIT Unreleased 330d103 2026-08-31T21:50:21-07:00
+
+#### Coming From:
+
+Unreleased 330d103
+
+#### Purpose:
+
+Accept the helper-only authored DVD selector compensation on physical hardware.
+
+#### Outcome:
+
+The user reports that the restored selector looks correct, and the direct capture confirms a clean authored crown-shaped highlight over the menu rather than the diagnostic magenta rectangle or prior speckles.  The 776,392-byte 1,920-by-1,080 screenshot at SHA-256 `603c7e3755e48eed0dc7cab5cb7f507c914c6b84343be623867592d784a6646b` preserves the menu background and shows the authored green-gold selector at Special Features.  The 2,693,429-byte helper/Main log at SHA-256 `931923f98e7bfa329fadaf6f41c204167da6ac49fa62d544e6b68b7271943994` contains the source-`330d103` authored-compensation marker, authored palette `00000000/316a5988/316a59bb/316a59ff`, nontransparent sparse-plane histograms and successful movement through all four buttons, including eleven Right transitions and one Left transition.  The 844-byte schema-21 snapshot at SHA-256 `87a953b3ed49e1711cb0773ea531540a8b85f9d2a9922c10a5e353ab9c0a8ea0` passes all prefix, row, index, parity and XOR checks with checksum `786cc6b3`; it reports two configs, 44 data records, two commits, one expected rejected standard candidate, one accepted compensated candidate, one plane publication and exactly 86,400 received bytes in the accepted candidate.  The video domain records 88,430 highlighted samples, 8,370 nonzero-alpha samples and zero opaque-magenta samples, independently distinguishing the sparse authored artwork from the removed probe.  This physically accepts source `330d103` for the menu-selector goal with the source-`2de0717` Main and source-`f5f650f` RBF unchanged.
+
+#### Next Steps:
+
+Preserve `host/build/MediaPlayer_Helper_AuthoredSelector_330d103` together with the installed source-`2de0717` Main and source-`f5f650f` RBF as the accepted DVD menu baseline.  Treat the selector restoration as complete; any later work should begin from this exact three-file combination and must not reopen the RBF or replace the authored compensation without new physical evidence.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 853 COMMIT Unreleased 330d103 2026-08-31T21:38:36-07:00
 
 #### Coming From:
@@ -1153,35 +1182,6 @@ The user should manually transfer only the exact ARM helper from the recorded bu
 - host/arm/media_source.c
 - tools/test_dvd_menu_hop.c
 - tools/test_dvd_menu_navigation.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 814 COMMIT Unreleased a9899e0 2026-08-31T05:41:30-07:00
-
-#### Coming From:
-
-Unreleased a9899e0
-
-#### Purpose:
-
-Correct entry 813's prefetch-thread diagnosis before implementing the approved root-menu navigation fix.
-
-#### Outcome:
-
-Complete inspection of `iso_prepare` proves that authored `isomenu:` and `dvdmenu:` playback intentionally bypasses the optical prefetch thread, so entry 813's statement that `iso_menu_command` races an active producer and leaves its ring undiscarded is incorrect and no source work is performed from that diagnosis.  The captured hardware evidence remains valid: root-menu command `0x09` and both control barriers complete, then the reset FPGA session trips only B-picture presentation error `0x0200` after 24,043 accepted bytes.  The actual unsafe helper boundary is narrower and directly visible in `iso_menu_command`: after successful `dvdnav_menu_call` or `dvdnav_button_activate`, it sets hop state but leaves `block_offset` and `block_size` pointing into the current 2,048-byte DVD block.  The next Program Stream pass can therefore consume a stale old-position block tail and assemble a pack or PES across the libdvdnav hop before reading the new authored position.  This corrects only the causal interpretation in entry 813; its screenshot, helper log, hashes and FPGA fault isolation are unchanged.
-
-#### Next Steps:
-
-Obtain approval for the corrected helper-only boundary before implementation: on successful root-menu or button-activation hops, invalidate the current DVD block, clear terminal and still state, and log the discarded block-tail byte count before returning to the existing Main/helper reset barrier.  Add a focused regression proving no pre-hop bytes survive either hop plus the existing real-image menu-navigation test, then build only the helper and repeat the early-trailer `M` hardware test without changing Main, the seed-20 RBF or Quartus source.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
