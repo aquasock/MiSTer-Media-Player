@@ -1,3 +1,36 @@
+## 856 COMMIT Unreleased ??? 2026-08-31T22:00:52-07:00
+
+#### Coming From:
+
+Unreleased 330d103
+
+#### Purpose:
+
+Make authored Play activation enter the existing decoder reset barrier when its menu-to-title transition is delayed by a finite still.
+
+#### Outcome:
+
+The approved helper-only correction will defer an activation continuation acknowledgment while libdvdnav exposes a finite authored still, leaving Main's existing navigation request pending without changing its executable.  The helper will classify the state immediately after the finite still is skipped: a title exit will invalidate the source boundary and return through the existing ready/go navigation barrier, while a transition that remains in a menu will acknowledge continuation and preserve the resident frame.  An indefinite menu still and a menu continuation that begins producing another menu stream will resolve promptly as continuations, so submenu activation remains interactive.  The source-`2de0717` Main, source-`f5f650f` RBF and accepted authored-selector transport compensation remain unchanged.
+
+#### Next Steps:
+
+Implement the pending-activation state and post-still classification in the helper and media source, add focused regressions for finite-still title exit, finite-still menu continuation and indefinite/menu-stream continuation, extend the real-image test to recognize a delayed activation barrier, run strict native regressions, and build only an authored-selector helper with the Raspberry Pi ARM toolchain.  Physical acceptance requires Play to hold for its authored duration and then start title video through one clean ready/go barrier while selector movement and menu-continuation behavior remain intact.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- host/arm/media_source.c
+- host/arm/media_source.h
+- tools/test_dvd_menu_hop.c
+- tools/test_dvd_menu_navigation.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 855 COMMIT Unreleased 330d103 2026-08-31T21:55:35-07:00
 
 #### Coming From:
@@ -1147,35 +1180,6 @@ Absolute-path FTP readback now reproduces `/media/fat/linux/MediaPlayer_Helper` 
 #### Next Steps:
 
 With the exact source-`0e70319` helper now active, press keyboard `M` during first-play, test Up, Down, Left and Right at the root menu before pressing Space, and leave any resulting screen visible.  Require `discarded_block_tail` logs for successful root and activation hops, visible highlight movement wherever the authored menu links adjacent buttons, successful activation without the `0x0200` B-presentation raster, and continued native 480i; capture the matching screen and helper log before accepting the candidate.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 816 COMMIT Unreleased 0e70319 2026-08-31T06:23:51-07:00
-
-#### Coming From:
-
-Unreleased 0e70319
-
-#### Purpose:
-
-Capture the first reported menu-direction and activation result and verify whether the source-`0e70319` helper actually produced it.
-
-#### Outcome:
-
-The user reports that keyboard `M` now reaches the physical disc's root menu, none of the keyboard arrow keys causes a visible change there, and Space activation produces the diagnostic screen left visible for collection.  Main records root command `0x09` at 100.597697 seconds and activation command `0x08` at 129.365372 seconds; both helper ready/go barriers complete, with activation discarding 105,816 pending Main bytes before the helper emits another subpicture overlay and enters an indefinite authored still.  The 31,913-byte screenshot `/tmp/entry816_menu_activate_failure.png`, SHA-256 `c07d08ce0ffb238f319f483e772d787f0409c665be0258e6356f0ddd04bb1a0b`, has all 64 schema-20 headers, row indices and parity bits valid and checksum `d8861e13` matching.  Its fatal snapshot accepts only 18,182 bytes and runs 24,263 decoder clocks in a new 30000/1001 B-picture session at temporal reference 7 before latching exactly error `0x0200` with presentation-error state asserted; no syntax, reconstruction, writer, cache, transport-block or timestamp-conflict error appears.  The 6,666,888-byte matching log has SHA-256 `5349d190bc9bd01c4bcaf342ad6f465c0f97d480f6b887db77c699c48e77969c`.  Absolute-path readback proves this is not a test of source `0e70319`: installed `/media/fat/linux/MediaPlayer_Helper` is the previous 904,564-byte source-`a9899e0` helper at SHA-256 `a00173f62ec4a8b0d126ef48695e299b2fecf4e836bff28abdc1107fe62eac7c`, not the identically sized source-`0e70319` candidate at `c8a39413c5131ddfa26947013986e2088f0e72fa618f2ff6dd85fdb4bc7d3baf`.  The missing `discarded_block_tail` log independently confirms the old helper ran, so neither the activation failure nor the arrow-key observation accepts or rejects the new helper.
-
-#### Next Steps:
-
-Manually replace only `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-0e70319/host/build/MediaPlayer_Helper` from the build PC and verify the destination SHA-256 is `c8a39413c5131ddfa26947013986e2088f0e72fa618f2ff6dd85fdb4bc7d3baf`, not merely the shared 904,564-byte size.  Restart MediaPlayer, press `M` during first-play, test all four arrow directions before Space, and leave the result visible; source-`0e70319` is accepted only if its root and activation `discarded_block_tail` logs appear, the highlight moves where the authored menu offers adjacent buttons, activation avoids the `0x0200` raster, and native 480i remains active.
 
 #### Files Modified:
 
