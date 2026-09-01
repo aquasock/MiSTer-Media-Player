@@ -1,3 +1,35 @@
+## 860 COMMIT Unreleased bb3110d 2026-08-31T22:52:26-07:00
+
+#### Coming From:
+
+Unreleased 79da6c3
+
+#### Purpose:
+
+Defer pending DVD activation classification beyond an ambiguous finite-still skip until libdvdnav exposes the actual post-still boundary.
+
+#### Outcome:
+
+Source `79da6c3` changes a title-zero result immediately after `dvdnav_still_skip` from a completed menu continuation to `MEDIA_SOURCE_DVD_MENU_PENDING`, leaves the source boundary and Main request intact, and makes the helper resume event consumption without sending `MENU_CONTINUE`; an immediate nonzero title still enters the existing hop, while a later observed menu leave uses the saved-start-code path to enter the ready/go barrier before title payload processing.  Source `bb3110d` completes the validation boundary by making the real-image harness recognize that helper-side post-still hop and require the pending-payload marker, post-still-pending marker, no continuation acknowledgment, menu leave, second ready event, post-hop random access and title bytes.  The strict authored-compensation native helper builds with `-Werror` after demoting only the pinned DVD headers' ignored-attribute warning, its complete capability smoke test passes, and the focused delayed-transition, random-access and fragmented-subpicture regressions pass.  The Raspberry Pi GNU 10.2.1 ARM toolchain builds exact source `bb3110d` into `host/build/MediaPlayer_Helper_PostStillPending_bb3110d`, a 908,660-byte static stripped ARMv7 EABI5 executable at SHA-256 `f1f40c7e9a36b5182016038bcbbcaa03a3db91ac020e53a544f54020418f67ad`; it has no dynamic section, contains the new post-still-pending and authored-compensation markers, omits the solid-magenta probe marker and returns the complete protocol-one capability string.  Main and the source-`f5f650f` RBF are unchanged.
+
+#### Next Steps:
+
+The user should exit MediaPlayer so its helper process stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_PostStillPending_bb3110d`, restore executable mode if needed and verify the 908,660-byte size and recorded SHA-256.  Preserve the installed source-`2de0717` Main and source-`f5f650f` RBF, restart the disc, enter the root menu, leave Play selected and press Space once, then wait through the authored ten-second still.  Physical acceptance requires `pending reached still`, `remains pending after finite still`, menu leave, `stream hop before payload`, one clean ready/go barrier, a new random-access group and continuously moving title video; returning to the menu must retain the authored selector.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- host/arm/media_source.c
+- tools/test_dvd_menu_hop.c
+- tools/test_dvd_menu_navigation.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 859 COMMIT Unreleased 33d8151 2026-08-31T22:39:27-07:00
 
 #### Coming From:
@@ -1154,35 +1186,6 @@ The user should manually replace `/media/fat/linux/MediaPlayer_Helper` with `/ho
 - tools/test_dvd_menu_hop.c
 - tools/test_dvd_menu_navigation.py
 - tools/test_dvd_spu.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 820 COMMIT Unreleased e99cb28 2026-08-31T07:37:10-07:00
-
-#### Coming From:
-
-Unreleased e99cb28
-
-#### Purpose:
-
-Capture the source-`e99cb28` physical-menu result and isolate invisible selection and black submenu activation from DVD navigation itself.
-
-#### Outcome:
-
-Absolute-path readback verifies that the installed 904,564-byte helper is the exact source-`e99cb28` candidate at SHA-256 `330502577a28200ad97ead837408e34dbaf04018fe510a0006ecdb7e0f3bb7df`, and its unique command diagnostics prove the running helper receives every keyboard arrow.  Across two runs the physical disc reports four authored buttons and repeatedly performs real transitions among buttons 1 through 4 with valid changing rectangles and selection palette `000feb80`; the final activation occurs on button 4 at rectangle 439,389 through 574,436, then completes a zero-tail ready barrier, emits a new subpicture and enters an indefinite still without a decoder fatal.  The 890,796-byte menu capture `/tmp/entry820_menu_no_highlight.png`, SHA-256 `d50b24341f0e0bd222608ba28c5e3261498b485e4a061e10c4fea6d235adc09b`, visibly identifies button 4 as Scene Selection while showing no selected-button highlight; its matching 2,840,191-byte log has SHA-256 `232052663a079b1a20db76d4b76416f940222f1c0417b324fa2bf2143c3e20de`.  Native read-only analysis of the same Coming to America authored fixture proves the helper's decoded plane contains nonzero pixels inside every changing button rectangle, but the root-menu configuration is published with menu set and visible clear because the subpicture decoder applies a later scheduled stop command immediately; the highlight pixels therefore cannot be composited.  The 31,888-byte post-activation capture `/tmp/entry820_same_menu_result.png`, SHA-256 `a36561c61b8a985cf20d67457a5ddf07bc65a925ea629ecea512ac324c89c84f`, and matching 3,259,439-byte log at SHA-256 `f713f582018d492013318f394f13f4159a61bc68b6632348b8a8fd343c21ce25` show the separate black submenu result.  Main currently deasserts download and resets the decoder before every activation command, so button 4's overlay-only Scene Selection transition loses the menu background frame that the authored indefinite still expects to retain.  Static RTL inspection confirms the white and black lower-left block is the existing always-on cadence telemetry overlay after a snapshot, not a DVD overlay corruption or post-Enter fatal.  Source `e99cb28` is rejected on hardware for visible menu interaction; no source, target file, Main, RBF or configuration is changed during collection.
-
-#### Next Steps:
-
-Keep RTL, QSF, RBF and Quartus frozen.  After user approval, make a bounded helper-and-Main change: a displayed libdvdnav highlight must force the decoded menu overlay visible despite a later unscheduled stop command, and activation must be classified before Main resets download so menu-to-menu overlay-only transitions preserve the resident video frame while title exits retain the existing clean decoder barrier.  Add native regressions that require visible root-menu style, nonzero highlighted pixels and distinct menu-continue versus stream-hop acknowledgments, then rebuild only the helper and patched Main for physical testing; removing or hiding the cadence telemetry block remains a deferred RBF concern.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
