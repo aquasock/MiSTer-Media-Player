@@ -1,3 +1,32 @@
+## 847 COMMIT Unreleased ??? 2026-08-31T20:27:44-07:00
+
+#### Coming From:
+
+Unreleased 924cb21
+
+#### Purpose:
+
+Restore the proven moving solid-purple DVD menu selector with a helper-only overlay-packet compatibility workaround while preserving the accepted Main and frozen RBF.
+
+#### Outcome:
+
+The latest physical capture proves that the installed probe helper still generates the correct opaque-magenta index-one palette and moving authored button rectangles and that Main receives and submits a complete 86,400-byte all-index-one plane with 22 ordered data records, the expected hash and no source corruption.  The FPGA nevertheless receives only 86,379 plane bytes and rejects the commit without publishing a plane; the exact 21-byte deficit equals one byte for each of the 21 maximum-size 4,096-byte data records, while the final short record is accounted for.  The approved plan changes only the helper's packetization to 4,000-byte payloads, which carries the same plane in the same 22-record count while avoiding the failing maximum record boundary; Main, selector generation, palette, protocol, total bytes and RBF remain unchanged.
+
+#### Next Steps:
+
+Implement the 4,000-byte overlay data chunk in `host/arm/media_player_helper.c`, validate strict native and local Raspberry Pi ARM builds plus the focused DVD overlay and navigation regressions, preserve a uniquely named probe helper for manual transfer, and repeat the menu test; acceptance requires reliable menu loading, a visible purple rectangle that follows every directional selection, 86,400 received plane bytes, one accepted and zero rejected commits and one published plane.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 846 COMMIT Unreleased 924cb21 2026-08-31T20:19:36-07:00
 
 #### Coming From:
@@ -1180,34 +1209,5 @@ Keep accepted source `6e44472` and its installed artifacts unchanged on the MiST
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 807 COMMIT Unreleased 6e44472 2026-08-31T01:20:21-07:00
-
-#### Coming From:
-
-Unreleased 6e44472
-
-#### Purpose:
-
-Complete hardware acceptance of the source-`6e44472` menu and mixed-film chapter corrections.
-
-#### Outcome:
-
-The user reports skipping throughout the physical DVD without any issue, including the previously abnormal chapters, which now look normal, and reports that the reorganized menu looks great.  Together with entry 806's perfect previous, next, play, pause, button-control, audio, video, WAV, MP3, FLAC and Ogg Vorbis results, this clears the chapter-two-to-three black-screen gate, the legacy 800x600 or vertically corrupted mixed-film chapter behavior and the OSD acceptance boundary for entries 803 through 805.  Source `6e44472`, its timing-clean seed-19 RBF, the installed Main and the installed helper are hardware-accepted; no screenshot, target capture, repository source, installed file, running playback, media or configuration changes during this report.
-
-#### Next Steps:
-
-Keep source `6e44472`, fitter seed 19 and the accepted installed artifacts unchanged as the current hardware baseline.  The transport controls, chapter navigation, mixed film and interlaced presentation, reorganized menu and four consumer-audio formats are accepted; choose and approve the next development or release-qualification boundary before changing source or rebuilding Quartus.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
