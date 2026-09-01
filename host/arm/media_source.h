@@ -44,7 +44,8 @@ enum media_source_dvd_command_result {
     MEDIA_SOURCE_DVD_COMMAND_ERROR = -1,
     MEDIA_SOURCE_DVD_NO_HOP = 0,
     MEDIA_SOURCE_DVD_STREAM_HOP = 1,
-    MEDIA_SOURCE_DVD_MENU_CONTINUE = 2
+    MEDIA_SOURCE_DVD_MENU_CONTINUE = 2,
+    MEDIA_SOURCE_DVD_MENU_PENDING = 3
 };
 
 struct media_source_dvd_state {
@@ -80,7 +81,8 @@ int media_source_dvd_state(struct media_source *source,
                            struct media_source_dvd_state *state);
 int media_source_dvd_still(struct media_source *source,
                            unsigned *seconds);
-int media_source_dvd_still_skip(struct media_source *source);
+int media_source_dvd_still_skip(struct media_source *source,
+                                int classify_menu_transition);
 void media_source_close(struct media_source *source);
 const char *media_source_kind_name(enum media_source_kind kind);
 

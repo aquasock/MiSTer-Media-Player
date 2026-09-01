@@ -72,6 +72,40 @@ int main(void)
                       "menu continuation retained stale still or NAV state");
 
     memset(&state, 0, sizeof(state));
+    state.block_offset = 256;
+    state.block_size = DVD_VIDEO_LB_LEN;
+    state.still_active = 1;
+    state.still_seconds = 10;
+    failed |= require(iso_complete_delayed_menu_transition(&state, 1) ==
+                          MEDIA_SOURCE_DVD_STREAM_HOP,
+                      "finite-still title exit was not classified as a hop");
+    failed |= require(state.dvd_state.hop && !state.still_active &&
+                          state.block_offset == 0 && state.block_size == 0,
+                      "finite-still title exit retained the old boundary");
+
+    memset(&state, 0, sizeof(state));
+    state.block_offset = 256;
+    state.block_size = DVD_VIDEO_LB_LEN;
+    state.still_active = 1;
+    state.still_seconds = 10;
+    failed |= require(iso_complete_delayed_menu_transition(&state, 0) ==
+                          MEDIA_SOURCE_DVD_MENU_CONTINUE,
+                      "finite-still menu transition requested a hop");
+    failed |= require(!state.dvd_state.hop && !state.still_active &&
+                          state.block_offset == 0 && state.block_size == 0,
+                      "finite-still menu continuation retained old state");
+
+    memset(&state, 0, sizeof(state));
+    state.block_offset = 128;
+    state.block_size = DVD_VIDEO_LB_LEN;
+    failed |= require(iso_complete_menu_pending(&state, "activate") ==
+                          MEDIA_SOURCE_DVD_MENU_PENDING,
+                      "menu activation did not enter the pending state");
+    failed |= require(!state.dvd_state.hop && state.block_offset == 0 &&
+                          state.block_size == 0,
+                      "pending activation retained its old source boundary");
+
+    memset(&state, 0, sizeof(state));
     state.menu_pci_valid = 1;
     state.menu_pci.hli.hl_gi.hli_ss = 1;
     state.menu_pci.hli.hl_gi.btn_ns = 2;
@@ -99,6 +133,6 @@ int main(void)
 
     if (failed)
         return 1;
-    puts("dvd menu hop: stream-hop and menu-continuation boundaries pass");
+    puts("dvd menu hop: immediate and delayed transition boundaries pass");
     return 0;
 }

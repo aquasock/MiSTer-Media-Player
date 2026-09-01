@@ -296,6 +296,9 @@ struct dvd_menu_state {
     uint16_t highlight_y1;
     uint16_t highlight_x2;
     uint16_t highlight_y2;
+    int activation_pending;
+    int resume_code_valid;
+    uint8_t resume_code;
 };
 
 static void usage(const char *program)
@@ -696,6 +699,19 @@ static enum media_source_dvd_command dvd_source_command(int command)
     default:
         return 0;
     }
+}
+
+static int acknowledge_menu_continuation(struct dvd_menu_state *menu,
+                                         int control_fd,
+                                         const char *reason)
+{
+    if (control_send(control_fd, MEDIA_PLAYER_CONTROL_MENU_CONTINUE) < 0)
+        return -1;
+    menu->activation_pending = 0;
+    fprintf(stderr,
+            "media_player_helper: DVD menu continuation reason=%s\n",
+            reason);
+    return 0;
 }
 
 static int refresh_dvd_menu_state(struct media_source *input,
@@ -2649,6 +2665,13 @@ static int wait_dvd_still(struct media_source *input,
     fprintf(stderr, "media_player_helper: DVD still wait %s%u seconds\n",
             seconds == 0xffu ? "indefinite/" : "", seconds);
 
+    if (seconds == 0xffu && menu->activation_pending) {
+        if (acknowledge_menu_continuation(menu, control_fd,
+                                          "indefinite-still") < 0)
+            return -1;
+        return 1;
+    }
+
     for (;;) {
         int command = control_read_command(control_fd);
         enum media_source_dvd_command menu_command;
@@ -2669,11 +2692,15 @@ static int wait_dvd_still(struct media_source *input,
             if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
                 return -1;
             if (navigation == MEDIA_SOURCE_DVD_MENU_CONTINUE) {
-                if (control_send(control_fd,
-                                 MEDIA_PLAYER_CONTROL_MENU_CONTINUE) < 0)
+                if (acknowledge_menu_continuation(menu, control_fd,
+                                                  "command") < 0)
                     return -1;
+                return 1;
+            }
+            if (navigation == MEDIA_SOURCE_DVD_MENU_PENDING) {
+                menu->activation_pending = 1;
                 fprintf(stderr,
-                        "media_player_helper: DVD menu continuation\n");
+                        "media_player_helper: DVD menu activation deferred\n");
                 return 1;
             }
             if (navigation == MEDIA_SOURCE_DVD_STREAM_HOP) {
@@ -2688,9 +2715,27 @@ static int wait_dvd_still(struct media_source *input,
         }
 
         if (seconds != 0xffu && monotonic_us() >= deadline) {
-            if (media_source_dvd_still_skip(input) < 0)
+            int navigation = media_source_dvd_still_skip(
+                input, menu->activation_pending);
+
+            if (navigation < 0)
                 return -1;
             fprintf(stderr, "media_player_helper: DVD finite still complete\n");
+            if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
+                return -1;
+            if (menu->activation_pending) {
+                if (navigation == MEDIA_SOURCE_DVD_STREAM_HOP) {
+                    menu->activation_pending = 0;
+                    *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
+                    fprintf(stderr,
+                            "media_player_helper: DVD delayed activation "
+                            "stream hop\n");
+                    return 2;
+                }
+                if (acknowledge_menu_continuation(
+                        menu, control_fd, "finite-still-menu") < 0)
+                    return -1;
+            }
             return 1;
         }
         while (nanosleep(&delay, &delay) < 0 && errno == EINTR)
@@ -2736,11 +2781,15 @@ static int process_program_stream(struct media_source *input,
             if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
                 return -1;
             if (navigation == MEDIA_SOURCE_DVD_MENU_CONTINUE) {
-                if (control_send(control_fd,
-                                 MEDIA_PLAYER_CONTROL_MENU_CONTINUE) < 0)
+                if (acknowledge_menu_continuation(menu, control_fd,
+                                                  "command") < 0)
                     return -1;
+                continue;
+            }
+            if (navigation == MEDIA_SOURCE_DVD_MENU_PENDING) {
+                menu->activation_pending = 1;
                 fprintf(stderr,
-                        "media_player_helper: DVD menu continuation\n");
+                        "media_player_helper: DVD menu activation deferred\n");
                 continue;
             }
             if (navigation == MEDIA_SOURCE_DVD_STREAM_HOP) {
@@ -2753,7 +2802,15 @@ static int process_program_stream(struct media_source *input,
             fprintf(stderr,
                     "media_player_helper: ignoring unexpected control "
                     "0x%02x during playback\n", command);
-        int found = find_start_code(input, &code);
+        int found;
+
+        if (menu->resume_code_valid) {
+            code = menu->resume_code;
+            menu->resume_code_valid = 0;
+            found = 1;
+        } else {
+            found = find_start_code(input, &code);
+        }
         if (found == 0) {
             int still = wait_dvd_still(input, menu, output, control_fd,
                                        control_command);
@@ -2768,6 +2825,23 @@ static int process_program_stream(struct media_source *input,
         }
         if (found < 0)
             return -1;
+        if (menu->activation_pending) {
+            if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
+                return -1;
+            if (!menu->menu_active) {
+                menu->activation_pending = 0;
+                menu->resume_code = code;
+                menu->resume_code_valid = 1;
+                *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
+                fprintf(stderr,
+                        "media_player_helper: DVD delayed activation "
+                        "stream hop before payload\n");
+                return 1;
+            }
+            if (acknowledge_menu_continuation(menu, control_fd,
+                                              "menu-payload") < 0)
+                return -1;
+        }
         if (code == 0xb9) {
             if (menu && menu->enabled)
                 continue;

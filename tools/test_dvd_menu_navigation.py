@@ -24,11 +24,17 @@ MENU_ACTIVATE = 0x08
 ROOT_MENU = 0x09
 MENU_UP = 0x04
 HOP_RE = re.compile(
-    rb"media_source: (?:DVD|ISO) menu hop (root|activate) "
+    rb"media_source: (?:DVD|ISO) menu hop "
+    rb"(root|activate|delayed activate) "
     rb"discarded_block_tail=([0-9]+)"
 )
 CONTINUE_RE = re.compile(
-    rb"media_source: (?:DVD|ISO) menu continue (activate) "
+    rb"media_source: (?:DVD|ISO) menu continue "
+    rb"(activate|delayed activate) "
+    rb"discarded_block_tail=([0-9]+)"
+)
+PENDING_RE = re.compile(
+    rb"media_source: (?:DVD|ISO) menu pending (activate) "
     rb"discarded_block_tail=([0-9]+)"
 )
 COMMAND_RE = re.compile(
@@ -119,6 +125,7 @@ def main():
     parser.add_argument("dvd")
     parser.add_argument("--timeout", type=float, default=35.0)
     parser.add_argument("--require-menu-continue", action="store_true")
+    parser.add_argument("--require-delayed-activation", action="store_true")
     args = parser.parse_args()
 
     parent, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
@@ -161,8 +168,12 @@ def main():
     hop_discarded = {"root": [], "activate": []}
     continue_counts = {"activate": 0}
     continue_discarded = {"activate": []}
+    pending_counts = {"activate": 0}
+    pending_discarded = {"activate": []}
     root_random_access = []
-    root_hop_seen = False
+    activation_random_access = []
+    last_hop = None
+    video_bytes_after_second_ready = 0
     command_counts = {name: 0 for name in
                       ("up", "down", "left", "right", "activate", "root")}
     direction_transitions = []
@@ -181,7 +192,14 @@ def main():
                 action_due = now + 0.35
 
             activation_done = (hop_counts["activate"] and ready_events >= 2) or (
-                continue_counts["activate"] and continue_events)
+                (continue_counts["activate"] or pending_counts["activate"]) and
+                continue_events)
+            if args.require_delayed_activation:
+                activation_done = (pending_counts["activate"] and
+                                   hop_counts["activate"] and
+                                   ready_events >= 2 and leave_events and
+                                   activation_random_access and
+                                   video_bytes_after_second_ready)
             if (activation_done and action_index == len(actions) and
                     hop_counts["root"] and
                     root_random_access and
@@ -217,6 +235,8 @@ def main():
                     except BlockingIOError:
                         continue
                     if chunk:
+                        if ready_events >= 2:
+                            video_bytes_after_second_ready += len(chunk)
                         video_buffer = parse_overlay_records(
                             video_buffer + chunk, counts, overlay_state)
                 else:
@@ -242,16 +262,25 @@ def main():
                             match = HOP_RE.search(line)
                             if match:
                                 name = match.group(1).decode("ascii")
+                                if name == "delayed activate":
+                                    name = "activate"
                                 hop_counts[name] += 1
                                 hop_discarded[name].append(
                                     int(match.group(2)))
-                                if name == "root":
-                                    root_hop_seen = True
+                                last_hop = name
                             match = CONTINUE_RE.search(line)
                             if match:
                                 name = match.group(1).decode("ascii")
+                                if name == "delayed activate":
+                                    name = "activate"
                                 continue_counts[name] += 1
                                 continue_discarded[name].append(
+                                    int(match.group(2)))
+                            match = PENDING_RE.search(line)
+                            if match:
+                                name = match.group(1).decode("ascii")
+                                pending_counts[name] += 1
+                                pending_discarded[name].append(
                                     int(match.group(2)))
                             match = COMMAND_RE.search(line)
                             if match:
@@ -267,10 +296,15 @@ def main():
                                     direction_transitions.append(
                                         (name, before, target, after))
                             match = RANDOM_ACCESS_RE.search(line)
-                            if match and root_hop_seen:
-                                root_random_access.append(tuple(
+                            if match and last_hop:
+                                access = tuple(
                                     int(match.group(index))
-                                    for index in range(1, 6)))
+                                    for index in range(1, 6))
+                                if last_hop == "root":
+                                    root_random_access.append(access)
+                                elif last_hop == "activate":
+                                    activation_random_access.append(access)
+                                last_hop = None
             if process.poll() is not None:
                 break
     finally:
@@ -286,11 +320,19 @@ def main():
     return_code = process.returncode
     activation_passed = (
         (hop_counts["activate"] >= 1 and ready_events >= 2) or
-        (continue_counts["activate"] >= 1 and continue_events >= 1)
+        ((continue_counts["activate"] >= 1 or
+          pending_counts["activate"] >= 1) and continue_events >= 1)
     )
     if args.require_menu_continue:
-        activation_passed = (continue_counts["activate"] >= 1 and
+        activation_passed = ((continue_counts["activate"] >= 1 or
+                              pending_counts["activate"] >= 1) and
                              continue_events >= 1 and ready_events >= 1)
+    if args.require_delayed_activation:
+        activation_passed = (pending_counts["activate"] >= 1 and
+                             hop_counts["activate"] >= 1 and
+                             ready_events >= 2 and leave_events >= 1 and
+                             activation_random_access and
+                             video_bytes_after_second_ready > 0)
     passed = (return_code in (0, -15) and root_sent and activation_passed and
               action_index == len(actions) and ready_events >= 1 and
               menu_events >= 1 and counts[1] >= 1 and counts[2] >= 1 and
@@ -313,10 +355,14 @@ def main():
           f"clear={counts[0]} root_hops={hop_counts['root']} "
           f"root_discarded={hop_discarded['root']} "
           f"root_random_access={root_random_access} "
+          f"activation_random_access={activation_random_access} "
+          f"post_activation_video={video_bytes_after_second_ready} "
           f"activate_hops={hop_counts['activate']} "
           f"activate_discarded={hop_discarded['activate']} "
           f"activate_continues={continue_counts['activate']} "
           f"continue_discarded={continue_discarded['activate']} "
+          f"activate_pending={pending_counts['activate']} "
+          f"pending_discarded={pending_discarded['activate']} "
           f"visible_highlights={overlay_state['visible_highlights']} "
           f"highlight_pixels={overlay_state['highlight_pixels']} "
           f"commands={command_counts} transitions={direction_transitions} "

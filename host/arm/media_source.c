@@ -913,6 +913,25 @@ static int iso_complete_menu_continue(struct iso_source_state *state,
     return MEDIA_SOURCE_DVD_MENU_CONTINUE;
 }
 
+static int iso_complete_menu_pending(struct iso_source_state *state,
+                                     const char *command)
+{
+    size_t discarded = iso_reset_after_menu_transition(state, 0);
+
+    fprintf(stderr,
+            "media_source: %s menu pending %s discarded_block_tail=%zu\n",
+            state->direct_device ? "DVD" : "ISO", command, discarded);
+    return MEDIA_SOURCE_DVD_MENU_PENDING;
+}
+
+static int iso_complete_delayed_menu_transition(
+    struct iso_source_state *state, int32_t title)
+{
+    if (title != 0)
+        return iso_complete_menu_hop(state, "delayed activate");
+    return iso_complete_menu_continue(state, "delayed activate");
+}
+
 static const char *iso_menu_command_name(enum media_source_dvd_command command)
 {
     switch (command) {
@@ -1038,7 +1057,7 @@ static int iso_menu_command(struct iso_source_state *state,
                                  "ok");
             if (dvdnav_current_title_info(state->navigation, &title, &part) ==
                     DVDNAV_STATUS_OK && title == 0)
-                return iso_complete_menu_continue(state, "activate");
+                return iso_complete_menu_pending(state, "activate");
             return iso_complete_menu_hop(state, "activate");
         }
         break;
@@ -1394,9 +1413,12 @@ int media_source_dvd_still(struct media_source *source, unsigned *seconds)
     return 1;
 }
 
-int media_source_dvd_still_skip(struct media_source *source)
+int media_source_dvd_still_skip(struct media_source *source,
+                                int classify_menu_transition)
 {
     struct iso_source_state *state;
+    int32_t title = 0;
+    int32_t part = 0;
 
     if (!source || source->ops != &iso_ops || !source->state)
         return -1;
@@ -1409,7 +1431,15 @@ int media_source_dvd_still_skip(struct media_source *source)
     }
     state->still_active = 0;
     state->still_seconds = 0;
-    return 0;
+    if (!classify_menu_transition)
+        return MEDIA_SOURCE_DVD_NO_HOP;
+    if (dvdnav_current_title_info(state->navigation, &title, &part) !=
+            DVDNAV_STATUS_OK) {
+        state->error = 1;
+        return MEDIA_SOURCE_DVD_COMMAND_ERROR;
+    }
+    iso_refresh_menu_state(state);
+    return iso_complete_delayed_menu_transition(state, title);
 }
 
 void media_source_close(struct media_source *source)
