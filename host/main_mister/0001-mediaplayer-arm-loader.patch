@@ -306,6 +306,7 @@ index 0000000..d828649
 +static int first_byte_seen = 0;
 +static bool playback_paused = false;
 +static bool chapter_barrier = false;
++static bool chapter_download_rearmed = false;
 +static bool navigation_pending = false;
 +static bool chapter_controls = false;
 +static bool menu_controls = false;
@@ -506,6 +507,7 @@ index 0000000..d828649
 +	}
 +	playback_paused = false;
 +	chapter_barrier = false;
++	chapter_download_rearmed = false;
 +	navigation_pending = false;
 +	chapter_controls = false;
 +	menu_controls = false;
@@ -642,6 +644,7 @@ index 0000000..d828649
 +	playback_index = index;
 +	playback_paused = false;
 +	chapter_barrier = false;
++	chapter_download_rearmed = false;
 +	navigation_pending = false;
 +	menu_active = false;
 +	menu_controls = !strncasecmp(source_spec, "dvdmenu:", 8) ||
@@ -761,6 +764,7 @@ index 0000000..d828649
 +		{
 +			navigation_pending = false;
 +			chapter_barrier = true;
++			chapter_download_rearmed = false;
 +			if (download_active)
 +			{
 +				user_io_set_download(0);
@@ -795,17 +799,21 @@ index 0000000..d828649
 +		return;
 +	}
 +	burst_state = {};
-+	user_io_set_index(playback_index);
-+	user_io_file_info(".M2V");
-+	user_io_set_download(1);
-+	download_active = 1;
-+	download_assert_us = monotonic_us();
++	if (!chapter_download_rearmed)
++	{
++		user_io_set_index(playback_index);
++		user_io_file_info(".M2V");
++		user_io_set_download(1);
++		download_active = 1;
++		download_assert_us = monotonic_us();
++	}
 +	if (!send_control(MEDIA_CONTROL_GO))
 +	{
 +		stop_with_reason("chapter-go-error");
 +		return;
 +	}
 +	chapter_barrier = false;
++	chapter_download_rearmed = false;
 +	diagnostic_write("chapter barrier released discarded=%llu paused=%d\n",
 +	                 (unsigned long long)discarded, playback_paused);
 +}
@@ -872,6 +880,16 @@ index 0000000..d828649
 +	}
 +	pending_size = pending_offset = 0;
 +	pending_eof = false;
++	burst_state = {};
++	user_io_set_index(playback_index);
++	user_io_file_info(".M2V");
++	user_io_set_download(1);
++	download_active = 1;
++	download_assert_us = monotonic_us();
++	chapter_download_rearmed = true;
++	diagnostic_write("chapter startup blank rearmed command=%s\n",
++	                 command == MEDIA_CONTROL_PREVIOUS_CHAPTER ?
++	                     "previous" : "next");
 +	chapter_barrier = true;
 +	if (!send_control(command))
 +	{

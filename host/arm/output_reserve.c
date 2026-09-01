@@ -33,6 +33,8 @@ struct output_reserve {
     int stopping;
     int failed;
     int failure_errno;
+    int discard_requested;
+    size_t discarded_bytes;
     pthread_t thread;
     pthread_mutex_t mutex;
     pthread_cond_t readable;
@@ -121,6 +123,17 @@ static void ring_remove_record(struct output_ring *ring, size_t size)
     ring->count -= size;
 }
 
+static size_t ring_discard(struct output_ring *ring)
+{
+    size_t discarded = ring->count;
+    size_t record_end_bytes = (ring->capacity + 7u) / 8u;
+
+    memset(ring->record_ends, 0, record_end_bytes);
+    ring->head = 0;
+    ring->count = 0;
+    return discarded;
+}
+
 static void reserve_fail_locked(struct output_reserve *reserve, int error)
 {
     reserve->failed = 1;
@@ -140,11 +153,29 @@ static void *output_reserve_worker(void *opaque)
 
         pthread_mutex_lock(&reserve->mutex);
         while (!reserve->normal.count && !reserve->priority.count &&
+               !reserve->discard_requested &&
                !reserve->stopping && !reserve->failed)
             pthread_cond_wait(&reserve->readable, &reserve->mutex);
-        if (reserve->failed ||
-            (!reserve->normal.count && !reserve->priority.count &&
-             reserve->stopping)) {
+        if (reserve->failed) {
+            pthread_mutex_unlock(&reserve->mutex);
+            break;
+        }
+        /*
+         * A discard requested during a write is observed only after that
+         * complete producer record reaches the pipe.  Main discards pipe
+         * bytes across a navigation barrier, while no framed output is ever
+         * split or left internally half-consumed.
+         */
+        if (reserve->discard_requested) {
+            reserve->discarded_bytes = ring_discard(&reserve->normal) +
+                                        ring_discard(&reserve->priority);
+            reserve->discard_requested = 0;
+            pthread_cond_broadcast(&reserve->writable);
+            pthread_mutex_unlock(&reserve->mutex);
+            continue;
+        }
+        if (!reserve->normal.count && !reserve->priority.count &&
+            reserve->stopping) {
             pthread_mutex_unlock(&reserve->mutex);
             break;
         }
@@ -270,8 +301,9 @@ static int output_reserve_write_ring(struct output_reserve *reserve,
         return -1;
     }
     pthread_mutex_lock(&reserve->mutex);
-    while (ring->capacity - ring->count < size && !reserve->failed &&
-           !reserve->stopping)
+    while ((reserve->discard_requested ||
+            ring->capacity - ring->count < size) &&
+           !reserve->failed && !reserve->stopping)
         pthread_cond_wait(&reserve->writable, &reserve->mutex);
     if (reserve->failed || reserve->stopping) {
         errno = reserve->failed ? reserve->failure_errno : EPIPE;
@@ -307,7 +339,8 @@ int output_reserve_drain(struct output_reserve *reserve)
         return -1;
     }
     pthread_mutex_lock(&reserve->mutex);
-    while ((reserve->normal.count || reserve->priority.count) &&
+    while ((reserve->normal.count || reserve->priority.count ||
+            reserve->discard_requested) &&
            !reserve->failed)
         pthread_cond_wait(&reserve->writable, &reserve->mutex);
     if (reserve->failed) {
@@ -315,6 +348,38 @@ int output_reserve_drain(struct output_reserve *reserve)
         pthread_mutex_unlock(&reserve->mutex);
         return -1;
     }
+    pthread_mutex_unlock(&reserve->mutex);
+    return 0;
+}
+
+int output_reserve_discard(struct output_reserve *reserve,
+                           size_t *discarded_bytes)
+{
+    if (!reserve) {
+        errno = EINVAL;
+        return -1;
+    }
+    pthread_mutex_lock(&reserve->mutex);
+    while (reserve->discard_requested && !reserve->failed &&
+           !reserve->stopping)
+        pthread_cond_wait(&reserve->writable, &reserve->mutex);
+    if (reserve->failed || reserve->stopping) {
+        errno = reserve->failed ? reserve->failure_errno : EPIPE;
+        pthread_mutex_unlock(&reserve->mutex);
+        return -1;
+    }
+    reserve->discarded_bytes = 0;
+    reserve->discard_requested = 1;
+    pthread_cond_signal(&reserve->readable);
+    while (reserve->discard_requested && !reserve->failed)
+        pthread_cond_wait(&reserve->writable, &reserve->mutex);
+    if (reserve->failed) {
+        errno = reserve->failure_errno;
+        pthread_mutex_unlock(&reserve->mutex);
+        return -1;
+    }
+    if (discarded_bytes)
+        *discarded_bytes = reserve->discarded_bytes;
     pthread_mutex_unlock(&reserve->mutex);
     return 0;
 }

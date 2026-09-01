@@ -434,6 +434,30 @@ static int flush_output(struct output_state *output, const char *what)
     return 0;
 }
 
+static int discard_reserved_output(struct output_state *output,
+                                   int command, const char *what)
+{
+    size_t discarded = 0;
+
+    if (!output->reserve)
+        return flush_output(output, what);
+    if (output_reserve_discard(output->reserve, &discarded) < 0) {
+        fprintf(stderr, "media_player_helper: discarding %s failed: %s\n",
+                what, strerror(errno));
+        return -1;
+    }
+    if (output->video && fflush(output->video) == EOF) {
+        fprintf(stderr, "media_player_helper: flushing %s failed: %s\n",
+                what, strerror(errno));
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: navigation reserve discarded command=0x%02x "
+            "bytes=%zu\n",
+            command, discarded);
+    return 0;
+}
+
 static int emit_overlay_record(struct output_state *output, uint8_t command,
                                const uint8_t *payload, size_t size)
 {
@@ -3293,7 +3317,13 @@ int main(int argc, char **argv)
                         "media_player_helper: chapter control failed\n");
                 goto done;
             }
-            if (flush_output(&output, "chapter barrier") < 0) {
+            if (command == MEDIA_PLAYER_CONTROL_ROOT_MENU ||
+                command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
+                command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER) {
+                if (discard_reserved_output(&output, command,
+                                            "navigation barrier") < 0)
+                    goto done;
+            } else if (flush_output(&output, "chapter barrier") < 0) {
                 goto done;
             }
             reset_audio_for_chapter(&audio);
