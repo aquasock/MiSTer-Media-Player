@@ -41,6 +41,7 @@
 #define PCM_STARTUP_VIDEO_BYTES     28672u
 #define PCM_RECORD_FRAMES           16u
 #define VIDEO_SLICE_BYTES           256u
+#define DVD_OVERLAY_DATA_CHUNK_BYTES 4000u
 #define MP3_PROBE_BYTES             (64u * 1024u)
 #define ID3V2_TAG_LIMIT             (64u * 1024u * 1024u)
 #define ISO_PTS_DISCONTINUITY_TICKS (10u * 90000u)
@@ -586,7 +587,7 @@ static int emit_overlay_frame(struct output_state *output,
 {
     size_t offset = 0;
 #ifdef MMP_DVD_OVERLAY_PROBE
-    uint8_t probe_plane[4096];
+    uint8_t probe_plane[DVD_OVERLAY_DATA_CHUNK_BYTES];
 
     overlay_probe_dump_plane(overlay);
     memset(probe_plane, 0x55, sizeof(probe_plane));
@@ -597,8 +598,9 @@ static int emit_overlay_frame(struct output_state *output,
     while (offset < DVD_SPU_PLANE_BYTES) {
         size_t count = DVD_SPU_PLANE_BYTES - offset;
 
-        if (count > 4096u)
-            count = 4096u;
+        /* Keep the command plus payload below the extractor's 4097-byte edge. */
+        if (count > DVD_OVERLAY_DATA_CHUNK_BYTES)
+            count = DVD_OVERLAY_DATA_CHUNK_BYTES;
         if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_DATA,
 #ifdef MMP_DVD_OVERLAY_PROBE
                                 probe_plane,
