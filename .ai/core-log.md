@@ -1,3 +1,32 @@
+## 866 COMMIT Unreleased 58196d6 2026-09-01T01:42:17-07:00
+
+#### Coming From:
+
+Unreleased 58196d6
+
+#### Purpose:
+
+Qualify the priority-overlay helper on physical hardware and isolate the remaining root-menu and Play response delays.
+
+#### Outcome:
+
+The user's physical source-`58196d6` capture accepts the 256-kibibyte priority overlay lane: the helper uniquely reports the four-megabyte normal reserve plus priority capacity, twelve directional changes visibly respond well, and Main receives each corresponding authored selector rectangle without overlay framing errors before activation.  Root-menu command `0x09` is submitted at 10.293811 seconds, the helper completes the root hop almost immediately, but Main does not receive navigation ready until 13.594761 seconds and releases the barrier at 13.595371 seconds, proving an artificial 3.301560-second wait while the helper drains obsolete normal-media reserve data.  Activation command `0x08` is submitted at 35.693855 seconds; its selector-clear style reaches Main at 36.073282 seconds, only 0.379427 seconds later, then the helper explicitly waits the disc-authored ten-second finite still and reports menu leave at 45.910168 seconds, so the 10.216313-second Play delay is authored navigation behavior rather than reserve or overlay latency.  More than twenty subsequent chapter barriers complete successfully and the user reports `N` and `P` remain fast.  The 4,062,817-byte log has SHA-256 `a1250d181338173b42b5d3817cf46accc40558ea78beb6227566c91373d09cf8`; the 541,595-byte screenshot and checksum-valid schema-21 telemetry have SHA-256 `01bed1b8cb9e28e0750eb563e1702d202fc1153d5fa84fd78d14ed083b717a4e` and `a6a90a2811ae5fcb2790621dc3ea7df2d5b02136127313054b57f3d961f56197`.
+
+#### Next Steps:
+
+Preserve Main, the RBF, the priority overlay lane and the existing `N` and `P` path.  After user approval, make a helper-only reserve-boundary change that finishes any record already being written, discards queued obsolete normal media for root-menu stream hops and lets Main's existing decoder barrier discard already-piped stale bytes, eliminating the artificial `M` drain without weakening the optical-stall reserve during ordinary playback.  Keep the authored ten-second finite Play still unless the user explicitly chooses immediate activation semantics; skipping that still is a separate DVD-navigation policy change and must retain the pending activation until libdvdnav exposes menu leave.  Validate reserve byte integrity, concurrent discard at every record boundary, menu overlay priority, root and delayed-activation hops, random access, AC-3 recovery and exact local ARM output before physical retest.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 865 COMMIT Unreleased 58196d6 2026-09-01T01:30:48-07:00
 
 #### Coming From:
@@ -1157,35 +1186,6 @@ Exit the MediaPlayer core or otherwise stop its running helper, replace only `/m
 - host/arm/dvd_spu.h
 - host/arm/media_player_helper.c
 - tools/test_dvd_spu.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 826 COMMIT Unreleased 3e4f54c 2026-08-31T10:11:41-07:00
-
-#### Coming From:
-
-Unreleased 3e4f54c
-
-#### Purpose:
-
-Qualify the source-`3e4f54c` physical-disc root-menu recovery and selected-button visibility from the user's fresh helper log, screenshot and telemetry.
-
-#### Outcome:
-
-The fresh physical Coming to America run reaches and continuously renders the root menu after the root navigation hop, and its helper log uniquely exercises the candidate random-access path by retaining sequence, intra and following-reference offsets 0, 296 and 7,892 with no discarded context pictures.  The 10,602,943-byte log `.ai/current_results/MediaPlayer_ARM.log`, SHA-256 `c6d87b215ad361f91d75b072313e6c04db712ca538be42ac7320a0e7c217322a`, records nine complete subpicture overlay updates and 50 successful directional transitions with valid authored highlight data; its final selection is button 3 at rectangle 311,389 through 430,436 with nontransparent palette `000ffb80`, and the helper remains active beyond 427 seconds without a malformed subpicture, helper fatal or process exit.  The matching 696,371-byte screenshot, SHA-256 `5f86fae990c98f7a6d7c469784e9663c648a15413bdcf26291781f3bd37f863f`, shows the clean menu background but no selected-button indicator in that unobscured button-3 rectangle.  The checksum-valid schema-20 telemetry at SHA-256 `d0b7c79989b398cf5e59aab0d54e2801b820be41232c47a282e64639d7aec88c` is a sticky STC-second-4 snapshot caused by one isolated `0x0400` audio underrun before menu entry, so its clear overlay error bits cannot qualify later menu activity.  This run accepts the candidate's root-menu random-access recovery but rejects visible selected-button output; the log clears libdvdnav selection, button geometry and palette acquisition while leaving the emitted physical overlay plane/style record versus FPGA compositor boundary unresolved, and no source, Main, RBF or target configuration changes during collection.
-
-#### Next Steps:
-
-Keep the running menu, helper, Main and frozen seed-20 RBF unchanged until the installed helper, Main and RBF hashes are independently read back.  After user approval, make a helper-only observability change that logs each emitted overlay configuration or style record together with visibility, menu flag, rectangle, decoded highlight RGBA values and selected-region plane-index histogram, then require the physical disc to prove nonzero selected pixels and a nontransparent emitted style before considering any RTL or RBF change; preserve the current root-hop filter and ignore the separately identified one-second no-progress false trigger for this boundary.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
