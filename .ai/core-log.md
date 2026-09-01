@@ -1,4 +1,4 @@
-## 843 COMMIT Unreleased ??? 2026-08-31T19:45:27-07:00
+## 843 COMMIT Unreleased 924cb21 2026-08-31T19:45:27-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Restore clean applicability of the pinned Main patch stack without changing the 
 
 #### Outcome:
 
-The exact source-`64f5156` Main build stops before compilation because the following overlay-trace patch retains context around the original transfer-profile declarations and the first patch inserted the new drain constants inside that context.  No compiler, link, binary or target result is produced.  The correction will only relocate those two declarations ahead of the retained context, preserving the same 500 millisecond behavior, log format, helper, RBF and submitted bytes while allowing both pinned patches to apply in their established order.
+The exact source-`64f5156` Main build stops before compilation because the following overlay-trace patch retains context around the original transfer-profile declarations and the first patch inserted the new drain constants inside that context.  No compiler, link, binary or target result is produced.  Source `924cb21` relocates only those two declarations ahead of the retained context, preserving the same 500 millisecond behavior, log format, helper, RBF and submitted bytes; the complete first patch is structurally valid and whitespace-clean, and exact ARM compilation remains pending.
 
 #### Next Steps:
 
-Commit the context-only patch-stack correction, rebuild Main from its exact source commit on build PC `10.10.0.42`, verify the resulting ARM executable and diagnostic marker, and then return to entry 842's unchanged twenty-hop physical acceptance test.
+Rebuild Main from exact source `924cb21` on build PC `10.10.0.42`, verify the resulting ARM executable and diagnostic marker, and then return to entry 842's unchanged twenty-hop physical acceptance test.
 
 #### Files Modified:
 
