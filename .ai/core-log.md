@@ -1,3 +1,32 @@
+## 861 COMMIT Unreleased bb3110d 2026-08-31T23:00:20-07:00
+
+#### Coming From:
+
+Unreleased bb3110d
+
+#### Purpose:
+
+Accept the post-still pending-activation helper on physical hardware for DVD Play entering continuous title playback.
+
+#### Outcome:
+
+The user reports that Play now works, and the physical source-`bb3110d` capture satisfies the targeted delayed-activation boundary.  Main submits activation command `0x08` at 13.526823 seconds; the helper retains it across 89 menu payloads and the authored ten-second still, reports `remains pending after finite still`, then observes menu leave and announces `stream hop before payload` without sending any menu-continuation acknowledgment.  Main receives menu leave and the navigation-ready event at 23.684043 and 23.684121 seconds, the existing barrier releases with zero discarded pending bytes, and the helper retains a complete random-access group at sequence, intra and following-reference offsets 0, 296 and 71,632.  The session then sustains title playback for more than 114 scheduler seconds, reaches 83,205,235 title-video bytes and 117,486,034 total submitted bytes, and records no fatal transport, helper or barrier event.  The 815,401-byte screenshot at SHA-256 `53715e69484d7a711ed106004048dc4b0ed14e01e3c2c48dd963317cfc0ddffb` visibly shows the moving feature-title credit rather than the resident menu; the matching 3,509,286-byte log has SHA-256 `c542e36ed059031e62ce1603e581b684c25a144b8635917de15071a7138191d7`, and the 805-byte checksum-valid schema-21 snapshot at SHA-256 `431dc8517d5fe3738f1e980ad21f1014575dacc9a8e31f2c3f29d9398858f853` reports zero decoder error flags.  This physically accepts source `bb3110d` for the Play transition with the source-`2de0717` Main, source-`f5f650f` RBF and authored selector compensation unchanged.
+
+#### Next Steps:
+
+Preserve `host/build/MediaPlayer_Helper_PostStillPending_bb3110d`, the installed source-`2de0717` Main and source-`f5f650f` RBF as the accepted DVD menu and title-activation baseline.  The user may continue exploratory menu, chapter, return-to-menu and title-playback testing; collect a fresh screenshot, telemetry and helper log for any reproducible failure, but do not change the accepted three-file combination merely for the expected authored ten-second Play still.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 860 COMMIT Unreleased bb3110d 2026-08-31T22:52:26-07:00
 
 #### Coming From:
@@ -1148,44 +1177,6 @@ Do not use this mixed installation to test submenu activation because the older 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 821 COMMIT Unreleased 53ccc04 2026-08-31T07:45:34-07:00
-
-#### Coming From:
-
-Unreleased e99cb28
-
-#### Purpose:
-
-Make authored DVD-menu highlights visible and preserve the resident video frame across overlay-only menu transitions without changing the FPGA build.
-
-#### Outcome:
-
-Source `53ccc04` makes displayed libdvdnav button state authoritative over a later scheduled subpicture stop, classifies successful activation as either a menu continuation or stream hop, adds control event `0x84` for the continuation, and makes Main defer its download reset until that decision arrives.  Menu continuations discard only stale helper block and still state while preserving the FPGA's resident video frame; title exits and root calls retain the ready, discard, reset and go barrier.  The focused scheduled-stop/highlight and stream-hop/menu-continuation tests pass, and the exact native helper builds with `-Werror`.  The corrected Coming to America authored-directory harness completes in 1.67 seconds with all six commands, three real directional transitions, one root ready barrier, one activation continuation acknowledgment, 17 overlay commits, 1,468,899 plane bytes, 1,311 visible highlighted states and 4,637 nonzero pixels in the largest selected rectangle.  Exact source `53ccc04` builds a 904,564-byte static stripped ARMv7 helper at SHA-256 `29665e7dbe7790872988d0f0d05e26487f95550128f6719f148fab2d1114c09f` and a 1,174,492-byte patched Main at SHA-256 `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496` under `/home/vash/MiSTer-Media-Player-53ccc04/host/build`; RTL, QSF, RBF and Quartus are unchanged.
-
-#### Next Steps:
-
-The user should manually replace `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-53ccc04/host/build/MediaPlayer_Helper` and the MiSTer root `MiSTer` executable with `/home/vash/MiSTer-Media-Player-53ccc04/host/build/MiSTer`, preserve the installed RBF, verify the recorded SHA-256 values and executable modes, then restart MediaPlayer.  Press `M`, verify that a visible highlight moves among all authored buttons, activate Scene Selection and confirm its submenu retains the background instead of going black, then activate a title and confirm its stream-hop barrier starts playback cleanly; leave the resulting screen and helper log available if any failure occurs.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/dvd_spu.c
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/arm/media_source.c
-- host/arm/media_source.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_dvd_menu_hop.c
-- tools/test_dvd_menu_navigation.py
-- tools/test_dvd_spu.c
 
 #### Status:
 
