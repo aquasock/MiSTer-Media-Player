@@ -1,3 +1,36 @@
+## 864 COMMIT Unreleased ??? 2026-09-01T00:51:35-07:00
+
+#### Coming From:
+
+Unreleased 0318f70
+
+#### Purpose:
+
+Add a bounded helper-side output reserve so temporary physical-DVD read stalls after aggressive chapter seeking do not interrupt otherwise recoverable playback.
+
+#### Outcome:
+
+The source-`0318f70` stress capture completes 129 rapid chapter commands and 131 navigation barriers without video corruption, survives eight false 44.1 kHz AC-3 candidates and fully resynchronizes audio, but approximately 35 seconds into the final continuous chapter-one run the helper-to-Main byte stream becomes completely idle for 2.184525 seconds while Main remains responsive and polls at normal cadence.  The helper scheduler advances 3.665042 seconds across the same interval while emitting only 69,120 PCM frames, converting the source drought into the user's brief audible distortion and silence; playback then resumes automatically, remains synchronized and finishes the chapter.  This proposal will decouple scheduled helper output from the blocking physical source with a finite multi-second RAM reserve, preserve byte order and chapter-barrier draining, and leave Main, RTL, the source-`1bf06db` RBF and Quartus untouched.
+
+#### Next Steps:
+
+Implement a bounded asynchronous output reserve in the helper with exact-byte ordering, blocking backpressure at its capacity, explicit drain semantics for every navigation barrier and clean shutdown, and error propagation from the writer thread.  Add a focused regression that proves the producer can enqueue through a deliberately stalled pipe, later drains byte-identical output and terminates cleanly; rerun the native helper, capability, overlay, AC-3, random-access, subpicture and menu-hop regressions, then build a uniquely named static ARMv7 helper locally for the same rapid-skip and continuous-play physical test.
+
+#### Files Modified:
+
+- host/arm/Makefile
+- host/arm/media_player_helper.c
+- host/arm/output_reserve.c
+- host/arm/output_reserve.h
+- tools/test_output_reserve.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 863 COMMIT Unreleased 0318f70 2026-09-01T00:25:23-07:00
 
 #### Coming From:
@@ -1149,42 +1182,6 @@ Exit the MediaPlayer core or otherwise stop its running helper, obtain only `/ho
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 824 COMMIT Unreleased 3e4f54c 2026-08-31T09:00:09-07:00
-
-#### Coming From:
-
-Unreleased 53ccc04
-
-#### Purpose:
-
-Require complete MPEG-2 sequence and reference-picture context before releasing video after a DVD random-access hop.
-
-#### Outcome:
-
-Source `3e4f54c` moves the helper's initial DVD random-access logic into a focused filter that withholds each initial or reset-causing stream until it has a complete sequence header, an I reference and the following I/P reference, neutralizes every start code in contextless pictures before that sequence plus pre-I and open-GOP leading-B pictures while preserving byte positions and timestamp records, and logs the retained offsets and discarded-picture counts.  The deterministic regression proves a prior contextless P picture, a post-sequence pre-I P picture and a leading B picture are hidden while the qualifying sequence/I/P group is retained, and rejects an incomplete group without a following reference.  The exact native helper builds with `-Werror`; the focused random-access, subpicture and menu-hop tests pass; and the strengthened Coming to America authored-directory harness completes root navigation, all four directional commands and menu continuation while requiring and observing a post-root restart group at sequence, I and following-reference offsets 0, 296 and 7,892, with 17 overlay commits, 1,468,899 plane bytes, 1,335 visible highlighted states and a 4,637-pixel selected region.  Exact detached source `3e4f54c902dbb27a89c3d32eb25df2954bf43a88` produces a 904,564-byte stripped static ARMv7 EABI5 helper at `/home/vash/MiSTer-Media-Player-3e4f54c/host/build/MediaPlayer_Helper`, SHA-256 `c4c47141205c99ade8a9ed266574beb9d072dce827d508efbff47694bb2ce197`, with no dynamic section; Main, RTL, QSF, the frozen seed-20 RBF and Quartus are unchanged.
-
-#### Next Steps:
-
-Stop the running MediaPlayer helper or exit the core, manually replace only `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-3e4f54c/host/build/MediaPlayer_Helper`, restore executable mode if the transfer client clears it, and verify the exact size and SHA-256 before restarting.  Preserve the installed source-`53ccc04` Main and frozen seed-20 RBF, load the physical Coming to America disc, press `M` during first-play and require the root menu to replace the black screen without a decoder diagnostic; if it appears, leave the menu visible for a capture before separately returning to entry 822's fragmented `SET UP` highlight defect.
-
-#### Files Modified:
-
-- docs/BUILDING.md
-- host/arm/ARCHITECTURE.md
-- host/arm/Makefile
-- host/arm/dvd_random_access.c
-- host/arm/dvd_random_access.h
-- host/arm/media_player_helper.c
-- tools/test_dvd_menu_navigation.py
-- tools/test_dvd_random_access.c
 
 #### Status:
 
