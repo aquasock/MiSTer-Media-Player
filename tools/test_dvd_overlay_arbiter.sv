@@ -2,16 +2,16 @@
 module test_dvd_overlay_arbiter;
 reg clk=0,reset=1,ddram_busy=0,ddram_dout_ready=0;
 always #5 clk=~clk;
-reg [7:0] wb=1,rb=1,pb=1,orb=1,owb=1;
-reg [28:0] wa=29'h10010,ra=29'h20,pa=29'h30,ora=29'h40,owa=29'h50050;
-reg wrd=0,rreq=0,preq=0,orreq=0,owrd=0;
-reg [63:0] wdin=64'h11,owdin=64'h22;
-reg [7:0] wbe=8'hff,owbe=8'hff;
-reg wwe=0,owwe=0;
-wire wbusy,rbusy,pbusy,orbusy,owbusy,rrdy,prdy,orrdy;
+reg [7:0] wb=1,uiwb=1,rb=1,pb=1,orb=1,owb=1;
+reg [28:0] wa=29'h10010,uiwa=29'h10060,ra=29'h20,pa=29'h30,ora=29'h40,owa=29'h50050;
+reg wrd=0,uiwrd=0,rreq=0,preq=0,orreq=0,owrd=0;
+reg [63:0] wdin=64'h11,uiwdin=64'h33,owdin=64'h22;
+reg [7:0] wbe=8'hff,uiwbe=8'hff,owbe=8'hff;
+reg wwe=0,uiwwe=0,owwe=0;
+wire wbusy,uiwbusy,rbusy,pbusy,orbusy,owbusy,rrdy,prdy,orrdy;
 wire [7:0] db;
 wire [28:0] da;
-wire drd,dwe,accept;
+wire drd,dwe,accept,uiaccept;
 wire [63:0] ddin;
 wire [7:0] dbe;
 
@@ -29,10 +29,10 @@ endtask
 initial begin
     repeat(3)@(posedge clk);@(negedge clk);reset=0;
     // Presentation read wins over every other simultaneous client.
-    rreq=1;orreq=1;preq=1;wwe=1;owwe=1;#1;
-    if(!drd||da!=ra||!orbusy||!pbusy||!wbusy||!owbusy)
+    rreq=1;orreq=1;preq=1;wwe=1;uiwwe=1;owwe=1;#1;
+    if(!drd||da!=ra||!orbusy||!pbusy||!wbusy||!uiwbusy||!owbusy)
         $fatal(1,"display priority/busy failure");
-    @(posedge clk);@(negedge clk);rreq=0;orreq=0;preq=0;wwe=0;owwe=0;
+    @(posedge clk);@(negedge clk);rreq=0;orreq=0;preq=0;wwe=0;uiwwe=0;owwe=0;
     response(0);
 
     // Overlay owns both words of its explicit descriptor.
@@ -45,12 +45,20 @@ initial begin
     @(posedge clk);@(negedge clk);preq=0;response(2);
 
     // Reconstruction write remains ahead of the low-priority plane writer.
-    wwe=1;owwe=1;#1;
-    if(!dwe||da!=wa||ddin!=wdin||!owbusy||!accept)
+    wwe=1;uiwwe=1;owwe=1;#1;
+    if(!dwe||da!=wa||ddin!=wdin||!uiwbusy||!owbusy||!accept)
         $fatal(1,"video writer priority failure");
     @(posedge clk);@(negedge clk);wwe=0;#1;
+    if(!dwe||da!=uiwa||ddin!=uiwdin||!owbusy||!uiaccept)
+        $fatal(1,"audio UI writer priority failure");
+    @(posedge clk);@(negedge clk);uiwwe=0;#1;
     if(!dwe||da!=owa||ddin!=owdin)$fatal(1,"overlay writer grant failure");
     @(posedge clk);@(negedge clk);owwe=0;
+
+    // The UI writer may never overwrite the region retained by display.
+    uiwa=29'h50;uiwwe=1;#1;
+    if(dwe||!uiwbusy||uiaccept)$fatal(1,"audio UI display ownership failure");
+    @(posedge clk);@(negedge clk);uiwwe=0;
     $display("dvd overlay arbiter: priority and response ownership pass");
     $finish;
 end
@@ -58,6 +66,9 @@ end
 mpeg2_h262_ddram_arbiter dut(
  .clk(clk),.reset(reset),.writer_burstcnt(wb),.writer_addr(wa),.writer_rd(wrd),
  .writer_din(wdin),.writer_be(wbe),.writer_we(wwe),.writer_busy(wbusy),
+ .ui_writer_burstcnt(uiwb),.ui_writer_addr(uiwa),.ui_writer_rd(uiwrd),
+ .ui_writer_din(uiwdin),.ui_writer_be(uiwbe),.ui_writer_we(uiwwe),
+ .ui_writer_busy(uiwbusy),
  .reader_burstcnt(rb),.reader_addr(ra),.reader_rd(rreq),.reader_busy(rbusy),
  .reader_dout_ready(rrdy),.prediction_burstcnt(pb),.prediction_addr(pa),
  .prediction_rd(preq),.prediction_busy(pbusy),.prediction_dout_ready(prdy),
@@ -68,5 +79,6 @@ mpeg2_h262_ddram_arbiter dut(
  .overlay_writer_be(owbe),.overlay_writer_we(owwe),.overlay_writer_busy(owbusy),
  .ddram_busy(ddram_busy),.ddram_dout_ready(ddram_dout_ready),
  .ddram_burstcnt(db),.ddram_addr(da),.ddram_rd(drd),.ddram_din(ddin),
- .ddram_be(dbe),.ddram_we(dwe),.writer_accept_debug(accept));
+ .ddram_be(dbe),.ddram_we(dwe),.writer_accept_debug(accept),
+ .ui_writer_accept_debug(uiaccept));
 endmodule

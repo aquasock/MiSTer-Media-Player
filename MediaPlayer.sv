@@ -134,12 +134,23 @@ wire        mpeg2_new_p_destination_ownership_hold;
 wire [32:0] mpeg2_new_extracted_pts_90k;
 wire        mpeg2_new_extracted_metadata_valid;
 wire        mpeg2_new_extracted_metadata_ready;
+wire [7:0]  display_record_data;
+wire        display_record_start;
+wire        display_record_last;
+wire        display_record_valid;
+wire        display_record_ready;
 wire [7:0]  dvd_overlay_record_data;
 wire        dvd_overlay_record_start;
 wire        dvd_overlay_record_last;
 wire        dvd_overlay_record_valid;
 wire        dvd_overlay_record_ready;
+wire [7:0]  audio_ui_record_data;
+wire        audio_ui_record_start;
+wire        audio_ui_record_last;
+wire        audio_ui_record_valid;
+wire        audio_ui_record_ready;
 wire        dvd_overlay_extractor_error;
+wire        display_record_router_error;
 wire [543:0] dvd_overlay_debug_words;
 wire         dvd_overlay_debug_commit_seen;
 
@@ -745,12 +756,33 @@ mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 	.pcm_ready          (mpeg2_new_inband_pcm_ready),
 	.pcm_sample_count   (mpeg2_new_inband_pcm_sample_count),
 	.pcm_protocol_error (mpeg2_new_inband_pcm_protocol_error),
-	.overlay_data       (dvd_overlay_record_data),
-	.overlay_start      (dvd_overlay_record_start),
-	.overlay_last       (dvd_overlay_record_last),
-	.overlay_valid      (dvd_overlay_record_valid),
-	.overlay_ready      (dvd_overlay_record_ready),
+	.overlay_data       (display_record_data),
+	.overlay_start      (display_record_start),
+	.overlay_last       (display_record_last),
+	.overlay_valid      (display_record_valid),
+	.overlay_ready      (display_record_ready),
 	.overlay_protocol_error(dvd_overlay_extractor_error)
+);
+
+mpeg2_h262_display_record_router mpeg2_h262_display_record_router
+(
+    .clk(clk_mpeg2),.reset(reset_mpeg2),
+    .record_data(display_record_data),
+    .record_start(display_record_start),
+    .record_last(display_record_last),
+    .record_valid(display_record_valid),
+    .record_ready(display_record_ready),
+    .dvd_data(dvd_overlay_record_data),
+    .dvd_start(dvd_overlay_record_start),
+    .dvd_last(dvd_overlay_record_last),
+    .dvd_valid(dvd_overlay_record_valid),
+    .dvd_ready(dvd_overlay_record_ready),
+    .ui_data(audio_ui_record_data),
+    .ui_start(audio_ui_record_start),
+    .ui_last(audio_ui_record_last),
+    .ui_valid(audio_ui_record_valid),
+    .ui_ready(audio_ui_record_ready),
+    .protocol_error(display_record_router_error)
 );
 
 wire mpeg2_new_clean_video_pending;
@@ -1180,6 +1212,21 @@ wire        dvd_overlay_reader_rd;
 wire        dvd_overlay_reader_busy;
 wire        dvd_overlay_reader_dout_ready;
 wire        dvd_overlay_engine_error;
+
+wire [7:0]  audio_ui_writer_burstcnt;
+wire [28:0] audio_ui_writer_addr;
+wire        audio_ui_writer_rd;
+wire [63:0] audio_ui_writer_din;
+wire [7:0]  audio_ui_writer_be;
+wire        audio_ui_writer_we;
+wire        audio_ui_writer_busy;
+wire        audio_ui_writer_accept;
+wire        audio_ui_protocol_error;
+wire        audio_ui_mode_active;
+wire        audio_ui_loading_active;
+wire        audio_ui_display_bank;
+wire        audio_ui_picture_publish;
+wire [15:0] audio_ui_committed_frames;
 
 wire [7:0]  mpeg2_new_pred_burstcnt;
 wire [28:0] mpeg2_new_pred_addr;
@@ -1734,6 +1781,7 @@ mpeg2_h262_native_startup mpeg2_h262_native_startup (
     .bypass_event(mpeg2_new_extracted_metadata_valid ||
         mpeg2_new_inband_pcm_valid ||
         dvd_overlay_record_valid ||
+        audio_ui_picture_publish ||
         (mpeg2_new_picture_header_classified_now && !mpeg2_new_i_picture_start_now) ||
         mpeg2_new_syntax_error || mpeg2_new_phase1_probe_error),
     .frame_window(display_frame_window),
@@ -1950,13 +1998,16 @@ localparam [28:0] MPEG2_NEW_DDR_FRAME_BANK_WORDS     = 29'h00010000;
 localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH0_WORDS = 29'h00020000;
 localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH1_WORDS = 29'h00030000;
 localparam [28:0] MPEG2_NEW_DDR_FRAME_BANK2_WORDS    = 29'h00040000;
-wire [28:0] mpeg2_new_display_frame_offset =
+wire [28:0] mpeg2_new_decoder_display_frame_offset =
     mpeg2_new_display_scratch ?
         (mpeg2_new_display_scratch_bank ? MPEG2_NEW_DDR_FRAME_SCRATCH1_WORDS :
                                            MPEG2_NEW_DDR_FRAME_SCRATCH0_WORDS) :
     (mpeg2_new_display_frame_bank == 2'd1) ? MPEG2_NEW_DDR_FRAME_BANK_WORDS :
     (mpeg2_new_display_frame_bank == 2'd2) ? MPEG2_NEW_DDR_FRAME_BANK2_WORDS :
                                              29'd0;
+wire [28:0] mpeg2_new_display_frame_offset = audio_ui_mode_active ?
+    (audio_ui_display_bank ? MPEG2_NEW_DDR_FRAME_BANK_WORDS : 29'd0) :
+    mpeg2_new_decoder_display_frame_offset;
 assign mpeg2_new_ddr_rd_banked_addr =
     mpeg2_new_ddr_rd_addr + mpeg2_new_display_frame_offset;
 
@@ -1967,16 +2018,16 @@ assign mpeg2_new_ddr_rd_banked_addr =
 // framebuffer counter still reads correctly.  Sample the region in effect on
 // each parity's fetch edge.  All of this is clk_mpeg2 logic and none of it
 // enters the video domain.
-wire [2:0] mpeg2_new_display_region =
-    mpeg2_new_display_scratch ?
+wire [2:0] mpeg2_new_display_region = audio_ui_mode_active ?
+    {2'b00,audio_ui_display_bank} : mpeg2_new_display_scratch ?
         (mpeg2_new_display_scratch_bank ? 3'd4 : 3'd3) :
         {1'b0, mpeg2_new_display_frame_bank};
 
 // Entry 531: address bits [18:16] encode bank two and the scratch regions as
 // 4, 2 and 3 respectively.  Keep that physical encoding for an exact compare
 // against accepted writer transactions.
-wire [2:0] mpeg2_new_display_physical_region =
-    mpeg2_new_display_scratch ?
+wire [2:0] mpeg2_new_display_physical_region = audio_ui_mode_active ?
+    {2'b00,audio_ui_display_bank} : mpeg2_new_display_scratch ?
         (mpeg2_new_display_scratch_bank ? 3'd3 : 3'd2) :
     (mpeg2_new_display_frame_bank == 2'd2) ? 3'd4 :
         {1'b0,mpeg2_new_display_frame_bank};
@@ -2039,22 +2090,54 @@ always @(posedge clk_mpeg2) begin
 end
 
 
+mpeg2_h262_audio_ui mpeg2_h262_audio_ui
+(
+    .clk(clk_mpeg2),.reset(reset_mpeg2),
+    .record_data(audio_ui_record_data),
+    .record_start(audio_ui_record_start),
+    .record_last(audio_ui_record_last),
+    .record_valid(audio_ui_record_valid),
+    .record_ready(audio_ui_record_ready),
+    .protocol_error(audio_ui_protocol_error),
+    .writer_burstcnt(audio_ui_writer_burstcnt),
+    .writer_addr(audio_ui_writer_addr),
+    .writer_rd(audio_ui_writer_rd),
+    .writer_din(audio_ui_writer_din),
+    .writer_be(audio_ui_writer_be),
+    .writer_we(audio_ui_writer_we),
+    .writer_busy(audio_ui_writer_busy),
+    .publish_window(mpeg2_new_swap_window_pulse),
+    .mode_active(audio_ui_mode_active),
+    .loading_active(audio_ui_loading_active),
+    .display_bank(audio_ui_display_bank),
+    .picture_publish(audio_ui_picture_publish),
+    .committed_frames(audio_ui_committed_frames)
+);
+
 mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 (
     .reset          (mpeg2_new_framebuffer_reset),
     .mem_clk        (clk_mpeg2),
-    .picture_complete(mpeg2_new_first_picture_420_parsed && mpeg2_new_display_descriptor_valid),
-    .horizontal_size(mpeg2_new_horizontal_size),
-    .vertical_size  (mpeg2_new_vertical_size),
+    .picture_complete(audio_ui_picture_publish ||
+        (mpeg2_new_first_picture_420_parsed &&
+         mpeg2_new_display_descriptor_valid)),
+    .horizontal_size(audio_ui_mode_active ? 12'd720 :
+        mpeg2_new_horizontal_size),
+    .vertical_size  (audio_ui_mode_active ? 12'd480 :
+        mpeg2_new_vertical_size),
     // Use the fully synchronized presentation-mode level on the memory side.
     // The framebuffer carries this descriptor back through its existing
     // video-domain descriptor synchronizers with the published picture.
-    .native_interlaced(mpeg2_new_native_active_sync[2]),
-    .top_field_first(mpeg2_new_display_top_field_first),
-    .progressive_chroma(mpeg2_new_display_progressive_frame),
+    .native_interlaced(audio_ui_mode_active ? 1'b0 :
+        mpeg2_new_native_active_sync[2]),
+    .top_field_first(audio_ui_mode_active ? 1'b0 :
+        mpeg2_new_display_top_field_first),
+    .progressive_chroma(audio_ui_mode_active ? 1'b1 :
+        mpeg2_new_display_progressive_frame),
     .framebuffer_generation(mpeg2_new_framebuffer_generation),
     .write_read_expected_region(mpeg2_new_display_physical_region),
-    .write_read_expected_valid(mpeg2_new_luma_writer_expected_valid),
+    .write_read_expected_valid(audio_ui_mode_active ? 1'b0 :
+        mpeg2_new_luma_writer_expected_valid),
     .write_read_expected_even_fingerprint(
         mpeg2_new_luma_writer_expected_even),
     .write_read_expected_odd_fingerprint(
@@ -2172,10 +2255,17 @@ mpeg2_h262_dvd_overlay mpeg2_h262_dvd_overlay
     .h_pos            (display_h_pos),
     .v_pos            (display_v_pos),
     .native_active    (display_native_interlaced),
-    .base_r           (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_r),
-    .base_g           (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_g),
-    .base_b           (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_b),
-    .base_de          (fb_video_de && !mpeg2_new_startup_video_blank),
+    .base_r           ((mpeg2_new_startup_video_blank ||
+                        (audio_ui_loading_active && !audio_ui_mode_active)) ?
+                        8'd0 : fb_video_r),
+    .base_g           ((mpeg2_new_startup_video_blank ||
+                        (audio_ui_loading_active && !audio_ui_mode_active)) ?
+                        8'd0 : fb_video_g),
+    .base_b           ((mpeg2_new_startup_video_blank ||
+                        (audio_ui_loading_active && !audio_ui_mode_active)) ?
+                        8'd0 : fb_video_b),
+    .base_de          (fb_video_de && !mpeg2_new_startup_video_blank &&
+                       !(audio_ui_loading_active && !audio_ui_mode_active)),
     .video_r          (dvd_overlay_video_r),
     .video_g          (dvd_overlay_video_g),
     .video_b          (dvd_overlay_video_b),
@@ -2194,6 +2284,13 @@ mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
     .writer_be       (mpeg2_new_ddr_wr_be),
     .writer_we       (mpeg2_new_ddr_wr_we),
     .writer_busy     (mpeg2_new_ddr_writer_busy),
+    .ui_writer_burstcnt(audio_ui_writer_burstcnt),
+    .ui_writer_addr  (audio_ui_writer_addr),
+    .ui_writer_rd    (audio_ui_writer_rd),
+    .ui_writer_din   (audio_ui_writer_din),
+    .ui_writer_be    (audio_ui_writer_be),
+    .ui_writer_we    (audio_ui_writer_we),
+    .ui_writer_busy  (audio_ui_writer_busy),
     .reader_burstcnt (mpeg2_new_ddr_rd_burstcnt),
     .reader_addr     (mpeg2_new_ddr_rd_banked_addr),
     .reader_rd       (mpeg2_new_ddr_rd),
@@ -2224,7 +2321,8 @@ mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
     .ddram_din       (DDRAM_DIN),
     .ddram_be        (DDRAM_BE),
     .ddram_we        (DDRAM_WE),
-    .writer_accept_debug(mpeg2_new_ddr_writer_accept)
+    .writer_accept_debug(mpeg2_new_ddr_writer_accept),
+    .ui_writer_accept_debug(audio_ui_writer_accept)
 );
 assign CLK_VIDEO = clk_video;
 assign CE_PIXEL  = display_pixel_ce;
@@ -2259,12 +2357,13 @@ wire mpeg2_new_cadence_session_quiet =
     !mpeg2_new_p_destination_ownership_hold &&
     !mpeg2_new_pred_rd &&
     !mpeg2_new_ddr_wr_we &&
+    !audio_ui_writer_we &&
     !dvd_overlay_reader_rd &&
     !dvd_overlay_writer_we &&
     !audio_pcm_terminal_pending;
 
 wire [15:0] mpeg2_new_cadence_error_flags = {
-    1'd0,
+    display_record_router_error || audio_ui_protocol_error,
     dvd_overlay_extractor_error,
     dvd_overlay_engine_error,
     mpeg2_new_ddr_bank_overlap_error,

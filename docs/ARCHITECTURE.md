@@ -6,7 +6,7 @@ MiSTer Media Player is being developed as a standards-driven media decoder for M
 
 ### HPS / host side
 
-The ARM helper opens file sources, demultiplexes bounded MPEG-2 Program Streams, extracts picture PTS, decodes MPEG Layer II or AC-3 to stereo, packs AC-3 or DTS passthrough bursts, and translates authored DVD menu subpictures into bounded overlay records. Patched MiSTer Main launches the helper with the selected audio mode and brokers its annotated byte stream through guarded, resumable transfers. Main remains the sole FPGA SPI owner; the helper does not access that bridge directly.
+The ARM helper opens file sources, demultiplexes bounded MPEG-2 Program Streams, extracts picture PTS, decodes MPEG Layer II or AC-3 to stereo, packs AC-3 or DTS passthrough bursts, and translates authored DVD menu subpictures into bounded overlay records. For standalone audio it also renders a planar 720x480 limited-range BT.601 interface, reserving a square album-art viewport and metadata strip while the first boundary draws static controls and a one-hertz sample-clock activity ruler. Patched MiSTer Main launches the helper with the selected audio mode and brokers its annotated byte stream through guarded, resumable transfers. Main remains the sole FPGA SPI owner; the helper does not access that bridge directly.
 
 DVD/ISO navigation uses libdvdnav first-play/root-menu state plus a private
 Main/helper control channel for directional, activation and root commands.
@@ -18,7 +18,7 @@ transport contracts.
 The active FPGA pipeline performs:
 
 1. asynchronous input buffering and clock-domain crossing;
-2. separation of video, picture-PTS, PCM-or-burst and DVD-overlay records, followed by H.262 byte/bit reading with backpressure;
+2. separation of video, picture-PTS, PCM-or-burst and shared display records, followed by command routing of display records to either the DVD-overlay engine or audio-interface uploader and H.262 byte/bit reading with backpressure;
 3. picture/slice/macroblock/block parsing;
 4. MPEG-2 DCT VLC decoding;
 5. inverse quantization;
@@ -28,8 +28,9 @@ The active FPGA pipeline performs:
 9. DDR3 readback through small ping-pong line caches;
 10. 4:2:0 chroma expansion;
 11. limited-range BT.601 YCbCr-to-RGB conversion;
-12. cadence-floor and picture-PTS scheduling with selectable 800x600 diagnostic or native 480i presentation;
-13. native-480i composition of the double-buffered DVD overlay with authored normal/highlight RGBA state.
+12. cadence-floor and picture-PTS scheduling with native 720x480p or 720x480i presentation;
+13. native-480i composition of the double-buffered DVD overlay with authored normal/highlight RGBA state;
+14. inactive-bank loading and safe-frame-boundary publication of the ARM-rendered standalone-audio interface in native 720x480p.
 
 Audio records enter an 8,192-frame stereo FIFO. The selected output routes decoded PCM to HDMI or S/PDIF, or sends AC-3/DTS bursts through a bit-preserving S/PDIF path that bypasses gain, mixing and filtering. The unused output is muted. Video decoder backpressure is isolated by the separate 64 KiB clean-video queue; the ingress FIFO adds 32 KiB of compressed read-ahead.
 
@@ -63,8 +64,15 @@ The current frame resides in a DDR region beginning at physical byte address `0x
 DVD menu overlays use two packed two-bit 720x480 planes at byte addresses
 `0x30280000` and `0x30300000`. The display client caches one parity line while
 the helper loads the inactive plane, then publishes it atomically on commit.
+The audio-only interface reuses ordinary frame regions zero and one. Each
+518,400-byte Y/Cb/Cr frame is divided into bounded records, written only to the
+inactive frame bank, validated for exact byte and word count, and then published
+by changing banks only at the established safe frame window. The helper offers
+at most one UI record after a PCM record, so a full-screen update cannot become
+an unbounded audio-service gap.
+
 The DDR arbiter preserves display-read priority, followed by overlay reads,
-prediction reads, decoder writes and overlay writes.
+prediction reads, decoder writes, audio-interface writes and overlay writes.
 
 ## Presentation path
 
@@ -89,7 +97,7 @@ The second tier preserves native 480i for an external processor and eventual HDM
 The principal active clocks are:
 
 - 60 MHz decoder/memory-side logic;
-- 40 MHz 800x600 diagnostic timing, or the native 480i video clock path.
+- 54 MHz video-side logic with exact 720x480 progressive or interlaced pixel enables.
 
 Phase 1P established the project's current timing/CDC discipline:
 

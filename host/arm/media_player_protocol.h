@@ -34,6 +34,9 @@
 #define MEDIA_PLAYER_OVERLAY_DATA   0x02
 #define MEDIA_PLAYER_OVERLAY_COMMIT 0x03
 #define MEDIA_PLAYER_OVERLAY_STYLE  0x04
+#define MEDIA_PLAYER_AUDIO_UI_BEGIN  0x10
+#define MEDIA_PLAYER_AUDIO_UI_DATA   0x11
+#define MEDIA_PLAYER_AUDIO_UI_COMMIT 0x12
 #define MEDIA_PLAYER_PCM_MODE_STEREO 0x01
 #define MEDIA_PLAYER_PCM_MODE_48K 0x02
 #define MEDIA_PLAYER_PCM_MODE_NON_AUDIO 0x80
@@ -47,7 +50,7 @@
     "mp3-s16le-44100,mp3-s16le-48000,wav-s16le-stereo-44100,wav-s16le-stereo-48000," \
     "flac-s16le-stereo-44100,flac-s16le-stereo-48000," \
     "ogg-vorbis-s16le-stereo-44100,ogg-vorbis-s16le-stereo-48000 " \
-    "transport=inband-pcm-v1,inband-dvd-overlay-v1 " \
+    "transport=inband-pcm-v1,inband-dvd-overlay-v1,inband-audio-ui-v1 " \
     "controls=chapter-v1,pause-hold-v1,dvd-menu-v1"
 
 #endif

@@ -7,6 +7,7 @@
 #include "ac3_resync.h"
 #include "mm_accel.h"
 #include "consumer_audio.h"
+#include "audio_ui.h"
 #include "dvd_random_access.h"
 #include "dvd_spu.h"
 #include "media_player_protocol.h"
@@ -188,6 +189,7 @@ struct output_state {
     int audio_pes_seen;
     int silent_video_mode;
     int audio_only_mode;
+    struct audio_ui *audio_ui;
     int pcm_non_audio;       /* IEC 61937 burst records, never decoded PCM */
     int scheduler_enabled;
     int scheduler_started;
@@ -548,7 +550,7 @@ static int discard_reserved_output(struct output_state *output,
     return 0;
 }
 
-static int emit_overlay_record(struct output_state *output, uint8_t command,
+static int emit_display_record(struct output_state *output, uint8_t command,
                                const uint8_t *payload, size_t size)
 {
     uint8_t *record;
@@ -570,9 +572,15 @@ static int emit_overlay_record(struct output_state *output, uint8_t command,
     if (size)
         memcpy(record + sizeof(header), payload, size);
     result = write_output_priority(output, record, sizeof(header) + size,
-                                   "DVD overlay record");
+                                   "display record");
     free(record);
     return result;
+}
+
+static int emit_audio_ui_record(void *opaque, uint8_t command,
+                                const uint8_t *payload, size_t size)
+{
+    return emit_display_record(opaque, command, payload, size);
 }
 
 static void overlay_style_payload(const struct dvd_spu_overlay *overlay,
@@ -680,7 +688,7 @@ static int emit_overlay_style(struct output_state *output,
 #ifdef MMP_DVD_OVERLAY_PROBE
     overlay_probe_style_payload(payload);
 #endif
-    result = emit_overlay_record(output, command, payload, sizeof(payload));
+    result = emit_display_record(output, command, payload, sizeof(payload));
     if (result < 0)
         return result;
     if (dvd_spu_selected_histogram(overlay, histogram) < 0) {
@@ -774,7 +782,7 @@ static int emit_overlay_frame(struct output_state *output,
 
         if (count > 4096u)
             count = 4096u;
-        if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_DATA,
+        if (emit_display_record(output, MEDIA_PLAYER_OVERLAY_DATA,
 #ifdef MMP_DVD_OVERLAY_PROBE
                                 transfer_plane,
 #else
@@ -784,14 +792,14 @@ static int emit_overlay_frame(struct output_state *output,
             return -1;
         offset += count;
     }
-    if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_COMMIT, NULL, 0) < 0)
+    if (emit_display_record(output, MEDIA_PLAYER_OVERLAY_COMMIT, NULL, 0) < 0)
         return -1;
     return 0;
 }
 
 static int emit_overlay_clear(struct output_state *output)
 {
-    return emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_CLEAR, NULL, 0);
+    return emit_display_record(output, MEDIA_PLAYER_OVERLAY_CLEAR, NULL, 0);
 }
 
 static enum media_source_dvd_command dvd_source_command(int command)
@@ -1302,6 +1310,15 @@ static int hold_flush(struct output_state *output, size_t keep)
             return -1;
         output->hold_head += (size_t)count * 2u;
         output->pcm_emitted_frames += count;
+        if (output->audio_ui &&
+            audio_ui_service(output->audio_ui,
+                             output->pcm_emitted_frames,
+                             (unsigned)output->hold_rate_hz,
+                             emit_audio_ui_record, output) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: audio UI output failed\n");
+            return -1;
+        }
     }
     if (output->hold_head && output->hold_head == output->hold_count) {
         output->hold_count = 0;
@@ -3456,6 +3473,15 @@ int main(int argc, char **argv)
     output.iso_start_filter_active =
         (input.kind == MEDIA_SOURCE_ISO || input.kind == MEDIA_SOURCE_DVD) &&
         output.scheduler_enabled;
+    if (is_audio_file && !output.pcm) {
+        if (audio_ui_create(&output.audio_ui) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: cannot allocate audio UI\n");
+            goto done;
+        }
+        fprintf(stderr,
+                "media_player_helper: audio UI 720x480p BT.601 frame enabled\n");
+    }
     if (is_mp3) {
         if (process_mp3_stream(&input, &audio, &output) < 0)
             goto done;
@@ -3582,6 +3608,13 @@ done:
     if (success && output.audio_frames && !output.pcm &&
         emit_pcm_end(&output) < 0)
         success = 0;
+    if (output.audio_ui) {
+        fprintf(stderr,
+                "media_player_helper: audio UI committed=%u frame(s)\n",
+                audio_ui_committed_frames(output.audio_ui));
+        audio_ui_destroy(output.audio_ui);
+        output.audio_ui = NULL;
+    }
     free(output.hold);
     output.hold = NULL;
     while (output.video_head)

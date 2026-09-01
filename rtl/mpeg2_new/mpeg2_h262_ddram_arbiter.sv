@@ -23,9 +23,10 @@
 // and reconstruction write. No prediction-side write encoding remains.
 //
 // Authored DVD menus add two explicit clients in disjoint regions 5 and 6:
-// a low-priority plane writer and a line-cache reader.  Display reads retain
-// highest priority; response ownership is widened instead of inferring a client
-// from addresses or timing.
+// a low-priority plane writer and a line-cache reader.  The ARM-rendered
+// audio-only screen adds a writer between the decoder and overlay writers.
+// Display reads retain highest priority; response ownership is widened instead
+// of inferring a client from addresses or timing.
 //
 // Commit 142 extends display ownership to the B scratch frame.  Entry 276 adds
 // a third retained reference at region 100.  Writer exclusion therefore keeps
@@ -49,6 +50,14 @@ module mpeg2_h262_ddram_arbiter
     input  wire [7:0]  writer_be,
     input  wire        writer_we,
     output wire        writer_busy,
+
+    input  wire [7:0]  ui_writer_burstcnt,
+    input  wire [28:0] ui_writer_addr,
+    input  wire        ui_writer_rd,
+    input  wire [63:0] ui_writer_din,
+    input  wire [7:0]  ui_writer_be,
+    input  tri0        ui_writer_we,
+    output wire        ui_writer_busy,
 
     input  wire [7:0]  reader_burstcnt,
     input  wire [28:0] reader_addr,
@@ -86,7 +95,8 @@ module mpeg2_h262_ddram_arbiter
     output wire        ddram_we,
     // Entry 531: passive pulse identifying the exact cycle on which the
     // writer request above is accepted by the external DDR interface.
-    output wire        writer_accept_debug
+    output wire        writer_accept_debug,
+    output wire        ui_writer_accept_debug
 );
 
 localparam integer DESCRIPTOR_DEPTH=`H262_PREDICTION_DESCRIPTOR_DEPTH;
@@ -117,6 +127,8 @@ wire read_descriptor_room=(read_descriptor_count<DESCRIPTOR_DEPTH)||
 
 wire writer_targets_reader_region =
     reader_bank_valid && (writer_addr[18:16] == reader_frame_region);
+wire ui_writer_targets_reader_region =
+    reader_bank_valid && (ui_writer_addr[18:16] == reader_frame_region);
 
 wire grant_reader =
     read_descriptor_room && reader_rd;
@@ -131,9 +143,13 @@ wire grant_writer =
     !read_outstanding && !reader_rd && !overlay_reader_rd && !prediction_rd &&
     writer_we && !writer_targets_reader_region;
 
+wire grant_ui_writer =
+    !read_outstanding && !reader_rd && !overlay_reader_rd && !prediction_rd &&
+    !writer_we && ui_writer_we && !ui_writer_targets_reader_region;
+
 wire grant_overlay_writer =
     !read_outstanding && !reader_rd && !overlay_reader_rd && !prediction_rd &&
-    !writer_we && overlay_writer_we;
+    !writer_we && !ui_writer_we && overlay_writer_we;
 
 // Busy reports capacity/priority independently of the corresponding request.
 // This is a ready/valid boundary: acceptance below remains request-qualified,
@@ -149,14 +165,18 @@ assign overlay_reader_busy =
 assign writer_busy = read_outstanding||reader_rd||overlay_reader_rd||prediction_rd||
     writer_targets_reader_region||ddram_busy;
 
+assign ui_writer_busy = read_outstanding||reader_rd||overlay_reader_rd||
+    prediction_rd||writer_we||ui_writer_targets_reader_region||ddram_busy;
+
 assign overlay_writer_busy = read_outstanding||reader_rd||overlay_reader_rd||
-    prediction_rd||writer_we||ddram_busy;
+    prediction_rd||writer_we||ui_writer_we||ddram_busy;
 
 assign ddram_burstcnt =
     grant_reader ? reader_burstcnt :
     grant_overlay_reader ? overlay_reader_burstcnt :
     grant_prediction ? prediction_burstcnt :
     grant_writer ? writer_burstcnt :
+    grant_ui_writer ? ui_writer_burstcnt :
     grant_overlay_writer ? overlay_writer_burstcnt : 8'd0;
 
 assign ddram_addr =
@@ -164,6 +184,7 @@ assign ddram_addr =
     grant_overlay_reader ? overlay_reader_addr :
     grant_prediction ? prediction_addr :
     grant_writer ? writer_addr :
+    grant_ui_writer ? ui_writer_addr :
     grant_overlay_writer ? overlay_writer_addr : 29'd0;
 
 assign ddram_rd =
@@ -173,20 +194,24 @@ assign ddram_rd =
 
 assign ddram_din =
     grant_writer ? writer_din :
+    grant_ui_writer ? ui_writer_din :
     grant_overlay_writer ? overlay_writer_din : 64'd0;
 
 assign ddram_be =
     grant_writer ? writer_be :
+    grant_ui_writer ? ui_writer_be :
     grant_overlay_writer ? overlay_writer_be : 8'hFF;
 
 assign ddram_we =
     grant_writer ? writer_we :
+    grant_ui_writer ? ui_writer_we :
     grant_overlay_writer ? overlay_writer_we : 1'b0;
 
 wire reader_accept=grant_reader&&!ddram_busy;
 wire overlay_reader_accept=grant_overlay_reader&&!ddram_busy;
 wire prediction_accept=grant_prediction&&!ddram_busy;
 assign writer_accept_debug=grant_writer&&!ddram_busy;
+assign ui_writer_accept_debug=grant_ui_writer&&!ddram_busy;
 wire read_accept=reader_accept||overlay_reader_accept||prediction_accept;
 wire [1:0] accepted_owner=reader_accept?READ_OWNER_DISPLAY:
     overlay_reader_accept?READ_OWNER_OVERLAY:READ_OWNER_PREDICTION;
@@ -259,6 +284,7 @@ always @(posedge clk) begin
 end
 
 wire unused_writer_rd = writer_rd;
+wire unused_ui_writer_rd = ui_writer_rd;
 wire unused_overlay_writer_rd = overlay_writer_rd;
 
 endmodule
