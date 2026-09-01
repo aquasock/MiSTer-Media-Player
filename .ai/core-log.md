@@ -1,3 +1,33 @@
+## 863 COMMIT Unreleased ??? 2026-09-01T00:13:48-07:00
+
+#### Coming From:
+
+Unreleased 1bf06db
+
+#### Purpose:
+
+Remove the obsolete authored-selector compensation and make DVD chapter AC-3 recovery reject false sample-rate candidates without terminating playback.
+
+#### Outcome:
+
+The source-`1bf06db` physical test makes chapter traversal materially smoother and repeatedly crosses the former FPGA session boundary without the prior phase-one error, while its repaired overlay path accepts and publishes the ordinary 86,400-byte authored plane before the compensated helper sends an unnecessary 86,422-byte candidate that shifts and duplicates the selector.  A separate deterministic chapter-nine-to-chapter-ten transition releases the navigation barrier, finds a complete MPEG-2 random-access group and reports zero FPGA decoder error flags, but AC-3 recovery rejects two incomplete candidates, mistakes later misaligned bytes for a 44.1 kHz header and exits code one even though the same substream is the disc's established 48 kHz track.  This helper-only boundary will remove the compensated candidate and distinguish an unsupported rate at clean acquisition from a false header encountered during bytewise recovery, leaving Main and the source-`1bf06db` RBF unchanged.
+
+#### Next Steps:
+
+Implement the bounded AC-3 recovery rule so a rate mismatch after recovery has begun advances by one byte and continues under the existing resynchronization limit, while a clean unsupported stream still fails explicitly; add focused regression coverage for the false-rate-candidate sequence and confirm the ordinary overlay build emits only one exact 86,400-byte plane.  Run the native helper build and retained navigation, random-access, subpicture and capability tests, then build a uniquely named ARMv7 helper locally with the installed GNU 10.2.1 toolchain for a physical chapter-ten and selector test without replacing Main or the RBF.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- tools/test_ac3_resync.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 862 COMMIT Unreleased 1bf06db 2026-08-31T23:11:01-07:00
 
 #### Coming From:
@@ -1152,35 +1182,6 @@ Stop the running MediaPlayer helper or exit the core, manually replace only `/me
 - host/arm/media_player_helper.c
 - tools/test_dvd_menu_navigation.py
 - tools/test_dvd_random_access.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 823 COMMIT Unreleased 53ccc04 2026-08-31T08:34:42-07:00
-
-#### Coming From:
-
-Unreleased 53ccc04
-
-#### Purpose:
-
-Capture and isolate the exact-source black-screen failure produced by a physical-disc root-menu command after correcting the Main deployment.
-
-#### Outcome:
-
-Absolute-path readback verifies the intended artifact combination before interpretation: the installed 904,564-byte helper is exact source `53ccc04` at SHA-256 `29665e7dbe7790872988d0f0d05e26487f95550128f6719f148fab2d1114c09f`, the 1,174,492-byte Main is exact source `53ccc04` at `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496`, and the unchanged 4,511,756-byte seed-20 RBF remains `02928bff70b25eb0e0b1a6b8f24afec0dfe687f2524754b33fe13f4ed3014e9d`.  The user presses keyboard `M` during physical-disc playback and receives a black diagnostic raster instead of the root menu.  The 31,878-byte 1920-by-1080 scaled capture `/tmp/entry823_root_menu_black.png`, SHA-256 `90df9d893e1875eab6a97663de564c254d7c4ea810b176ec0397bf1fb12e35fc`, decodes with all 64 schema-20 headers, row indices and parity bits valid and checksum `1ffb896e` matching.  Its fatal snapshot accepts only 16,467 video bytes and runs 19,694 decoder clocks without a first presentation before latching exactly error `0x0002`, the phase-one probe error; the retained current header is a P picture while frame-rate code and completed-picture count remain zero, and every syntax, prediction, inverse-quantization, IDCT, reconstruction, writer, cache, presentation, audio and DVD-overlay error bit is clear.  The matching 1,578,363-byte helper log at SHA-256 `4e50195d8d16a41138d9e679e4a22518fd1dab109afc9af5991fd207dce4f08b` proves that root navigation succeeds, discards zero partial-block bytes, is classified as a stream hop, completes the new Main/helper ready barrier with 59,752 pending Main bytes discarded, rearms the random-access filter with zero leading B pictures, publishes six subpicture overlays and continues transferring hundreds of megabytes without a helper fatal.  This rejects source `53ccc04` on the physical root-menu gate and localizes the black screen to the reset FPGA session beginning without sufficient independent sequence and reference-picture context rather than to deployment, Main/helper deadlock or an overlay fault; entry 822's fragmented selected-button result remains a separate open defect.
-
-#### Next Steps:
-
-Keep the exact source-`53ccc04` Main, helper and frozen seed-20 RBF unchanged and do not use this failed session for further menu commands.  After user approval, make a bounded helper-only random-access correction that withholds every reset-causing DVD stream hop until complete independently decodable sequence context and an intra reference are present, add a real authored-disc regression reproducing the root call from the observed mid-first-play position and require its first outgoing video to decode cleanly, then rebuild only the helper and repeat `M`; do not change Main, RTL, QSF, the RBF or the separately open overlay-highlight path in that boundary.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
