@@ -586,6 +586,7 @@ static int emit_overlay_frame(struct output_state *output,
 {
     size_t offset = 0;
 #ifdef MMP_DVD_OVERLAY_PROBE
+    const size_t compensated_bytes = DVD_SPU_PLANE_BYTES + 21u;
     uint8_t probe_plane[4096];
 
     overlay_probe_dump_plane(overlay);
@@ -609,7 +610,39 @@ static int emit_overlay_frame(struct output_state *output,
             return -1;
         offset += count;
     }
+    if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_COMMIT, NULL, 0) < 0)
+        return -1;
+
+#ifdef MMP_DVD_OVERLAY_PROBE
+    /*
+     * Physical hardware has exhibited two repeatable outcomes for the same
+     * 21-full-record transfer: either every plane byte arrives, or the final
+     * byte of each full record is absent.  Keep the ordinary candidate first,
+     * then send 21 additional all-index-one bytes in a second candidate.  A
+     * rejected commit leaves an already published plane intact, so one of the
+     * two candidates can publish under either observed outcome.
+     */
+    fprintf(stderr,
+            "media_player_helper: DVD overlay compensation "
+            "standard_bytes=%u candidate_bytes=%u extra_bytes=21\n",
+            (unsigned)DVD_SPU_PLANE_BYTES, (unsigned)compensated_bytes);
+    if (emit_overlay_style(output, overlay, MEDIA_PLAYER_OVERLAY_CONFIG) < 0)
+        return -1;
+    offset = 0;
+    while (offset < compensated_bytes) {
+        size_t count = compensated_bytes - offset;
+
+        if (count > sizeof(probe_plane))
+            count = sizeof(probe_plane);
+        if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_DATA,
+                                probe_plane, count) < 0)
+            return -1;
+        offset += count;
+    }
     return emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_COMMIT, NULL, 0);
+#else
+    return 0;
+#endif
 }
 
 static int emit_overlay_clear(struct output_state *output)
