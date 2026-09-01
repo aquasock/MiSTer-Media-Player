@@ -297,6 +297,7 @@ struct dvd_menu_state {
     uint16_t highlight_x2;
     uint16_t highlight_y2;
     int activation_pending;
+    unsigned activation_payloads;
     int resume_code_valid;
     uint8_t resume_code;
 };
@@ -708,6 +709,7 @@ static int acknowledge_menu_continuation(struct dvd_menu_state *menu,
     if (control_send(control_fd, MEDIA_PLAYER_CONTROL_MENU_CONTINUE) < 0)
         return -1;
     menu->activation_pending = 0;
+    menu->activation_payloads = 0;
     fprintf(stderr,
             "media_player_helper: DVD menu continuation reason=%s\n",
             reason);
@@ -2664,6 +2666,12 @@ static int wait_dvd_still(struct media_source *input,
         deadline = monotonic_us() + (uint64_t)seconds * 1000000u;
     fprintf(stderr, "media_player_helper: DVD still wait %s%u seconds\n",
             seconds == 0xffu ? "indefinite/" : "", seconds);
+    if (menu->activation_pending && menu->activation_payloads)
+        fprintf(stderr,
+                "media_player_helper: DVD menu activation pending reached "
+                "still payloads=%u duration=%s%u\n",
+                menu->activation_payloads,
+                seconds == 0xffu ? "indefinite/" : "", seconds);
 
     if (seconds == 0xffu && menu->activation_pending) {
         if (acknowledge_menu_continuation(menu, control_fd,
@@ -2699,6 +2707,7 @@ static int wait_dvd_still(struct media_source *input,
             }
             if (navigation == MEDIA_SOURCE_DVD_MENU_PENDING) {
                 menu->activation_pending = 1;
+                menu->activation_payloads = 0;
                 fprintf(stderr,
                         "media_player_helper: DVD menu activation deferred\n");
                 return 1;
@@ -2726,6 +2735,7 @@ static int wait_dvd_still(struct media_source *input,
             if (menu->activation_pending) {
                 if (navigation == MEDIA_SOURCE_DVD_STREAM_HOP) {
                     menu->activation_pending = 0;
+                    menu->activation_payloads = 0;
                     *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
                     fprintf(stderr,
                             "media_player_helper: DVD delayed activation "
@@ -2788,6 +2798,7 @@ static int process_program_stream(struct media_source *input,
             }
             if (navigation == MEDIA_SOURCE_DVD_MENU_PENDING) {
                 menu->activation_pending = 1;
+                menu->activation_payloads = 0;
                 fprintf(stderr,
                         "media_player_helper: DVD menu activation deferred\n");
                 continue;
@@ -2830,6 +2841,7 @@ static int process_program_stream(struct media_source *input,
                 return -1;
             if (!menu->menu_active) {
                 menu->activation_pending = 0;
+                menu->activation_payloads = 0;
                 menu->resume_code = code;
                 menu->resume_code_valid = 1;
                 *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
@@ -2838,9 +2850,11 @@ static int process_program_stream(struct media_source *input,
                         "stream hop before payload\n");
                 return 1;
             }
-            if (acknowledge_menu_continuation(menu, control_fd,
-                                              "menu-payload") < 0)
-                return -1;
+            ++menu->activation_payloads;
+            if (menu->activation_payloads == 1)
+                fprintf(stderr,
+                        "media_player_helper: DVD menu activation pending "
+                        "through payload code=0x%02x\n", code);
         }
         if (code == 0xb9) {
             if (menu && menu->enabled)

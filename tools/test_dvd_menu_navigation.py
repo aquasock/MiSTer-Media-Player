@@ -37,6 +37,10 @@ PENDING_RE = re.compile(
     rb"media_source: (?:DVD|ISO) menu pending (activate) "
     rb"discarded_block_tail=([0-9]+)"
 )
+PENDING_PAYLOAD_RE = re.compile(
+    rb"media_player_helper: DVD menu activation pending reached still "
+    rb"payloads=([1-9][0-9]*) duration=(?:indefinite/)?([0-9]+)"
+)
 COMMAND_RE = re.compile(
     rb"media_source: (?:DVD|ISO) menu command="
     rb"(up|down|left|right|activate|root) pci_lbn=([0-9]+) "
@@ -170,6 +174,7 @@ def main():
     continue_discarded = {"activate": []}
     pending_counts = {"activate": 0}
     pending_discarded = {"activate": []}
+    pending_payloads = []
     root_random_access = []
     activation_random_access = []
     last_hop = None
@@ -196,6 +201,7 @@ def main():
                 continue_events)
             if args.require_delayed_activation:
                 activation_done = (pending_counts["activate"] and
+                                   pending_payloads and
                                    hop_counts["activate"] and
                                    ready_events >= 2 and leave_events and
                                    activation_random_access and
@@ -282,6 +288,11 @@ def main():
                                 pending_counts[name] += 1
                                 pending_discarded[name].append(
                                     int(match.group(2)))
+                            match = PENDING_PAYLOAD_RE.search(line)
+                            if match:
+                                pending_payloads.append(
+                                    (int(match.group(1)),
+                                     int(match.group(2))))
                             match = COMMAND_RE.search(line)
                             if match:
                                 name = match.group(1).decode("ascii")
@@ -329,6 +340,7 @@ def main():
                              continue_events >= 1 and ready_events >= 1)
     if args.require_delayed_activation:
         activation_passed = (pending_counts["activate"] >= 1 and
+                             pending_payloads and
                              hop_counts["activate"] >= 1 and
                              ready_events >= 2 and leave_events >= 1 and
                              activation_random_access and
@@ -363,6 +375,7 @@ def main():
           f"continue_discarded={continue_discarded['activate']} "
           f"activate_pending={pending_counts['activate']} "
           f"pending_discarded={pending_discarded['activate']} "
+          f"pending_payloads={pending_payloads} "
           f"visible_highlights={overlay_state['visible_highlights']} "
           f"highlight_pixels={overlay_state['highlight_pixels']} "
           f"commands={command_counts} transitions={direction_transitions} "
