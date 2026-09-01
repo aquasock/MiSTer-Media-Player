@@ -39,9 +39,20 @@ int main(void)
     failed |= require(output.video != NULL, "could not create output stream");
     if (failed)
         return 1;
+    failed |= require(output_reserve_create(&output.reserve,
+                                            fileno(output.video),
+                                            4u * 1024u * 1024u) == 0,
+                      "could not create production output reserve");
+    if (failed)
+        return 1;
 
     failed |= require(emit_overlay_frame(&output, &overlay) == 0,
                       "production frame emitter failed");
+    failed |= require(output_reserve_destroy(output.reserve) == 0,
+                      "production priority output did not drain");
+    output.reserve = NULL;
+    failed |= require(fflush(output.video) == 0,
+                      "production output stream did not flush");
     rewind(output.video);
     for (;;) {
         uint8_t header[7];

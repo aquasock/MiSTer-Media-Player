@@ -403,6 +403,22 @@ static int write_output(struct output_state *output, const void *data,
     return write_all(output->video, data, size, what);
 }
 
+static int write_output_priority(struct output_state *output,
+                                 const void *data, size_t size,
+                                 const char *what)
+{
+    if (output->reserve) {
+        if (output_reserve_write_priority(output->reserve, data, size) < 0) {
+            fprintf(stderr, "media_player_helper: writing priority %s "
+                    "through output reserve failed: %s\n",
+                    what, strerror(errno));
+            return -1;
+        }
+        return 0;
+    }
+    return write_all(output->video, data, size, what);
+}
+
 static int flush_output(struct output_state *output, const char *what)
 {
     if (output->reserve && output_reserve_drain(output->reserve) < 0) {
@@ -421,20 +437,28 @@ static int flush_output(struct output_state *output, const char *what)
 static int emit_overlay_record(struct output_state *output, uint8_t command,
                                const uint8_t *payload, size_t size)
 {
-    uint8_t header[7] = {
+    uint8_t *record;
+    const uint8_t header[7] = {
         0x00, 0x00, 0x01, MEDIA_PLAYER_OVERLAY_MARKER_CODE,
         0x00, 0x00, command
     };
     size_t record_size = size + 1u;
+    int result;
 
-    if (!output->video || record_size > 65535u)
+    if (!output->video || record_size > 65535u || (!payload && size))
         return -1;
-    header[4] = (uint8_t)(record_size >> 8);
-    header[5] = (uint8_t)record_size;
-    if (write_output(output, header, sizeof(header), "DVD overlay record") < 0 ||
-        write_output(output, payload, size, "DVD overlay payload") < 0)
+    record = malloc(sizeof(header) + size);
+    if (!record)
         return -1;
-    return 0;
+    memcpy(record, header, sizeof(header));
+    record[4] = (uint8_t)(record_size >> 8);
+    record[5] = (uint8_t)record_size;
+    if (size)
+        memcpy(record + sizeof(header), payload, size);
+    result = write_output_priority(output, record, sizeof(header) + size,
+                                   "DVD overlay record");
+    free(record);
+    return result;
 }
 
 static void overlay_style_payload(const struct dvd_spu_overlay *overlay,
@@ -3222,8 +3246,10 @@ int main(int argc, char **argv)
             goto done;
         }
         fprintf(stderr,
-                "media_player_helper: DVD output reserve=%zu bytes\n",
-                output_reserve_capacity(output.reserve));
+                "media_player_helper: DVD output reserve=%zu bytes "
+                "overlay_priority=%zu bytes\n",
+                output_reserve_capacity(output.reserve),
+                output_reserve_priority_capacity(output.reserve));
     }
     output.scheduler_enabled = is_program_stream && !output.pcm;
     output.iso_pts_normalization =

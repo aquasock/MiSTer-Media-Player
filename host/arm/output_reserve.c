@@ -10,13 +10,26 @@
 #include <unistd.h>
 
 #define OUTPUT_RESERVE_WRITE_CHUNK (64u * 1024u)
+#define OUTPUT_RESERVE_PRIORITY_BYTES (256u * 1024u)
 
-struct output_reserve {
-    int fd;
+/*
+ * One bit per queued byte marks the final byte of each producer write.  The
+ * writer may split that record into bounded system calls, but it never changes
+ * lanes until the complete record reaches the pipe.  An overlay can therefore
+ * overtake queued media without landing inside an in-band PCM record.
+ */
+struct output_ring {
     uint8_t *data;
+    uint8_t *record_ends;
     size_t capacity;
     size_t head;
     size_t count;
+};
+
+struct output_reserve {
+    int fd;
+    struct output_ring normal;
+    struct output_ring priority;
     int stopping;
     int failed;
     int failure_errno;
@@ -25,6 +38,88 @@ struct output_reserve {
     pthread_cond_t readable;
     pthread_cond_t writable;
 };
+
+static int ring_allocate(struct output_ring *ring, size_t capacity)
+{
+    size_t record_end_bytes;
+
+    if (capacity > SIZE_MAX - 7u) {
+        errno = EOVERFLOW;
+        return -1;
+    }
+    record_end_bytes = (capacity + 7u) / 8u;
+
+    ring->data = malloc(capacity);
+    ring->record_ends = calloc(record_end_bytes, 1u);
+    if (!ring->data || !ring->record_ends) {
+        free(ring->record_ends);
+        free(ring->data);
+        memset(ring, 0, sizeof(*ring));
+        return -1;
+    }
+    ring->capacity = capacity;
+    return 0;
+}
+
+static int ring_has_record_end(const struct output_ring *ring, size_t index)
+{
+    return (ring->record_ends[index >> 3] >> (index & 7u)) & 1u;
+}
+
+static void ring_set_record_end(struct output_ring *ring, size_t index)
+{
+    ring->record_ends[index >> 3] |= (uint8_t)(1u << (index & 7u));
+}
+
+static void ring_clear_record_end(struct output_ring *ring, size_t index)
+{
+    ring->record_ends[index >> 3] &= (uint8_t)~(1u << (index & 7u));
+}
+
+static void ring_free(struct output_ring *ring)
+{
+    free(ring->record_ends);
+    free(ring->data);
+    memset(ring, 0, sizeof(*ring));
+}
+
+static void ring_enqueue(struct output_ring *ring, const uint8_t *data,
+                         size_t size)
+{
+    size_t tail = (ring->head + ring->count) % ring->capacity;
+    size_t first = ring->capacity - tail;
+    size_t end;
+
+    if (first > size)
+        first = size;
+    memcpy(ring->data + tail, data, first);
+    memcpy(ring->data, data + first, size - first);
+    end = (tail + size - 1u) % ring->capacity;
+    ring_set_record_end(ring, end);
+    ring->count += size;
+}
+
+static size_t ring_first_record_size(const struct output_ring *ring)
+{
+    size_t size;
+
+    for (size = 1; size <= ring->count; ++size) {
+        size_t index = (ring->head + size - 1u) % ring->capacity;
+
+        if (ring_has_record_end(ring, index))
+            return size;
+    }
+    return 0;
+}
+
+static void ring_remove_record(struct output_ring *ring, size_t size)
+{
+    size_t end = (ring->head + size - 1u) % ring->capacity;
+
+    ring_clear_record_end(ring, end);
+    ring->head = (ring->head + size) % ring->capacity;
+    ring->count -= size;
+}
 
 static void reserve_fail_locked(struct output_reserve *reserve, int error)
 {
@@ -39,30 +134,44 @@ static void *output_reserve_worker(void *opaque)
     struct output_reserve *reserve = opaque;
 
     for (;;) {
-        size_t chunk;
-        size_t written = 0;
+        struct output_ring *ring;
+        size_t record_size;
+        size_t record_written = 0;
 
         pthread_mutex_lock(&reserve->mutex);
-        while (!reserve->count && !reserve->stopping && !reserve->failed)
+        while (!reserve->normal.count && !reserve->priority.count &&
+               !reserve->stopping && !reserve->failed)
             pthread_cond_wait(&reserve->readable, &reserve->mutex);
-        if (reserve->failed || (!reserve->count && reserve->stopping)) {
+        if (reserve->failed ||
+            (!reserve->normal.count && !reserve->priority.count &&
+             reserve->stopping)) {
             pthread_mutex_unlock(&reserve->mutex);
             break;
         }
-        chunk = reserve->capacity - reserve->head;
-        if (chunk > reserve->count)
-            chunk = reserve->count;
-        if (chunk > OUTPUT_RESERVE_WRITE_CHUNK)
-            chunk = OUTPUT_RESERVE_WRITE_CHUNK;
+        /* Priority is reconsidered only at the preceding record boundary. */
+        ring = reserve->priority.count ? &reserve->priority : &reserve->normal;
+        record_size = ring_first_record_size(ring);
+        if (!record_size) {
+            reserve_fail_locked(reserve, EPROTO);
+            pthread_mutex_unlock(&reserve->mutex);
+            break;
+        }
         pthread_mutex_unlock(&reserve->mutex);
 
-        while (written < chunk) {
-            ssize_t result = write(reserve->fd,
-                                   reserve->data + reserve->head + written,
-                                   chunk - written);
+        while (record_written < record_size) {
+            size_t index = (ring->head + record_written) % ring->capacity;
+            size_t chunk = ring->capacity - index;
+            size_t remaining = record_size - record_written;
+            ssize_t result;
+
+            if (chunk > remaining)
+                chunk = remaining;
+            if (chunk > OUTPUT_RESERVE_WRITE_CHUNK)
+                chunk = OUTPUT_RESERVE_WRITE_CHUNK;
+            result = write(reserve->fd, ring->data + index, chunk);
 
             if (result > 0) {
-                written += (size_t)result;
+                record_written += (size_t)result;
                 continue;
             }
             if (result < 0 && errno == EINTR)
@@ -74,8 +183,7 @@ static void *output_reserve_worker(void *opaque)
         }
 
         pthread_mutex_lock(&reserve->mutex);
-        reserve->head = (reserve->head + chunk) % reserve->capacity;
-        reserve->count -= chunk;
+        ring_remove_record(ring, record_size);
         pthread_cond_broadcast(&reserve->writable);
         pthread_mutex_unlock(&reserve->mutex);
     }
@@ -96,17 +204,19 @@ int output_reserve_create(struct output_reserve **reserve_out, int fd,
     reserve = calloc(1, sizeof(*reserve));
     if (!reserve)
         return -1;
-    reserve->data = malloc(capacity);
-    if (!reserve->data) {
+    if (ring_allocate(&reserve->normal, capacity) < 0 ||
+        ring_allocate(&reserve->priority, OUTPUT_RESERVE_PRIORITY_BYTES) < 0) {
+        ring_free(&reserve->priority);
+        ring_free(&reserve->normal);
         free(reserve);
         return -1;
     }
     reserve->fd = fd;
-    reserve->capacity = capacity;
     result = pthread_mutex_init(&reserve->mutex, NULL);
     if (result) {
         errno = result;
-        free(reserve->data);
+        ring_free(&reserve->priority);
+        ring_free(&reserve->normal);
         free(reserve);
         return -1;
     }
@@ -114,7 +224,8 @@ int output_reserve_create(struct output_reserve **reserve_out, int fd,
     if (result) {
         errno = result;
         pthread_mutex_destroy(&reserve->mutex);
-        free(reserve->data);
+        ring_free(&reserve->priority);
+        ring_free(&reserve->normal);
         free(reserve);
         return -1;
     }
@@ -123,7 +234,8 @@ int output_reserve_create(struct output_reserve **reserve_out, int fd,
         errno = result;
         pthread_cond_destroy(&reserve->readable);
         pthread_mutex_destroy(&reserve->mutex);
-        free(reserve->data);
+        ring_free(&reserve->priority);
+        ring_free(&reserve->normal);
         free(reserve);
         return -1;
     }
@@ -134,7 +246,8 @@ int output_reserve_create(struct output_reserve **reserve_out, int fd,
         pthread_cond_destroy(&reserve->writable);
         pthread_cond_destroy(&reserve->readable);
         pthread_mutex_destroy(&reserve->mutex);
-        free(reserve->data);
+        ring_free(&reserve->priority);
+        ring_free(&reserve->normal);
         free(reserve);
         return -1;
     }
@@ -142,43 +255,49 @@ int output_reserve_create(struct output_reserve **reserve_out, int fd,
     return 0;
 }
 
-int output_reserve_write(struct output_reserve *reserve, const void *data,
-                         size_t size)
+static int output_reserve_write_ring(struct output_reserve *reserve,
+                                     struct output_ring *ring,
+                                     const void *data, size_t size)
 {
-    const uint8_t *source = data;
-    size_t offset = 0;
-
     if (!reserve || (!data && size)) {
         errno = EINVAL;
         return -1;
     }
-    while (offset < size) {
-        size_t tail;
-        size_t space;
-        size_t chunk;
-
-        pthread_mutex_lock(&reserve->mutex);
-        while (reserve->count == reserve->capacity && !reserve->failed)
-            pthread_cond_wait(&reserve->writable, &reserve->mutex);
-        if (reserve->failed) {
-            errno = reserve->failure_errno;
-            pthread_mutex_unlock(&reserve->mutex);
-            return -1;
-        }
-        tail = (reserve->head + reserve->count) % reserve->capacity;
-        space = reserve->capacity - reserve->count;
-        chunk = reserve->capacity - tail;
-        if (chunk > space)
-            chunk = space;
-        if (chunk > size - offset)
-            chunk = size - offset;
-        memcpy(reserve->data + tail, source + offset, chunk);
-        reserve->count += chunk;
-        offset += chunk;
-        pthread_cond_signal(&reserve->readable);
-        pthread_mutex_unlock(&reserve->mutex);
+    if (!size)
+        return 0;
+    if (size > ring->capacity) {
+        errno = EMSGSIZE;
+        return -1;
     }
+    pthread_mutex_lock(&reserve->mutex);
+    while (ring->capacity - ring->count < size && !reserve->failed &&
+           !reserve->stopping)
+        pthread_cond_wait(&reserve->writable, &reserve->mutex);
+    if (reserve->failed || reserve->stopping) {
+        errno = reserve->failed ? reserve->failure_errno : EPIPE;
+        pthread_mutex_unlock(&reserve->mutex);
+        return -1;
+    }
+    ring_enqueue(ring, data, size);
+    pthread_cond_signal(&reserve->readable);
+    pthread_mutex_unlock(&reserve->mutex);
     return 0;
+}
+
+int output_reserve_write(struct output_reserve *reserve, const void *data,
+                         size_t size)
+{
+    return output_reserve_write_ring(reserve,
+                                     reserve ? &reserve->normal : NULL,
+                                     data, size);
+}
+
+int output_reserve_write_priority(struct output_reserve *reserve,
+                                  const void *data, size_t size)
+{
+    return output_reserve_write_ring(reserve,
+                                     reserve ? &reserve->priority : NULL,
+                                     data, size);
 }
 
 int output_reserve_drain(struct output_reserve *reserve)
@@ -188,7 +307,8 @@ int output_reserve_drain(struct output_reserve *reserve)
         return -1;
     }
     pthread_mutex_lock(&reserve->mutex);
-    while (reserve->count && !reserve->failed)
+    while ((reserve->normal.count || reserve->priority.count) &&
+           !reserve->failed)
         pthread_cond_wait(&reserve->writable, &reserve->mutex);
     if (reserve->failed) {
         errno = reserve->failure_errno;
@@ -222,7 +342,8 @@ int output_reserve_destroy(struct output_reserve *reserve)
     pthread_cond_destroy(&reserve->writable);
     pthread_cond_destroy(&reserve->readable);
     pthread_mutex_destroy(&reserve->mutex);
-    free(reserve->data);
+    ring_free(&reserve->priority);
+    ring_free(&reserve->normal);
     free(reserve);
     if (result)
         errno = saved_errno;
@@ -231,5 +352,10 @@ int output_reserve_destroy(struct output_reserve *reserve)
 
 size_t output_reserve_capacity(const struct output_reserve *reserve)
 {
-    return reserve ? reserve->capacity : 0;
+    return reserve ? reserve->normal.capacity : 0;
+}
+
+size_t output_reserve_priority_capacity(const struct output_reserve *reserve)
+{
+    return reserve ? reserve->priority.capacity : 0;
 }
