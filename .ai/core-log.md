@@ -1,3 +1,32 @@
+## 855 COMMIT Unreleased 330d103 2026-08-31T21:55:35-07:00
+
+#### Coming From:
+
+Unreleased 330d103
+
+#### Purpose:
+
+Diagnose why activating Play with Spacebar leaves the DVD menu frame frozen instead of starting the title.
+
+#### Outcome:
+
+The user's fresh physical run selects Play and presses Spacebar, which Main correctly remaps to menu activation command `0x08` at diagnostic time 11.117172 seconds with playback unpaused.  The helper successfully calls `dvdnav_button_activate` on button one, but because `dvdnav_current_title_info` still reports menu title zero immediately after the call, it classifies the action as an overlay-only menu continuation; Main receives that acknowledgment at 11.147338 seconds and deliberately preserves the resident menu frame.  Libdvdnav then reports an authored ten-second finite still.  At 21.157916 seconds the helper completes the still, reports menu leave, switches to subpicture stream 128, resynchronizes AC-3 and begins producing the movie, but it never sends a ready event, enters a navigation barrier or rearms the random-access filter at this delayed menu-to-title boundary.  Main consequently keeps the original decoder session while continuing to read and submit title bytes; the log reaches more than 115 MB submitted at 56.624699 seconds, proving this is neither a paused player, stopped disc nor helper starvation.  The 729,689-byte screenshot at SHA-256 `13a938c828b3d622d1853d76324f712dfa5d7664309ffeecc51ca630ed576ec0` still shows the resident menu frame after the authored still has expired and the selector has been cleared.  The matching 1,137,918-byte helper/Main log has SHA-256 `a0cf8f1ca89b3d4c6a5e2b4f18515ec987484dcc76ee30db42474b5aa7916fcf`; its timeline localizes the fault to delayed activation classification.  The 844-byte checksum-valid schema-21 snapshot at SHA-256 `26bb7bf3ecc1411b7457995883dbde7e52ac25d008d0b03bba035856768e3e7b` retains the accepted authored-selector plane evidence and introduces no separate selector regression.  Static source inspection confirms that `media_source_dvd_still_skip` clears the still but does not report a menu-to-title hop, so `wait_dvd_still` resumes inside the old session instead of invoking Main's already proven ready/go reset barrier.  Main, the authored selector compensation and the source-`f5f650f` RBF are not implicated.
+
+#### Next Steps:
+
+Obtain approval for a helper-only delayed-transition correction: after a finite still is skipped, refresh libdvdnav title state and classify a menu-to-title change as `MEDIA_SOURCE_DVD_STREAM_HOP`, invalidate the current source boundary and make `wait_dvd_still` enter the existing ready/go navigation barrier before any title bytes are emitted.  Add focused regressions that distinguish a finite still remaining inside a menu from a finite still exiting to a title, extend the real-image navigation test to require the delayed second ready event and post-barrier title video, build only the helper locally with authored selector compensation, and preserve Main and the RBF.  Physical acceptance requires Play to retain its authored ten-second still, then start moving title video after one clean barrier with no selector regression.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 854 COMMIT Unreleased 330d103 2026-08-31T21:50:21-07:00
 
 #### Coming From:
@@ -1151,37 +1180,6 @@ Manually replace only `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiS
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 815 COMMIT Unreleased 0e70319 2026-08-31T05:45:08-07:00
-
-#### Coming From:
-
-Unreleased a9899e0
-
-#### Purpose:
-
-Prevent stale bytes from the current DVD block from crossing successful authored-menu navigation hops into a reset decoder session.
-
-#### Outcome:
-
-Successful root-menu and button-activation calls now share a bounded cleanup that discards the unread tail of the current 2,048-byte libdvdnav block, clears stale terminal and still state, preserves the hop notification for the existing Main/helper ready barrier, and logs the command plus exact discarded-tail length.  The focused native regression proves both a 1,535-byte unread tail and an empty boundary are invalidated correctly, and the retained subtitle/highlight decoder test passes.  The enhanced authored-DVD navigation harness waits for active libdvdnav state rather than CSS preflight, accepts ISO files or DVD directories, and passes against the Blazing Saddles directory with one root hop, one activation hop, two ready/go barriers, directional input, two overlay configurations, 44 data records carrying 172,800 bytes, two commits and 496 style updates.  Exact detached source `0e70319` builds both the native helper and a 904,564-byte static ARMv7 hard-float `MediaPlayer_Helper` at `/home/vash/MiSTer-Media-Player-0e70319/host/build/MediaPlayer_Helper` on the build PC, SHA-256 `c8a39413c5131ddfa26947013986e2088f0e72fa618f2ff6dd85fdb4bc7d3baf`; Main, RTL, QSF, RBF and Quartus remain untouched.
-
-#### Next Steps:
-
-The user should manually transfer only the exact ARM helper from the recorded build-PC path to `/media/fat/linux/MediaPlayer_Helper`, retain the installed Main and seed-20 RBF, then restart the core and press keyboard `M` during the early first-play trailers.  Hardware acceptance requires the root menu to appear without a freeze or 800-by-600 diagnostic raster, menu direction and activation to remain interactive, native 480i to remain active, and terminal telemetry to report no B-presentation or other errors; leave the terminal telemetry visible for collection after the run.
-
-#### Files Modified:
-
-- host/arm/media_source.c
-- tools/test_dvd_menu_hop.c
-- tools/test_dvd_menu_navigation.py
 
 #### Status:
 
