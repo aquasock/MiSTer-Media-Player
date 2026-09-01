@@ -1,3 +1,32 @@
+## 846 COMMIT Unreleased 924cb21 2026-08-31T20:19:36-07:00
+
+#### Coming From:
+
+Unreleased ad0d5ec
+
+#### Purpose:
+
+Restore the proven moving solid-purple DVD menu selector entirely in the ARM helper while freezing the accepted RBF and reliable Main menu-load behavior.
+
+#### Outcome:
+
+The user defines the current source-`f5f650f` RBF as complete for the required product scope because playback, chapter and menu stream hops, software-directed DVD navigation and overlay rendering have all been physically demonstrated, with the residual intermittent overlay-plane shortfall treated as a software compatibility constraint rather than an FPGA release blocker.  The existing opt-in `MMP_DVD_OVERLAY_PROBE` implementation already provides the required behavior by sending an all-index-one plane with a transparent normal palette, opaque magenta highlight palette and the authored moving button rectangle, so no source, RBF or Main change is needed.  On the Raspberry Pi, the user's installed GNU 10.2.1 ARM toolchain builds the current helper locally with that definition into `host/build/MediaPlayer_Helper` and the byte-identical uniquely named `host/build/MediaPlayer_Helper_PurpleSelector_924cb21`; both are 908,660-byte stripped static 32-bit ARM EABI5 executables at SHA-256 `fd5d46f116ec41224ff9dd4c13fb62453a009ec462de9ab9b1bdfa794ff2b26c`, contain the required `probe=solid-index1-magenta` marker and return the complete protocol-one capability string when executed.  A strict native equivalent build and the focused fragmented-SPU, selected-histogram, scheduled-stop, random-access and menu-hop regressions pass; the prior ordinary helper is preserved locally as `host/build/MediaPlayer_Helper_Authored_f5f650f`.
+
+#### Next Steps:
+
+Exit the MediaPlayer core so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_PurpleSelector_924cb21`, restore executable mode if needed and verify the installed size and SHA-256.  Preserve the installed Main and RBF, restart the DVD, press `M` and move through every menu button; acceptance requires the menu to continue loading reliably and one solid purple selector rectangle to follow the arrow keys.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 845 COMMIT Unreleased 924cb21 2026-08-31T19:59:36-07:00
 
 #### Coming From:
@@ -1171,35 +1200,6 @@ The user reports skipping throughout the physical DVD without any issue, includi
 #### Next Steps:
 
 Keep source `6e44472`, fitter seed 19 and the accepted installed artifacts unchanged as the current hardware baseline.  The transport controls, chapter navigation, mixed film and interlaced presentation, reorganized menu and four consumer-audio formats are accepted; choose and approve the next development or release-qualification boundary before changing source or rebuilding Quartus.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 806 COMMIT Unreleased 6e44472 2026-08-31T01:17:02-07:00
-
-#### Coming From:
-
-Unreleased 6e44472
-
-#### Purpose:
-
-Record the user's hardware acceptance of transport controls, button mappings, audio and video playback, and all four consumer-audio formats on the installed source-`6e44472` system.
-
-#### Outcome:
-
-The user reports that previous chapter, next chapter, play and pause all work perfectly, every tested button control behaves correctly, audio and video are perfect, and WAV, MP3, FLAC and Ogg Vorbis files all play properly.  At the user's direction no screenshot or other target capture is taken, and no repository source, installed file, running playback, RBF, Main, helper, media or configuration changes during this acceptance report.  This accepts the transport-control and consumer-audio portions of entries 803 through 805; the report does not independently identify the requested menu-layout checks or the chapter-specific mixed-film sequence at chapters 8, 11, 15, 17 and 23, so those narrow gates remain open.
-
-#### Next Steps:
-
-Confirm whether the three file actions, `16:9` default, `4:3` choice, Bob and Weave choices and unchanged audio sections appear correctly in the OSD, then explicitly verify that chapter 2 advances into chapter 3 and chapters 8, 11, 15, 17 and 23 remain in native 480i without a black screen, legacy 800x600 raster or vertical corruption.  If those checks already formed part of this test, record that confirmation without taking a screenshot; otherwise leave source `6e44472` and the installed timing-clean RBF unchanged while completing only those remaining hardware gates.
 
 #### Files Modified:
 
