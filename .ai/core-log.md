@@ -1,4 +1,4 @@
-## 870 COMMIT Unreleased ??? 2026-09-01T02:45:32-07:00
+## 870 COMMIT Unreleased 59f6312 2026-09-01T02:45:32-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Stage ambiguous post-activation DVD output until the authored menu destination c
 
 #### Outcome:
 
-The user approves the helper-only transaction boundary diagnosed in entry 869.  The planned source will begin a bounded record-preserving stage when a title-zero menu activation becomes pending, keeping newly generated video, PCM metadata and overlay records separate from the already draining physical-DVD reserve.  A payload-bearing indefinite still will retain that staged destination, discard only obsolete pre-activation reserve output, use the established ready/go decoder barrier and publish the destination after rearm without resetting its newly decoded SPU state; an indefinite still with no destination payload will cancel the empty stage and preserve the resident frame, while a finite still will commit its staged transition immediately and keep activation pending for the already accepted later title hop.  Main, RTL, RBF, record formats, authored still duration and ordinary reserve behavior remain unchanged.
+Source `59f6312` adds a bounded four-megabyte helper output transaction for ambiguous same-title DVD menu activations.  When libdvdnav returns pending activation, the helper resets its parser and audio scheduling state and stages all newly generated video, in-band PCM and overlay records with their record order and priority tags while the old physical-DVD reserve remains independently drainable.  A destination containing payload followed by an indefinite still now discards only that stale reserve, enters the established Main ready/go decoder barrier and commits the staged destination after rearm without clearing the newly decoded subpicture state; an empty indefinite still cancels its empty transaction and retains the resident-frame continuation, while a finite still commits immediately and retains the authored delay and later title-hop behavior.  Chapter, root, menu-leave and superseding-command paths cancel obsolete transactions explicitly, and partial commit failure retains only unwritten records.  One hundred repeated byte-exact stage tests, stale-reserve preservation, AddressSanitizer, UndefinedBehaviorSanitizer, GCC analyzer, strict native and sanitizer helper builds, capabilities, output-reserve, AC-3 recovery, random-access, subpicture and menu-hop tests plus twenty production 86,400-byte overlay reconstructions pass.  The Raspberry Pi GNU 10.2.1 toolchain builds `host/build/MediaPlayer_Helper_SceneStage_59f6312`, a 916,852-byte static stripped ARMv7 EABI5 hard-float executable with no dynamic section at SHA-256 `12946bc036c497088a9016db5a613f4a9c33c17e19c6fce75e97fd3f060026bc`; Main, RTL, the source-`1bf06db` RBF, record formats and Quartus are untouched.
 
 #### Next Steps:
 
-Implement a reusable bounded output-stage module and integrate it only with deferred DVD menu activation, add byte-exact tests for normal and priority record order, capacity failure, commit, cancel and preservation across stale-reserve discard, and extend menu-policy coverage for payload-bearing indefinite, empty indefinite and finite still destinations.  Rerun strict native and sanitizer builds plus capabilities, AC-3 recovery, random access, subpicture, menu-hop and production overlay-priority regressions, then use the Raspberry Pi GNU 10.2.1 ARM toolchain to build one uniquely named static helper for physical Scene Selection, Play and root-return testing without contacting the build PC.
+Exit MediaPlayer so the running helper releases its executable, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_SceneStage_59f6312`, restore executable mode if needed and verify the recorded size and SHA-256 while preserving the installed source-`22e780a` Main and source-`1bf06db` RBF.  Reboot or restart the core, enter the root menu, activate Scene Selection and require its authored background and selector to appear and remain interactive instead of retaining the root background and freezing; then activate a scene, return to the root menu, exercise Play, directional controls and several chapter hops, and capture a fresh helper/Main log, screenshot and telemetry for physical acceptance.  The decisive log path must show activation staging, a payload-bearing indefinite staged hop, stale reserve discard, ready/go release and staged commit without `MENU_CONTINUE` for the Scene Selection transition.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Implement a reusable bounded output-stage module and integrate it only with defe
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
