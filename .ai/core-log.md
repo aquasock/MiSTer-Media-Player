@@ -1,4 +1,4 @@
-## 864 COMMIT Unreleased ??? 2026-09-01T00:51:35-07:00
+## 864 COMMIT Unreleased 5ae655a 2026-09-01T01:03:21-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add a bounded helper-side output reserve so temporary physical-DVD read stalls a
 
 #### Outcome:
 
-The source-`0318f70` stress capture completes 129 rapid chapter commands and 131 navigation barriers without video corruption, survives eight false 44.1 kHz AC-3 candidates and fully resynchronizes audio, but approximately 35 seconds into the final continuous chapter-one run the helper-to-Main byte stream becomes completely idle for 2.184525 seconds while Main remains responsive and polls at normal cadence.  The helper scheduler advances 3.665042 seconds across the same interval while emitting only 69,120 PCM frames, converting the source drought into the user's brief audible distortion and silence; playback then resumes automatically, remains synchronized and finishes the chapter.  This proposal will decouple scheduled helper output from the blocking physical source with a finite multi-second RAM reserve, preserve byte order and chapter-barrier draining, and leave Main, RTL, the source-`1bf06db` RBF and Quartus untouched.
+Source `5ae655a` adds a four-megabyte helper-side ring reserve between the synchronous physical-DVD producer and a dedicated output writer, preserving exact byte order while giving the producer approximately four seconds of combined-stream read-ahead through temporary optical-source stalls.  Capacity backpressure is bounded, writer errors propagate to the producer, navigation barriers and shutdown explicitly drain the reserve, and the reserve is enabled only for physical-DVD program-stream playback through the in-band output so ISO, file and split-output behavior remains unchanged.  A focused stalled-pipe regression proves that two megabytes can enqueue before a reader exists and that six megabytes spanning repeated drain and ring-wrap cycles emerge byte-identically; strict native, sanitizer, analyzer, capability, production-overlay, AC-3, random-access, subpicture and menu-hop validation also passes.  The Raspberry Pi GNU 10.2.1 toolchain builds exact source `5ae655a` into `host/build/MediaPlayer_Helper_DVDReserve_5ae655a`, a 908,660-byte static stripped ARMv7 EABI5 executable at SHA-256 `5fb737f79ad54c6754e92fe433359bf1237e6366bd21ee5b15ea827615ad23cd`; it has no dynamic section and includes the reserve and false-sync recovery diagnostics without authored-selector compensation or the solid-magenta overlay probe.  Main, RTL, the source-`1bf06db` RBF and Quartus are untouched.
 
 #### Next Steps:
 
-Implement a bounded asynchronous output reserve in the helper with exact-byte ordering, blocking backpressure at its capacity, explicit drain semantics for every navigation barrier and clean shutdown, and error propagation from the writer thread.  Add a focused regression that proves the producer can enqueue through a deliberately stalled pipe, later drains byte-identical output and terminates cleanly; rerun the native helper, capability, overlay, AC-3, random-access, subpicture and menu-hop regressions, then build a uniquely named static ARMv7 helper locally for the same rapid-skip and continuous-play physical test.
+Exit MediaPlayer so its current helper stops, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_DVDReserve_5ae655a`, restore executable mode if needed, and verify the 908,660-byte size and recorded SHA-256.  Preserve the installed source-`2de0717` Main and source-`1bf06db` RBF.  Restart the DVD and first verify reliable menu entry, the correctly aligned movable selector and Play navigation, then repeat many fast forward and backward chapter skips before allowing chapter one to play continuously for more than sixty seconds.  The helper log must identify a 4,194,304-byte DVD output reserve; acceptance requires fluid chapter changes, intact video and selector rendering, a surviving helper, no audible gap through a comparable temporary optical stall and continued A/V synchronization.  Capture a fresh helper log, screenshot and telemetry for physical acceptance.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Implement a bounded asynchronous output reserve in the helper with exact-byte or
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
