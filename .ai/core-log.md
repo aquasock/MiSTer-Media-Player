@@ -1,3 +1,32 @@
+## 850 COMMIT Unreleased ??? 2026-08-31T21:09:16-07:00
+
+#### Coming From:
+
+Unreleased 2de0717
+
+#### Purpose:
+
+Restore a visible moving purple selector with a helper-only dual-candidate plane that tolerates both physically observed overlay-transfer outcomes.
+
+#### Outcome:
+
+The user approves a software-only response to entry 849's exact recurring 21-byte shortfall while keeping the source-`f5f650f` RBF and source-`2de0717` pre-drain Main frozen.  The probe helper will retain its unchanged first config, 22-record, 86,400-byte all-`0x55` plane and commit, then immediately emit a second config and candidate containing 86,421 all-`0x55` bytes in the same 21 full 4,096-byte records plus a 405-byte final record before committing again.  A zero-loss transfer can publish the first candidate and safely reject the later oversized one without clearing the displayed plane, while the recurring loss of one byte from each full record leaves exactly 86,400 bytes in the second candidate for acceptance and publication.  This compensation is restricted to the opt-in solid-purple probe build and does not alter authored overlay pixels, DVD navigation, Main, the RBF, transport framing limits or normal helper behavior.
+
+#### Next Steps:
+
+Implement the second probe candidate and an explicit compensation marker in `host/arm/media_player_helper.c`, validate strict native compilation and the focused subpicture, random-access and menu-hop regressions, verify generated framing contains one 86,400-byte and one 86,421-byte candidate with legal record lengths, build a uniquely named static ARM helper locally with the Raspberry Pi GNU 10.2.1 toolchain, and preserve Main and the RBF.  Physical acceptance requires the existing menu to load, at least one overlay commit and plane publication, and a solid purple selector that follows directional input.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 849 COMMIT Unreleased 2de0717 2026-08-31T21:06:18-07:00
 
 #### Coming From:
@@ -1158,34 +1187,5 @@ Keep exact source `a9899e0`, fitter seed 20 and RBF SHA-256 `02928bff` frozen as
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 810 COMMIT Unreleased 6e44472 2026-08-31T04:13:58-07:00
-
-#### Coming From:
-
-Unreleased 2738e99
-
-#### Purpose:
-
-Capture and qualify the on-screen telemetry after the user's perfect full-disc DVD playback on the accepted source-`6e44472` installation.
-
-#### Outcome:
-
-The user reports that the DVD finished perfectly after extensive chapter skipping and leaves the completed session's telemetry visible for collection.  The 285,090-byte 1920-by-1080 scaled screenshot `/tmp/entry810_completed_dvd_telemetry.png`, SHA-256 `3c3a184eb5df0e8c6fe31bdddf4bd8956debbe2320dfc796bdd89787156c7dc4`, has all 64 schema-20 headers, row indices and parity bits valid and checksum `eb7a78f8` matching.  The visible raster is the sticky first-error snapshot at STC second 1,795 rather than an end-of-file snapshot: it records 1,085,445,320 accepted video bytes, 42,919 displayed pictures, 42,918 swaps, exactly one audio FIFO underrun, FIFO floor zero, zero transport blocks and no error flag other than the corresponding `0x0400` audio-underrun bit; its three retained largest gaps are each 66.733 milliseconds, with 42,917 deadline-gap events and 21,465 cadence outliers.  The matching 194,633,412-byte helper log `/tmp/entry810_completed_dvd_arm_helper.log`, SHA-256 `e0db52dc8a47949209a3574b93d5b81c359c3b0ec6cfeb9cfa3cfcacf86efa8c`, identifies direct optical title 1 with 24 chapters and HDMI decoded stereo PCM, later reaches DVD EOF and exits zero after approximately 7,014 seconds of a session that included the user's navigation; it processes 4,239,456,995 video bytes and 219,032 AC-3 frames, produces and consumes 5,096,290,304 DVD-buffer bytes with zero consumer waits, and Main submits 5,690,325,341 bytes entirely through the fast path.  The single latched underrun remains within the previously accepted isolated-underrun allowance and produced no user-perceived defect; no repository source, installed file, RBF, Main, helper, media, playback option or target configuration changes during collection.
-
-#### Next Steps:
-
-Keep accepted source `6e44472` and its installed artifacts unchanged as the hardware baseline, retain source `2738e99` as the uninstalled authored-menu candidate, and continue to pause implementation and build work until the user explicitly approves or declines the separately proposed bounded eight-seed fit-and-timing search.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
