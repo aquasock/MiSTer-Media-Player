@@ -11,6 +11,7 @@
 #include "dvd_spu.h"
 #include "media_player_protocol.h"
 #include "media_source.h"
+#include "output_reserve.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -32,6 +33,7 @@
  * and keeps the runaway protection this bound exists for.
  */
 #define VIDEO_QUEUE_LIMIT  (2u * 1024u * 1024u)
+#define OUTPUT_RESERVE_BYTES (4u * 1024u * 1024u)
 #define PCM_SCHEDULE_RESERVE_FRAMES 8192u
 #define PCM_SCHEDULE_BATCH_FRAMES   2048u
 #define PCM_INITIAL_RELEASE_FRAMES  8192u
@@ -154,6 +156,7 @@ struct video_chunk {
 struct output_state {
     FILE *video;
     FILE *pcm;
+    struct output_reserve *reserve;
     uint64_t video_bytes;
     uint64_t pcm_frames;
     unsigned video_pts;
@@ -386,6 +389,35 @@ static int write_all(FILE *stream, const void *data, size_t size,
     return 0;
 }
 
+static int write_output(struct output_state *output, const void *data,
+                        size_t size, const char *what)
+{
+    if (output->reserve) {
+        if (output_reserve_write(output->reserve, data, size) < 0) {
+            fprintf(stderr, "media_player_helper: writing %s through "
+                    "output reserve failed: %s\n", what, strerror(errno));
+            return -1;
+        }
+        return 0;
+    }
+    return write_all(output->video, data, size, what);
+}
+
+static int flush_output(struct output_state *output, const char *what)
+{
+    if (output->reserve && output_reserve_drain(output->reserve) < 0) {
+        fprintf(stderr, "media_player_helper: draining %s failed: %s\n",
+                what, strerror(errno));
+        return -1;
+    }
+    if (output->video && fflush(output->video) == EOF) {
+        fprintf(stderr, "media_player_helper: flushing %s failed: %s\n",
+                what, strerror(errno));
+        return -1;
+    }
+    return 0;
+}
+
 static int emit_overlay_record(struct output_state *output, uint8_t command,
                                const uint8_t *payload, size_t size)
 {
@@ -399,8 +431,8 @@ static int emit_overlay_record(struct output_state *output, uint8_t command,
         return -1;
     header[4] = (uint8_t)(record_size >> 8);
     header[5] = (uint8_t)record_size;
-    if (write_all(output->video, header, sizeof(header), "DVD overlay record") < 0 ||
-        write_all(output->video, payload, size, "DVD overlay payload") < 0)
+    if (write_output(output, header, sizeof(header), "DVD overlay record") < 0 ||
+        write_output(output, payload, size, "DVD overlay payload") < 0)
         return -1;
     return 0;
 }
@@ -895,7 +927,7 @@ static int emit_video_pts(struct output_state *output, uint64_t pts)
     uint8_t record[9];
 
     encode_video_pts(record, pts);
-    if (write_all(output->video, record, sizeof(record), "video timestamp") < 0)
+    if (write_output(output, record, sizeof(record), "video timestamp") < 0)
         return -1;
     output->video_bytes += sizeof(record);
     output->video_pts++;
@@ -943,7 +975,7 @@ static int emit_pcm_run(struct output_state *output,
         record[7 + i * 4u] = (uint8_t)(right_bits >> 8);
         record[8 + i * 4u] = (uint8_t)right_bits;
     }
-    if (write_all(output->video, record, 5u + count * 4u, "in-band PCM") < 0)
+    if (write_output(output, record, 5u + count * 4u, "in-band PCM") < 0)
         return -1;
     output->video_bytes_since_pcm = 0;
     return 0;
@@ -952,7 +984,7 @@ static int emit_pcm_run(struct output_state *output,
 static int emit_pcm_end(struct output_state *output)
 {
     const uint8_t record[4] = {0, 0, 1, MEDIA_PLAYER_PCM_END_MARKER_CODE};
-    return write_all(output->video, record, sizeof(record), "PCM end marker");
+    return write_output(output, record, sizeof(record), "PCM end marker");
 }
 
 /* Write bytes that the scheduler has admitted to the shared FPGA path. */
@@ -962,7 +994,7 @@ static int write_video_immediate(struct output_state *output, const void *data,
     const uint8_t *bytes = data;
     size_t i;
 
-    if (write_all(output->video, bytes, size, what) < 0)
+    if (write_output(output, bytes, size, what) < 0)
         return -1;
     output->video_bytes += size;
     output->video_bytes_since_pcm += size;
@@ -1277,6 +1309,7 @@ static void reset_output_for_chapter(struct output_state *output,
 {
     FILE *video = output->video;
     FILE *pcm = output->pcm;
+    struct output_reserve *reserve = output->reserve;
 
     free(output->hold);
     output->hold = NULL;
@@ -1285,6 +1318,7 @@ static void reset_output_for_chapter(struct output_state *output,
     memset(output, 0, sizeof(*output));
     output->video = video;
     output->pcm = pcm;
+    output->reserve = reserve;
     output->hold_limit = hold_limit;
     output->hold_active = hold_limit != 0;
     output->scheduler_started = !output->hold_active;
@@ -2968,7 +3002,16 @@ static int process_ogg_stream(struct media_source *input,
 
 static int finish_output(struct output_state *output, int success)
 {
-    if (output->video && fflush(output->video) == EOF)
+    if (output->reserve) {
+        if (output_reserve_destroy(output->reserve) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: output reserve shutdown failed: %s\n",
+                    strerror(errno));
+            success = 0;
+        }
+        output->reserve = NULL;
+    }
+    if (flush_output(output, "final output") < 0)
         success = 0;
     if (output->pcm) {
         if (fclose(output->pcm) == EOF)
@@ -3169,6 +3212,19 @@ int main(int argc, char **argv)
                 media_source_kind_name(input.kind));
         goto done;
     }
+    if (is_program_stream && input.kind == MEDIA_SOURCE_DVD &&
+        output.video == stdout && !output.pcm) {
+        if (output_reserve_create(&output.reserve, fileno(output.video),
+                                  OUTPUT_RESERVE_BYTES) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: cannot allocate DVD output reserve: %s\n",
+                    strerror(errno));
+            goto done;
+        }
+        fprintf(stderr,
+                "media_player_helper: DVD output reserve=%zu bytes\n",
+                output_reserve_capacity(output.reserve));
+    }
     output.scheduler_enabled = is_program_stream && !output.pcm;
     output.iso_pts_normalization =
         input.kind == MEDIA_SOURCE_ISO || input.kind == MEDIA_SOURCE_DVD;
@@ -3211,10 +3267,7 @@ int main(int argc, char **argv)
                         "media_player_helper: chapter control failed\n");
                 goto done;
             }
-            if (fflush(output.video) == EOF) {
-                fprintf(stderr,
-                        "media_player_helper: chapter barrier flush failed: %s\n",
-                        strerror(errno));
+            if (flush_output(&output, "chapter barrier") < 0) {
                 goto done;
             }
             reset_audio_for_chapter(&audio);
