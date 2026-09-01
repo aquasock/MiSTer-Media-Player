@@ -1,4 +1,4 @@
-## 842 COMMIT Unreleased ??? 2026-08-31T19:40:09-07:00
+## 842 COMMIT Unreleased 64f5156 2026-08-31T19:40:09-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Test whether residual pre-hop bytes in the FPGA input FIFO cause the intermitten
 
 #### Outcome:
 
-The user approves a Main-only diagnostic after one physical session completes repeated root-menu reloads before a later identical hop fails with only `0x0200`; the failing reset session accepts 18,937 bytes, recognizes a B picture at temporal reference ten while frame-rate code remains zero, and therefore reaches a picture header before parsing the new sequence header.  The helper reports the same valid sequence, intra and following-reference boundary on the successful and failing menu-to-menu hops, while static inspection proves that each `ioctl_download` rising edge resets the MPEG decoder but leaves the 32 KiB dual-clock input FIFO intact until a full core reset.  This boundary will retain the helper, RBF and submitted stream bytes, add a logged 500 millisecond download-off drain interval before Main rearms each chapter or menu stream hop, and determine whether residual FIFO occupancy is the causal state difference.
+The user approves and source `64f5156` implements a Main-only diagnostic after one physical session completes repeated root-menu reloads before a later identical hop fails with only `0x0200`; the failing reset session accepts 18,937 bytes, recognizes a B picture at temporal reference ten while frame-rate code remains zero, and therefore reaches a picture header before parsing the new sequence header.  The helper reports the same valid sequence, intra and following-reference boundary on the successful and failing menu-to-menu hops, while static inspection proves that each `ioctl_download` rising edge resets the MPEG decoder but leaves the 32 KiB dual-clock input FIFO intact until a full core reset.  Main now timestamps every chapter or menu download release, waits until at least 500 milliseconds have elapsed before the next rising edge, and logs the measured release-to-rearm interval without changing the helper, RBF or submitted stream bytes; the complete pinned patch is structurally valid and whitespace-clean, while exact ARM compilation remains pending.
 
 #### Next Steps:
 
-Implement the bounded delay in the pinned Main loader patch, exercise a focused native timing test where practical, build and verify one uniquely named ARM Main from the exact source commit, then preserve the installed helper and source-`f5f650f` RBF while manually replacing only Main and rebooting.  Hardware acceptance requires at least twenty consecutive `M` root-menu reloads without the schema-21 `0x0200` raster, with each log recording a download-off interval of at least 500 milliseconds; any recurrence rejects the drain hypothesis and returns to exact scheduler-source instrumentation.
+Build and verify one uniquely named ARM Main from exact source `64f5156`, then preserve the installed helper and source-`f5f650f` RBF while manually replacing only Main and rebooting.  Hardware acceptance requires at least twenty consecutive `M` root-menu reloads without the schema-21 `0x0200` raster, with each log recording a download-off interval of at least 500 milliseconds; any recurrence rejects the drain hypothesis and returns to exact scheduler-source instrumentation.
 
 #### Files Modified:
 
