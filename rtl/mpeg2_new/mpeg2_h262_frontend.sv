@@ -38,6 +38,7 @@ module mpeg2_h262_frontend
 
     output wire        frontend_ready,
     output wire        phase1_supported,
+    output wire        native_progressive_supported,
     output wire        native_film_supported,
     output wire        native_480i_supported,
     output reg         syntax_error,
@@ -243,6 +244,21 @@ wire phase1_progressive_i_frame =
     progressive_sequence &&
     progressive_frame &&
     chroma_420_type;
+
+// Production progressive presentation owns the complete supported I/P/B
+// envelope. Geometry is bounded by the three 720x480 frame regions already
+// allocated in DDR; smaller coded pictures are centered by the framebuffer.
+// Direct Table 6-4 rates 1..5 are scheduled exactly by the presentation path.
+assign native_progressive_supported =
+    frontend_ready && !sequence_scalable_extension_seen &&
+    (chroma_format == 2'b01) && (picture_structure == 2'b11) &&
+    (picture_coding_type >= 3'd1) && (picture_coding_type <= 3'd3) &&
+    !concealment_motion_vectors &&
+    progressive_sequence && progressive_frame && chroma_420_type &&
+    (horizontal_size != 14'd0) && (horizontal_size <= 14'd720) &&
+    (vertical_size != 14'd0) && (vertical_size <= 14'd480) &&
+    (frame_rate_code >= 4'd1) && (frame_rate_code <= 4'd5) &&
+    !timing_unsupported && !timing_error;
 
 // H262-028 through H262-034: a 30000/1001 interlaced sequence may carry a
 // complete interlaced frame picture.  With frame_pred_frame_dct set, the

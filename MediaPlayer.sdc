@@ -181,14 +181,14 @@ set_false_path \
     -from [get_keepers {*|mpeg2_h262_native_field_order:*|film_mode*}] \
     -to   [get_keepers {*|mpeg2_new_film_mode_video_sync[0]}]
 set_false_path \
-    -from [get_keepers {*|mpeg2_video_output_timing:*|native_field *|mpeg2_video_output_timing:*|native_active*}] \
+    -from [get_keepers {*|mpeg2_video_output_timing:*|interlaced_field *|mpeg2_video_output_timing:*|interlaced_active*}] \
     -to   [get_keepers {*|mpeg2_new_native_field_sync[0]}]
 
 # Native presentation mode is requested from the 60 MHz decoder domain and
 # acknowledged back from the 54 MHz timing domain through explicit two/three
 # stage synchronizers. Cut only the asynchronous inputs to their first stages.
 set_false_path \
-    -to [get_keepers {*|mpeg2_video_output_timing:*|native_request_sync[0]}]
+    -to [get_keepers {*|mpeg2_video_output_timing:*|interlaced_request_sync[0]}]
 set_false_path \
     -to [get_keepers {*|mpeg2_video_output_timing:*|top_field_first_sync[0]}]
 set_false_path \
@@ -280,20 +280,20 @@ set_false_path \
     -to   [get_keepers {*|reset_video_sync[*]}]
 
 # The framebuffer reset reaches a second async-assert/sync-deassert chain in
-# the independent 40 MHz read domain.  Cut only the asynchronous transfer from
+# the independent 54 MHz read domain.  Cut only the asynchronous transfer from
 # the already-synchronized MPEG reset output into that chain.
 set_false_path \
     -from [get_keepers {*|reset_mpeg2_sync[2]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
 
 # kate - Phase 1R controlled frame-bank publication uses a four-cycle reset
-# request generated entirely in the 54 MHz memory/decoder domain to restart the
+# request generated entirely in the 60 MHz memory/decoder domain to restart the
 # framebuffer memory-side prefill state after bank 1 has been completed.  That
-# request also intentionally asserts the framebuffer's existing 40 MHz
+# request also intentionally asserts the framebuffer's existing 54 MHz
 # rd_reset_sync chain asynchronously; release is still synchronized by the
 # chain itself.  Treat only this new assertion boundary like the original
 # reset_mpeg2_sync boundary above.  Do not cut the stage-to-stage release paths
-# or any other 54 MHz -> 40 MHz logic.
+# or any other 60 MHz -> 54 MHz logic.
 set_false_path \
     -from [get_keepers {*|mpeg2_h262_b_presentation_scheduler:*|framebuffer_swap_reset_count[*]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]

@@ -141,8 +141,9 @@ mpeg2video decoder
 .debug_resample_y_pos    (debug_resample_y_pos),
 .debug_resample_wr_en    (debug_resample_wr_en),
 
-// kate - Phase 1G: legacy MPEG2FPGA timing is intentionally disconnected.
-// The wrapper's debug_video_* outputs are driven by our fixed SVGA generator.
+// Legacy MPEG2FPGA timing is intentionally disconnected. This wrapper is not
+// part of the active Quartus source set; keep its old debug raster outputs
+// inert now that the Phase 1G development generator has been retired.
 .debug_video_h_pos       (),
 .debug_video_v_pos       (),
 .debug_video_pixel_en    (),
@@ -150,19 +151,10 @@ mpeg2video decoder
 .debug_video_v_sync      ()
 );
 
-// kate - Phase 1G standalone presentation timing.
-// Fixed VESA 800x600 @ 60 Hz-class raster from the existing 40 MHz dot clock.
-// No MPEG syntax or MPEG2FPGA register can move or resize this raster.
-mpeg2_video_svga_800x600 mpeg2_video_svga_800x600
-(
-	.clk      (dot_clk),
-	.reset    (reset),
-
-	.h_pos    (debug_video_h_pos),
-	.v_pos    (debug_video_v_pos),
-	.pixel_en (debug_video_pixel_en),
-	.h_sync   (debug_video_h_sync),
-	.v_sync   (debug_video_v_sync)
-);
+assign debug_video_h_pos    = 12'd0;
+assign debug_video_v_pos    = 12'd0;
+assign debug_video_pixel_en = 1'b0;
+assign debug_video_h_sync   = 1'b0;
+assign debug_video_v_sync   = 1'b0;
 
 endmodule

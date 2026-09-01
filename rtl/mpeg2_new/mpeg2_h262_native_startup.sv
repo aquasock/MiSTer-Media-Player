@@ -1,11 +1,12 @@
-// Native elementary-stream startup reserve. The first completed bank stays
+// Production elementary-stream startup reserve. The first completed bank stays
 // cached while a second picture becomes presentable. Show the first bank at a
-// field-pair boundary, then allow swaps after its video-domain acknowledgement.
+// complete progressive-frame or interlaced field-pair boundary, then allow
+// swaps after its video-domain acknowledgement.
 // No clock, sync, DE, decode ownership or timestamp admission is changed here.
 module mpeg2_h262_native_startup (
     input wire clk_mpeg2, input wire reset_mpeg2,
     input wire clk_video, input wire reset_video,
-    input wire native_request, input wire [3:0] frame_rate_code,
+    input wire presentation_request,
     input wire first_picture_complete, input wire candidate_presentable,
     input wire sequence_end_seen, input wire bypass_event,
     input wire frame_window, input wire swap_window_active,
@@ -36,11 +37,11 @@ always @(posedge clk_mpeg2) begin
             first_window_finished <= 1'b1;
         // Bypass is sticky until download rearm; mode changes never restart a
         // running session. Metadata is observed at extraction, before queuing.
-        if (bypass_event || (decided && !native_request))
+        if (bypass_event || (decided && !presentation_request))
             bypass <= 1'b1;
         if (first_picture_complete && !decided) begin
             decided <= 1'b1;
-            if (!native_request || frame_rate_code != 4'd4)
+            if (!presentation_request)
                 bypass <= 1'b1;
         end
         // EOS releases a one-picture file without requiring a nonexistent

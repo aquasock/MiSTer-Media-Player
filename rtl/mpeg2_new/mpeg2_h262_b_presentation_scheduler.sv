@@ -136,40 +136,8 @@ reg ordinary_secondary_released;
 reg ordinary_resume_pending;
 reg ordinary_terminal_drain_pending;
 
-// Entry 354: the fixed 40 MHz 800x600 raster produces one swap window every
-// 1056*628 pixels.  Accumulate source-picture credit in pixel-clock units for
-// the 24000/1001, exact 24, 25, 30000/1001, and exact 30 fps Table 6-4 rates.
-// The 24000/1001 fractional rate uses the exact reduced ratio
-//     (663168 * 24000) / (40000000 * 1001) = 22608 / 56875
-// and the 30000/1001 rate uses
-//     (663168 * 30000) / (40000000 * 1001) = 5652 / 11375
-// so neither drifts or rounds to its neighboring integer rate.  Saturating at
-// the next due slot prevents a decode stall from banking credit and replaying
-// ready pictures on consecutive refreshes.
-localparam [25:0] CADENCE_LIMIT_24000_1001 = 26'd56875;
-localparam [25:0] CADENCE_STEP_24000_1001  = 26'd22608;
-localparam [25:0] CADENCE_DUE_24000_1001 =
-    CADENCE_LIMIT_24000_1001-CADENCE_STEP_24000_1001;
-localparam [25:0] CADENCE_LIMIT_24FPS = 26'd40000000;
-localparam [25:0] CADENCE_STEP_24FPS  = 26'd15916032;
-localparam [25:0] CADENCE_DUE_24FPS =
-    CADENCE_LIMIT_24FPS-CADENCE_STEP_24FPS;
-localparam [25:0] CADENCE_LIMIT_25FPS = 26'd40000000;
-localparam [25:0] CADENCE_STEP_25FPS  = 26'd16579200;
-localparam [25:0] CADENCE_DUE_25FPS =
-    CADENCE_LIMIT_25FPS-CADENCE_STEP_25FPS;
-localparam [25:0] CADENCE_LIMIT_30000_1001 = 26'd11375;
-localparam [25:0] CADENCE_STEP_30000_1001  = 26'd5652;
-localparam [25:0] CADENCE_DUE_30000_1001 =
-    CADENCE_LIMIT_30000_1001-CADENCE_STEP_30000_1001;
-localparam [25:0] CADENCE_LIMIT_30FPS = 26'd40000000;
-localparam [25:0] CADENCE_STEP_30FPS  = 26'd19895040;
-localparam [25:0] CADENCE_DUE_30FPS =
-    CADENCE_LIMIT_30FPS-CADENCE_STEP_30FPS;
 reg [1:0] native_fields_elapsed;
 wire [1:0] native_field_duration=display_repeat_first_field ? 2'd3 : 2'd2;
-reg [25:0] cadence_credit;
-reg [3:0] cadence_rate_code_q;
 
 wire ordinary_b_header_wait=pending_frame_valid&&
     (ordinary_secondary_valid||ordinary_reference_decode_open);
@@ -196,35 +164,21 @@ wire [1:0] scheduled_frame_bank=(future_waiting&&!ordinary_before_b_waiting)?fut
 wire scheduled_frame_differs=scheduled_frame_scratch?
     (!display_scratch||(scheduled_scratch_bank!=display_scratch_bank)):
     (display_scratch||(scheduled_frame_bank!=display_frame_bank));
-wire cadence_24000_1001=(frame_rate_code==4'h1);
-wire cadence_24fps=(frame_rate_code==4'h2);
-wire cadence_25fps=(frame_rate_code==4'h3);
-wire cadence_30000_1001=(frame_rate_code==4'h4);
-wire cadence_30fps=(frame_rate_code==4'h5);
-wire cadence_supported=cadence_24000_1001||cadence_24fps||cadence_25fps||
-                       cadence_30000_1001||cadence_30fps;
-wire [25:0] cadence_limit=cadence_24000_1001?CADENCE_LIMIT_24000_1001:
-                          cadence_30000_1001?CADENCE_LIMIT_30000_1001:
-                          CADENCE_LIMIT_24FPS;
-wire [25:0] cadence_step=cadence_24000_1001?CADENCE_STEP_24000_1001:
-                         cadence_24fps?CADENCE_STEP_24FPS:
-                         cadence_25fps?CADENCE_STEP_25FPS:
-                         cadence_30000_1001?CADENCE_STEP_30000_1001:
-                                             CADENCE_STEP_30FPS;
-wire [25:0] cadence_due=cadence_24000_1001?CADENCE_DUE_24000_1001:
-                        cadence_24fps?CADENCE_DUE_24FPS:
-                        cadence_25fps?CADENCE_DUE_25FPS:
-                        cadence_30000_1001?CADENCE_DUE_30000_1001:
-                                            CADENCE_DUE_30FPS;
-wire cadence_scale_changed=
-    (cadence_24000_1001!=(cadence_rate_code_q==4'h1))||
-    (cadence_30000_1001!=(cadence_rate_code_q==4'h4));
+wire ordinary_cadence_slot;
 wire cadence_slot=native_film_mode ?
     ((native_fields_elapsed>=native_field_duration) &&
      (candidate_top_field_first==native_field)) :
-    (!cadence_scale_changed && (!cadence_supported||(cadence_credit>=cadence_due)));
+    ordinary_cadence_slot;
 wire presentation_slot=cadence_slot&&
                        (!timestamp_candidate_active||timestamp_candidate_due);
+wire presentation_consume=swap_window_pulse&&presentation_slot&&
+                          scheduled_frame_valid&&scheduled_frame_differs;
+
+mpeg2_h262_output_cadence mpeg2_h262_output_cadence(
+    .clk(clk),.reset(reset),.tick(cadence_tick_pulse),
+    .consume(presentation_consume&&!native_film_mode),
+    .frame_rate_code(frame_rate_code),.slot(ordinary_cadence_slot)
+);
 assign candidate_frame_valid=scheduled_frame_valid;
 assign candidate_frame_scratch=scheduled_frame_scratch;
 assign candidate_scratch_bank=scheduled_scratch_bank;
@@ -391,7 +345,6 @@ always @(posedge clk) begin
         ordinary_resume_pending<=0;
         ordinary_terminal_drain_pending<=0;
         run_picture_count<=0;presentation_complete<=1;presentation_error<=0;
-        cadence_credit<=CADENCE_DUE_24FPS;cadence_rate_code_q<=0;
         native_fields_elapsed<=0;
     end else begin
         b_user_success_d<=b_user_success;
@@ -421,7 +374,6 @@ always @(posedge clk) begin
         else if(non_b_picture_start&&run_closed&&
                 !(queued_run_active&&!queued_run_closed))
             deferred_reference_payload<=1;
-        cadence_rate_code_q<=frame_rate_code;
         if(!native_film_mode) native_fields_elapsed<=0;
         else if(cadence_tick_pulse && display_picture_present && native_fields_elapsed!=3)
             native_fields_elapsed<=native_fields_elapsed+1'b1;
@@ -433,17 +385,6 @@ always @(posedge clk) begin
             last_bound_reference_valid<=1;
             last_bound_reference_bank<=reference_frame_bank;
             last_bound_reference_count<=reference_promotion_count;
-        end
-
-        if(cadence_scale_changed)
-            cadence_credit<=cadence_due;
-        else if(cadence_tick_pulse)begin
-            if(!cadence_supported)
-                cadence_credit<=CADENCE_DUE_24FPS;
-            else if(cadence_credit<cadence_due)
-                cadence_credit<=cadence_credit+cadence_step;
-            else
-                cadence_credit<=cadence_due;
         end
 
         // Entry 225: a reference publication is not display-order permission.
@@ -864,13 +805,10 @@ always @(posedge clk) begin
             end
         end
 
-        if(swap_window_pulse&&presentation_slot&&scheduled_frame_valid&&
-           scheduled_frame_differs)begin
+        if(presentation_consume)begin
             // Entry 470: presentation_slot guarantees cadence_slot here, so a
             // timestamped presentation consumes exactly the same accumulated
             // cadence credit as an untimestamped presentation.
-            if(cadence_supported)
-                cadence_credit<=cadence_credit+cadence_step-cadence_limit;
             native_fields_elapsed<=0;
             display_scratch<=scheduled_frame_scratch;
             if(scheduled_frame_scratch)display_scratch_bank<=scheduled_scratch_bank;

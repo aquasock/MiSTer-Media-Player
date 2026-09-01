@@ -925,9 +925,9 @@ mpeg2_video_output_timing mpeg2_video_output_timing
 (
 	.clk                     (clk_video),
 	.reset                   (reset_video),
-	.native_request_async    (mpeg2_new_native_480i_request),
+	.interlaced_request_async(mpeg2_new_native_480i_request),
 	.top_field_first_async   (mpeg2_new_native_top_field_first),
-	.native_active           (display_native_interlaced),
+	.interlaced_active       (display_native_interlaced),
 	.ce_pixel                (display_pixel_ce),
 	.h_pos                   (display_h_pos),
 	.v_pos                   (display_v_pos),
@@ -987,6 +987,7 @@ wire        mpeg2_new_chroma_420_type;
 // Picture field-order and repeat metadata feed native film presentation.
 wire        mpeg2_new_top_field_first;
 wire        mpeg2_new_native_film_mode;
+wire        mpeg2_new_native_progressive_supported;
 wire        mpeg2_new_native_film_supported;
 wire        mpeg2_new_native_480i_supported;
 wire        mpeg2_new_pce_repeat_first_field, mpeg2_new_pce_progressive_frame;
@@ -1015,6 +1016,10 @@ wire mpeg2_new_native_480i_request =
 	!mpeg2_new_progressive_sequence &&
 	mpeg2_new_native_field_order_locked &&
 	!mpeg2_new_native_field_order_mismatch;
+wire mpeg2_new_presentation_request =
+    mpeg2_new_progressive_sequence ?
+        mpeg2_new_native_progressive_supported :
+        mpeg2_new_native_480i_request;
 // Entry 369: picture metadata supplied by the HPS in band with the
 // elementary stream.  Distinct from the frontend's parsed fields above:
 // these come from the container, those from the bitstream.
@@ -1222,6 +1227,7 @@ wire mpeg2_new_phase1n_frame_geometry_supported =
 
 mpeg2_h262_frontend mpeg2_h262_frontend
 (
+    .native_progressive_supported(mpeg2_new_native_progressive_supported),
     .native_film_supported(mpeg2_new_native_film_supported),
     .native_480i_supported(mpeg2_new_native_480i_supported),
     .picture_coding_extension_repeat_first_field(mpeg2_new_pce_repeat_first_field),
@@ -1721,8 +1727,7 @@ wire mpeg2_new_startup_video_blank;
 mpeg2_h262_native_startup mpeg2_h262_native_startup (
     .clk_mpeg2(clk_mpeg2), .reset_mpeg2(reset_mpeg2),
     .clk_video(clk_video), .reset_video(reset_video),
-    .native_request(mpeg2_new_native_480i_request),
-    .frame_rate_code(mpeg2_new_frame_rate_code),
+    .presentation_request(mpeg2_new_presentation_request),
     .first_picture_complete(mpeg2_new_first_picture_420_parsed),
     .candidate_presentable(mpeg2_new_b_candidate_presentable_debug),
     .sequence_end_seen(mpeg2_new_sequence_end_seen),
@@ -2288,7 +2293,6 @@ mpeg2_h262_hardware_cadence_profiler
     .clk_video                 (clk_video),
     .reset_video               (reset_video),
     .pixel_ce                  (display_pixel_ce),
-    .native_active             (display_native_interlaced),
     .framebuffer_generation_reset(
         mpeg2_new_framebuffer_generation_reset),
     .framebuffer_picture_present(
@@ -2360,7 +2364,7 @@ mpeg2_h262_hardware_cadence_profiler
     .framebuffer_second_field_fetch(
         mpeg2_new_framebuffer_second_field_fetch_toggle),
     .fifo_pending              (!mpeg2_stream_empty),
-    .native_decode_active      (mpeg2_new_native_active_mpeg2),
+    .native_decode_active      (mpeg2_new_presentation_request),
     .decoder_input_pending     (mpeg2_new_clean_video_pending),
     .writer_capacity_blocked   (mpeg2_new_ddr_capture_blocked),
     .decoder_ready             (mpeg2_new_decoder_stream_ready),

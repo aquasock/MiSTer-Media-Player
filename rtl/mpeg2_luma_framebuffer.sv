@@ -10,7 +10,8 @@
 //   Cr : two cached 360-pel lines, 45 x 64-bit words per line
 //
 // The memory side runs at the decoder/DDRAM clock.  The presentation side runs
-// at the independent fixed 40 MHz video clock.  Each cache RAM is dual-clock.
+// at the independent fixed 54 MHz video clock with a raster-specific pixel
+// enable.  Each cache RAM is dual-clock.
 //
 // The first two luma lines and first two chroma lines are prefetched before a
 // picture is published.  Once display begins, finishing source line N frees a
@@ -114,7 +115,7 @@ module mpeg2_luma_framebuffer
     output reg  [31:0] luma_write_read_raw_fingerprint_debug,
     output reg         luma_write_read_mismatch_debug,
 
-    // Independent fixed video side - 40 MHz.
+    // Independent fixed 54 MHz video side.
     input  wire        rd_clk,
     input  wire [11:0] h_pos,
     input  wire [11:0] v_pos,
@@ -1327,7 +1328,7 @@ assign luma_return_byte_debug        = ddram_dout[7:0];
 assign sequence_phase_error_debug     = sequence_phase_error_rd;
 
 // kate - Phase 1P: the module reset input is synchronized to mem_clk by the
-// top level.  It still crosses into the independent 40 MHz rd_clk domain, so
+// top level.  It still crosses into the independent 54 MHz rd_clk domain, so
 // synchronize only its RELEASE again here.  Assertion remains asynchronous.
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] rd_reset_sync;
@@ -1342,13 +1343,27 @@ end
 wire rd_reset = rd_reset_sync[2];
 wire framebuffer_descriptor_valid =
     (picture_width_r2 != 12'd0) && (picture_height_r2 != 11'd0);
+wire [11:0] progressive_origin_x;
+wire [11:0] progressive_origin_y;
+wire        progressive_source_window;
+wire [11:0] progressive_source_x;
+wire [11:0] progressive_source_y;
+
+mpeg2_progressive_geometry mpeg2_progressive_geometry(
+    .pixel_en(pixel_en),.h_pos(h_pos),.v_pos(v_pos),
+    .picture_width(picture_width_r2),.picture_height(picture_height_r2),
+    .origin_x(progressive_origin_x),.origin_y(progressive_origin_y),
+    .source_window(progressive_source_window),
+    .source_x(progressive_source_x),.source_y(progressive_source_y)
+);
 wire native_publish_origin =
     framebuffer_descriptor_valid && native_interlaced_r2 && pixel_en &&
     (h_pos == 12'd0) && (v_pos[8:1] == 8'd0) &&
     (v_pos[0] == first_field_r2);
 wire progressive_publish_origin =
     framebuffer_descriptor_valid && !native_interlaced_r2 &&
-    (h_pos == 12'd0) && (v_pos == 12'd0);
+    (h_pos == progressive_origin_x) &&
+    (v_pos == progressive_origin_y);
 
 // Entry 516: field phase implied by the scanned raster line versus the field
 // the presentation sequence believes it is in.  The 480-entry order places the
@@ -1654,9 +1669,11 @@ always @(posedge rd_clk) begin
                 ((native_interlaced_r2 && pixel_en &&
                   (h_pos == 12'd719)) ||
                  (!native_interlaced_r2 && pixel_en &&
-                  (h_pos == 12'd759) &&
-                  (v_pos >= 12'd60) &&
-                  (v_pos < (12'd60 + {1'b0, picture_height_r2})))))
+                  (h_pos == (progressive_origin_x +
+                             picture_width_r2 - 12'd1)) &&
+                  (v_pos >= progressive_origin_y) &&
+                  (v_pos < (progressive_origin_y +
+                            {1'b0, picture_height_r2})))))
             begin
                 line_done_pending_rd <= 1'b1;
 
@@ -1682,13 +1699,12 @@ end
 // -------------------------------------------------------------------------
 
 wire source_window = native_interlaced_r2 ?
-    pixel_en :
-    (pixel_en &&
-     (h_pos >= 12'd40)  && (h_pos < 12'd760) &&
-     (v_pos >= 12'd60)  && (v_pos < 12'd540));
+    pixel_en : progressive_source_window;
 
-wire [11:0] source_x = native_interlaced_r2 ? h_pos : (h_pos - 12'd40);
-wire [11:0] source_y = native_interlaced_r2 ? v_pos : (v_pos - 12'd60);
+wire [11:0] source_x = native_interlaced_r2 ?
+    h_pos : progressive_source_x;
+wire [11:0] source_y = native_interlaced_r2 ?
+    v_pos : progressive_source_y;
 
 wire picture_present_effective =
     picture_present_rd ||

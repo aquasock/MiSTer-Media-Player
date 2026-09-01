@@ -20,7 +20,6 @@ module mpeg2_h262_hardware_cadence_profiler #(
 )(
     input wire clk_mpeg2,input wire reset_mpeg2,
     input wire clk_video,input wire reset_video,input wire pixel_ce,
-    input wire native_active,
     input wire framebuffer_generation_reset,
     input wire framebuffer_picture_present,
     input wire framebuffer_prefill_deadline_missed,
@@ -67,7 +66,7 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire framebuffer_first_field_fetch,
     input wire framebuffer_second_field_fetch,
     input wire fifo_pending,input wire decoder_ready,
-    // Entry 557: all three taps are in clk_mpeg2, unlike native_active above.
+    // Entry 557: all three taps are in clk_mpeg2.
     input wire native_decode_active,input wire decoder_input_pending,
     input wire writer_capacity_blocked,
     input wire presentation_hold,input wire destination_hold,
@@ -134,10 +133,9 @@ localparam [31:0] SNAPSHOT_FORMAT=
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
-// Entry 516: schema 11 appends two packed words, so both origins move eight
-// rows up to keep the final row flush with the diagnostic and native rasters.
-localparam [11:0] OVERLAY_DIAG_Y=12'd344;
-localparam [11:0] OVERLAY_NATIVE_Y=12'd224;
+// Entry 516: schema 11 appends two packed words. Keep the final row flush with
+// the permanent 480-line production raster.
+localparam [11:0] OVERLAY_Y=12'd224;
 localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd256;
 
 reg session_active;
@@ -1355,7 +1353,7 @@ assign snapshot_ready=snapshot_ready_sync[2];
 
 reg [42:0] overlay_shift;
 reg [31:0] overlay_row_word;
-wire [11:0] overlay_y=native_active?OVERLAY_NATIVE_Y:OVERLAY_DIAG_Y;
+wire [11:0] overlay_y=OVERLAY_Y;
 wire [11:0] overlay_row_offset=(v_pos-overlay_y)>>2;
 wire [5:0] overlay_row_index=overlay_row_offset[5:0];
 always @* begin
