@@ -1,4 +1,4 @@
-## 848 COMMIT Unreleased ??? 2026-08-31T20:44:17-07:00
+## 848 COMMIT Unreleased 2de0717 2026-08-31T20:44:17-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Restore the last physically proven moving-purple selector userspace combination 
 
 #### Outcome:
 
-The source-`aab7d09` physical test keeps menu video stable and proves the expected helper, Main and schema-21 overlay-capable RBF behaviors are active, but the 4,000-byte helper packetization worsens the rejected plane from the prior 21-byte deficit to 4,220 missing bytes: Main still submits 22 ordered records and all 86,400 all-`0x55` bytes with the expected hash, while the FPGA engine receives 82,180 bytes, rejects the commit and publishes no plane.  The user explicitly prioritizes a working selector over the newer menu-reliability drain if both cannot yet coexist.  The approved rollback therefore restores the helper's physically proven 4,096-byte record framing and removes only Main's later 500-millisecond stream-hop drain, returning both userspace components to entry 840's successful selector behavior while preserving overlay tracing, navigation, the frozen RBF and all other functionality.
+The source-`aab7d09` physical test keeps menu video stable and proves the expected helper, Main and schema-21 overlay-capable RBF behaviors are active, but the 4,000-byte helper packetization worsens the rejected plane from the prior 21-byte deficit to 4,220 missing bytes: Main still submits 22 ordered records and all 86,400 all-`0x55` bytes with the expected hash, while the FPGA engine receives 82,180 bytes, rejects the commit and publishes no plane.  The user explicitly prioritizes a working selector over the newer menu-reliability drain if both cannot yet coexist.  Source `2de0717` restores the helper's physically proven 4,096-byte record framing and removes only Main's later 500-millisecond stream-hop drain, making both source files byte-identical to the entry-840 successful selector combination while preserving overlay tracing, navigation and the frozen source-`f5f650f` RBF.  Strict native compilation and the focused subpicture, random-access and menu-hop regressions pass, and the restored framing emits exactly 22 records carrying all 86,400 bytes with 4,096-byte maximum payloads and a 384-byte final payload.  The Raspberry Pi GNU 10.2.1 ARM toolchain builds `host/build/MediaPlayer_Helper_PurpleSelector_2de0717`, a 908,660-byte stripped static ARM EABI5 executable at SHA-256 `fd5d46f116ec41224ff9dd4c13fb62453a009ec462de9ab9b1bdfa794ff2b26c`, and `host/build/MiSTer_SelectorProven_2de0717`, a 1,178,588-byte stripped dynamic ARM EABI5 executable at SHA-256 `872050d44266d74c28e302a54336f409426fbca235ce3384c3b1735eb1aa6356`.  Both hashes exactly match the binaries used by the successful entry-840 hardware test.  The helper returns the complete protocol-one capability string and contains the required `probe=solid-index1-magenta` marker.  No RBF was built or changed; `output_files/MediaPlayer_20260831_f5f650f.rbf` remains 4,456,796 bytes at SHA-256 `4c57f9350b3c553d322395d0d4c0f7cc78dc14f8d7be863a251c83d10af647f7`.
 
 #### Next Steps:
 
-Revert the helper framing and Main drain additions, validate the helper with strict native and focused DVD regressions, verify both Main patches still apply, build the purple helper and Main locally with the Raspberry Pi GNU 10.2.1 ARM toolchain, and preserve uniquely named artifacts for manual transfer.  Hardware acceptance requires one accepted and zero rejected overlay commits, all 86,400 plane bytes, one plane publication and a visible purple selector following directional input; intermittent menu-load failure remains an accepted temporary tradeoff for this restoration boundary.
+Exit the MediaPlayer core so the running helper stops, manually replace `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_PurpleSelector_2de0717` and replace `/media/fat/MiSTer` with local `host/build/MiSTer_SelectorProven_2de0717`, restore executable mode if needed and verify both installed hashes.  Reboot because Main changed, load the existing `MediaPlayer_20260831_f5f650f.rbf`, restart the DVD, press `M` and move through every menu button.  Hardware acceptance requires one accepted and zero rejected overlay commit, all 86,400 plane bytes, one plane publication and a visible purple selector following directional input; intermittent menu-load failure remains an accepted temporary tradeoff for this restoration boundary and may be retried or cleared by rebooting.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Revert the helper framing and Main drain additions, validate the helper with str
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
