@@ -1,4 +1,4 @@
-## 873 COMMIT Unreleased ??? 2026-09-01T05:51:42-07:00
+## 873 COMMIT Unreleased f0fba4d 2026-09-01T05:51:42-07:00
 
 #### Coming From:
 
@@ -10,15 +10,17 @@ Add the first audio-only ARM-rendered user-interface boundary with reserved albu
 
 #### Outcome:
 
-The approved boundary will keep native 720-by-480p output active during standalone MP3, WAV, FLAC and Ogg Vorbis playback while the ARM helper renders a limited-range BT.601 4:2:0 interface into the decoder's existing frame geometry.  A fixed square region will be reserved for later album-art decoding, while this cycle renders a deterministic background, static transport symbols and a sample-clock-driven progress indicator.  New bounded display records will carry one inactive-bank frame in audio-interleaved chunks and publish it only after a complete validated transfer at a safe video-frame boundary; the FPGA will reuse existing DDR frame banks and framebuffer readback without sending the interface through H.262 syntax, changing the video decoder engines or weakening DVD overlay behavior.  PCM service remains dominant and each UI record remains bounded so a full-screen refresh cannot monopolize the shared transport.
+Source `f0fba4d` implements the first standalone-audio presentation boundary: the ARM helper renders a deterministic limited-range BT.601 720-by-480 4:2:0 interface with a reserved 280-by-280 album-art viewport, static transport panel, reserved metadata strip and sample-clock-driven activity ruler.  Bounded in-band begin, data and commit records upload one complete frame into the inactive existing DDR framebuffer bank without passing through H.262 syntax; PCM records retain transport priority, publication is atomic at a safe frame boundary and DVD overlay commands retain their existing route and arbitration order.  Strict native and Raspberry Pi GNU 10.2 ARM builds pass, the 916,852-byte static stripped ARMv7 helper has SHA-256 `5de3178711e7893d23ad75e22f1ef19a7905454bf48fc71c9bf98a95db6977a4`, 48 kHz and 44.1 kHz renderer tests pass, sanitizer coverage passes, and a 3.2-second WAV integration emits 9,600 PCM records plus three complete UI commits with every UI record following PCM service.  The exact-source FPGA UI regression reconstructs all 64,800 64-bit writes and one safe commit, while the retained DDR-arbiter regression passes.  Seed 23 completed synthesis, fitting and assembly but was rejected at negative 7.142-nanosecond global setup slack because the new first-frame loading level directly crossed from the 60 MHz decoder domain into 54 MHz video blanking; `f0fba4d` corrects that structural defect with an explicit three-stage video-domain synchronizer and a first-stage-only timing exception.  The one permitted seed-24 attempt passed the focused regressions and synthesis, but the user cancelled it after approximately 30 minutes in fitting because routing was progressing abnormally slowly.  No timing-qualified RBF was produced or collected.
 
 #### Next Steps:
 
-Implement and independently test the ARM renderer, record framing, command router, bounded DDR writer, inactive-bank ownership and atomic framebuffer publication.  Require byte-exact host reconstruction, malformed-record rejection, no write into the displayed bank, one UI commit per sample-clock second, unchanged PCM framing and retained DVD-overlay regressions; then run the focused SystemVerilog suite and strict native and ARM helper builds before committing source and attempting one timing-clean Quartus build for MiSTer validation.
+Pause at source `f0fba4d` as requested and preserve the physically accepted source-`add7d00` RBF and installed helper on MiSTer.  Do not install the new audio-UI helper by itself because its display records require the matching FPGA implementation.  Resume only with explicit user approval; first inspect the cancelled seed-24 fitter reports and constrain any next attempt to a separately approved build boundary, then require a timing-clean RBF before transferring both the new helper and RBF for physical standalone MP3, WAV, FLAC and Ogg Vorbis validation plus retained MPG and DVD regression testing.
 
 #### Files Modified:
 
 - MediaPlayer.sv
+- MediaPlayer.qsf
+- MediaPlayer.sdc
 - README.md
 - docs/ARCHITECTURE.md
 - files.qip
