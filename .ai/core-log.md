@@ -1,4 +1,4 @@
-## 847 COMMIT Unreleased ??? 2026-08-31T20:27:44-07:00
+## 847 COMMIT Unreleased aab7d09 2026-08-31T20:27:44-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Restore the proven moving solid-purple DVD menu selector with a helper-only over
 
 #### Outcome:
 
-The latest physical capture proves that the installed probe helper still generates the correct opaque-magenta index-one palette and moving authored button rectangles and that Main receives and submits a complete 86,400-byte all-index-one plane with 22 ordered data records, the expected hash and no source corruption.  The FPGA nevertheless receives only 86,379 plane bytes and rejects the commit without publishing a plane; the exact 21-byte deficit equals one byte for each of the 21 maximum-size 4,096-byte data records, while the final short record is accounted for.  The approved plan changes only the helper's packetization to 4,000-byte payloads, which carries the same plane in the same 22-record count while avoiding the failing maximum record boundary; Main, selector generation, palette, protocol, total bytes and RBF remain unchanged.
+The latest physical capture proves that the installed probe helper still generates the correct opaque-magenta index-one palette and moving authored button rectangles and that Main receives and submits a complete 86,400-byte all-index-one plane with 22 ordered data records, the expected hash and no source corruption.  The FPGA nevertheless receives only 86,379 plane bytes and rejects the commit without publishing a plane; the exact 21-byte deficit equals one byte for each of the 21 maximum-size 4,096-byte data records, while the final short record is accounted for.  Source `aab7d09` changes only the helper's overlay data chunk from 4,096 to 4,000 payload bytes, carrying the identical plane in 21 full records plus one 2,400-byte record while keeping every command-plus-payload record below the failing 4,097-byte edge; Main, selector generation, palette, protocol, total bytes and RBF remain unchanged.  The strict native purple-probe build and capability smoke test pass together with the focused fragmented-SPU, selected-histogram, scheduled-stop, random-access and menu-hop regressions and a framing check for exactly 22 records and 86,400 bytes.  The user's local GNU 10.2.1 ARM toolchain produces the 908,660-byte stripped static 32-bit ARM EABI5 `host/build/MediaPlayer_Helper_PurpleSelector_aab7d09` at SHA-256 `5f0bbe70fd8da1a85de39ef5a9a47917606b685b3e7a2b330ca7343db4285c1c`; it contains the `probe=solid-index1-magenta` marker and returns the complete protocol-one capability string when executed on the Raspberry Pi.
 
 #### Next Steps:
 
-Implement the 4,000-byte overlay data chunk in `host/arm/media_player_helper.c`, validate strict native and local Raspberry Pi ARM builds plus the focused DVD overlay and navigation regressions, preserve a uniquely named probe helper for manual transfer, and repeat the menu test; acceptance requires reliable menu loading, a visible purple rectangle that follows every directional selection, 86,400 received plane bytes, one accepted and zero rejected commits and one published plane.
+Exit the MediaPlayer core so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_PurpleSelector_aab7d09`, restore executable mode if needed and verify the installed size and SHA-256.  Preserve the installed Main and RBF, restart the DVD, press `M` and move through every menu button; acceptance requires reliable menu loading, a visible purple rectangle that follows every directional selection, 86,400 received plane bytes, one accepted and zero rejected commits and one published plane.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Implement the 4,000-byte overlay data chunk in `host/arm/media_player_helper.c`,
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
