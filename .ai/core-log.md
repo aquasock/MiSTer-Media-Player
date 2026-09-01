@@ -1,4 +1,4 @@
-## 852 COMMIT Unreleased ??? 2026-08-31T21:22:44-07:00
+## 852 COMMIT Unreleased 413ace2 2026-08-31T21:22:44-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Close the physically measured final one-byte selector deficit with a helper-only
 
 #### Outcome:
 
-The user approves preserving the proven source-`f5f650f` RBF, source-`2de0717` pre-drain Main and unchanged first 86,400-byte probe candidate while increasing only the second probe candidate from 86,421 to 86,422 all-`0x55` bytes.  Entry 851 proves the second candidate currently loses 22 bytes and reaches 86,399, so the new total is intended to leave exactly 86,400 accepted plane bytes; its 21 full 4,096-byte data records remain unchanged and only the final payload increases from 405 to 406 bytes.  The change remains restricted to the opt-in purple-probe helper and does not modify normal authored overlays, navigation, Main, the RBF or protocol limits.
+The user approves preserving the proven source-`f5f650f` RBF, source-`2de0717` pre-drain Main and unchanged first 86,400-byte probe candidate while increasing only the second probe candidate from 86,421 to 86,422 all-`0x55` bytes.  Source `413ace2` makes that one-byte correction and updates its diagnostic marker; the compensated candidate still uses 21 full 4,096-byte records, with only the final payload increasing from 405 to 406 bytes.  Strict native compilation and the focused fragmented-subpicture, selected-histogram, scheduled-stop, random-access and menu-hop regressions pass.  A direct framing harness verifies exactly two candidates of 86,400 and 86,422 bytes, 22 data records each, maximum payload 4,096, and final payloads of 384 and 406.  The Raspberry Pi GNU 10.2.1 ARM toolchain builds `host/build/MediaPlayer_Helper_DualCandidate22_413ace2`, a 908,660-byte stripped static ARM EABI5 executable at SHA-256 `beb698b86b46e4a937871637ad6f0b4e5878ae0c2c3eff7dde1c0afabd75b8f4`; it contains the solid-magenta probe and `extra_bytes=22` compensation markers and returns the complete protocol-one capability string when executed locally.  The correction remains restricted to the opt-in purple-probe helper and does not modify normal authored overlays, navigation, Main, the RBF or protocol limits.
 
 #### Next Steps:
 
-Make the one-byte source and diagnostic-marker correction, validate strict native compilation and the focused subpicture, random-access and menu-hop regressions, verify direct framing reports 86,400 and 86,422 bytes with 384-byte and 406-byte final payloads, build a uniquely named static ARM helper locally with the Raspberry Pi GNU 10.2.1 toolchain, and preserve Main and the RBF.  Physical acceptance requires the second candidate to reach exactly 86,400 bytes and 10,800 DDR words, at least one accepted commit, one plane publication and a solid purple selector following directional input.
+Exit the MediaPlayer core so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_DualCandidate22_413ace2`, restore executable mode if needed and verify the installed size and SHA-256.  Preserve the installed source-`2de0717` Main and source-`f5f650f` RBF, restart the DVD, enter the menu and move through every button; physical acceptance requires the second candidate to reach exactly 86,400 bytes and 10,800 DDR words, at least one accepted commit, one plane publication and a solid purple selector following directional input.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Make the one-byte source and diagnostic-marker correction, validate strict nativ
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
