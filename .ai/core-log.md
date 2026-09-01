@@ -1,4 +1,4 @@
-## 871 COMMIT Unreleased ??? 2026-09-01T03:23:04-07:00
+## 871 COMMIT Unreleased add7d00 2026-09-01T03:23:04-07:00
 
 #### Coming From:
 
@@ -10,24 +10,29 @@ Replace the development-era 800-by-600 fallback with native 720-by-480 progressi
 
 #### Outcome:
 
-The user approves an RBF development boundary that removes the obsolete Phase 1G 800-by-600 diagnostic raster completely, makes 720-by-480 progressive at 60000/1001 refresh the reset and fallback output, admits supported progressive 4:2:0 I, P and B sequences up to 720 by 480, and retains 720-by-480i only for supported interlaced or film-in-interlaced sequences.  The implementation will separate output geometry from interlaced cache order, replace 40 MHz raster-specific cadence arithmetic with exact 480p refresh ratios including 24000/1001 two-of-five frame admission, generalize startup blanking and mode transitions, move retained telemetry into the 480-line raster and delete the standalone and embedded 800-by-600 timing logic.  Host Main, the ARM helper, DVD navigation, audio and record formats remain outside this source boundary.
+Source `add7d00` removes the standalone and embedded 800-by-600 timing paths, makes exact 720-by-480 progressive at 60000/1001 the reset presentation, retains the existing 720-by-480i field path for supported interlaced and film-in-interlaced sequences, and admits progressive 4:2:0 frame-picture I, P and B sequences through 720 by 480 at H.262 rate codes one through five.  Progressive framebuffer geometry is now centered inside the permanent 720-by-480 raster, the extracted cadence accumulator implements exact source-to-output ratios including two presentations per five output frames for 24000/1001, and presentation mode changes complete only on safe frame or field boundaries.  The obsolete generator is absent from the active QIP and the legacy inactive wrapper, while historical changelog text and the excluded frozen `rtl/mpeg2fpga` reference remain intact.  All nine focused and retained SystemVerilog regressions pass on exact source, and deterministic fixtures probe as 720-by-480 progressive 24000/1001 and top-field-first interlaced 30000/1001.  Clean Quartus Prime 17.0.2 seeds 20, 21 and 22 were rejected for unrelated global setup slacks of negative 0.010, 0.409 and 0.130 nanoseconds; seed 23 completes synthesis, fitting, assembly and the project timing gate with positive setup, hold, recovery, removal and minimum-pulse-width slacks of 0.224, 0.244, 3.333, 0.625 and 0.925 nanoseconds, plus dedicated 60 MHz decoder and 54 MHz video setup slacks of 0.872 and 2.685 nanoseconds with no violations.  The fit uses 35,092 ALMs, 54,790 registers, 4,187,011 block-memory bits in 535 RAM blocks and 70 DSP blocks.  The byte-identical local and build-PC artifact `output_files/MediaPlayer_20260901_add7d00.rbf` is 4,478,208 bytes at SHA-256 `33ecb87988427d44a97993dc7dda53930c60b0397d0a0202a6e928bb36aa048f`; Main, the helper, DVD navigation, audio and record formats are unchanged.
 
 #### Next Steps:
 
-Implement the approved output family and deterministic progressive fixtures, then use focused simulations to prove exact 480p timing, safe 480p-to-480i and 480i-to-480p boundaries, sequential progressive framebuffer lines, exact supported-rate cadence, I/P/B presentation and unchanged 480i field order.  Run the retained transport, overlay, decoder and timing regressions, commit the complete source boundary, pull that exact commit on build PC `10.10.0.42`, perform one clean Quartus Prime 17.0.2 build with positive global and dedicated decoder/video timing, and provide a uniquely named RBF for the user's progressive MPG and interlaced-reference hardware test.
+Upload only `output_files/MediaPlayer_20260901_add7d00.rbf` to the MiSTer while preserving the installed Main and helper, then test the generated-style 720-by-480 progressive 24000/1001 MPEG-2 Program Stream and an ordinary progressive code-four or code-five stream for stable native video, correct centering, smooth exact cadence and no vertical-line artifact.  Retest the known-good 720-by-480 top-field-first 30000/1001 interlaced reference for unchanged field order, motion and DVD overlay behavior, then report the installed RBF hash and capture a fresh screenshot, helper/Main log and telemetry if either presentation family fails; hardware acceptance is required before marking this entry Passed.
 
 #### Files Modified:
 
+- MediaPlayer.qsf
 - MediaPlayer.sdc
 - MediaPlayer.sv
+- README.md
 - files.qip
+- rtl/mpeg2_decoder.sv
 - rtl/mpeg2_luma_framebuffer.sv
-- rtl/mpeg2_video_output_timing.sv
-- rtl/mpeg2_video_svga_800x600.sv
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - rtl/mpeg2_new/mpeg2_h262_frontend.sv
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - rtl/mpeg2_new/mpeg2_h262_native_startup.sv
+- rtl/mpeg2_new/mpeg2_h262_output_cadence.sv
+- rtl/mpeg2_progressive_geometry.sv
+- rtl/mpeg2_video_output_timing.sv
+- rtl/mpeg2_video_svga_800x600.sv
 - tools/generate-progressive-regression.sh
 - tools/test_mpeg2_output_timing.sv
 - tools/test_mpeg2_progressive_cadence.sv
@@ -35,7 +40,7 @@ Implement the approved output family and deterministic progressive fixtures, the
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
