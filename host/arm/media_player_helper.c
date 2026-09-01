@@ -4,6 +4,7 @@
 
 #include "minimp3.h"
 #include "a52.h"
+#include "ac3_resync.h"
 #include "mm_accel.h"
 #include "consumer_audio.h"
 #include "dvd_random_access.h"
@@ -44,7 +45,6 @@
 #define MP3_PROBE_BYTES             (64u * 1024u)
 #define ID3V2_TAG_LIMIT             (64u * 1024u * 1024u)
 #define ISO_PTS_DISCONTINUITY_TICKS (10u * 90000u)
-#define OVERLAY_COMPENSATED_SOURCE_BYTES 4095u
 
 /*
  * Entry 429: the FPGA gates its whole in-band byte path on the PCM sink, so a
@@ -590,11 +590,8 @@ static int emit_overlay_frame(struct output_state *output,
                               const struct dvd_spu_overlay *overlay)
 {
     size_t offset = 0;
-#if defined(MMP_DVD_OVERLAY_PROBE) || defined(MMP_DVD_OVERLAY_COMPENSATE)
-    const size_t compensated_bytes = DVD_SPU_PLANE_BYTES + 22u;
-    uint8_t transfer_plane[4096];
-#endif
 #ifdef MMP_DVD_OVERLAY_PROBE
+    uint8_t transfer_plane[4096];
 
     overlay_probe_dump_plane(overlay);
     memset(transfer_plane, 0x55, sizeof(transfer_plane));
@@ -619,62 +616,7 @@ static int emit_overlay_frame(struct output_state *output,
     }
     if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_COMMIT, NULL, 0) < 0)
         return -1;
-
-#if defined(MMP_DVD_OVERLAY_PROBE) || defined(MMP_DVD_OVERLAY_COMPENSATE)
-    /*
-     * Keep the ordinary candidate first for the physically observed zero-loss
-     * path.  On the recurring loss path, hardware drops the final byte from
-     * each data record.  Split the authored plane into at most 4095-byte source
-     * spans and duplicate each span's final byte.  The 22 discarded duplicates
-     * then reconstruct the exact original 86400-byte plane.  A rejected second
-     * commit leaves an already published first candidate intact.
-     */
-#ifdef MMP_DVD_OVERLAY_PROBE
-    fprintf(stderr,
-            "media_player_helper: DVD overlay compensation "
-            "mode=solid standard_bytes=%u candidate_bytes=%u "
-            "extra_bytes=22\n",
-            (unsigned)DVD_SPU_PLANE_BYTES, (unsigned)compensated_bytes);
-#else
-    fprintf(stderr,
-            "media_player_helper: DVD overlay compensation "
-            "mode=authored standard_bytes=%u candidate_bytes=%u "
-            "source_bytes_per_record=%u duplicate_bytes=22\n",
-            (unsigned)DVD_SPU_PLANE_BYTES, (unsigned)compensated_bytes,
-            (unsigned)OVERLAY_COMPENSATED_SOURCE_BYTES);
-#endif
-    if (emit_overlay_style(output, overlay, MEDIA_PLAYER_OVERLAY_CONFIG) < 0)
-        return -1;
-    offset = 0;
-#ifdef MMP_DVD_OVERLAY_PROBE
-    while (offset < compensated_bytes) {
-        size_t count = compensated_bytes - offset;
-
-        if (count > sizeof(transfer_plane))
-            count = sizeof(transfer_plane);
-        if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_DATA,
-                                transfer_plane, count) < 0)
-            return -1;
-        offset += count;
-    }
-#else
-    while (offset < DVD_SPU_PLANE_BYTES) {
-        size_t count = DVD_SPU_PLANE_BYTES - offset;
-
-        if (count > OVERLAY_COMPENSATED_SOURCE_BYTES)
-            count = OVERLAY_COMPENSATED_SOURCE_BYTES;
-        memcpy(transfer_plane, overlay->pixels + offset, count);
-        transfer_plane[count] = transfer_plane[count - 1u];
-        if (emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_DATA,
-                                transfer_plane, count + 1u) < 0)
-            return -1;
-        offset += count;
-    }
-#endif
-    return emit_overlay_record(output, MEDIA_PLAYER_OVERLAY_COMMIT, NULL, 0);
-#else
     return 0;
-#endif
 }
 
 static int emit_overlay_clear(struct output_state *output)
@@ -1788,6 +1730,17 @@ static int decode_ac3_buffer(struct audio_state *audio,
         }
         if ((size_t)length > original_size - offset)
             break;
+        if (sample_rate != (int)PCM_SAMPLE_RATE &&
+            ac3_rate_candidate(sample_rate, (int)PCM_SAMPLE_RATE,
+                               audio->ac3_resync_bytes,
+                               audio->ac3_resync_events) ==
+                AC3_RATE_CANDIDATE_RECOVER) {
+            fprintf(stderr,
+                    "media_player_helper: rejecting false AC-3 sync "
+                    "candidate at %d Hz during resynchronization\n",
+                    sample_rate);
+            goto resynchronize_candidate;
+        }
         if (sample_rate != (int)PCM_SAMPLE_RATE) {
             fprintf(stderr,
                     "media_player_helper: unsupported AC-3 sample rate %d Hz "
@@ -1869,12 +1822,14 @@ resynchronize_candidate:
                     AC3_RESYNC_LIMIT, audio->ac3_resync_events);
             return -1;
         }
-        a52_free(audio->a52);
-        audio->a52 = a52_init(0);
-        if (!audio->a52) {
-            fprintf(stderr,
-                    "media_player_helper: AC-3 decoder reinit failed\n");
-            return -1;
+        if (audio->a52) {
+            a52_free(audio->a52);
+            audio->a52 = a52_init(0);
+            if (!audio->a52) {
+                fprintf(stderr,
+                        "media_player_helper: AC-3 decoder reinit failed\n");
+                return -1;
+            }
         }
     }
     if (offset) {

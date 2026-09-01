@@ -8,7 +8,7 @@ DVD_PREFIX ?= $(DEPS_DIR)/dvd-install-native
 OUTPUT ?= media_player_helper
 SOURCES := media_player_helper.c media_source.c dvd_random_access.c dvd_spu.c
 HEADERS := media_source.h media_player_protocol.h consumer_audio.h \
-	dvd_random_access.h dvd_spu.h \
+	ac3_resync.h dvd_random_access.h dvd_spu.h \
 	$(DEPS_DIR)/minimp3.h $(DEPS_DIR)/miniaudio.h \
 	$(DEPS_DIR)/stb_vorbis.c
 DVDNAV_LIBRARY := $(DVD_PREFIX)/lib/libdvdnav.a
