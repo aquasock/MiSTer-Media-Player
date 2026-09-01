@@ -1,3 +1,32 @@
+## 841 COMMIT Unreleased f5f650f 2026-08-31T19:20:09-07:00
+
+#### Coming From:
+
+Unreleased 647c36e
+
+#### Purpose:
+
+Build and qualify the ordinary ARM helper that restores the authored DVD selector while preserving the accepted Main and RBF.
+
+#### Outcome:
+
+The exact clean checkout `f5f650f87109193e90c664175b1785e721134d26` on build PC `10.10.0.42` builds the normal native helper with strict warnings and passes its capability smoke test plus the focused fragmented-subpicture, selected-histogram, scheduled-stop, random-access and menu-hop regressions.  The same exact source builds the ordinary ARM helper without defining `MMP_DVD_OVERLAY_PROBE` under MiSTer's pinned GNU 10.2.1 toolchain.  `/home/vash/MiSTer-Media-Player-f5f650f/host/build/MediaPlayer_Helper` is a 908,660-byte stripped static 32-bit ARM EABI5 hard-float executable with no dynamic section, contains no `probe=solid-index1-magenta` marker and has SHA-256 `7818463017de063ba72846429c60816b967444b0137dcd2f156d9902ae96e96b`.  The artifact is copied byte-identically to local `host/build/MediaPlayer_Helper` for the user's manual transfer.  No repository source, Main, RBF, MiSTer file, running process or playback setting changes during this build.
+
+#### Next Steps:
+
+The user will exit the MediaPlayer core so the probe helper is no longer running, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper`, create no backup, preserve Main and `/media/fat/MediaPlayer_20260831_f5f650f.rbf`, restore executable mode if the transfer client clears it, and verify the installed file is 908,660 bytes with SHA-256 `7818463017de063ba72846429c60816b967444b0137dcd2f156d9902ae96e96b`.  Restart the DVD, enter the root menu and move among all four buttons; acceptance requires the solid magenta rectangle to disappear and the sparse authored highlight to follow the selector, after which collect a fresh screenshot and helper log.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 840 COMMIT Unreleased f5f650f 2026-08-31T19:16:30-07:00
 
 #### Coming From:
@@ -1185,35 +1214,6 @@ The user confirms that play/pause now works correctly, but advancing from chapte
 #### Next Steps:
 
 Stop the source-`6de2778` acceptance cycle and obtain approval for a revised two-boundary plan.  First make a helper-only correction that retains the established audio substream across chapter changes, resynchronizes cleanly at the first complete access unit and treats a bad candidate frame as a bounded resynchronization event rather than terminating otherwise valid playback; prove deterministic chapter-one-through-three control, all three authored AC-3 track boundaries, HDMI decode and S/PDIF passthrough without changing Main or the RBF.  Separately, after explicit RBF authorization, extend native field-order ownership to this observed mixed film/interlaced frame-picture sequence without accepting field pictures or weakening decoder error gates, run focused mixed-mode and complete native-480i simulations, perform one clean seed-19 Quartus build with full timing and resource gates, then hardware-test chapters 8, 11, 15, 17 and 23 for stable native output and clean telemetry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 801 COMMIT Unreleased 6de2778 2026-08-30T22:30:02-07:00
-
-#### Coming From:
-
-Unreleased 6de2778
-
-#### Purpose:
-
-Record the user's simplified deployment policy for future Main and MediaPlayer Helper replacements.
-
-#### Outcome:
-
-The user directs that future deployments of `/media/fat/MiSTer` and `/media/fat/linux/MediaPlayer_Helper` must not create rollback, predecessor or backup copies because either binary can be reproduced from the GitHub source.  Deployment should first attempt to upload the verified new artifact directly to its exact absolute destination; if the FTP server refuses replacement, delete only that exact destination and immediately upload the verified artifact at the same path.  Post-upload readback verification and the normal Main reboot requirement remain applicable, while this directive does not alter RBF handling.  Existing backup files are not removed by this instruction, and no source, installed file, process, Main, helper or RBF changes while recording it.
-
-#### Next Steps:
-
-Continue the source-`6de2778` control qualification already requested in entry 800.  For every later Main or MediaPlayer Helper deployment, do not create a backup or staged rollback: verify the build artifact locally, attempt direct replacement at `/media/fat/MiSTer` or `/media/fat/linux/MediaPlayer_Helper`, fall back to deletion of only the refused destination followed by immediate upload, independently read back the installed bytes, and reboot only when Main changes.
 
 #### Files Modified:
 
