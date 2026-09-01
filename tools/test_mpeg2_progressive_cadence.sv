@@ -21,8 +21,10 @@ endtask
 task reset_rate;
 input [3:0] code;
 begin
+    @(negedge clk);
     reset=1;tick=0;consume=0;frame_rate_code=0;
     repeat(3) @(posedge clk);
+    @(negedge clk);
     frame_rate_code=code;reset=0;
     repeat(2) @(posedge clk);
 end
