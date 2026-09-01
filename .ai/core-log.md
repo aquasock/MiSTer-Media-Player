@@ -1,4 +1,4 @@
-## 867 COMMIT Unreleased ??? 2026-09-01T01:55:58-07:00
+## 867 COMMIT Unreleased 22e780a 2026-09-01T01:55:58-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Remove avoidable reserved-output latency from DVD root and chapter hops while hi
 
 #### Outcome:
 
-The user approves one host-only change boundary after the source-`58196d6` physical capture measures root-menu latency at 3.301560 seconds and 26 chapter command-to-barrier intervals from 0.115260 through 1.355978 seconds, with chapter scrambling visible during those otherwise fast transitions.  The normal reserve currently drains media that becomes obsolete as soon as root, previous or next navigation takes effect, while Main does not trigger the FPGA's already installed download-rearm startup blank until the helper barrier completes.  The approved design will let a record already being written finish atomically, discard all later queued normal and priority records at the helper stream boundary, preserve ordinary-playback optical-stall buffering and overlay priority, and move the existing Main download-session rearm to the chapter key press so the resident old frame blacks within the current core before the seek.  No new black overlay protocol, DVD authored-still change, RTL, RBF or Quartus work is authorized.
+Source `44a1cc9` implements the approved host-only boundary and source `22e780a` corrects the generated Main patch's new-file hunk length after the first exact build exposed truncation, making `22e780a` the final build source.  The helper's atomic discard request waits only for a record already being written, drops every later queued normal and priority record, blocks concurrent producers until that boundary completes and reports the discarded byte count; root, previous and next navigation use it while activation and ordinary completion retain the existing exact drain.  Main now lowers and immediately reasserts download at an `N` or `P` key press, leaving the already installed FPGA startup blank active throughout helper seeking and stale-pipe discard, then sends go without a second reset; root and Play navigation retain their prior Main sequencing and the disc-authored ten-second still is unchanged.  The stalled-sink reserve regression passes 100 consecutive runs, preserving the complete active record and new post-discard record while dropping exactly 1,048,647 queued obsolete bytes, and also passes AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer validation.  Strict native helper and capabilities, AC-3 recovery, random access, subpicture, immediate and delayed menu-hop, plus 20 repeated production overlay-priority runs pass.  Both Main patches apply cleanly to pinned upstream `0a8fb44` and the complete Main ARM build succeeds.  The Raspberry Pi GNU 10.2.1 toolchain builds `host/build/MediaPlayer_Helper_NavBlank_22e780a`, a 912,756-byte static stripped ARMv7 EABI5 executable with no dynamic section at SHA-256 `a3c7ae74e5e40394b2931874ec3244bb805350626e3ea5160ba96a78a0ec9b60`, and `host/build/MiSTer_NavBlank_22e780a`, a 1,178,588-byte stripped dynamic ARMv7 EABI5 executable at SHA-256 `48dd016c5d83d8d2dbe8ab93794b01dd58d5dcf4fe424cda3c145b4dc1907ddb`.  RTL, the source-`1bf06db` RBF and Quartus are untouched.
 
 #### Next Steps:
 
-Add an atomic reserve-discard operation with concurrent writer and producer coverage, use it for root, previous and next stream hops while retaining the ordinary drain for other boundaries, and make Main hold the freshly rearmed download session across its existing chapter output-discard loop until helper ready and go.  Require the focused reserve test to prove the active record remains exact, queued obsolete records never escape, a post-discard record remains exact and no stalled-sink deadlock occurs; require Main's patch to apply cleanly and compile with immediate rearm and no second barrier rearm; rerun strict helper, sanitizer, analyzer, overlay, AC-3, random-access and menu-hop regressions; then build exact static ARM helper and Main artifacts locally.  Physical acceptance requires `M` and chapter transitions no slower than source `58196d6`, a near-instant chapter hop where source access permits, black rather than scrambled video until the first clean chapter picture, unchanged responsive arrows and `N` or `P`, reliable Play through the authored ten-second still and no regression in continuous optical-stall recovery.
+Exit MediaPlayer so its helper stops, replace `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_NavBlank_22e780a`, replace `/media/fat/MiSTer` with `host/build/MiSTer_NavBlank_22e780a`, restore executable modes if needed, verify both recorded sizes and hashes, and reboot because Main changed while preserving the source-`1bf06db` RBF.  Exercise repeated `M`, rapid forward and backward chapter runs, selector arrows and Play.  The log must show `navigation reserve discarded` for commands `0x09`, `0x01` and `0x02` plus `chapter startup blank rearmed` for previous and next; acceptance requires root and chapter command-to-barrier timing no slower than source `58196d6`, near-instant chapter changes where the drive permits, black rather than scrambled video until each first clean chapter picture, unchanged selector response, the authored Play still and continuing synchronized playback after aggressive seeking and an optical stall.  Capture a fresh helper/Main log, screenshot and telemetry for physical qualification.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Add an atomic reserve-discard operation with concurrent writer and producer cove
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
