@@ -343,14 +343,14 @@ index 0000000..d828649
 +};
 +static media_transfer_profile transfer_profile = {};
 +static media_burst_state burst_state = {};
++static const uint64_t stream_hop_drain_us = 500000;
++static uint64_t download_release_us = 0;
 +static uint8_t pending_buffer[16384];
 +static uint32_t pending_size = 0, pending_offset = 0;
 +static bool pending_eof = false;
 +static unsigned transfer_events = 0;
 +static const unsigned media_poll_budget_us = 2000;
 +static const unsigned media_poll_step_limit = 8;
-+static const uint64_t stream_hop_drain_us = 500000;
-+static uint64_t download_release_us = 0;
 +
 +
 +static uint64_t monotonic_us()
