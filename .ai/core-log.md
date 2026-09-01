@@ -1,4 +1,4 @@
-## 862 COMMIT Unreleased ??? 2026-08-31T23:11:01-07:00
+## 862 COMMIT Unreleased 1bf06db 2026-08-31T23:11:01-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Correct the two FPGA transport boundaries currently masked by the Main stream-ho
 
 #### Outcome:
 
-The user's repeated chapter-forward and chapter-backward run captures ten software-successful DVD stream hops with complete random-access boundaries at sequence offset zero, intra offset 296 and following-reference offsets between 73,204 and 110,220 bytes, followed by the same hardware failure previously seen on intermittent menu reloads.  The checksum-valid schema-21 fallback snapshot accepts only 13,635 bytes in the new session, records zero sequence, reference, B, display or swap pictures, sees a P-picture before any frame-rate code and latches only phase-one probe error `0x0002`; this confirms that the decoder reset can consume residual pre-hop bytes because its 32 KiB dual-clock input FIFO is not reset at a new `ioctl_download` session.  The separately proven overlay compatibility fault remains an exact one-byte loss from each maximum-size data record, requiring the current helper to submit a second 86,422-byte candidate with duplicated record tails to reconstruct the authored 86,400-byte plane.  The user approves an RBF-only root correction for both boundaries while Main and helper behavior remain frozen.
+The user's repeated chapter-forward and chapter-backward run captures ten software-successful DVD stream hops with complete random-access boundaries followed by the same hardware failure previously seen on intermittent menu reloads: the checksum-valid schema-21 fallback accepts only 13,635 bytes, records zero sequence or picture progress, sees a P-picture before any frame-rate code and latches only phase-one probe error `0x0002`.  Source `1bf06db` now asynchronously clears the 32 KiB mixed-width input FIFO on every download rising edge, stretches that clear in the write domain, relies on the primitive's independent read and write release synchronizers, withdraws both legacy wait and burst readiness until an additional 32 write-clock settle cycles complete, and preserves the rolling accepted-word counter and digest used by Main's verifier.  The same source replaces the physical one-byte-per-maximum-record overlay boundary and its helper compensation requirement with a timing-isolated two-entry retained extractor queue that keeps byte and boundary fields stable, absorbs the transition into DDR backpressure and has no combinational engine-ready path.  Six focused and retained Icarus regressions pass, including stale old-session bytes followed by an exact first new word, a nonuniform 86,400-byte plane across 22 records under sustained DDR stalls, metadata retention, engine write/read and blend, DDR arbitration and schema-21 triggering.  A clean exact-commit Quartus Prime 17.0.2 seed-20 build completes synthesis, fitting, assembly and timing with zero errors; global setup, hold, recovery, removal and minimum-pulse-width slacks are positive at 0.129, 0.245, 3.481, 0.437 and 0.925 nanoseconds, while the dedicated 60 MHz decoder and 54 MHz video checks have 0.831 and 1.753 nanoseconds of setup slack and zero violated paths.  The fit uses 34,752 ALMs, 54,655 registers, 4,187,011 block-memory bits and 70 DSP blocks.  Local `output_files/MediaPlayer_20260831_1bf06db.rbf` is byte-identical to the build-PC result at 4,458,716 bytes and SHA-256 `b315309c8fb72b20d5cf1e690ba36808804bd1549a142b98ea73d121554ba63c`; Main and helper source and binaries remain unchanged.
 
 #### Next Steps:
 
-Reset and re-settle the MPEG input FIFO on every download rising edge, expose not-ready backpressure until asynchronous-clear release has synchronized into both FIFO clock domains, and add a focused regression proving stale queued words cannot cross into a new session or cause loss of its first word.  Replace the one-entry nonelastic overlay output slot with a timing-isolated two-entry retained queue so engine stalls cannot create the physical record-tail shortfall, strengthen the full 86,400-byte multi-record integration regression under sustained DDR stalls, then run the complete relevant Icarus suite and build one timing-clean Quartus RBF from the approved source while leaving Main, helper record generation, navigation semantics, decoder logic and rendering semantics unchanged.
+The user should preserve the installed source-`2de0717` Main and source-`bb3110d` compensated helper, copy only `output_files/MediaPlayer_20260831_1bf06db.rbf` to the MiSTer as a new rollback-safe file, verify its size and SHA-256, and load it.  Restart the disc and exercise at least twenty mixed boundaries using repeated `M`, forward and backward chapter skips, Play through the authored still and return to menu; acceptance requires every completed hop to show moving video without the 800-by-600 `0x0002` diagnostic raster, the authored selector to remain visible and movable, and schema 21 to show the ordinary first 86,400-byte overlay candidate accepted and published before the still-installed oversized compensation candidate is safely rejected.  After that physical proof, remove the no-longer-needed helper compensation in a separate helper-only cleanup and repeat one menu-selector check without changing this RBF or Main.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Reset and re-settle the MPEG input FIFO on every download rising edge, expose no
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
