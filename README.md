@@ -46,7 +46,7 @@ The supported subset is intentionally bounded while the architecture is being pr
 | Audio output | A menu option selects HDMI or S/PDIF. The unused output is muted, because both are fed from one stereo stream |
 | Audio buffering | Packed signed PCM records into an 8,192-frame stereo FPGA FIFO |
 | Frame storage | Retained planar MiSTer DDR3 I/P banks and separate B scratch storage; native all-I overlap uses a bounded three-region ordinary frame queue |
-| Video output | 800x600 progressive diagnostic output, or native 480i for supported interlaced input |
+| Video output | Native 720x480p at 60000/1001 for supported progressive input, or native 720x480i at 30000/1001 for supported interlaced input |
 
 The frozen `rtl/mpeg2fpga/` tree remains historical reference material and is not part of the active Quartus build.
 
@@ -239,7 +239,7 @@ DDR reference/B-scratch storage
 cadence floor + 90 kHz PTS scheduler
           |
           v
-800x600 diagnostic or native 480i video output
+native 720x480p or 720x480i video output
 ```
 
 Raw `.m2v` files bypass Program Stream demux and audio decoding while retaining
