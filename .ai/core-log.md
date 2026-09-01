@@ -1,3 +1,32 @@
+## 845 COMMIT Unreleased 924cb21 2026-08-31T19:59:36-07:00
+
+#### Coming From:
+
+Unreleased 132ee3f
+
+#### Purpose:
+
+Evaluate the Main-only 500 millisecond stream-hop drain diagnostic across the user's repeated physical root-menu reloads without conflating video-hop stability with selector-plane delivery.
+
+#### Outcome:
+
+The user's updated physical capture contains fifteen consecutive `M` root-menu commands, fifteen ready barriers, fifteen chapter-barrier releases and fifteen measured drain intervals tightly bounded from 500,064 through 500,067 microseconds against the 500,000-microsecond target.  Every reload preserves the authored menu video, no schema-21 `0x0200` B-picture presentation failure or fatal transport event occurs, and the final screenshot remains on the correct menu instead of the former black raster, providing strong 15-of-15 evidence for residual pre-hop FIFO bytes as the intermittent video failure.  This does not yet satisfy entry 844's stated twenty-reload threshold, and it is not a clean selector result: the checksum-valid final matrix reports one rejected and zero accepted overlay commits, only 86,379 of 86,400 plane bytes, 10,797 complete DDR words plus three byte lanes, no plane publication and the sticky overlay-engine protocol flag `0x2000`; the Main trace independently sees the helper submit all 86,400 bytes with the expected `c23cad52` FNV-1a, so the absent selector is a separate FPGA-side overlay-delivery failure rather than recurrence of the menu-video fault.
+
+#### Next Steps:
+
+Preserve the working Main drain diagnostic and source-`f5f650f` RBF while treating the black-screen and selector faults independently.  Complete five additional consecutive root-menu reloads to close the predeclared twenty-hop video acceptance boundary, but first use the exact 21-byte physical shortfall and retained extractor handshake to define the smallest RBF diagnostic or correction for the intermittent overlay loss; require a fresh matrix with 86,400 plane bytes, 10,800 DDR words, one accepted and zero rejected commits, one plane publication, no `0x2000` flag and a visibly moving authored selector.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 844 COMMIT Unreleased 924cb21 2026-08-31T19:48:07-07:00
 
 #### Coming From:
@@ -1180,34 +1209,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 805 COMMIT Unreleased 6e44472 2026-08-31T00:16:48-07:00
-
-#### Coming From:
-
-Unreleased 4525ae4
-
-#### Purpose:
-
-Move the expanded MediaPlayer configuration string into exactly one M10K so the timing-clean decoder and video logic no longer displace the HDMI scaler into a failing placement.
-
-#### Outcome:
-
-Source `6e44472` changes only the sole `hps_io` instantiation to enable its existing synchronous `CONF_STR_BRAM` implementation, preserving every configuration byte, selector, status bit, menu label, scaler function, decoder path, clock and fitter seed.  A focused ROM test returns the complete byte sequence with the designed one-cycle latency, the mixed field-order test passes, and the complete native-480i startup, cache, TFF/BFF timing, Bob/Weave, pattern, overlap, PTS, presentation, fingerprint, generation, deadline and cadence suite passes after the user's build-PC reboot interrupted and invalidated the first run.  Exactly one clean Quartus Prime 17.0.2 build from the exact source commit at pinned seed 19 completes successfully using 34,034 of 41,910 ALMs, 52,553 registers, 4,184,067 memory bits in exactly 533 of 553 M10Ks and 67 of 112 DSP blocks, satisfying the user's condition of one and only one additional M10K.  Every timing category is positive with zero setup TNS: setup 0.119 ns, hold 0.246 ns, recovery 3.684 ns, removal 0.587 ns and minimum pulse width 0.925 ns; the 60 MHz decoder and 54 MHz video setup domains are positive 0.533 and 2.673 ns.  The 4,441,756-byte RBF has SHA-256 `5d6fc43700d935edac4e14e2f26895aed33db5fe917dd5092128a5cc18a97c20`, is installed at `/media/fat/MediaPlayer_20260829_b9c2657.rbf`, reproduces the exact hash by readback and is loaded on the MiSTer; hardware menu and playback acceptance remain open.
-
-#### Next Steps:
-
-Open the MiSTer OSD and verify the three requested file actions, 16:9 default, 4:3 choice, Bob/Weave choices and unchanged audio sections.  Launch the physical DVD, confirm unchanged play/pause, advance beyond chapter 2 and then through chapters 8, 11, 15, 17 and 23 without a black screen, legacy 800x600 raster or vertical corruption, and test one Ogg Vorbis file; preserve the helper log and telemetry before accepting entries 803 through 805 as hardware-passed.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
