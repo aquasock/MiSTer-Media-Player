@@ -269,7 +269,7 @@ new file mode 100644
 index 0000000..d828649
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,783 @@
+@@ -0,0 +1,801 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
