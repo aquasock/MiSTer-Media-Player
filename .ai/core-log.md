@@ -1,4 +1,4 @@
-## 856 COMMIT Unreleased ??? 2026-08-31T22:00:52-07:00
+## 856 COMMIT Unreleased 85cda13 2026-08-31T22:00:52-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make authored Play activation enter the existing decoder reset barrier when its 
 
 #### Outcome:
 
-The approved helper-only correction will defer an activation continuation acknowledgment while libdvdnav exposes a finite authored still, leaving Main's existing navigation request pending without changing its executable.  The helper will classify the state immediately after the finite still is skipped: a title exit will invalidate the source boundary and return through the existing ready/go navigation barrier, while a transition that remains in a menu will acknowledge continuation and preserve the resident frame.  An indefinite menu still and a menu continuation that begins producing another menu stream will resolve promptly as continuations, so submenu activation remains interactive.  The source-`2de0717` Main, source-`f5f650f` RBF and accepted authored-selector transport compensation remain unchanged.
+Source `85cda13` introduces an explicit pending result for an activation that still reports menu title zero, discards its stale source boundary but defers the continuation acknowledgment so Main's existing navigation request remains pending through an authored finite still.  At still expiry the source refreshes libdvdnav title state: a title exit invalidates the boundary and enters the existing ready/go decoder barrier, while a transition that remains in a menu acknowledges continuation and preserves the resident frame.  Indefinite stills acknowledge immediately, and a menu payload that appears without a still is acknowledged before processing; an immediate title payload is retained across the barrier by saving its start code.  The strict native helper builds with `-Werror`, the focused transition test proves pending, finite-still hop and finite-still continuation boundaries, the random-access and fragmented-subpicture regressions pass, and the real-image harness now offers a delayed-activation gate requiring menu leave, a second ready event, a post-activation random-access group and subsequent title bytes.  The Raspberry Pi GNU 10.2.1 ARM toolchain builds a 908,660-byte static stripped ARMv7 helper at `host/build/MediaPlayer_Helper_DelayedPlay_85cda13`, SHA-256 `7b4af55c0de6c88a8be110693476c07e4bebf41fd4cd19bdd88cc5e6471392f2`, with authored-selector compensation and no dynamic section.  Main and the source-`f5f650f` RBF are unchanged.
 
 #### Next Steps:
 
-Implement the pending-activation state and post-still classification in the helper and media source, add focused regressions for finite-still title exit, finite-still menu continuation and indefinite/menu-stream continuation, extend the real-image test to recognize a delayed activation barrier, run strict native regressions, and build only an authored-selector helper with the Raspberry Pi ARM toolchain.  Physical acceptance requires Play to hold for its authored duration and then start title video through one clean ready/go barrier while selector movement and menu-continuation behavior remain intact.
+The user should exit MediaPlayer so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_DelayedPlay_85cda13`, restore executable mode if needed and verify the 908,660-byte size and recorded SHA-256.  Preserve the installed source-`2de0717` Main and source-`f5f650f` RBF, restart the disc, enter the root menu, leave Play selected and press Space once; wait through the authored ten-second still.  Physical acceptance requires a pending activation followed by menu leave, one clean ready/go barrier and moving title video, then a return to the menu with the authored selector still visible and movable.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Implement the pending-activation state and post-still classification in the help
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
