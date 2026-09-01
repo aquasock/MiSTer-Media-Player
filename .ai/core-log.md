@@ -1,3 +1,36 @@
+## 867 COMMIT Unreleased ??? 2026-09-01T01:55:58-07:00
+
+#### Coming From:
+
+Unreleased 58196d6
+
+#### Purpose:
+
+Remove avoidable reserved-output latency from DVD root and chapter hops while hiding any irreducible chapter transition behind the existing clean-start blank.
+
+#### Outcome:
+
+The user approves one host-only change boundary after the source-`58196d6` physical capture measures root-menu latency at 3.301560 seconds and 26 chapter command-to-barrier intervals from 0.115260 through 1.355978 seconds, with chapter scrambling visible during those otherwise fast transitions.  The normal reserve currently drains media that becomes obsolete as soon as root, previous or next navigation takes effect, while Main does not trigger the FPGA's already installed download-rearm startup blank until the helper barrier completes.  The approved design will let a record already being written finish atomically, discard all later queued normal and priority records at the helper stream boundary, preserve ordinary-playback optical-stall buffering and overlay priority, and move the existing Main download-session rearm to the chapter key press so the resident old frame blacks within the current core before the seek.  No new black overlay protocol, DVD authored-still change, RTL, RBF or Quartus work is authorized.
+
+#### Next Steps:
+
+Add an atomic reserve-discard operation with concurrent writer and producer coverage, use it for root, previous and next stream hops while retaining the ordinary drain for other boundaries, and make Main hold the freshly rearmed download session across its existing chapter output-discard loop until helper ready and go.  Require the focused reserve test to prove the active record remains exact, queued obsolete records never escape, a post-discard record remains exact and no stalled-sink deadlock occurs; require Main's patch to apply cleanly and compile with immediate rearm and no second barrier rearm; rerun strict helper, sanitizer, analyzer, overlay, AC-3, random-access and menu-hop regressions; then build exact static ARM helper and Main artifacts locally.  Physical acceptance requires `M` and chapter transitions no slower than source `58196d6`, a near-instant chapter hop where source access permits, black rather than scrambled video until the first clean chapter picture, unchanged responsive arrows and `N` or `P`, reliable Play through the authored ten-second still and no regression in continuous optical-stall recovery.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- host/arm/output_reserve.c
+- host/arm/output_reserve.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_output_reserve.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 866 COMMIT Unreleased 58196d6 2026-09-01T01:42:17-07:00
 
 #### Coming From:
@@ -1154,38 +1187,6 @@ Keep the accepted helper, Main and seed-20 RBF installed until the next boundary
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 827 COMMIT Unreleased 673b6d7 2026-08-31T10:20:37-07:00
-
-#### Coming From:
-
-Unreleased 3e4f54c
-
-#### Purpose:
-
-Prove the exact DVD highlight style and selected-region plane indices emitted by the helper before considering any FPGA or RBF change.
-
-#### Outcome:
-
-The user approved and source `673b6d7` implements the helper-only observability boundary after the physical menu regressed from sparse distorted selection pixels to no visible indicator.  Independent absolute-path FTP readback first proved the installed artifacts were exactly the intended 904,564-byte source-`3e4f54c` helper at SHA-256 `c4c47141205c99ade8a9ed266574beb9d072dce827d508efbff47694bb2ce197`, the 1,174,492-byte source-`53ccc04` Main at `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496`, and the unchanged 4,511,756-byte seed-20 RBF at `02928bff70b25eb0e0b1a6b8f24afec0dfe687f2524754b33fe13f4ed3014e9d`.  Every successfully emitted overlay configuration or style record now reports its visible and menu flags, inclusive highlight rectangle, four decoded RGBA entries, exact two-bit plane-index histogram inside the selected rectangle, total selected pixels and the subset whose mapped highlight alpha is nonzero; the transport bytes, decoder, scheduler, menu selection and overlay behavior are unchanged.  The strict focused subpicture test proves the exact `0,2,2,0` histogram plus invalid-bound and persistence cases, and the existing random-access and menu-hop regressions pass.  The complete native helper compiles and its capability smoke test passes after demoting only the pinned DVD headers' pre-existing ignored-`gcc_struct` attribute warning on the local AArch64 GCC 15 host; no authorized non-archived DVD image is locally available for the real-menu harness.  An exact detached build-PC checkout of `673b6d7819a666b3b3387be3b594085ff6776b12` builds only `/home/vash/MiSTer-Media-Player-673b6d7/host/build/MediaPlayer_Helper`, a 908,660-byte stripped static ARMv7 hard-float executable with no dynamic section at SHA-256 `e0960b0fb2dcd95cb7c759803ba5e3c6a873a8feb57c5e9ab2c1e23e8af36050`; Main, RTL, QSF, RBF and Quartus remain untouched.
-
-#### Next Steps:
-
-Exit the MediaPlayer core or otherwise stop its running helper, replace only `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-673b6d7/host/build/MediaPlayer_Helper` from the build PC, restore executable permission if needed, and verify the destination SHA-256 is `e0960b0fb2dcd95cb7c759803ba5e3c6a873a8feb57c5e9ab2c1e23e8af36050`.  Restart the physical DVD, reach the menu, move the selected item at least once and capture a fresh helper log containing the new `DVD overlay record=` lines; the emitted style is capable of drawing a marker only when it reports `visible=1`, at least one nonzero-alpha RGBA entry maps to a populated histogram bin, and `selected_nontransparent_pixels` is nonzero.  Preserve Main and the seed-20 RBF because this result will decide whether the missing indicator originates before or after FPGA overlay composition.
-
-#### Files Modified:
-
-- host/arm/dvd_spu.c
-- host/arm/dvd_spu.h
-- host/arm/media_player_helper.c
-- tools/test_dvd_spu.c
 
 #### Status:
 
