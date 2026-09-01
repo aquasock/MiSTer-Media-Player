@@ -1,3 +1,32 @@
+## 842 COMMIT Unreleased ??? 2026-08-31T19:40:09-07:00
+
+#### Coming From:
+
+Unreleased 3c68242
+
+#### Purpose:
+
+Test whether residual pre-hop bytes in the FPGA input FIFO cause the intermittent root-menu B-picture presentation failure without rebuilding the RBF.
+
+#### Outcome:
+
+The user approves a Main-only diagnostic after one physical session completes repeated root-menu reloads before a later identical hop fails with only `0x0200`; the failing reset session accepts 18,937 bytes, recognizes a B picture at temporal reference ten while frame-rate code remains zero, and therefore reaches a picture header before parsing the new sequence header.  The helper reports the same valid sequence, intra and following-reference boundary on the successful and failing menu-to-menu hops, while static inspection proves that each `ioctl_download` rising edge resets the MPEG decoder but leaves the 32 KiB dual-clock input FIFO intact until a full core reset.  This boundary will retain the helper, RBF and submitted stream bytes, add a logged 500 millisecond download-off drain interval before Main rearms each chapter or menu stream hop, and determine whether residual FIFO occupancy is the causal state difference.
+
+#### Next Steps:
+
+Implement the bounded delay in the pinned Main loader patch, exercise a focused native timing test where practical, build and verify one uniquely named ARM Main from the exact source commit, then preserve the installed helper and source-`f5f650f` RBF while manually replacing only Main and rebooting.  Hardware acceptance requires at least twenty consecutive `M` root-menu reloads without the schema-21 `0x0200` raster, with each log recording a download-off interval of at least 500 milliseconds; any recurrence rejects the drain hypothesis and returns to exact scheduler-source instrumentation.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 841 COMMIT Unreleased f5f650f 2026-08-31T19:20:09-07:00
 
 #### Coming From:
@@ -1189,35 +1218,6 @@ Proceed with entry 804's separately approved mixed film/interlaced native-480i s
 - host/arm/media_player_protocol.h
 - host/build_arm_stack.sh
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 802 COMMIT Unreleased 6de2778 2026-08-30T22:43:15-07:00
-
-#### Coming From:
-
-Unreleased 6de2778
-
-#### Purpose:
-
-Reject the first source-`6de2778` hardware control gate and isolate the chapter-three black-screen exit from the reported legacy-raster chapter starts.
-
-#### Outcome:
-
-The user confirms that play/pause now works correctly, but advancing from chapter 2 to chapter 3 leaves a black screen, and reports that earlier successful navigation made chapters 8, 11, 15, 17 and 23 render through the old 800x600 diagnostic raster with vertical downward corruption.  The live 708,865-byte helper log `/tmp/entry802_chapter2_black_arm_helper.log`, SHA-256 `74362cec8a0a54ea6938cf416e32479d83eaef36a490be8eed20ee096d1ac234`, proves that Main submits the next-chapter command, releases download, discards old bytes, and completes the helper ready/go barrier; libdvdnav reports current chapter 2, target chapter 3 of 24 and refills the direct-device ring to 4 MiB in 169,671 microseconds, but liba52 then reports `undecodable AC-3 block`, the helper closes stdout and exits with code 1, and Main completes the session after only 20,463,192 submitted bytes.  The 20,481-byte 1440x1080 scaled screenshot `/tmp/entry802_chapter2_black.png`, SHA-256 `bf55329fbfae9db50343401f8974a0b98bd19c53f39be228fa969159f26da000`, is completely black.  The same log shows a separate deterministic track-selection defect: initial playback chooses AC-3 substream `0x80`, while the chapter-one-to-two jump chooses `0x81` because the reset forgets the established track and reclaims whichever private substream arrives first.  Read-only FFprobe analysis of the matching build-PC title confirms three valid AC-3 tracks, finds `0x81` before `0x80` at the chapter-two boundary, and decodes all tracks in chapters 1 through 3 without error, localizing the fatal block to helper chapter-start synchronization rather than damaged authored audio.  The exact five reported legacy-raster chapters independently share a second signature absent from adjacent chapters: each starts with an interlaced I-picture and immediately continues with progressive film P and B pictures.  The FPGA native-field-order tracker explicitly rejects such mixed film/interlaced sessions by latching mismatch and withdrawing native 480i, which selects the 800x600 fallback; correcting that behavior requires an RBF boundary.  This rejects chapter navigation beyond chapter 2 while accepting the new play/pause binding, and changes no repository source, installed file, Main, helper, RBF, FPGA configuration, media, playback option or running process during collection.
-
-#### Next Steps:
-
-Stop the source-`6de2778` acceptance cycle and obtain approval for a revised two-boundary plan.  First make a helper-only correction that retains the established audio substream across chapter changes, resynchronizes cleanly at the first complete access unit and treats a bad candidate frame as a bounded resynchronization event rather than terminating otherwise valid playback; prove deterministic chapter-one-through-three control, all three authored AC-3 track boundaries, HDMI decode and S/PDIF passthrough without changing Main or the RBF.  Separately, after explicit RBF authorization, extend native field-order ownership to this observed mixed film/interlaced frame-picture sequence without accepting field pictures or weakening decoder error gates, run focused mixed-mode and complete native-480i simulations, perform one clean seed-19 Quartus build with full timing and resource gates, then hardware-test chapters 8, 11, 15, 17 and 23 for stable native output and clean telemetry.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
