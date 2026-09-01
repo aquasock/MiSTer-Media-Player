@@ -1,3 +1,35 @@
+## 865 COMMIT Unreleased ??? 2026-09-01T01:20:13-07:00
+
+#### Coming From:
+
+Unreleased 5ae655a
+
+#### Purpose:
+
+Preserve the physical-DVD output reserve while allowing menu overlay changes to bypass its multi-second normal-media backlog at complete record boundaries.
+
+#### Outcome:
+
+The user's physical source-`5ae655a` capture proves that the four-megabyte output reserve is active and leaves chapter `N` and `P` transitions as responsive as before, but rejects the current FIFO ordering for interactive menu use.  The helper handles Right at approximately 19.155498 seconds while Main receives the corresponding selector style at 24.194433 seconds, a 5.038935-second delay, then handles Left at approximately 26.065074 seconds while Main receives that style at 31.576002 seconds, a 5.510928-second delay.  Main submits Activate at 34.250141 seconds and the helper processes it by approximately 34.332884 seconds, proving that keyboard delivery, the control socket and libdvdnav remain responsive while the generated in-band overlay waits behind queued A/V.  This proposal will retain the bounded reserve for optical stalls but preserve producer write boundaries and add a FIFO priority lane for complete DVD overlay records, so a selector change can pass after the one normal record already being written without splitting PCM or other framed output; Main, RTL, the source-`1bf06db` RBF and Quartus will remain untouched.
+
+#### Next Steps:
+
+Make the reserve track complete producer writes, add bounded FIFO priority storage serviced between normal records, assemble each overlay header and payload into one priority write, and retain exact normal ordering, capacity backpressure, drain, shutdown and writer-error behavior.  Extend the stalled-sink regression to prove that an urgent overlay overtakes a multi-megabyte normal backlog only at an intact record boundary and that all normal and priority bytes remain exact, rerun the strict native helper and retained protocol regressions, then build a uniquely named static ARMv7 helper locally for immediate selector movement plus repeated rapid chapter switching and continuous-play validation.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- host/arm/output_reserve.c
+- host/arm/output_reserve.h
+- tools/test_output_reserve.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 864 COMMIT Unreleased 5ae655a 2026-09-01T01:03:21-07:00
 
 #### Coming From:
@@ -1149,35 +1181,6 @@ The fresh physical Coming to America run reaches and continuously renders the ro
 #### Next Steps:
 
 Keep the running menu, helper, Main and frozen seed-20 RBF unchanged until the installed helper, Main and RBF hashes are independently read back.  After user approval, make a helper-only observability change that logs each emitted overlay configuration or style record together with visibility, menu flag, rectangle, decoded highlight RGBA values and selected-region plane-index histogram, then require the physical disc to prove nonzero selected pixels and a nontransparent emitted style before considering any RTL or RBF change; preserve the current root-hop filter and ignore the separately identified one-second no-progress false trigger for this boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 825 COMMIT Unreleased 3e4f54c 2026-08-31T09:12:37-07:00
-
-#### Coming From:
-
-Unreleased 3e4f54c
-
-#### Purpose:
-
-Determine whether the repeated physical-disc root-menu black screen qualifies the source-`3e4f54c` random-access correction.
-
-#### Outcome:
-
-The repeated test does not exercise source `3e4f54c`.  Absolute-path FTP readback shows that `/media/fat/linux/MediaPlayer_Helper` remains the 904,564-byte source-`53ccc04` helper at SHA-256 `29665e7dbe7790872988d0f0d05e26487f95550128f6719f148fab2d1114c09f`, rather than the newly built 904,564-byte source-`3e4f54c` helper at `c4c47141205c99ade8a9ed266574beb9d072dce827d508efbff47694bb2ce197`; the installed 1,174,492-byte Main remains the intended source-`53ccc04` executable at `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496`.  The 7,126,742-byte matching helper log `/tmp/entry825_root_menu_black_arm_helper.log`, SHA-256 `c5914545ef52c3eda200d93215c682cb0f40adf2d0cc905d52e399eb111be895`, independently identifies the old code by printing `DVD random access discarded 0 leading B picture(s)` at startup and after the successful zero-tail root hop instead of the candidate's sequence, intra and following-reference offsets.  The 4,809-byte grayscale capture `/tmp/entry825_root_menu_black.png`, SHA-256 `1c64413772575d21111b51ba9e8f14363179d012e6d97188422f161bb86caa02`, contains all 64 schema-20 prefixes, row indices and parity bits with matching checksum `9e4824d8`; it records 24,625 accepted bytes, 12,305,210 decoder clocks, zero completed or displayed pictures and exactly error `0x0200`, the B-picture presentation failure, on a B-picture header at temporal reference 12.  This black-screen result is valid evidence for the still-installed predecessor but neither accepts nor rejects the source-`3e4f54c` helper, and no source, Main, RBF or target configuration is changed during collection.
-
-#### Next Steps:
-
-Exit the MediaPlayer core or otherwise stop its running helper, obtain only `/home/vash/MiSTer-Media-Player-3e4f54c/host/build/MediaPlayer_Helper` from the build PC, verify its local SHA-256 is `c4c47141205c99ade8a9ed266574beb9d072dce827d508efbff47694bb2ce197`, and replace `/media/fat/linux/MediaPlayer_Helper`; if FileZilla refuses overwrite, delete that exact destination after the core has exited and upload the candidate under the exact same name.  Restore executable permission if needed, then require an independent destination readback matching the candidate hash before repeating the physical-disc `M` test; do not replace Main or the frozen seed-20 RBF.
 
 #### Files Modified:
 
