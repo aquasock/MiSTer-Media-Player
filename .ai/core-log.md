@@ -1,4 +1,4 @@
-## 874 COMMIT Unreleased ??? 2026-09-01T07:09:16-07:00
+## 874 COMMIT Unreleased 5f00e35 2026-09-01T07:09:16-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Restore the known seed-23 placement for the synchronized audio-interface source 
 
 #### Outcome:
 
-The approved correction will retain the explicit three-stage `clk_mpeg2`-to-`clk_video` startup-blank synchronizer and its first-stage-only exception from source `f0fba4d`, replace the cancelled slow seed-24 placement with seed 23, and rebuild from an exact clean source checkout on build PC `10.10.0.42`.  Seed 23 is the last known placement to route this design promptly and already met every clock domain before the unsynchronized audio-interface level was introduced; the structural crossing rather than placement caused its prior negative 7.142-nanosecond result.  Focused audio-interface and DDR-arbiter regressions will precede one clean Quartus synthesis, fit, assembly and timing gate, with no RBF collected unless global setup, hold, recovery, removal and minimum-pulse-width margins plus dedicated decoder and video checks are all positive.
+Source `5f00e35` restores seed 23 while retaining the source-`f0fba4d` three-stage audio-startup blank synchronizer and its resolved first-stage-only timing exception.  The exact source matches on Raspberry Pi and build PC `10.10.0.42`; the focused audio-interface regression reconstructs all 64,800 DDR words and one safe commit, and the retained DDR-arbiter priority and response-ownership regression passes.  Quartus Prime 17.0.2 completes synthesis in 3 minutes 11 seconds, fitting in 11 minutes 45 seconds, assembly and the full timing gate with zero errors.  Global setup, hold, recovery, removal and minimum-pulse-width slacks are positive at 0.110, 0.124, 4.037, 0.597 and 0.925 nanoseconds; dedicated 60 MHz decoder and 54 MHz video setup slacks are 0.689 and 2.528 nanoseconds with no violations.  The fit uses 34,837 ALMs, 54,693 registers, 4,187,011 block-memory bits in 535 RAM blocks and 70 DSP blocks.  The byte-identical local and build-PC artifact `output_files/MediaPlayer_20260901_5f00e35.rbf` is 4,462,772 bytes at SHA-256 `74a529213b4dfdcb4f2784f9c21129d625743d489315c211058f20e61da6603a`; the matching 916,852-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_AudioUI_5f00e35` has SHA-256 `5de3178711e7893d23ad75e22f1ef19a7905454bf48fc71c9bf98a95db6977a4`.
 
 #### Next Steps:
 
-Change only the fitter seed back to 23, commit and push the exact source, pull it on the build PC, rerun the focused SystemVerilog tests and perform one clean full build.  If timing passes, preserve a uniquely named RBF and the matching ARM helper locally with verified hashes for user transfer; if timing fails, stop and report the exact remaining path rather than reseeding.
+Exit MediaPlayer so the running helper releases its executable, transfer `host/build/MediaPlayer_Helper_AudioUI_5f00e35` as `/media/fat/linux/MediaPlayer_Helper`, preserve executable mode, and upload `output_files/MediaPlayer_20260901_5f00e35.rbf` as a new core file while retaining the accepted source-`add7d00` rollback.  Test standalone MP3, WAV, FLAC and Ogg Vorbis playback for uninterrupted audio, stable native 720-by-480 output, the reserved album-art viewport, static controls and once-per-second activity motion; then retest a known-good progressive MPG and physical DVD menu before reporting acceptance or collecting a fresh helper/Main log, screenshot and telemetry for any failure.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Change only the fitter seed back to 23, commit and push the exact source, pull i
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
