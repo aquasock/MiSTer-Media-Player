@@ -1,3 +1,32 @@
+## 843 COMMIT Unreleased ??? 2026-08-31T19:45:27-07:00
+
+#### Coming From:
+
+Unreleased 64f5156
+
+#### Purpose:
+
+Restore clean applicability of the pinned Main patch stack without changing the approved stream-hop drain experiment.
+
+#### Outcome:
+
+The exact source-`64f5156` Main build stops before compilation because the following overlay-trace patch retains context around the original transfer-profile declarations and the first patch inserted the new drain constants inside that context.  No compiler, link, binary or target result is produced.  The correction will only relocate those two declarations ahead of the retained context, preserving the same 500 millisecond behavior, log format, helper, RBF and submitted bytes while allowing both pinned patches to apply in their established order.
+
+#### Next Steps:
+
+Commit the context-only patch-stack correction, rebuild Main from its exact source commit on build PC `10.10.0.42`, verify the resulting ARM executable and diagnostic marker, and then return to entry 842's unchanged twenty-hop physical acceptance test.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 842 COMMIT Unreleased 64f5156 2026-08-31T19:40:09-07:00
 
 #### Coming From:
@@ -1182,46 +1211,6 @@ Keep the accepted RBF installed and do not deploy this timing-failed artifact.  
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 803 COMMIT Unreleased de29d54 2026-08-30T22:48:28-07:00
-
-#### Coming From:
-
-Unreleased 6de2778
-
-#### Purpose:
-
-Correct host-side chapter audio recovery and reorganize the MediaPlayer menu with functional Ogg Vorbis playback before the separately approved FPGA mixed-mode boundary.
-
-#### Outcome:
-
-Source `de29d54` reorganizes the core menu into separate DVD-Video, MPEG-2 and consumer-audio selectors, makes 16:9 the default aspect ratio, preserves the existing Bob/Weave and audio choices, teaches the pinned Main selector about `.flac`, `.mpeg` and `.ogg`, and adds functional Ogg Vorbis decode through pinned stb_vorbis source.  Chapter resets now retain the established Program Stream codec and AC-3 or DTS private substream; HDMI AC-3 decoding scans forward at most 64 KiB and rebuilds liba52 after a rejected boundary candidate instead of terminating.  Native WAV, MP3, FLAC and 44.1/48 kHz Ogg tests are deterministic, an intentionally damaged AC-3 Program Stream resynchronizes and completes, and the exact Coming Toamerica DVD folder passes chapter 1 to 2 and 2 to 3 with substream `0x80` retained and bounded recovery logged at both barriers.  Exact source builds reproduce a 896,372-byte static ARM helper at SHA-256 `156917b7a165905f3cc73adf995886d05fc3f60aa301a4a31574f36ac0b06202` and a 1,174,492-byte Main at SHA-256 `d91b570057d6cf314f5f98d7d637a8607f59fe5b61a193a40e6a615a6bab8c98`; both are directly installed without backups, independently read back, mode 755, and a verified reboot activates Main.  The installed RBF remains unchanged, so the new menu and mixed native-video behavior are not yet active and hardware playback acceptance remains open.
-
-#### Next Steps:
-
-Proceed with entry 804's separately approved mixed film/interlaced native-480i source and seed-19 FPGA boundary so one readback-verified RBF activates both the new menu and the presentation correction.  Hardware acceptance must then confirm chapter navigation beyond chapter 2, stable native presentation at chapters 8, 11, 15, 17 and 23, unchanged play/pause, correct 16:9 default and selector layout, and functional Ogg playback; capture the helper log and telemetry before settling either entry as passed.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sv
-- README.md
-- docs/BUILDING.md
-- host/arm/ARCHITECTURE.md
-- host/arm/Makefile
-- host/arm/consumer_audio.c
-- host/arm/consumer_audio.h
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/build_arm_stack.sh
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
