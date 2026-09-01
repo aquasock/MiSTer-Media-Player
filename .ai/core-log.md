@@ -1,3 +1,32 @@
+## 869 COMMIT Unreleased 22e780a 2026-09-01T02:39:54-07:00
+
+#### Coming From:
+
+Unreleased 22e780a
+
+#### Purpose:
+
+Close the accepted chapter-transition masking limitation and localize the missing Scene Selection menu background after activation from the root menu.
+
+#### Outcome:
+
+The user explicitly accepts the remaining visible chapter scramble as a closed known limitation and preserves the source-`22e780a` Main/helper with the source-`1bf06db` RBF.  A fresh reboot-to-root-menu run then moves correctly through all four root buttons and successfully activates Scene Selection, but the screenshot retains the old root-menu background behind the new upper selection rectangle and the remaining video naturally drains and freezes after approximately one or two seconds.  The 1,111,768-byte log at SHA-256 `2645d8dafd7c361e19b672ba02d8b453b2b1fa19dcac52a1334f53385074249d` proves activation command `0x08` succeeds on button four, enters the pending same-title-zero path, consumes 249 post-activation payload start codes with a PTS discontinuity, receives a new SPU stream and complete new menu overlay, then reaches an authored indefinite still and incorrectly sends `MENU_CONTINUE`; Main consequently logs `DVD menu continuation preserved resident frame` instead of performing a decoder barrier.  The helper source reaches the indefinite still at 22.322828 seconds while its four-megabyte reserve continues feeding queued bytes until 27.203381 seconds, explaining the short additional motion and subsequent non-crash freeze.  The 686,552-byte screenshot at SHA-256 `a2df586866caaafb9f378dd8ea3c81206f273a637bb18c0e4395391a5c8965f6` visibly confirms the stale base frame and new upper selector, while checksum-valid schema-21 telemetry at SHA-256 `2ee40370dcb3f010c68434bcc36e5256ff14ee4893c8411750dff87e0df54ad7` proves the second 86,400-byte plane received all 22 data records, accepted one commit, published one plane and has no decoder error flags.  The fault is therefore helper-side deferred-activation classification and old-reserve ownership, not DVD button navigation, the overlay pipeline, FPGA rendering or a decoder crash.
+
+#### Next Steps:
+
+After user approval, preserve Main and the RBF and add a bounded helper-side activation transaction that separates all post-activation output from the pre-activation reserve while libdvdnav exposes the destination.  An indefinite still reached after destination payload must discard only stale pre-activation reserve data, enter the existing ready/go stream-hop barrier and release the staged clean destination menu after rearm; a no-payload indefinite still must retain the resident-frame continuation, while finite-still Play must release its staged transition normally and keep the pending activation alive for the later title hop.  Add focused reserve and menu-navigation regressions for all three paths, rerun AC-3, random-access, subpicture and overlay-priority validation, then build only a new helper locally for physical Scene Selection, Play and root-return testing.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 868 COMMIT Unreleased 22e780a 2026-09-01T02:27:02-07:00
 
 #### Coming From:
@@ -1158,35 +1187,6 @@ Exit the MediaPlayer core or otherwise stop its running helper, then replace onl
 #### Files Modified:
 
 - host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 829 COMMIT Unreleased 673b6d7 2026-08-31T11:01:48-07:00
-
-#### Coming From:
-
-Unreleased 673b6d7
-
-#### Purpose:
-
-Exhaust non-RBF methods for isolating the missing authored-menu selection after the helper proves it emits drawable pixels.
-
-#### Outcome:
-
-Read-only history comparison proves the installed seed-20 source-`a9899e0` overlay RTL, in-band extractor, DDR arbiter and top-level wiring are byte-identical to source `673b6d7`, so current-source simulation is representative of the installed logic.  On the build PC, all three existing exact-source simulations pass for bounded in-band extraction and backpressure, DDR arbitration and response ownership, and plane write/read plus normal and highlight blending.  The existing engine bench holds horizontal and vertical position at zero, so a temporary untracked bench additionally drives two complete 858-by-525 timing rasters, uses the physical button-four rectangle from `439,389` through `574,436`, refills every two-line cache entry through the DDR model and measures the second frame; it renders all 6,528 expected opaque highlight pixels with zero wrong pixels and no protocol error.  This rules out a deterministic coordinate, two-bit packing, palette selection, bottom-raster row-cache or blend defect under an idle DDR model, but it does not reproduce live decoder contention or prove that the hardware receives the helper's records.  No repository source, installed helper, Main, RBF or target file is changed, and the temporary simulation does not generate a bitstream.
-
-#### Next Steps:
-
-Prefer one helper-only discriminator before modifying the RBF: build a reversible diagnostic helper that preserves the existing transport framing while dumping each distinct real menu plane for exact software replay and substituting a known all-index-one plane with transparent normal color and an unmistakable opaque highlight color, producing a solid rectangle only inside the authored selection coordinates.  If the rectangle appears, the failure is in the real plane data or its hardware delivery pattern; if it remains absent, capture or instrument Main's helper-to-ioctl byte forwarding next, and only after both software endpoints prove the exact records should FPGA-internal counters or another RBF be required.  Preserve the current Main and seed-20 RBF throughout this helper-only test.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
