@@ -1,3 +1,32 @@
+## 872 COMMIT Unreleased add7d00 2026-09-01T04:57:47-07:00
+
+#### Coming From:
+
+Unreleased add7d00
+
+#### Purpose:
+
+Record physical acceptance of native progressive presentation while confirming that the retained DVD path remains unchanged.
+
+#### Outcome:
+
+The user physically accepts source `add7d00` and its 4,478,208-byte `MediaPlayer_20260901_add7d00.rbf`: progressive MPG files play well through the new native 720-by-480p path and DVD playback behaves the same as before, closing the removal of the 800-by-600 presentation mode.  The collected 1,793,035-byte Main/helper log at SHA-256 `14ecb520c5d8d6f845e5b7ba12febbbde66a74fc80d5c51bb9c511d0d8931eed` independently confirms a complete physical-DVD run with successful root-menu entry, right and left navigation across all four buttons, activation, the authored finite still, staged destination output, delayed stream hop, post-hop random access and one complete 22-record, 86,400-byte overlay at zero order errors, with no transport fault, fatal event, unsupported-stream report or decoder error.  The 566,331-byte 1,920-by-1,080 screenshot at SHA-256 `ac586df0d0ca936ceb208f4a4e08927ff89169f54dd67d6c70eaeb75746b6691` shows stable displayed video, and the 818-byte schema-21 snapshot at SHA-256 `f268ca46da9cd93f4cc02a06bac18b8c9a277937844acaf7451610a1d5277329` passes all 64 prefixes, row indices and parity bits with checksum `36a563a4` matching word 63.
+
+#### Next Steps:
+
+Preserve source `add7d00`, the accepted RBF and the existing Main/helper as the hardware baseline.  Prepare showcase media as progressive 720-by-480 4:2:0 MPEG-2 Program Streams at the source-appropriate supported rate from 24000/1001 through 30 frames per second, with I, P and B pictures and 48 kHz stereo MPEG Layer II audio; begin a new development cycle only when a reproducible unsupported stream or separate requested feature provides the next boundary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 871 COMMIT Unreleased add7d00 2026-09-01T03:23:04-07:00
 
 #### Coming From:
@@ -1179,36 +1208,6 @@ Do not modify the helper or Main again for this fault because the source-`0e89c7
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 832 COMMIT Unreleased 0e89c73 2026-08-31T14:59:02-07:00
-
-#### Coming From:
-
-Unreleased f515341
-
-#### Purpose:
-
-Prove whether Main submits each complete helper-generated DVD overlay record to successful FPGA ioctl transfers without changing the submitted stream or the RBF.
-
-#### Outcome:
-
-The user approves and source `0e89c73` implements the Main-only observability boundary after the known opaque helper probe produces two complete synthetic overlay frames and 152 moving style records but the physical menu displays no magenta pixels.  A second patch against pinned Main source `0a8fb44` adds a bounded streaming verifier after, and only after, each successful `user_io_file_tx_data_step` consumption so it observes the exact byte sequence Main reports as submitted while leaving its contents, chunking, credit protocol, pacing and control behavior unchanged.  The verifier recognizes overlay markers and declared lengths across arbitrary pipe and ioctl boundaries, retains only bounded configuration and style state, validates frame command order, counts data records and bytes, calculates FNV-1a over the submitted plane, counts non-`0x55` probe bytes, suppresses repeated identical style logs, and reports changed selections plus every commit and session summary.  A focused build of the exact patched header with C++11 strict warnings passes when every byte is fed separately and again in 37-byte chunks, recognizing the complete 22-record, 86,400-byte probe at FNV-1a `f8555d45`, rejecting a one-byte corruption, zero and oversized lengths, data and commit before config, an interrupted frame, an unknown command and a repeated style.  Both Main patches apply cleanly in order and the complete exact-source ARM Main build succeeds with MiSTer's GNU 10.2 toolchain.  `/home/vash/MiSTer-Media-Player-0e89c73/host/build/MiSTer_OverlayTrace` is a 1,178,588-byte stripped dynamically linked ARMv7 EABI5 hard-float executable at SHA-256 `872050d44266d74c28e302a54336f409426fbca235ce3384c3b1735eb1aa6356` and contains the required commit and summary markers.  The helper, kernel, ioctl implementation, FPGA source, QSF and seed-20 RBF remain untouched.
-
-#### Next Steps:
-
-Replace only `/media/fat/MiSTer` with `/home/vash/MiSTer-Media-Player-0e89c73/host/build/MiSTer_OverlayTrace` from the build PC, preserving the currently installed diagnostic helper and seed-20 RBF, verify the 1,178,588-byte destination and SHA-256 `872050d44266d74c28e302a54336f409426fbca235ce3384c3b1735eb1aa6356`, restore executable permission if needed, and perform a normal MiSTer reboot because Main changes.  Restart the physical DVD, enter the root menu, move through several buttons and capture the fresh `/tmp/MediaPlayer_ARM.log` plus screenshot.  A decisive successful submission has `overlay_submit config` with `probe_payload=1`, `overlay_submit commit` with 22 data records, 86,400 data bytes, FNV-1a `f8555d45`, zero non-`0x55` bytes, zero order errors and `probe_complete=1`, followed by moving style rectangles; if those exact lines coexist with no magenta rectangle, userspace Main is cleared and the remaining boundary is kernel-to-FPGA delivery or live FPGA processing.
-
-#### Files Modified:
-
-- host/build_arm_stack.sh
-- host/main_mister/0002-mediaplayer-overlay-trace.patch
 
 #### Status:
 
