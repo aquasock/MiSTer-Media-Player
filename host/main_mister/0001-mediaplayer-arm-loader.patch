@@ -269,7 +269,7 @@ new file mode 100644
 index 0000000..d828649
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,783 @@
+@@ -0,0 +1,811 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -349,6 +349,8 @@ index 0000000..d828649
 +static unsigned transfer_events = 0;
 +static const unsigned media_poll_budget_us = 2000;
 +static const unsigned media_poll_step_limit = 8;
++static const uint64_t stream_hop_drain_us = 500000;
++static uint64_t download_release_us = 0;
 +
 +
 +static uint64_t monotonic_us()
@@ -356,6 +358,26 @@ index 0000000..d828649
 +	struct timespec now;
 +	if (clock_gettime(CLOCK_MONOTONIC, &now)) return 0;
 +	return (uint64_t)now.tv_sec * 1000000ull + (uint64_t)(now.tv_nsec / 1000);
++}
++static void diagnostic_write(const char *format, ...);
++
++static void wait_stream_hop_drain()
++{
++	const uint64_t release_us = download_release_us ?
++	                            download_release_us : monotonic_us();
++	uint64_t elapsed_us;
++
++	for (;;)
++	{
++		elapsed_us = monotonic_us() - release_us;
++		if (elapsed_us >= stream_hop_drain_us) break;
++		uint64_t remaining_us = stream_hop_drain_us - elapsed_us;
++		if (remaining_us > 100000) remaining_us = 100000;
++		(void)usleep((useconds_t)remaining_us);
++	}
++	diagnostic_write("stream hop drain release_to_rearm_us=%llu target_us=%llu\n",
++	                 (unsigned long long)elapsed_us,
++	                 (unsigned long long)stream_hop_drain_us);
 +}
 +
 +static void diagnostic_write(const char *format, ...)
@@ -445,6 +467,7 @@ index 0000000..d828649
 +	would_block_events = 0;
 +	session_start_us = monotonic_us();
 +	download_assert_us = 0;
++	download_release_us = 0;
 +	first_byte_seen = 0;
 +	transfer_profile = {};
 +	diagnostic_write("start source=%s index=%u core=%s alternate=%s\n",
@@ -510,6 +533,7 @@ index 0000000..d828649
 +	chapter_controls = false;
 +	menu_controls = false;
 +	menu_active = false;
++	download_release_us = 0;
 +}
 +
 +static void stop_with_reason(const char *reason)
@@ -765,6 +789,7 @@ index 0000000..d828649
 +			{
 +				user_io_set_download(0);
 +				download_active = 0;
++				download_release_us = monotonic_us();
 +			}
 +			pending_size = pending_offset = 0;
 +			pending_eof = false;
@@ -797,9 +822,11 @@ index 0000000..d828649
 +	burst_state = {};
 +	user_io_set_index(playback_index);
 +	user_io_file_info(".M2V");
++	wait_stream_hop_drain();
 +	user_io_set_download(1);
 +	download_active = 1;
 +	download_assert_us = monotonic_us();
++	download_release_us = 0;
 +	if (!send_control(MEDIA_CONTROL_GO))
 +	{
 +		stop_with_reason("chapter-go-error");
@@ -869,6 +896,7 @@ index 0000000..d828649
 +	{
 +		user_io_set_download(0);
 +		download_active = 0;
++		download_release_us = monotonic_us();
 +	}
 +	pending_size = pending_offset = 0;
 +	pending_eof = false;
