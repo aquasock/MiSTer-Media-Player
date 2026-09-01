@@ -1,3 +1,33 @@
+## 848 COMMIT Unreleased ??? 2026-08-31T20:44:17-07:00
+
+#### Coming From:
+
+Unreleased aab7d09
+
+#### Purpose:
+
+Restore the last physically proven moving-purple selector userspace combination while keeping the accepted source-`f5f650f` RBF frozen.
+
+#### Outcome:
+
+The source-`aab7d09` physical test keeps menu video stable and proves the expected helper, Main and schema-21 overlay-capable RBF behaviors are active, but the 4,000-byte helper packetization worsens the rejected plane from the prior 21-byte deficit to 4,220 missing bytes: Main still submits 22 ordered records and all 86,400 all-`0x55` bytes with the expected hash, while the FPGA engine receives 82,180 bytes, rejects the commit and publishes no plane.  The user explicitly prioritizes a working selector over the newer menu-reliability drain if both cannot yet coexist.  The approved rollback therefore restores the helper's physically proven 4,096-byte record framing and removes only Main's later 500-millisecond stream-hop drain, returning both userspace components to entry 840's successful selector behavior while preserving overlay tracing, navigation, the frozen RBF and all other functionality.
+
+#### Next Steps:
+
+Revert the helper framing and Main drain additions, validate the helper with strict native and focused DVD regressions, verify both Main patches still apply, build the purple helper and Main locally with the Raspberry Pi GNU 10.2.1 ARM toolchain, and preserve uniquely named artifacts for manual transfer.  Hardware acceptance requires one accepted and zero rejected overlay commits, all 86,400 plane bytes, one plane publication and a visible purple selector following directional input; intermittent menu-load failure remains an accepted temporary tradeoff for this restoration boundary.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 847 COMMIT Unreleased aab7d09 2026-08-31T20:27:44-07:00
 
 #### Coming From:
@@ -1153,57 +1183,6 @@ Keep source `2738e99` and the accepted source-`6e44472` MiSTer installation unch
 
 - MediaPlayer.sdc
 - rtl/mpeg2_new/mpeg2_h262_dvd_overlay.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 808 COMMIT Unreleased 8d1a5d0 2026-08-31T01:28:52-07:00
-
-#### Coming From:
-
-Unreleased 6e44472
-
-#### Purpose:
-
-Implement authored DVD-Video menu navigation and subpicture highlights through the existing libdvdnav session and a bounded FPGA DDR overlay plane.
-
-#### Outcome:
-
-Source `8d1a5d0` implements authored first-play, directional selection, activation and return-to-menu for ISO and optical DVD sources while preserving the accepted title, chapter, pause, audio and CSS paths.  The helper assembles fragmented DVD subpictures into a packed 720-by-480 two-bit plane with palette, alpha and highlight state; bounded in-band records feed an inactive FPGA DDR plane, an atomic commit publishes it, and a native-480i line cache composites it before the cadence diagnostic overlay without using decoder frame banks.  Focused malformed-SPU, fragmentation, palette, alpha, highlight, metadata-backpressure, overlay-engine and arbiter tests pass, the complete retained native-480i regression passes, ordinary MPG and legacy `iso:` candidate output is byte-identical to the accepted helper, and a real authored ISO navigation harness observes menu entry, menu exit, two ready barriers, two overlay commits and successful root, direction and activation behavior.  Exact-source ARM helper, Main and strict native helper builds succeed.  The one authorized clean seed-19 Quartus compile completes synthesis, fitting and assembly with same-clock setup margins of positive 0.675 ns at 60 MHz and positive 1.946 ns at 54 MHz, but final timing rejects the RBF because the new explicit two-stage overlay clock crossings lack source-to-first-stage exceptions: global setup is negative 1.951 ns, hold is negative 0.281 ns, while recovery, removal and minimum-pulse-width are positive.  The rejected RBF is not installed and the MiSTer remains on accepted source `6e44472` artifacts.
-
-#### Next Steps:
-
-Keep accepted source `6e44472` and its installed artifacts unchanged on the MiSTer.  Before any further source edit or Quartus build, obtain approval for a separate narrowly scoped timing-correction boundary that cuts only the stable overlay handshake buses and toggles from their source registers to the first synchronizer stages, retains timing through the second stages, and cleans the two reported overlay width-truncation warnings; then rerun focused clock-crossing and retained regressions and one clean seed-19 build, accepting an RBF only if setup, hold, recovery, removal and minimum-pulse-width are all positive.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sv
-- README.md
-- docs/ARCHITECTURE.md
-- docs/BUILDING.md
-- files.qip
-- host/arm/ARCHITECTURE.md
-- host/arm/Makefile
-- host/arm/dvd_spu.c
-- host/arm/dvd_spu.h
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/arm/media_source.c
-- host/arm/media_source.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- rtl/mpeg2_new/mpeg2_dvd_overlay.sv
-- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
-- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
-- tools/test_dvd_menu_navigation.py
-- tools/test_dvd_overlay_arbiter.sv
-- tools/test_dvd_overlay_engine.sv
-- tools/test_dvd_overlay_metadata.sv
-- tools/test_dvd_spu.c
 
 #### Status:
 
