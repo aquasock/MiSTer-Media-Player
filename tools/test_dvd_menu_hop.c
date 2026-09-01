@@ -89,11 +89,13 @@ int main(void)
     state.still_active = 1;
     state.still_seconds = 10;
     failed |= require(iso_complete_delayed_menu_transition(&state, 0) ==
-                          MEDIA_SOURCE_DVD_MENU_CONTINUE,
-                      "finite-still menu transition requested a hop");
-    failed |= require(!state.dvd_state.hop && !state.still_active &&
-                          state.block_offset == 0 && state.block_size == 0,
-                      "finite-still menu continuation retained old state");
+                          MEDIA_SOURCE_DVD_MENU_PENDING,
+                      "ambiguous finite-still transition was acknowledged");
+    failed |= require(!state.dvd_state.hop && state.still_active &&
+                          state.still_seconds == 10 &&
+                          state.block_offset == 256 &&
+                          state.block_size == DVD_VIDEO_LB_LEN,
+                      "ambiguous finite-still transition changed state");
 
     memset(&state, 0, sizeof(state));
     state.block_offset = 128;

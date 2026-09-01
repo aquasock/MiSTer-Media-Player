@@ -41,6 +41,10 @@ PENDING_PAYLOAD_RE = re.compile(
     rb"media_player_helper: DVD menu activation pending reached still "
     rb"payloads=([1-9][0-9]*) duration=(?:indefinite/)?([0-9]+)"
 )
+POST_STILL_PENDING_RE = re.compile(
+    rb"media_player_helper: DVD delayed activation remains pending "
+    rb"after finite still"
+)
 COMMAND_RE = re.compile(
     rb"media_source: (?:DVD|ISO) menu command="
     rb"(up|down|left|right|activate|root) pci_lbn=([0-9]+) "
@@ -175,6 +179,7 @@ def main():
     pending_counts = {"activate": 0}
     pending_discarded = {"activate": []}
     pending_payloads = []
+    post_still_pending = 0
     root_random_access = []
     activation_random_access = []
     last_hop = None
@@ -202,8 +207,10 @@ def main():
             if args.require_delayed_activation:
                 activation_done = (pending_counts["activate"] and
                                    pending_payloads and
+                                   post_still_pending and
                                    hop_counts["activate"] and
                                    ready_events >= 2 and leave_events and
+                                   not continue_events and
                                    activation_random_access and
                                    video_bytes_after_second_ready)
             if (activation_done and action_index == len(actions) and
@@ -293,6 +300,8 @@ def main():
                                 pending_payloads.append(
                                     (int(match.group(1)),
                                      int(match.group(2))))
+                            if POST_STILL_PENDING_RE.search(line):
+                                post_still_pending += 1
                             match = COMMAND_RE.search(line)
                             if match:
                                 name = match.group(1).decode("ascii")
@@ -341,8 +350,11 @@ def main():
     if args.require_delayed_activation:
         activation_passed = (pending_counts["activate"] >= 1 and
                              pending_payloads and
+                             post_still_pending >= 1 and
                              hop_counts["activate"] >= 1 and
                              ready_events >= 2 and leave_events >= 1 and
+                             continue_events == 0 and
+                             continue_counts["activate"] == 0 and
                              activation_random_access and
                              video_bytes_after_second_ready > 0)
     passed = (return_code in (0, -15) and root_sent and activation_passed and
@@ -376,6 +388,7 @@ def main():
           f"activate_pending={pending_counts['activate']} "
           f"pending_discarded={pending_discarded['activate']} "
           f"pending_payloads={pending_payloads} "
+          f"post_still_pending={post_still_pending} "
           f"visible_highlights={overlay_state['visible_highlights']} "
           f"highlight_pixels={overlay_state['highlight_pixels']} "
           f"commands={command_counts} transitions={direction_transitions} "

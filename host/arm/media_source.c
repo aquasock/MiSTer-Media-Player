@@ -902,17 +902,6 @@ static int iso_complete_menu_hop(struct iso_source_state *state,
     return MEDIA_SOURCE_DVD_STREAM_HOP;
 }
 
-static int iso_complete_menu_continue(struct iso_source_state *state,
-                                      const char *command)
-{
-    size_t discarded = iso_reset_after_menu_transition(state, 0);
-
-    fprintf(stderr,
-            "media_source: %s menu continue %s discarded_block_tail=%zu\n",
-            state->direct_device ? "DVD" : "ISO", command, discarded);
-    return MEDIA_SOURCE_DVD_MENU_CONTINUE;
-}
-
 static int iso_complete_menu_pending(struct iso_source_state *state,
                                      const char *command)
 {
@@ -929,7 +918,10 @@ static int iso_complete_delayed_menu_transition(
 {
     if (title != 0)
         return iso_complete_menu_hop(state, "delayed activate");
-    return iso_complete_menu_continue(state, "delayed activate");
+    fprintf(stderr,
+            "media_source: %s menu pending delayed activate after still\n",
+            state->direct_device ? "DVD" : "ISO");
+    return MEDIA_SOURCE_DVD_MENU_PENDING;
 }
 
 static const char *iso_menu_command_name(enum media_source_dvd_command command)

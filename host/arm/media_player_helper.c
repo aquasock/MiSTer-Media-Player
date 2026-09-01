@@ -2742,6 +2742,12 @@ static int wait_dvd_still(struct media_source *input,
                             "stream hop\n");
                     return 2;
                 }
+                if (navigation == MEDIA_SOURCE_DVD_MENU_PENDING) {
+                    fprintf(stderr,
+                            "media_player_helper: DVD delayed activation "
+                            "remains pending after finite still\n");
+                    return 1;
+                }
                 if (acknowledge_menu_continuation(
                         menu, control_fd, "finite-still-menu") < 0)
                     return -1;
