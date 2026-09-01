@@ -1,4 +1,4 @@
-## 865 COMMIT Unreleased ??? 2026-09-01T01:20:13-07:00
+## 865 COMMIT Unreleased 58196d6 2026-09-01T01:30:48-07:00
 
 #### Coming From:
 
@@ -10,22 +10,23 @@ Preserve the physical-DVD output reserve while allowing menu overlay changes to 
 
 #### Outcome:
 
-The user's physical source-`5ae655a` capture proves that the four-megabyte output reserve is active and leaves chapter `N` and `P` transitions as responsive as before, but rejects the current FIFO ordering for interactive menu use.  The helper handles Right at approximately 19.155498 seconds while Main receives the corresponding selector style at 24.194433 seconds, a 5.038935-second delay, then handles Left at approximately 26.065074 seconds while Main receives that style at 31.576002 seconds, a 5.510928-second delay.  Main submits Activate at 34.250141 seconds and the helper processes it by approximately 34.332884 seconds, proving that keyboard delivery, the control socket and libdvdnav remain responsive while the generated in-band overlay waits behind queued A/V.  This proposal will retain the bounded reserve for optical stalls but preserve producer write boundaries and add a FIFO priority lane for complete DVD overlay records, so a selector change can pass after the one normal record already being written without splitting PCM or other framed output; Main, RTL, the source-`1bf06db` RBF and Quartus will remain untouched.
+The user's physical source-`5ae655a` capture proves that the four-megabyte output reserve is active and leaves chapter `N` and `P` transitions as responsive as before, and the user cannot yet reproduce the original first-chapter audio dropout, but the run rejects its FIFO ordering for interactive menu use.  The helper handles Right at approximately 19.155498 seconds while Main receives the corresponding selector style at 24.194433 seconds, a 5.038935-second delay, then handles Left at approximately 26.065074 seconds while Main receives that style at 31.576002 seconds, a 5.510928-second delay; Activate reaches the helper in approximately 83 milliseconds, isolating the latency to the in-band overlay waiting behind queued A/V.  Source `58196d6` preserves the four-megabyte normal reserve, marks every complete producer write with a compact boundary map and adds a bounded 256-kibibyte FIFO priority lane serviced only between complete normal records, so an overlay cannot split PCM or another framed output.  Every overlay header and payload is now assembled into one priority record.  The focused stalled-pipe regression proves that a 49-byte priority update overtakes a four-megabyte normal backlog exactly after the already active two-megabyte test record while all 6,291,505 output bytes remain exact, passes 100 consecutive runs, and passes sanitizer and static-analyzer validation; the real production emitter also passes 20 repeated priority-drain runs while reconstructing its one configuration, 22 records and all 86,400 authored plane bytes exactly.  Strict native and optional solid-overlay-probe helper builds, full capabilities, AC-3 recovery, random access, subpicture and immediate/delayed menu-hop regressions pass.  The Raspberry Pi GNU 10.2.1 toolchain builds exact source `58196d6` into `host/build/MediaPlayer_Helper_MenuPriority_58196d6`, a 912,756-byte static stripped ARMv7 EABI5 executable at SHA-256 `759d01177f37d7b2d624a026ac3d8aa68a8f24ac72e1704e01f4d1e11d9bf649`; it has no dynamic section, contains the reserve-priority and false-sync recovery diagnostics, and omits authored-selector compensation and the solid-magenta overlay probe.  Main, RTL, the source-`1bf06db` RBF and Quartus are untouched.
 
 #### Next Steps:
 
-Make the reserve track complete producer writes, add bounded FIFO priority storage serviced between normal records, assemble each overlay header and payload into one priority write, and retain exact normal ordering, capacity backpressure, drain, shutdown and writer-error behavior.  Extend the stalled-sink regression to prove that an urgent overlay overtakes a multi-megabyte normal backlog only at an intact record boundary and that all normal and priority bytes remain exact, rerun the strict native helper and retained protocol regressions, then build a uniquely named static ARMv7 helper locally for immediate selector movement plus repeated rapid chapter switching and continuous-play validation.
+Exit MediaPlayer so its current helper stops, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_MenuPriority_58196d6`, restore executable mode if needed, and verify the 912,756-byte size and recorded SHA-256 while preserving the installed source-`2de0717` Main and source-`1bf06db` RBF.  The new log marker must report `DVD output reserve=4194304 bytes overlay_priority=262144 bytes`.  Enter the menu, rapidly move the selector among all buttons and activate Play; acceptance requires visually immediate correctly aligned selector changes rather than the measured five-second lag, reliable menu and Play transitions, and no overlay framing or plane corruption.  Then repeat rapid forward and backward chapter changes before playing chapter one continuously; acceptance also requires the previously retained fast `N` and `P` response, a surviving helper, no reproduced audio dropout through a comparable optical stall and continued A/V synchronization.  Capture a fresh helper log, screenshot and telemetry for physical acceptance.
 
 #### Files Modified:
 
 - host/arm/media_player_helper.c
 - host/arm/output_reserve.c
 - host/arm/output_reserve.h
+- tools/test_dvd_overlay_output.c
 - tools/test_output_reserve.c
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
