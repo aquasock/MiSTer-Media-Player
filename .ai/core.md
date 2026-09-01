@@ -162,11 +162,11 @@ Idle Current: ~1.1A
 
 4. Commit the changes to the online repository with a commit message that follows previous agents commit message conventions. This will become the next build's official commit hash.
 
-5. You will then build the project yourself and inform the user the files are ready for testing. 
+5. You will then build the project yourself and inform the user the files are ready for testing. The user will upload and replace the appropiate files on the MiSTer.
 
 6. Update core-log.md with your build results and commit it to the online repository.
 
-7. I will inform you when my test results are ready on the local GitHub repository.
+7. I will inform you when my test results are ready in the local project's "results" folder.
 
 8. Review the test results and determine if the proposed plan of action worked.
 
