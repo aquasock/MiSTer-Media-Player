@@ -1224,6 +1224,22 @@ wire        audio_ui_writer_accept;
 wire        audio_ui_protocol_error;
 wire        audio_ui_mode_active;
 wire        audio_ui_loading_active;
+wire        audio_ui_initial_loading_mpeg2 =
+    audio_ui_loading_active && !audio_ui_mode_active;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] audio_ui_initial_loading_video_sync;
+
+always @(posedge clk_video) begin
+    if (reset_video)
+        audio_ui_initial_loading_video_sync <= 3'b000;
+    else
+        audio_ui_initial_loading_video_sync <=
+            {audio_ui_initial_loading_video_sync[1:0],
+             audio_ui_initial_loading_mpeg2};
+end
+
+wire audio_ui_initial_loading_video =
+    audio_ui_initial_loading_video_sync[2];
 wire        audio_ui_display_bank;
 wire        audio_ui_picture_publish;
 wire [15:0] audio_ui_committed_frames;
@@ -2256,16 +2272,16 @@ mpeg2_h262_dvd_overlay mpeg2_h262_dvd_overlay
     .v_pos            (display_v_pos),
     .native_active    (display_native_interlaced),
     .base_r           ((mpeg2_new_startup_video_blank ||
-                        (audio_ui_loading_active && !audio_ui_mode_active)) ?
+                        audio_ui_initial_loading_video) ?
                         8'd0 : fb_video_r),
     .base_g           ((mpeg2_new_startup_video_blank ||
-                        (audio_ui_loading_active && !audio_ui_mode_active)) ?
+                        audio_ui_initial_loading_video) ?
                         8'd0 : fb_video_g),
     .base_b           ((mpeg2_new_startup_video_blank ||
-                        (audio_ui_loading_active && !audio_ui_mode_active)) ?
+                        audio_ui_initial_loading_video) ?
                         8'd0 : fb_video_b),
     .base_de          (fb_video_de && !mpeg2_new_startup_video_blank &&
-                       !(audio_ui_loading_active && !audio_ui_mode_active)),
+                       !audio_ui_initial_loading_video),
     .video_r          (dvd_overlay_video_r),
     .video_g          (dvd_overlay_video_g),
     .video_b          (dvd_overlay_video_b),

@@ -238,6 +238,14 @@ set_false_path \
     -from [get_keepers {*|hps_io:hps_io|ioctl_download}] \
     -to   [get_keepers {*|mpeg2_h262_download_rearm:*|download_sync[0]}]
 
+# Entry 873: the audio UI loader exports one level from clk_mpeg2 solely to
+# blank the video while the first complete UI frame is uploaded.  The level is
+# sampled by an explicit three-register clk_video synchronizer.  Cut only the
+# asynchronous source -> first sampling stage; the settling stages and all
+# video-domain blanking logic remain timed in clk_video.
+set_false_path \
+    -to [get_keepers {*|audio_ui_initial_loading_video_sync[0]}]
+
 # Entry 245: the frozen hardware-cadence snapshot is produced in clk_mpeg2 and
 # remains stable permanently before its trailing ready level can enable the
 # video overlay.  The snapshot bus uses two explicit clk_video sampling stages;
