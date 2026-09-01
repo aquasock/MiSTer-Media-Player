@@ -1,3 +1,46 @@
+## 873 COMMIT Unreleased ??? 2026-09-01T05:51:42-07:00
+
+#### Coming From:
+
+Unreleased add7d00
+
+#### Purpose:
+
+Add the first audio-only ARM-rendered user-interface boundary with reserved album-art space and atomic one-hertz progress presentation.
+
+#### Outcome:
+
+The approved boundary will keep native 720-by-480p output active during standalone MP3, WAV, FLAC and Ogg Vorbis playback while the ARM helper renders a limited-range BT.601 4:2:0 interface into the decoder's existing frame geometry.  A fixed square region will be reserved for later album-art decoding, while this cycle renders a deterministic background, static transport symbols and a sample-clock-driven progress indicator.  New bounded display records will carry one inactive-bank frame in audio-interleaved chunks and publish it only after a complete validated transfer at a safe video-frame boundary; the FPGA will reuse existing DDR frame banks and framebuffer readback without sending the interface through H.262 syntax, changing the video decoder engines or weakening DVD overlay behavior.  PCM service remains dominant and each UI record remains bounded so a full-screen refresh cannot monopolize the shared transport.
+
+#### Next Steps:
+
+Implement and independently test the ARM renderer, record framing, command router, bounded DDR writer, inactive-bank ownership and atomic framebuffer publication.  Require byte-exact host reconstruction, malformed-record rejection, no write into the displayed bank, one UI commit per sample-clock second, unchanged PCM framing and retained DVD-overlay regressions; then run the focused SystemVerilog suite and strict native and ARM helper builds before committing source and attempting one timing-clean Quartus build for MiSTer validation.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+- README.md
+- docs/ARCHITECTURE.md
+- files.qip
+- host/arm/Makefile
+- host/arm/audio_ui.c
+- host/arm/audio_ui.h
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- rtl/mpeg2_new/mpeg2_h262_audio_ui.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- rtl/mpeg2_new/mpeg2_h262_display_record_router.sv
+- tools/test_audio_ui_output.c
+- tools/test_dvd_overlay_arbiter.sv
+- tools/test_mpeg2_audio_ui.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 872 COMMIT Unreleased add7d00 2026-09-01T04:57:47-07:00
 
 #### Coming From:
@@ -1179,35 +1222,6 @@ Check out exact source `d4ed809` on build PC `10.10.0.42`, rerun all four focuse
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - tools/test_dvd_overlay_engine.sv
 - tools/test_dvd_overlay_snapshot.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 833 COMMIT Unreleased 0e89c73 2026-08-31T15:30:28-07:00
-
-#### Coming From:
-
-Unreleased 0e89c73
-
-#### Purpose:
-
-Determine whether the complete known-pattern DVD overlay stream reaches the FPGA ingress FIFO before the physically absent menu highlight.
-
-#### Outcome:
-
-The source-`0e89c73` physical-disc result proves one complete synthetic overlay frame crossed the helper, Main, SPI file-transfer path and FPGA ingress acceptance boundary without corruption or backpressure failure, while the rendered menu still contains no magenta selection pixels.  The 1,321,892-byte Main/helper log at SHA-256 `ec8523c89cd34d22821c6c5a2666158d6754a3c08d5375f8e1687c053299de18` records config flags `3`, rectangle `135,397` through `208,436`, opaque-magenta highlight entry one, 22 data records, exactly 86,400 data bytes, FNV-1a `f8555d45`, zero non-`0x55` bytes, zero order errors and `probe_complete=1`; its 26 successfully submitted style changes follow 26 root or directional menu commands through all four authored rectangles, and no `transport_fault` occurs.  Because `user_io_file_tx_data_step` verifies each batch against the FPGA FIFO's returned accepted-word counter and rolling digest before the verifier receives those bytes, this clears not only helper construction and Main forwarding but also physical acceptance into the FPGA ingress FIFO.  The 745,871-byte 1,920-by-1,080 screenshot at SHA-256 `7ee61103f6fae63fe62ced7716dea093fc00be3b5949dfcbd200ce297b023287` visibly shows the active menu and unobscured button area with no magenta rectangle.  The 792-byte schema-20 matrix text at SHA-256 `fc469765c947ca4910204205dd29347e1c05460e2c833ecdf299ccb3467f3436` passes all row framing and checksum `70fb7917`; word 19 again contains only audio-underrun flag `0x0400`, and its 209,628,414 decoder clocks or 3.494 seconds precede the first submitted overlay config at 12.847 seconds, so that sticky snapshot cannot report later overlay state.  A verifier-only oversized B9 candidate with length 65,503 appears at byte offset 28,625,926 about 23 seconds after the valid commit and cannot explain the initial failure; because the bounded Main verifier recognizes only B9 framing while the FPGA extractor also consumes B0, B1 and B6 payloads atomically, this later candidate is not evidence by itself that hardware saw an invalid overlay record.  The remaining defect is strictly downstream of the accepted FPGA FIFO write, in FIFO read or in-band extraction, overlay command handling and DDR publication/cache, or final video-domain style publication and blending.
-
-#### Next Steps:
-
-Do not modify the helper or Main again for this fault because the source-`0e89c73` evidence exhausts their observable transport boundary.  After explicit user approval, add an FPGA-observability-only schema that captures after a valid overlay commit or style change instead of freezing on the earlier audio underrun and positively counts extractor config, data, commit and style records, engine plane bytes and accepted DDR writes, initial and moving row-cache fills, style publications, row-tag matches and opaque blend samples; strengthen the focused simulation to require those counters across the known all-`0x55` magenta probe, then build one timing-clean diagnostic RBF while preserving the current helper, Main and rendering behavior.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
