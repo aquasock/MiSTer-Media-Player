@@ -1,3 +1,32 @@
+## 853 COMMIT Unreleased ??? 2026-08-31T21:38:36-07:00
+
+#### Coming From:
+
+Unreleased 413ace2
+
+#### Purpose:
+
+Replace the physically accepted solid-purple diagnostic selector with the correctly shaped authored DVD selector while preserving the proven userspace-only transfer compensation.
+
+#### Outcome:
+
+The user's refreshed physical capture proves source `413ace2` closes the compensated-candidate byte deficit.  The 857-byte schema-21 snapshot at SHA-256 `5b1b15f4bff4195cd7b487ff0808214475408180ca16267f5242fd4f7dd24729` passes every prefix, row, index, parity and XOR check with checksum `5d8d8a25`; it reports two configs, 44 data records, two commits, one rejected commit, one accepted commit and one plane publication.  The first candidate receives 86,379 bytes, while the second receives exactly 86,400 of its submitted 86,422 bytes and publishes successfully.  The 11,001,450-byte helper/Main log at SHA-256 `eaf58071e5a06a70ad7659fa5f65e51724217578d09c5e7594b2c7e4944a055d` confirms that the helper has already decoded the sparse authored plane at FNV-1a `c23cad52`, but the opt-in probe deliberately replaces both its pixels and palette with solid opaque magenta.  The 1,920-by-1,080 screenshot at SHA-256 `37d9b3e7cc6fa4f38a9d654bdfac9274d5278681bde2da3dfe0ede4c07c25050` contains exactly 21,780 opaque-magenta pixels in one 242-by-90 rectangle from output coordinate 566,894 through 807,983, proving the published plane, palette, compositor and authored moving rectangle.  The approved helper-only correction will preserve the unchanged 86,400-byte authored candidate for the zero-loss case, then packetize the compensated authored candidate as at most 4,095 source bytes followed by a duplicate of that record's final source byte.  Its 21 full 4,096-byte records and one 406-byte final record still submit 86,422 bytes, but the measured one-byte loss at each of the 22 record boundaries will discard only duplicates and reconstruct the exact original 86,400-byte plane.  Main and the source-`f5f650f` RBF remain frozen.
+
+#### Next Steps:
+
+Implement authored-palette and authored-plane dual-candidate emission in the helper, retain the solid-magenta probe as a separate opt-in diagnostic, and add a direct framing regression that removes the final payload byte from every compensated record and proves byte-for-byte recovery of the original plane.  Pass strict native compilation and the focused subpicture, random-access and menu-hop regressions, build only a uniquely named static ARM helper with the Raspberry Pi GNU 10.2.1 toolchain, then physically require one accepted commit, one plane publication and a correctly shaped authored selector that follows every directional input without replacing Main or the RBF.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 852 COMMIT Unreleased 413ace2 2026-08-31T21:22:44-07:00
 
 #### Coming From:
@@ -1149,35 +1178,6 @@ Complete inspection of `iso_prepare` proves that authored `isomenu:` and `dvdmen
 #### Next Steps:
 
 Obtain approval for the corrected helper-only boundary before implementation: on successful root-menu or button-activation hops, invalidate the current DVD block, clear terminal and still state, and log the discarded block-tail byte count before returning to the existing Main/helper reset barrier.  Add a focused regression proving no pre-hop bytes survive either hop plus the existing real-image menu-navigation test, then build only the helper and repeat the early-trailer `M` hardware test without changing Main, the seed-20 RBF or Quartus source.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 813 COMMIT Unreleased a9899e0 2026-08-31T05:35:17-07:00
-
-#### Coming From:
-
-Unreleased a9899e0
-
-#### Purpose:
-
-Capture and isolate the first hardware failure when an authored physical DVD receives the root-menu command during first-play trailers.
-
-#### Outcome:
-
-The source-`a9899e0` installation plays the physical disc's Viacom Paramount intro, four-language selection and three first-play trailers until its authored menu is eventually reached, proving sustained first-play video and audio before the navigation test.  After a fresh launch, keyboard `M` with the OSD closed submits root-menu command `0x09` at diagnostic time 4.138167 seconds; Main closes the download, discards 190,463 pending bytes, receives the helper's ready barrier and releases the new session, while the helper reports that the navigation barrier completes and its rearmed random-access filter discards zero leading B pictures.  The screen then freezes in the 800-by-600 diagnostic raster.  The 31,886-byte scaled screenshot `/tmp/entry813_root_menu_freeze.png`, SHA-256 `e5d61e8a547183b92a58ed5ccbd17eb73a439bd232294efdb73d02979856cc68`, contains all 64 schema-20 rows with valid headers, indices and parity and matching checksum `d80518c4`; its fatal snapshot occurs only 24,043 accepted video bytes and 443,132 decoder clocks after the navigation reset, on a 30000/1001 B picture with temporal reference 12, and reports exactly error `0x0200`, the B-picture presentation error, with the overlay extractor, overlay engine, syntax, reconstruction, writer, cache and audio error bits clear.  The matching 1,843,639-byte log `/tmp/entry813_root_menu_freeze_arm_helper.log`, SHA-256 `bb145d181f90e3642b4ac8a746067bdf6f4b2d83d1bee5e1f511e36f1997762b`, shows Main and helper continuing to transfer hundreds of megabytes after the fatal FPGA snapshot, so this is neither a Main barrier deadlock nor a helper stall.  Static inspection localizes the unsafe boundary to `iso_menu_command`: unlike accepted chapter changes, it calls the shared libdvdnav handle while the optical producer thread is active and neither stops nor discards its prefetched navigation ring before the FPGA download reset, allowing stale or concurrently spliced pre-hop bytes to open the new decoder session.  No target file, playback option or repository source changes during collection.
-
-#### Next Steps:
-
-Keep the seed-20 RBF and Main frozen and do not invoke another root-menu or activation hop on this running session.  Before implementation, approve a helper-only navigation-buffer correction that serializes libdvdnav hop commands with the optical producer, discards the pre-hop ring and partial block, restarts and prefills from the new authored position, and logs the discarded byte count; exercise it with a host concurrency regression and existing menu-navigation tests, then deploy only the helper and repeat the same early-trailer `M` test while requiring native 480i to remain active and all FPGA error flags to stay clear.
 
 #### Files Modified:
 
