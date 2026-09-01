@@ -1,3 +1,32 @@
+## 875 COMMIT Unreleased 5f00e35 2026-09-01T07:34:29-07:00
+
+#### Coming From:
+
+Unreleased 5f00e35
+
+#### Purpose:
+
+Record physical acceptance of the timing-qualified ARM-rendered standalone-audio interface and its moving progress presentation.
+
+#### Outcome:
+
+The user reports that source `5f00e35` looks great on MiSTer and explicitly confirms that the progress bar moves correctly during standalone FLAC playback.  The 9,154-byte 1,920-by-1,080 screenshot at SHA-256 `674f4dab0fdfa1636f195b75af90f89425dda637ddff0e92cb216cdd19de0dd5` shows a clean stable native presentation with the reserved square album-art viewport, transport panel, progress bar and activity ruler plus reserved metadata strip.  The 6,000,885-byte Main/helper log at SHA-256 `0aff68b888e6c58f4d3733c4de0e915a9dbb62efd8f04c8ae0a750ca969a831f` starts `Symphony No.6 (1st movement).flac`, selects decoded stereo HDMI PCM and enables the 720-by-480p BT.601 audio interface; across approximately one hundred seconds it carries 99 frame begins, 12,559 data chunks and 98 commits.  Every completed frame contains exactly 127 chunks comprising 126 full 4,096-byte payloads and one 2,304-byte tail, with zero framing or ordering failures, while the final begun frame is merely partial at capture time.  Main's repeated `overlay_submit unknown` and `order_errors` labels are stale diagnostic classification of the newly valid commands `0x10`, `0x11` and `0x12`, not FPGA or transport faults; the log contains no fatal, decoder, protocol, unsupported-stream or transport error.  The 2,818-byte file at SHA-256 `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004` records only that the legacy screenshot telemetry decoder finds no stripe in the audio-interface image, as expected, and is not a failed hardware snapshot.  The timing-qualified RBF/helper pair is physically accepted for this first audio-interface boundary.
+
+#### Next Steps:
+
+Preserve `output_files/MediaPlayer_20260901_5f00e35.rbf` and `host/build/MediaPlayer_Helper_AudioUI_5f00e35` together as the accepted standalone-audio interface baseline while retaining source `add7d00` as the prior video-only rollback.  In the next approved feature cycle, teach the ARM renderer to populate the reserved viewport and metadata strip from bounded album-art and tag decoding without increasing the one-hertz FPGA publication rate or weakening PCM priority; also update Main's passive record profiler to recognize commands `0x10` through `0x12` so future logs do not mislabel valid UI records as DVD-overlay order errors.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 874 COMMIT Unreleased 5f00e35 2026-09-01T07:09:16-07:00
 
 #### Coming From:
@@ -1186,35 +1215,6 @@ The checksum-valid 883-byte schema-21 capture at SHA-256 `c146d2775a491c4ce8a652
 #### Next Steps:
 
 After user approval, replace the pulse-only overlay output with a conventional retained valid/data/start/last register whose valid bit clears only on an actual engine-ready transfer, derive extractor input readiness from the availability of that output slot, and add an integrated regression that drives the complete 86,400-byte plane through the extractor and engine while injecting DDR writer stalls.  Require exactly 86,400 engine plane bytes, 10,800 accepted DDR writes, one accepted and zero rejected commits, one plane publication, nonzero alpha and opaque-magenta video samples, then build a timing-clean RBF without changing Main, the helper, the record protocol or rendering semantics.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 835 COMMIT Unreleased d4ed809 2026-08-31T16:04:26-07:00
-
-#### Coming From:
-
-Unreleased b5e49db
-
-#### Purpose:
-
-Build and qualify the exact source-`d4ed809` DVD overlay pipeline diagnostic RBF for physical MiSTer testing.
-
-#### Outcome:
-
-The exact clean source checkout `d4ed809999e6efd6891b2522ede6aefbed24a75f` passes the focused all-`0x55` overlay-engine regression, retained metadata extractor and arbiter regressions, and both settled-commit and no-commit-fallback snapshot paths under Icarus Verilog on build PC `10.10.0.42`.  Quartus Prime 17.0.2 seed 20 completes synthesis, fitting, assembly and the project timing gate with zero errors; global setup, hold, recovery, removal and minimum-pulse-width slacks are respectively positive at 0.018, 0.244, 3.816, 0.593 and 0.925 nanoseconds, while the dedicated 60 MHz decoder and 54 MHz video checks have 0.871 and 1.932 nanoseconds of setup slack and no violations.  The schema-21 Gray-code source-to-first-synchronizer exception resolves without an ignored-filter warning.  The fit uses 34,791 ALMs, 54,483 registers, 4,187,011 block-memory bits in 535 RAM blocks and 70 DSP blocks.  The uniquely preserved `output_files/MediaPlayer_20260831_d4ed809.rbf` is 4,468,560 bytes with SHA-256 `6ea1615feec15a2c229ad10331bdfd48f955f76e48adaa69effe9c77e09ee45b`, identical on the build PC and in the local workspace.
-
-#### Next Steps:
-
-Preserve the installed `MiSTer_OverlayTrace` Main and `MediaPlayer_Helper_OverlayProbe` helper, upload only `MediaPlayer_20260831_d4ed809.rbf` as a new file rather than overwriting the current rollback, load that core, start the physical DVD, enter the root menu, move the selector several times, wait at least two seconds after the first menu commit, then collect a fresh `telemetry.txt`, screenshot and Main/helper log.  Require checksum-valid schema 21 with word 37 equal to `4f564c31`; its words 38 through 54 will localize the first stage that fails to advance, while visible opaque magenta would independently prove the final compositor path.
 
 #### Files Modified:
 
