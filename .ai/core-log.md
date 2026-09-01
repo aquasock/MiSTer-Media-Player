@@ -1,3 +1,32 @@
+## 868 COMMIT Unreleased 22e780a 2026-09-01T02:27:02-07:00
+
+#### Coming From:
+
+Unreleased 22e780a
+
+#### Purpose:
+
+Qualify the source-`22e780a` navigation-discard and chapter-blank changes on physical hardware and localize the remaining visible chapter scramble.
+
+#### Outcome:
+
+The user's physical source-`22e780a` run accepts the helper reserve discard and every tested control path: all buttons operate correctly, chapter transitions are visibly faster, and 51 consecutive chapter requests comprising 25 next and 26 previous commands complete without a fatal helper or transport event.  Main records `chapter startup blank rearmed` for every request, the helper discards between 528,161 and 4,188,934 obsolete reserved bytes at complete record boundaries, and rearm-to-barrier latency is 2,206 microseconds minimum, 25,936 microseconds median, 22,584 microseconds mean and 95,160 microseconds maximum; two root requests reach stream-hop ready in 23,249 and 49,993 microseconds.  The requested black masking is rejected because the user still sees the transition scramble.  The 6,371,107-byte log at SHA-256 `cb7b5d9059fbfb734cfa4950826d27fb051e92d5f033377bc366a7753d1befc5` proves that the first post-barrier payload is a seven-byte overlay-clear record before each clean random-access video group, while the installed source-`1bf06db` RBF makes any `dvd_overlay_record_valid` event sticky-bypass the existing startup blank; the host correctly rearms the session, but the core releases black on that overlay clear approximately 0.2 to 0.3 seconds before the first clean chapter video reaches Main.  The matching screenshot and checksum-valid schema-21 telemetry have SHA-256 `73e81bba6248cf8408cd235e6b5551a3e417596f9b6007430f2116d497d5ce95` and `19c6fbca57ec69db661347a684b04e93ddfe8c9da3330f603c3f6d3036b0256d`; the snapshot reports no decoder error flags but is not timed to observe the transient blank state.
+
+#### Next Steps:
+
+Preserve source `22e780a` Main and helper because their speed and controls pass.  After user approval, make a narrowly scoped RBF correction that latches black on each download rearm independently of metadata, PCM and DVD overlay traffic and releases it only when the new decoder session has a clean presentable video frame, without delaying helper output, chapter barriers, audio or video decode; retain the existing native-startup swap policy separately, add focused simulation for overlay clear and audio records arriving before the first random-access picture, then perform a timing-clean Quartus build for physical chapter-transition validation.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 867 COMMIT Unreleased 22e780a 2026-09-01T01:55:58-07:00
 
 #### Coming From:
@@ -1154,35 +1183,6 @@ Read-only history comparison proves the installed seed-20 source-`a9899e0` overl
 #### Next Steps:
 
 Prefer one helper-only discriminator before modifying the RBF: build a reversible diagnostic helper that preserves the existing transport framing while dumping each distinct real menu plane for exact software replay and substituting a known all-index-one plane with transparent normal color and an unmistakable opaque highlight color, producing a solid rectangle only inside the authored selection coordinates.  If the rectangle appears, the failure is in the real plane data or its hardware delivery pattern; if it remains absent, capture or instrument Main's helper-to-ioctl byte forwarding next, and only after both software endpoints prove the exact records should FPGA-internal counters or another RBF be required.  Preserve the current Main and seed-20 RBF throughout this helper-only test.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 828 COMMIT Unreleased 673b6d7 2026-08-31T10:48:20-07:00
-
-#### Coming From:
-
-Unreleased 673b6d7
-
-#### Purpose:
-
-Determine whether the source-`673b6d7` helper emits drawable DVD selection pixels during the physical menu failure.
-
-#### Outcome:
-
-The user's exact source-`673b6d7` physical-disc run reaches the four-button menu, accepts eight successful navigation commands including the root hop and seven right or left moves, and displays no selection pixels by direct observation or in the matching 768,280-byte screenshot at SHA-256 `15d6f1a64c8d9623f354574d70bdd953d727f0d63d683a02b76ea4d69c2a2e6b`.  The 1,169,066-byte helper log at SHA-256 `debde6d17b1f20fdccf11d820511ba5928d13c21f1449c1136b1230348a20be8` contains one complete overlay configuration and 54 style records, all with `visible=1` and `menu=1`; the selected rectangle moves consistently from button one through four and back, and its exact plane histograms contain respectively 279, 278, 272 and 267 pixels whose mapped highlight alpha is nonzero.  All four emitted highlight entries are stable at transparent `00000000` followed by `316a5988`, `316a59bb` and `316a59ee`, so the helper has a valid nontransparent plane, palette, rectangle and selection state and the failure is downstream of DVD parsing and helper overlay generation.  The matching 792-byte schema-20 matrix text at SHA-256 `7911a2299b1cb84ad748177fbf03cccdba2d683044551fc369da261b20bb1924` passes all 64 prefixes, indices, parity bits and checksum `7023d571`, but its sticky snapshot froze at STC second three on only error `0x0400`, one audio FIFO underrun, before the first menu overlay configuration; its zero overlay extractor and engine error bits therefore cannot prove whether the later records were extracted, written, cached or blended.  No repository source, Main, helper, RBF or target file is changed while collecting or analyzing this evidence.
-
-#### Next Steps:
-
-Keep the accepted helper, Main and seed-20 RBF installed until the next boundary is approved.  The smallest decisive follow-up is an FPGA-observability-only schema update that captures after a menu style event rather than the earlier sticky audio underrun and positively counts overlay records, plane bytes and commits, DDR writes, row-cache fills, style publications, row-tag matches and nonzero-alpha blend samples; strengthen the overlay engine bench with a moving native raster and selection rectangle, then build only a timing-clean RBF.  These counters will distinguish missing in-band extraction, plane storage or cache delivery from final video blending without changing DVD selection, helper transport or overlay rendering behavior.
 
 #### Files Modified:
 
