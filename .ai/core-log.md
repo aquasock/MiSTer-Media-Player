@@ -1,3 +1,36 @@
+## 870 COMMIT Unreleased ??? 2026-09-01T02:45:32-07:00
+
+#### Coming From:
+
+Unreleased 22e780a
+
+#### Purpose:
+
+Stage ambiguous post-activation DVD output until the authored menu destination can be classified without losing its background frame or regressing Play.
+
+#### Outcome:
+
+The user approves the helper-only transaction boundary diagnosed in entry 869.  The planned source will begin a bounded record-preserving stage when a title-zero menu activation becomes pending, keeping newly generated video, PCM metadata and overlay records separate from the already draining physical-DVD reserve.  A payload-bearing indefinite still will retain that staged destination, discard only obsolete pre-activation reserve output, use the established ready/go decoder barrier and publish the destination after rearm without resetting its newly decoded SPU state; an indefinite still with no destination payload will cancel the empty stage and preserve the resident frame, while a finite still will commit its staged transition immediately and keep activation pending for the already accepted later title hop.  Main, RTL, RBF, record formats, authored still duration and ordinary reserve behavior remain unchanged.
+
+#### Next Steps:
+
+Implement a reusable bounded output-stage module and integrate it only with deferred DVD menu activation, add byte-exact tests for normal and priority record order, capacity failure, commit, cancel and preservation across stale-reserve discard, and extend menu-policy coverage for payload-bearing indefinite, empty indefinite and finite still destinations.  Rerun strict native and sanitizer builds plus capabilities, AC-3 recovery, random access, subpicture, menu-hop and production overlay-priority regressions, then use the Raspberry Pi GNU 10.2.1 ARM toolchain to build one uniquely named static helper for physical Scene Selection, Play and root-return testing without contacting the build PC.
+
+#### Files Modified:
+
+- host/arm/Makefile
+- host/arm/media_player_helper.c
+- host/arm/output_stage.c
+- host/arm/output_stage.h
+- tools/test_output_stage.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 869 COMMIT Unreleased 22e780a 2026-09-01T02:39:54-07:00
 
 #### Coming From:
@@ -1158,35 +1191,6 @@ Leave the diagnostic helper, Main and seed-20 RBF unchanged until the user appro
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 830 COMMIT Unreleased f515341 2026-08-31T11:13:16-07:00
-
-#### Coming From:
-
-Unreleased 673b6d7
-
-#### Purpose:
-
-Distinguish a real DVD subpicture-plane defect from a downstream transport or rendering failure without modifying Main or the RBF.
-
-#### Outcome:
-
-The user approves and source `f515341` implements the helper-only known-pattern probe after source `673b6d7` proves the real menu state contains 267 through 279 drawable pixels but the unchanged hardware displays none, while exact installed-RTL simulation renders a complete bottom-menu rectangle correctly under an idle DDR model.  Ordinary builds remain behavior-identical, and compile-time definition `MMP_DVD_OVERLAY_PROBE` alone enables a separately named artifact that logs all 480 rows of each real 86,400-byte two-bit plane with its FNV-1a hash, retains the authored visible and menu flags plus moving selection rectangle, and transmits an all-index-one plane with a transparent normal palette and opaque magenta highlight index one.  Strict default and probe compilation, capability smoke tests, focused subpicture, random-access and menu-hop regressions, and a byte-level probe framing test all pass locally.  On the exact detached build-PC checkout, the authored-menu harness passes root, all four directions, activation, visible-highlight and control-acknowledgment coverage; it observes 17 complete overlay commits, 1,303 visible highlight events and the expected 6,528-pixel solid selected rectangle.  The normal and probe ARM outputs both build with MiSTer's GNU 10.2 toolchain; the uniquely named probe is a 908,660-byte stripped static ARMv7 hard-float executable with no dynamic section at SHA-256 `2b7de20983d9b9f2b2fe561d5ca78e33b94d3f099f6bdd0a88b31c3980118ef5`.  No decoder, scheduler, navigation, record framing, Main, RTL, QSF, RBF or installed target file is changed by the implementation itself.
-
-#### Next Steps:
-
-Exit the MediaPlayer core or otherwise stop its running helper, then replace only `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-f515341/host/build/MediaPlayer_Helper_OverlayProbe` from the build PC, restore executable permission if needed, and verify the destination is 908,660 bytes with SHA-256 `2b7de20983d9b9f2b2fe561d5ca78e33b94d3f099f6bdd0a88b31c3980118ef5`.  Preserve Main and the installed seed-20 RBF.  Restart the physical DVD, reach its menu, move the selected item several times and capture a fresh helper log plus screenshot; the log must contain `probe=solid-index1-magenta` and the bounded real-plane dump.  A solid magenta rectangle following the selection localizes the defect to the real plane or its delivery pattern, while another completely absent rectangle moves the next non-RBF investigation to Main's helper-to-ioctl forwarding.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
 
 #### Status:
 
