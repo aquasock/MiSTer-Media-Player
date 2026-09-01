@@ -1,3 +1,33 @@
+## 858 COMMIT Unreleased ??? 2026-08-31T22:23:13-07:00
+
+#### Coming From:
+
+Unreleased 85cda13
+
+#### Purpose:
+
+Keep a pending DVD activation alive across intermediate menu payloads until libdvdnav exposes a definitive continuation or title boundary.
+
+#### Outcome:
+
+The approved helper-only correction will remove source `85cda13`'s invalid assumption that the first payload after activation proves a menu continuation.  While activation is pending, ordinary menu payloads will continue through the existing output path without sending `MENU_CONTINUE`; the helper will log that the request remains pending and continue until an indefinite still, a finite-still completion or an observed menu leave provides a definitive boundary.  Existing indefinite-still continuation, post-finite-still title classification, ready/go barrier, saved start-code handling, authored selector compensation, Main and RBF behavior remain unchanged.
+
+#### Next Steps:
+
+Remove only the menu-payload acknowledgment, extend the real-image harness to require evidence that payload was crossed while activation remained pending before a delayed title hop, run strict native helper and focused DVD regressions, and build one compensated ARMv7 helper with the Raspberry Pi toolchain.  Physical acceptance requires Play activation to log pending payload, wait through the authored ten-second still, report menu leave and delayed stream hop, complete the existing ready/go barrier, and start moving title video while preserving menu and selector behavior on return.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- tools/test_dvd_menu_navigation.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 857 COMMIT Unreleased 85cda13 2026-08-31T22:20:32-07:00
 
 #### Coming From:
@@ -1155,35 +1185,6 @@ The user should manually replace only `/media/fat/linux/MediaPlayer_Helper` with
 - host/arm/media_source.c
 - tools/test_dvd_menu_hop.c
 - tools/test_dvd_menu_navigation.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 818 COMMIT Unreleased 0e70319 2026-08-31T06:54:47-07:00
-
-#### Coming From:
-
-Unreleased 0e70319
-
-#### Purpose:
-
-Capture the exact source-`0e70319` physical-disc result after root-menu entry, directional input and Enter activation.
-
-#### Outcome:
-
-The user reports that keyboard `M` reaches the physical disc's menu, the arrow keys still cause no visible change, and Enter leaves a black screen.  The 30,212-byte matching capture `/tmp/entry818_menu_enter_black.png` has SHA-256 `7a50ed345aa27e73fef99d4a64f3704ef2752923cd58c82b553913631be70f82`, and the 11,543,671-byte helper log `/tmp/entry818_menu_enter_black_arm_helper.log` has SHA-256 `6d08df11102a2d437e062284d779af76a2fdb727ff1b877f2faefdcc8e9151b3`.  The capture is a black native active frame rather than an 800-by-600 telemetry raster, while the active source-`0e70319` helper records both root and activation hops with `discarded_block_tail=0`, completes both Main/helper ready barriers and remains alive without any fatal, decoder error or `0x0200` B-presentation failure.  The final activation does not produce a menu-leave transition; instead libdvdnav emits another overlay update and enters an indefinite authored still, so the stale-tail crash gate passes but full menu interaction does not.  Existing logs do not identify individual directional commands, selected button numbers or highlight rectangles, and the native harness only counted generic style events, so it cannot establish whether the helper used the NAV PCI synchronized to the displayed menu or merely returned a visually unchanged selection.
-
-#### Next Steps:
-
-Keep Main, RTL, QSF, RBF and Quartus frozen.  The next bounded helper-only cycle should log every direction and activation with the before and after button numbers, NAV logical-block number, authored neighbor and highlight rectangle, strengthen the native harness to require a real selection transition, and retain the NAV PCI associated with the displayed packet for button selection and activation instead of relying on libdvdnav's potentially ahead current PCI; rebuild and retest this same physical menu before expanding menu support.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
