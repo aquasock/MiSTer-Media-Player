@@ -1,3 +1,32 @@
+## 851 COMMIT Unreleased 4baf17a 2026-08-31T21:19:44-07:00
+
+#### Coming From:
+
+Unreleased 4baf17a
+
+#### Purpose:
+
+Evaluate the helper-only dual-candidate selector compensation on physical hardware and determine the remaining correction from direct pipeline evidence.
+
+#### Outcome:
+
+The user reports that menu loading is again intermittently incomplete but every subsequent `M` command restores it, an accepted consequence of retaining the pre-drain Main, and that small purple speckles are visible near the moving menu selection.  The 857-byte schema-21 snapshot at SHA-256 `4eb9b426d3535001b114b3779721384c1a9b05cb8a7301d04eb7d6e199444e9e` passes all row, index, parity and XOR checks with checksum `07e2e504` and captures exactly two configs, 44 data records, two commits and two styles from the first dual-candidate pair.  Main submits the intended complete 86,400-byte and 86,421-byte all-`0x55` candidates, but the engine receives 86,379 bytes from the standard candidate and 86,399 bytes from the compensated candidate: the first loses 21 bytes and the second loses 22, for 43 missing bytes across the pair.  Both commits are rejected, zero commits are accepted and no plane is published; the second candidate nevertheless reaches 10,799 complete DDR words plus seven byte lanes, exactly one byte short of the required 86,400.  The correct visible-menu style, rectangle 135,397 through 208,436 and opaque-magenta entry one are published while the display bank still contains uninitialized data, producing 73,418 magenta video samples and exactly 926 opaque-magenta screenshot pixels as sparse speckles rather than a valid selector plane.  The matching 4,359,882-byte Main/helper log at SHA-256 `f815529eb5cdd18c02d4d4cabaad0f83c15061aeb3f7424a375f0bdab55282c9` repeatedly proves both candidate sizes, valid framing and directional style movement, and the 1,920-by-1,080 screenshot at SHA-256 `a9d58cdf6cd935522906ef08c21ab0bff12836557f1eb655cdc95dac2a1e03df` visually confirms the localized speckles.  The loaded RBF has already physically rendered a complete purple bar, so this result does not reopen its compositor or scaling path; the dual-candidate strategy reaches the correct software boundary and misses acceptance by exactly one compensated byte.
+
+#### Next Steps:
+
+Preserve the source-`f5f650f` RBF and source-`2de0717` pre-drain Main, and obtain approval for a one-byte helper-only correction that changes the compensated probe candidate from 86,421 to 86,422 bytes and its final payload from 405 to 406 while retaining the standard first candidate unchanged.  Rebuild locally with the Raspberry Pi ARM toolchain and require physical telemetry to show the second candidate receive exactly 86,400 bytes, complete 10,800 DDR words, accept at least one commit, publish a plane and render a solid moving purple selector instead of speckles.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 850 COMMIT Unreleased 4baf17a 2026-08-31T21:09:16-07:00
 
 #### Coming From:
@@ -1153,35 +1182,6 @@ Perform one normal MiSTer reboot, load MediaPlayer, and begin with an authored D
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 811 COMMIT Unreleased a9899e0 2026-08-31T04:19:24-07:00
-
-#### Coming From:
-
-Unreleased 6e44472
-
-#### Purpose:
-
-Find and pin a timing-clean fitter placement for the source-`2738e99` authored-menu design without changing its logic or constraints.
-
-#### Outcome:
-
-The user authorizes the bounded placement-only search after source `2738e99` removed the authored-menu overlay crossing failures but seed 19 exposed negative 0.107 ns global setup slack on sixteen ordinary same-clock HDMI scaler paths.  Seed 20 is the first and only searched placement and passes, so source `a9899e0` changes only the QSF seed from 19 to 20 and stops the search without any RTL, SDC, interface or memory-allocation change.  The retained-netlist fit, assembly and timing run passes all five categories, and the required clean exact-commit Quartus build then completes analysis and synthesis with zero errors and 154 warnings, fitting with zero errors and 45 warnings, assembly with zero errors and zero warnings, and TimeQuest plus Phase-1P extraction with zero errors.  Global setup is positive 0.161 ns with zero TNS in every reported setup clock, hold is positive 0.243 ns, recovery is positive 3.980 ns, removal is positive 0.428 ns and minimum pulse width is positive 0.925 ns; the 60 MHz decoder and 54 MHz video setup domains are positive 0.925 ns and 2.564 ns with zero violated paths.  The clean fit uses 35,797 of 41,910 ALMs, 54,851 registers, 4,187,011 memory bits, 535 of 553 M10Ks and 70 of 112 DSPs, with 38 percent average and 61 percent peak interconnect usage.  The retained-netlist and clean builds produce byte-identical 4,511,756-byte RBFs at SHA-256 `02928bff70b25eb0e0b1a6b8f24afec0dfe687f2524754b33fe13f4ed3014e9d`; the clean artifact is preserved on the build PC and fetched to the Raspberry Pi but is not installed on the MiSTer.
-
-#### Next Steps:
-
-Keep exact source `a9899e0`, fitter seed 20 and RBF SHA-256 `02928bff` frozen as the final FPGA boundary and perform no further Quartus work unless the user explicitly reopens it after a demonstrated FPGA-only defect.  After separate deployment authorization, build or verify the matching source-`a9899e0` Main and ARM helper, preserve the accepted source-`6e44472` installation as rollback, install and read back all three candidate artifacts, then hardware-test first-play and root menus, directional selection, activation, animated menu audio and video, subpicture graphics and highlights on several differently authored ISO and physical discs; keep subsequent compatibility work in Main and the helper wherever this frozen overlay architecture permits.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
 
 #### Status:
 
