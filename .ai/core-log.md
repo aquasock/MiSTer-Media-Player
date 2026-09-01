@@ -1,3 +1,32 @@
+## 874 COMMIT Unreleased ??? 2026-09-01T07:09:16-07:00
+
+#### Coming From:
+
+Unreleased f0fba4d
+
+#### Purpose:
+
+Restore the known seed-23 placement for the synchronized audio-interface source and require a clean full-core timing result.
+
+#### Outcome:
+
+The approved correction will retain the explicit three-stage `clk_mpeg2`-to-`clk_video` startup-blank synchronizer and its first-stage-only exception from source `f0fba4d`, replace the cancelled slow seed-24 placement with seed 23, and rebuild from an exact clean source checkout on build PC `10.10.0.42`.  Seed 23 is the last known placement to route this design promptly and already met every clock domain before the unsynchronized audio-interface level was introduced; the structural crossing rather than placement caused its prior negative 7.142-nanosecond result.  Focused audio-interface and DDR-arbiter regressions will precede one clean Quartus synthesis, fit, assembly and timing gate, with no RBF collected unless global setup, hold, recovery, removal and minimum-pulse-width margins plus dedicated decoder and video checks are all positive.
+
+#### Next Steps:
+
+Change only the fitter seed back to 23, commit and push the exact source, pull it on the build PC, rerun the focused SystemVerilog tests and perform one clean full build.  If timing passes, preserve a uniquely named RBF and the matching ARM helper locally with verified hashes for user transfer; if timing fails, stop and report the exact remaining path rather than reseeding.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 873 COMMIT Unreleased f0fba4d 2026-09-01T05:51:42-07:00
 
 #### Coming From:
@@ -1190,40 +1219,6 @@ Preserve the installed `MiSTer_OverlayTrace` Main and `MediaPlayer_Helper_Overla
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 834 COMMIT Unreleased d4ed809 2026-08-31T15:36:39-07:00
-
-#### Coming From:
-
-Unreleased 0e89c73
-
-#### Purpose:
-
-Localize the physically absent known-pattern DVD highlight inside the FPGA after its byte-exact ingress FIFO acceptance.
-
-#### Outcome:
-
-The user approves and source `d4ed809` implements the first RBF observability change after source `0e89c73` proves the complete all-index-one plane, opaque-magenta palette, visible menu configuration, commit and moving style records enter the FPGA FIFO with matching accepted-word count and rolling digest but produce no magenta screen pixels.  The helper, Main, in-band record protocol, overlay control, DDR addresses, cache behavior, compositor and fitter seed remain unchanged.  Passive saturating counters now report accepted config, data, commit, style and clear records, all engine record and plane bytes, accepted DDR writes, valid and rejected commits, line-cache fills, memory-domain plane and style publications, synchronized video-domain publication and row-tag arrivals, row-tag-matched samples, highlighted samples, nonzero-alpha samples and exact opaque-magenta samples.  Schema 21 maps this evidence into words 37 through 54, suppresses the unrelated first-error snapshot, captures one decoder-clock second after any commit reaches the engine, and falls back after thirty active seconds if no commit arrives.  Each video counter crosses back as separately valid registered Gray code through two explicit synchronizer stages, with only the source-to-first-stage path cut.  The focused exact all-`0x55` engine simulation writes and reads 86,400 bytes through 10,800 DDR words, publishes the probe plane and style, renders opaque magenta, clears back to base video and requires every schema-21 stage to advance; the retained extractor and arbiter tests pass, and the new trigger regression passes both settled-commit and no-commit fallback paths under Icarus Verilog with warnings limited to pre-existing inherited timescales.
-
-#### Next Steps:
-
-Check out exact source `d4ed809` on build PC `10.10.0.42`, rerun all four focused overlay regressions there, perform one clean Quartus Prime 17.0.2 seed-20 build, require positive setup, hold, recovery, removal and minimum-pulse-width timing plus resolved schema-21 CDC constraints, and provide a uniquely named diagnostic RBF while preserving the installed target files until the user replaces only the RBF.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-- MediaPlayer.sdc
-- rtl/mpeg2_new/mpeg2_h262_dvd_overlay.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/test_dvd_overlay_engine.sv
-- tools/test_dvd_overlay_snapshot.sv
 
 #### Status:
 
