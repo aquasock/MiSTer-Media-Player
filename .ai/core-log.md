@@ -1,3 +1,32 @@
+## 859 COMMIT Unreleased 33d8151 2026-08-31T22:39:27-07:00
+
+#### Coming From:
+
+Unreleased 33d8151
+
+#### Purpose:
+
+Capture the physical Play result for the pending-payload helper and isolate the remaining delayed menu-to-title classification failure.
+
+#### Outcome:
+
+The user's physical source-`33d8151` run improves the visible result from a permanently resident menu frame to the authored ten-second pause followed by approximately one second of motion, but title playback then freezes permanently.  The unique pending-payload diagnostics prove that the intended 908,660-byte helper receives activation command `0x08`, keeps the request pending across 89 menu payloads and reaches the ten-second finite still.  At expiry, `dvdnav_still_skip` immediately samples `dvdnav_current_title_info` while it still reports title zero, so the helper sends `MENU_CONTINUE` with reason `finite-still-menu` and Main preserves the resident decoder session; only immediately afterward does libdvdnav report menu leave and subpicture stream 128.  Because that acknowledgment clears `activation_pending`, the observed menu leave cannot enter the existing ready/go barrier or rearm random access, yet Main and the helper remain alive and submit more than 257 megabytes of title data through 102 seconds.  The 724,552-byte screenshot at SHA-256 `ca0a97c23a78142ebbf2407287a0605468e427268fff4db0b28cd4988435cefa` shows the later frozen authored frame, the matching 1,937,579-byte log has SHA-256 `cbfa731889b1dfde1f2f109bef1ae7b4b4311ea4632f88deba80c865febd81c3`, and the 844-byte checksum-valid schema-21 snapshot has SHA-256 `ec4ceaaf5deee8fff354d187248264d8e96a4388ba42c1ce032b7c9060ac9697`.  This rejects source `33d8151` on hardware and proves that title zero immediately after a finite-still skip is ambiguous rather than proof of a menu continuation; Main, authored-selector compensation and the source-`f5f650f` RBF remain cleared.
+
+#### Next Steps:
+
+Keep Main, RTL, QSF, the source-`f5f650f` RBF and authored-selector compensation frozen.  After user approval, make a bounded helper-only correction that treats title zero immediately after a pending activation's finite-still skip as still pending, then resolves the request only after libdvdnav exposes the post-still boundary: an observed menu leave enters the existing ready/go barrier before the first title start code, while an indefinite still or another definitive menu state acknowledges continuation.  Strengthen the focused and real-image delayed-activation regressions to reproduce title zero at skip followed by menu leave, require no premature `MENU_CONTINUE`, one delayed stream hop, a second ready event, post-hop random access and title bytes, rebuild only the helper locally and repeat Play.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 858 COMMIT Unreleased 33d8151 2026-08-31T22:23:13-07:00
 
 #### Coming From:
@@ -1154,37 +1183,6 @@ Keep RTL, QSF, RBF and Quartus frozen.  After user approval, make a bounded help
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 819 COMMIT Unreleased e99cb28 2026-08-31T07:01:17-07:00
-
-#### Coming From:
-
-Unreleased 0e70319
-
-#### Purpose:
-
-Synchronize DVD menu commands and selected-button highlighting to the displayed NAV packet while making directional transitions directly testable.
-
-#### Outcome:
-
-Source `e99cb28` retains a decoded copy of each delivered DVD NAV PCI, invalidates it across rewinds, chapter changes and successful menu hops, and uses that stable packet for directional selection, activation and highlight lookup instead of libdvdnav's potentially ahead current PCI.  Ordinary selected buttons now use the selection palette rather than the activation palette, and every root, direction and activation command logs the packet logical-block number, button count, before, authored target and after button numbers, status, highlight rectangle and palette.  The strict native helper builds with `-Werror`; the focused stale-tail test additionally proves retained-PCI invalidation, selection-palette choice, rectangle recovery and authored-target lookup; and the retained fragmented subpicture, palette, alpha, highlight and rejection test passes.  The strengthened Blazing Saddles authored-DVD harness records all six commands and real transitions Right 1-to-2 and Left 1-to-4 while preserving two ready barriers, both clean zero-tail hops and the overlay stream.  The closer Coming to America authored fixture also passes with Down 1-to-2, Left 2-to-1 and Up 1-to-4, twenty overlay configurations, 443 data records carrying 1,728,196 bytes and 1,574 style updates.  Exact detached source `e99cb28` reproducibly builds a 904,564-byte static stripped ARMv7 EABI5 helper at `/home/vash/MiSTer-Media-Player-e99cb28/host/build/MediaPlayer_Helper`, SHA-256 `330502577a28200ad97ead837408e34dbaf04018fe510a0006ecdb7e0f3bb7df`; Main, RTL, QSF, RBF and Quartus are unchanged.
-
-#### Next Steps:
-
-The user should manually replace only `/media/fat/linux/MediaPlayer_Helper` with `/home/vash/MiSTer-Media-Player-e99cb28/host/build/MediaPlayer_Helper`, verify the destination SHA-256 is `330502577a28200ad97ead837408e34dbaf04018fe510a0006ecdb7e0f3bb7df`, restart MediaPlayer and press `M` during first-play.  At the root menu, exercise all four arrows before Enter and leave the resulting screen visible; hardware acceptance requires visible selection movement wherever the logged authored target differs, command logs whose before and after values match that movement, clean root and activation hops, and no black dead end, diagnostic raster or decoder error.
-
-#### Files Modified:
-
-- host/arm/media_source.c
-- tools/test_dvd_menu_hop.c
-- tools/test_dvd_menu_navigation.py
 
 #### Status:
 
