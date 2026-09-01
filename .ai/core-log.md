@@ -1,4 +1,4 @@
-## 858 COMMIT Unreleased ??? 2026-08-31T22:23:13-07:00
+## 858 COMMIT Unreleased 33d8151 2026-08-31T22:23:13-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Keep a pending DVD activation alive across intermediate menu payloads until libd
 
 #### Outcome:
 
-The approved helper-only correction will remove source `85cda13`'s invalid assumption that the first payload after activation proves a menu continuation.  While activation is pending, ordinary menu payloads will continue through the existing output path without sending `MENU_CONTINUE`; the helper will log that the request remains pending and continue until an indefinite still, a finite-still completion or an observed menu leave provides a definitive boundary.  Existing indefinite-still continuation, post-finite-still title classification, ready/go barrier, saved start-code handling, authored selector compensation, Main and RBF behavior remain unchanged.
+Source `33d8151` removes source `85cda13`'s invalid menu-payload continuation acknowledgment.  While activation is pending, ordinary menu payloads now continue through the existing output path without clearing Main's navigation request; the helper counts them, logs the first payload and logs the accumulated count when a still is reached.  Only an indefinite still, a finite-still completion or an observed menu leave now resolves the request, preserving the existing post-still title classification, ready/go barrier and saved-start-code path.  The strict compensated native helper builds with `-Werror`, its capability smoke test passes, and the focused delayed-transition, random-access and fragmented-subpicture regressions pass; the real-image harness's delayed-activation gate additionally requires a nonzero pending-payload count before the title hop, a second ready event, post-hop random access and title bytes.  The Raspberry Pi GNU 10.2.1 ARM toolchain builds `host/build/MediaPlayer_Helper_PendingPayload_33d8151`, a 908,660-byte static stripped ARMv7 EABI5 executable at SHA-256 `915bb2c064f459a9cd4a1d53321db5c8ebe442a103a3ce385da550583661bfa1` with authored-selector compensation and no dynamic section.  Main and the source-`f5f650f` RBF are unchanged.
 
 #### Next Steps:
 
-Remove only the menu-payload acknowledgment, extend the real-image harness to require evidence that payload was crossed while activation remained pending before a delayed title hop, run strict native helper and focused DVD regressions, and build one compensated ARMv7 helper with the Raspberry Pi toolchain.  Physical acceptance requires Play activation to log pending payload, wait through the authored ten-second still, report menu leave and delayed stream hop, complete the existing ready/go barrier, and start moving title video while preserving menu and selector behavior on return.
+The user should exit MediaPlayer so its helper process stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_PendingPayload_33d8151`, restore executable mode if needed and verify the 908,660-byte size and recorded SHA-256.  Preserve the installed Main and source-`f5f650f` RBF, restart the disc, enter the root menu, leave Play selected and press Space once, then wait through the authored ten-second still.  Physical acceptance requires pending-payload and reached-still diagnostics, menu leave, delayed stream hop, one clean ready/go barrier and moving title video; returning to the menu must retain the authored selector.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Remove only the menu-payload acknowledgment, extend the real-image harness to re
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
