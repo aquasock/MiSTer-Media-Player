@@ -1,3 +1,32 @@
+## 844 COMMIT Unreleased 924cb21 2026-08-31T19:48:07-07:00
+
+#### Coming From:
+
+Unreleased c787835
+
+#### Purpose:
+
+Build and verify the Main-only 500 millisecond stream-hop drain diagnostic for physical FIFO-residue testing.
+
+#### Outcome:
+
+The exact clean source checkout `924cb217c1617a3c466df28094616758c3ad2644` on build PC `10.10.0.42` applies both pinned Main patches in order and builds Main successfully with MiSTer's pinned GNU 10.2.1 ARM toolchain.  The uniquely preserved `/home/vash/MiSTer-Media-Player-924cb21/host/build/MiSTer_StreamHopDrain_924cb21` and local `host/build/MiSTer_StreamHopDrain_924cb21` are byte-identical 1,178,588-byte stripped dynamically linked 32-bit ARM EABI5 executables at SHA-256 `6f49f425dae7e789c2f54b919fcc99fdb0f804e0ebbb60996f7c235e799bdf65`; the binary contains the required `stream hop drain release_to_rearm_us` marker.  The source checkout remains clean, and no helper, RBF, MiSTer installation, media or running process changes during this build.
+
+#### Next Steps:
+
+The user will manually replace only `/media/fat/MiSTer` with local `host/build/MiSTer_StreamHopDrain_924cb21`, restore executable mode if needed, verify the exact size and SHA-256, and reboot while preserving the installed ordinary helper and source-`f5f650f` RBF.  Start the physical DVD and perform at least twenty consecutive `M` root-menu reloads; acceptance requires every completed hop to log `release_to_rearm_us` at or above 500,000, continued menu video and selector operation, and no schema-21 `0x0200` raster, while any recurrence rejects residual FIFO drain as a sufficient remedy.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 843 COMMIT Unreleased 924cb21 2026-08-31T19:45:27-07:00
 
 #### Coming From:
@@ -1179,38 +1208,6 @@ Open the MiSTer OSD and verify the three requested file actions, 16:9 default, 4
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 804 COMMIT Unreleased 4525ae4 2026-08-30T23:17:00-07:00
-
-#### Coming From:
-
-Unreleased de29d54
-
-#### Purpose:
-
-Keep native 480i presentation active when one interlaced-sequence chapter mixes ordinary interlaced and progressive film frame pictures.
-
-#### Outcome:
-
-Source `4525ae4` makes native field-order tracking sticky after any progressive frame appears in a supported interlaced sequence and allows either supported ordinary-interlaced or film-frame pictures to retain native ownership, while preserving the pre-transition fixed-order mismatch guard and every existing syntax, timing and decoder-error rejection.  Focused ordinary-to-film, film-to-ordinary, per-picture field-order, pure-interlaced mismatch and reset tests pass, followed by the complete native-480i timing, cache, cadence, presentation, mixed-raster, I/P/B, field-motion, field-DCT and exhaustive B-motion regressions.  Exactly one clean Quartus Prime 17.0.2 build is attempted at pinned seed 19 from the exact source commit.  Analysis, fitting, assembly and timing extraction complete using 34,072 of 41,910 ALMs, 52,748 registers, 4,181,443 memory bits in 532 of 553 M10Ks and 67 of 112 DSP blocks, but the global timing gate rejects the RBF because setup slack is negative 0.480 ns with TNS negative 2.373 ns; hold, recovery, removal and minimum-pulse-width margins remain positive 0.249, 4.034, 0.586 and 0.925 ns.  The targeted 60 MHz decoder and 54 MHz video domains remain clean at 0.263 and 3.055 ns, while detailed extraction localizes the violations to the unrelated 148.54 MHz HDMI scaler address path led by `ascal|o_adrs_pre[11]` to `ascal|o_adrs[12]`.  The rejected 4,459,620-byte RBF has SHA-256 `1444f6512e910a8b662767b98d98b5f8970c83823deb2e22cbd954336b4805db`; it is not installed, and no reseed or second compile is performed.
-
-#### Next Steps:
-
-Keep the accepted RBF installed and do not deploy this timing-failed artifact.  Use the extracted seed-19 HDMI scaler paths and the accepted source-`205bbd7` timing baseline to prepare a separately approved, narrowly bounded timing correction that restores positive global setup margin without changing the mixed-film behavior, menu semantics, scaler function or seed; repeat the functional regressions before one further clean build is considered, then install only a five-category timing-clean RBF and perform the pending chapter, menu and Ogg hardware gates.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sv
-- README.md
-- rtl/mpeg2_new/mpeg2_h262_native_field_order.sv
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
