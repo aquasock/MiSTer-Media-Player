@@ -12,6 +12,7 @@
 #include "media_player_protocol.h"
 #include "media_source.h"
 #include "output_reserve.h"
+#include "output_stage.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -34,6 +35,7 @@
  */
 #define VIDEO_QUEUE_LIMIT  (2u * 1024u * 1024u)
 #define OUTPUT_RESERVE_BYTES (4u * 1024u * 1024u)
+#define OUTPUT_ACTIVATION_STAGE_BYTES (4u * 1024u * 1024u)
 #define PCM_SCHEDULE_RESERVE_FRAMES 8192u
 #define PCM_SCHEDULE_BATCH_FRAMES   2048u
 #define PCM_INITIAL_RELEASE_FRAMES  8192u
@@ -157,6 +159,7 @@ struct output_state {
     FILE *video;
     FILE *pcm;
     struct output_reserve *reserve;
+    struct output_stage *activation_stage;
     uint64_t video_bytes;
     uint64_t pcm_frames;
     unsigned video_pts;
@@ -301,6 +304,7 @@ struct dvd_menu_state {
     uint16_t highlight_y2;
     int activation_pending;
     unsigned activation_payloads;
+    int activation_staged_hop;
     int resume_code_valid;
     uint8_t resume_code;
 };
@@ -389,13 +393,19 @@ static int write_all(FILE *stream, const void *data, size_t size,
     return 0;
 }
 
-static int write_output(struct output_state *output, const void *data,
-                        size_t size, const char *what)
+static int write_output_unstaged(struct output_state *output,
+                                 const void *data, size_t size,
+                                 int priority, const char *what)
 {
     if (output->reserve) {
-        if (output_reserve_write(output->reserve, data, size) < 0) {
-            fprintf(stderr, "media_player_helper: writing %s through "
-                    "output reserve failed: %s\n", what, strerror(errno));
+        int result = priority ?
+            output_reserve_write_priority(output->reserve, data, size) :
+            output_reserve_write(output->reserve, data, size);
+
+        if (result < 0) {
+            fprintf(stderr, "media_player_helper: writing %s%s through "
+                    "output reserve failed: %s\n",
+                    priority ? "priority " : "", what, strerror(errno));
             return -1;
         }
         return 0;
@@ -403,20 +413,100 @@ static int write_output(struct output_state *output, const void *data,
     return write_all(output->video, data, size, what);
 }
 
+static int write_output_stage_callback(void *opaque, const void *data,
+                                       size_t size, int priority)
+{
+    return write_output_unstaged(opaque, data, size, priority,
+                                 "staged DVD activation output");
+}
+
+static int write_output(struct output_state *output, const void *data,
+                        size_t size, const char *what)
+{
+    int staged = output->activation_stage ?
+        output_stage_write(output->activation_stage, data, size, 0) : 0;
+
+    if (staged < 0) {
+        fprintf(stderr, "media_player_helper: staging %s failed: %s\n",
+                what, strerror(errno));
+        return -1;
+    }
+    if (staged)
+        return 0;
+    return write_output_unstaged(output, data, size, 0, what);
+}
+
 static int write_output_priority(struct output_state *output,
                                  const void *data, size_t size,
                                  const char *what)
 {
-    if (output->reserve) {
-        if (output_reserve_write_priority(output->reserve, data, size) < 0) {
-            fprintf(stderr, "media_player_helper: writing priority %s "
-                    "through output reserve failed: %s\n",
-                    what, strerror(errno));
-            return -1;
-        }
-        return 0;
+    int staged = output->activation_stage ?
+        output_stage_write(output->activation_stage, data, size, 1) : 0;
+
+    if (staged < 0) {
+        fprintf(stderr,
+                "media_player_helper: staging priority %s failed: %s\n",
+                what, strerror(errno));
+        return -1;
     }
-    return write_all(output->video, data, size, what);
+    if (staged)
+        return 0;
+    return write_output_unstaged(output, data, size, 1, what);
+}
+
+static int begin_activation_stage(struct output_state *output)
+{
+    if (output_stage_begin(output->activation_stage) < 0) {
+        fprintf(stderr,
+                "media_player_helper: starting DVD activation stage failed: %s\n",
+                strerror(errno));
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: DVD activation output stage started "
+            "capacity=%u\n", OUTPUT_ACTIVATION_STAGE_BYTES);
+    return 0;
+}
+
+static int commit_activation_stage(struct output_state *output,
+                                   const char *reason)
+{
+    size_t bytes = 0;
+    size_t records = 0;
+
+    if (output_stage_commit(output->activation_stage,
+                            write_output_stage_callback, output,
+                            &bytes, &records) < 0) {
+        fprintf(stderr,
+                "media_player_helper: committing DVD activation stage "
+                "failed: %s\n", strerror(errno));
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: DVD activation output stage committed "
+            "reason=%s records=%zu bytes=%zu\n",
+            reason, records, bytes);
+    return 0;
+}
+
+static int cancel_activation_stage(struct output_state *output,
+                                   const char *reason)
+{
+    size_t bytes = 0;
+    size_t records = 0;
+
+    if (output_stage_cancel(output->activation_stage,
+                            &bytes, &records) < 0) {
+        fprintf(stderr,
+                "media_player_helper: cancelling DVD activation stage "
+                "failed: %s\n", strerror(errno));
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: DVD activation output stage cancelled "
+            "reason=%s records=%zu bytes=%zu\n",
+            reason, records, bytes);
+    return 0;
 }
 
 static int flush_output(struct output_state *output, const char *what)
@@ -732,6 +822,7 @@ static int acknowledge_menu_continuation(struct dvd_menu_state *menu,
         return -1;
     menu->activation_pending = 0;
     menu->activation_payloads = 0;
+    menu->activation_staged_hop = 0;
     fprintf(stderr,
             "media_player_helper: DVD menu continuation reason=%s\n",
             reason);
@@ -1358,6 +1449,7 @@ static void reset_output_for_chapter(struct output_state *output,
     FILE *video = output->video;
     FILE *pcm = output->pcm;
     struct output_reserve *reserve = output->reserve;
+    struct output_stage *activation_stage = output->activation_stage;
 
     free(output->hold);
     output->hold = NULL;
@@ -1367,12 +1459,47 @@ static void reset_output_for_chapter(struct output_state *output,
     output->video = video;
     output->pcm = pcm;
     output->reserve = reserve;
+    output->activation_stage = activation_stage;
     output->hold_limit = hold_limit;
     output->hold_active = hold_limit != 0;
     output->scheduler_started = !output->hold_active;
     output->scheduler_enabled = pcm == NULL;
     output->iso_pts_normalization = 1;
     output->iso_start_filter_active = output->scheduler_enabled;
+}
+
+static int start_pending_menu_activation(struct dvd_menu_state *menu,
+                                         struct audio_state *audio,
+                                         struct output_state *output)
+{
+    size_t hold_limit = output->hold_limit;
+
+    if (output_stage_active(output->activation_stage) &&
+        cancel_activation_stage(output, "superseded-activation") < 0)
+        return -1;
+    if (begin_activation_stage(output) < 0)
+        return -1;
+    reset_audio_for_chapter(audio);
+    reset_output_for_chapter(output, hold_limit);
+    menu->activation_pending = 1;
+    menu->activation_payloads = 0;
+    menu->activation_staged_hop = 0;
+    fprintf(stderr,
+            "media_player_helper: DVD menu activation deferred\n");
+    return 0;
+}
+
+static int cancel_pending_menu_activation(struct dvd_menu_state *menu,
+                                          struct output_state *output,
+                                          const char *reason)
+{
+    if (output_stage_active(output->activation_stage) &&
+        cancel_activation_stage(output, reason) < 0)
+        return -1;
+    menu->activation_pending = 0;
+    menu->activation_payloads = 0;
+    menu->activation_staged_hop = 0;
+    return 0;
 }
 
 /*
@@ -2690,10 +2817,12 @@ done:
  */
 static int wait_dvd_still(struct media_source *input,
                           struct dvd_menu_state *menu,
+                          struct audio_state *audio,
                           struct output_state *output,
                           int control_fd, int *control_command)
 {
     struct timespec delay = {0, 10 * 1000 * 1000};
+    enum output_stage_still_action stage_action;
     unsigned seconds = 0;
     uint64_t deadline = 0;
 
@@ -2710,12 +2839,30 @@ static int wait_dvd_still(struct media_source *input,
                 menu->activation_payloads,
                 seconds == 0xffu ? "indefinite/" : "", seconds);
 
-    if (seconds == 0xffu && menu->activation_pending) {
+    stage_action = output_stage_classify_still(
+        output_stage_active(output->activation_stage),
+        menu->activation_payloads, seconds);
+    if (stage_action == OUTPUT_STAGE_STILL_HOP) {
+        menu->activation_staged_hop = 1;
+        *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
+        fprintf(stderr,
+                "media_player_helper: DVD payload-bearing indefinite menu "
+                "requires staged stream hop records=%zu bytes=%zu\n",
+                output_stage_records(output->activation_stage),
+                output_stage_size(output->activation_stage));
+        return 2;
+    }
+    if (stage_action == OUTPUT_STAGE_STILL_CANCEL) {
+        if (cancel_activation_stage(output, "empty-indefinite-still") < 0)
+            return -1;
         if (acknowledge_menu_continuation(menu, control_fd,
                                           "indefinite-still") < 0)
             return -1;
         return 1;
     }
+    if (stage_action == OUTPUT_STAGE_STILL_COMMIT &&
+        commit_activation_stage(output, "finite-still") < 0)
+        return -1;
 
     for (;;) {
         int command = control_read_command(control_fd);
@@ -2725,6 +2872,9 @@ static int wait_dvd_still(struct media_source *input,
             return -1;
         if (command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
             command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER) {
+            if (cancel_pending_menu_activation(menu, output,
+                                               "chapter-interrupt") < 0)
+                return -1;
             *control_command = command;
             return 2;
         }
@@ -2737,19 +2887,24 @@ static int wait_dvd_still(struct media_source *input,
             if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
                 return -1;
             if (navigation == MEDIA_SOURCE_DVD_MENU_CONTINUE) {
+                if (output_stage_active(output->activation_stage) &&
+                    cancel_activation_stage(output,
+                                            "command-continuation") < 0)
+                    return -1;
                 if (acknowledge_menu_continuation(menu, control_fd,
                                                   "command") < 0)
                     return -1;
                 return 1;
             }
             if (navigation == MEDIA_SOURCE_DVD_MENU_PENDING) {
-                menu->activation_pending = 1;
-                menu->activation_payloads = 0;
-                fprintf(stderr,
-                        "media_player_helper: DVD menu activation deferred\n");
+                if (start_pending_menu_activation(menu, audio, output) < 0)
+                    return -1;
                 return 1;
             }
             if (navigation == MEDIA_SOURCE_DVD_STREAM_HOP) {
+                if (cancel_pending_menu_activation(menu, output,
+                                                   "menu-command-hop") < 0)
+                    return -1;
                 *control_command = command;
                 return 2;
             }
@@ -2818,6 +2973,9 @@ static int process_program_stream(struct media_source *input,
             return -1;
         if (command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
             command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER) {
+            if (cancel_pending_menu_activation(menu, output,
+                                               "chapter-interrupt") < 0)
+                return -1;
             *control_command = command;
             return 1;
         }
@@ -2834,19 +2992,24 @@ static int process_program_stream(struct media_source *input,
             if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
                 return -1;
             if (navigation == MEDIA_SOURCE_DVD_MENU_CONTINUE) {
+                if (output_stage_active(output->activation_stage) &&
+                    cancel_activation_stage(output,
+                                            "command-continuation") < 0)
+                    return -1;
                 if (acknowledge_menu_continuation(menu, control_fd,
                                                   "command") < 0)
                     return -1;
                 continue;
             }
             if (navigation == MEDIA_SOURCE_DVD_MENU_PENDING) {
-                menu->activation_pending = 1;
-                menu->activation_payloads = 0;
-                fprintf(stderr,
-                        "media_player_helper: DVD menu activation deferred\n");
+                if (start_pending_menu_activation(menu, audio, output) < 0)
+                    return -1;
                 continue;
             }
             if (navigation == MEDIA_SOURCE_DVD_STREAM_HOP) {
+                if (cancel_pending_menu_activation(menu, output,
+                                                   "menu-command-hop") < 0)
+                    return -1;
                 *control_command = command;
                 return 1;
             }
@@ -2866,7 +3029,7 @@ static int process_program_stream(struct media_source *input,
             found = find_start_code(input, &code);
         }
         if (found == 0) {
-            int still = wait_dvd_still(input, menu, output, control_fd,
+            int still = wait_dvd_still(input, menu, audio, output, control_fd,
                                        control_command);
 
             if (still < 0)
@@ -2883,8 +3046,12 @@ static int process_program_stream(struct media_source *input,
             if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
                 return -1;
             if (!menu->menu_active) {
+                if (output_stage_active(output->activation_stage) &&
+                    cancel_activation_stage(output, "menu-leave") < 0)
+                    return -1;
                 menu->activation_pending = 0;
                 menu->activation_payloads = 0;
+                menu->activation_staged_hop = 0;
                 menu->resume_code = code;
                 menu->resume_code_valid = 1;
                 *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
@@ -3212,6 +3379,14 @@ int main(int argc, char **argv)
         media_source_close(&input);
         return 1;
     }
+    if (dvd_menu.enabled &&
+        output_stage_create(&output.activation_stage,
+                            OUTPUT_ACTIVATION_STAGE_BYTES) < 0) {
+        fprintf(stderr,
+                "media_player_helper: cannot allocate DVD activation stage: %s\n",
+                strerror(errno));
+        goto done;
+    }
     if (pcm_path) {
         output.pcm = fopen(pcm_path, "wb");
         if (!output.pcm) {
@@ -3319,7 +3494,8 @@ int main(int argc, char **argv)
             }
             if (command == MEDIA_PLAYER_CONTROL_ROOT_MENU ||
                 command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
-                command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER) {
+                command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER ||
+                dvd_menu.activation_staged_hop) {
                 if (discard_reserved_output(&output, command,
                                             "navigation barrier") < 0)
                     goto done;
@@ -3337,10 +3513,19 @@ int main(int argc, char **argv)
                 goto done;
             }
             if (dvd_menu.enabled) {
-                dvd_spu_reset(dvd_menu.decoder);
-                dvd_menu.overlay_emitted = 0;
-                if (emit_overlay_clear(&output) < 0)
-                    goto done;
+                if (dvd_menu.activation_staged_hop) {
+                    if (commit_activation_stage(
+                            &output, "payload-indefinite-menu-hop") < 0)
+                        goto done;
+                    dvd_menu.activation_pending = 0;
+                    dvd_menu.activation_payloads = 0;
+                    dvd_menu.activation_staged_hop = 0;
+                } else {
+                    dvd_spu_reset(dvd_menu.decoder);
+                    dvd_menu.overlay_emitted = 0;
+                    if (emit_overlay_clear(&output) < 0)
+                        goto done;
+                }
             }
             fprintf(stderr,
                     "media_player_helper: navigation barrier released\n");
@@ -3401,6 +3586,15 @@ done:
     output.hold = NULL;
     while (output.video_head)
         free_video_head(&output);
+    if (output.activation_stage) {
+        if (success && output_stage_active(output.activation_stage)) {
+            fprintf(stderr,
+                    "media_player_helper: active DVD output stage at shutdown\n");
+            success = 0;
+        }
+        output_stage_destroy(output.activation_stage);
+        output.activation_stage = NULL;
+    }
     if (video_path && output.video) {
         fclose(output.video);
         output.video = NULL;
