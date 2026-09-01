@@ -163,7 +163,8 @@ hps_io #(.CONF_STR(CONF_STR), .CONF_STR_BRAM(1), .WIDE(1), .MEDIA_BURST(1)) hps_
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
 
-	.ioctl_wait(ioctl_download && mpeg2_stream_full),
+	.ioctl_wait(ioctl_download &&
+	            (mpeg2_stream_full || !mpeg2_burst_ready)),
 	.ioctl_burst_credit(mpeg2_burst_credit),
 	.ioctl_burst_words(mpeg2_burst_words),
 	.ioctl_burst_digest(mpeg2_burst_digest),
@@ -652,6 +653,7 @@ assign mpeg2_stream_wr =
 	ioctl_download &&
 	ioctl_wr &&
 	(ioctl_index[5:0] == 6'd1) &&
+	mpeg2_burst_ready &&
 	!mpeg2_stream_full;
 
 // Phase 1V: the decoder owns syntax/persistence backpressure, while the top
@@ -774,6 +776,11 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 (
 	// kate - DCFIFO owns reset-release synchronization for wr_clk and rd_clk.
 	.reset    (reset_request),
+	// Every rising download edge starts a logically independent elementary
+	// stream.  Flush bytes retained from the prior stream before accepting the
+	// first new word; burst_ready keeps both legacy wait and burst transport
+	// backpressured through the FIFO's synchronized reset release.
+	.session_start(audio_download_start_sys),
 
 	.wr_clk   (clk_sys),
 	.wr_data  (mpeg2_stream_wr ? ioctl_dout : 16'd0),

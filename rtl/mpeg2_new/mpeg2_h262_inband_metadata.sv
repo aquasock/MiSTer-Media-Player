@@ -81,10 +81,10 @@ module mpeg2_h262_inband_metadata
     output reg  [13:0] pcm_sample_count,
     output reg         pcm_protocol_error,
 
-    output reg   [7:0] overlay_data,
-    output reg         overlay_start,       // first command/payload byte
-    output reg         overlay_last,        // final command/payload byte
-    output reg         overlay_valid,       // retained until ready transfer
+    output wire  [7:0] overlay_data,
+    output wire        overlay_start,       // first command/payload byte
+    output wire        overlay_last,        // final command/payload byte
+    output wire        overlay_valid,       // retained until ready transfer
     input  wire        overlay_ready,
     output reg         overlay_protocol_error
 );
@@ -119,6 +119,15 @@ reg [1:0]  pcm_byte_index;
 reg [23:0] pcm_frame;
 reg [15:0] overlay_length;
 reg [15:0] overlay_remaining;
+reg [1:0]  overlay_queue_count;
+reg [7:0]  overlay_queue_data [0:1];
+reg [1:0]  overlay_queue_start;
+reg [1:0]  overlay_queue_last;
+
+assign overlay_data  = overlay_queue_data[0];
+assign overlay_start = overlay_queue_start[0];
+assign overlay_last  = overlay_queue_last[0];
+assign overlay_valid = (overlay_queue_count != 2'd0);
 
 // The integrated decoder advances on stream_valid itself rather than on a
 // conventional valid-and-ready transfer.  Retain a pending output byte while
@@ -143,7 +152,11 @@ assign input_ready =
     (!stream_pending || stream_ready) &&
     (!pts_payload_final || metadata_ready) &&
     (!pcm_payload_final || pcm_ready) &&
-    ((state != S_OVERLAY_PAYLOAD) || !overlay_valid);
+    ((state != S_OVERLAY_PAYLOAD) || (overlay_queue_count != 2'd2));
+
+wire overlay_enqueue =
+    (state == S_OVERLAY_PAYLOAD) && input_valid && input_ready;
+wire overlay_dequeue = overlay_valid && overlay_ready;
 
 wire [31:0] window_next = {window[23:0], input_data};
 // window_fill saturates at four; the window then always holds the true
@@ -186,10 +199,11 @@ always @(posedge clk) begin
         pcm_mode_seen      <= 1'b0;
         pcm_byte_index     <= 2'd0;
         pcm_frame          <= 24'd0;
-        overlay_data       <= 8'd0;
-        overlay_start      <= 1'b0;
-        overlay_last       <= 1'b0;
-        overlay_valid      <= 1'b0;
+        overlay_queue_count <= 2'd0;
+        overlay_queue_data[0] <= 8'd0;
+        overlay_queue_data[1] <= 8'd0;
+        overlay_queue_start <= 2'b00;
+        overlay_queue_last  <= 2'b00;
         overlay_protocol_error <= 1'b0;
         overlay_length     <= 16'd0;
         overlay_remaining  <= 16'd0;
@@ -198,12 +212,57 @@ always @(posedge clk) begin
         metadata_valid <= 1'b0;
         pcm_valid      <= 1'b0;
         pcm_end        <= 1'b0;
-        // Unlike the metadata and PCM event pulses, an overlay byte is a
-        // conventional ready/valid transfer.  Retain its data and boundary
-        // flags throughout an engine stall.  Refill the slot on the following
-        // cycle instead of adding the engine ready path to upstream readiness.
-        if (overlay_valid && overlay_ready)
-            overlay_valid <= 1'b0;
+        // A two-entry retained queue absorbs the engine's transition into a
+        // DDR-write stall without exposing overlay_ready on the upstream
+        // timing path.  Its front remains stable for the complete stall, and
+        // simultaneous dequeue/enqueue preserves continuous source progress.
+        case ({overlay_enqueue,overlay_dequeue})
+            2'b01: begin
+                if (overlay_queue_count == 2'd2) begin
+                    overlay_queue_data[0]  <= overlay_queue_data[1];
+                    overlay_queue_start[0] <= overlay_queue_start[1];
+                    overlay_queue_last[0]  <= overlay_queue_last[1];
+                end
+                overlay_queue_count <= overlay_queue_count - 2'd1;
+            end
+            2'b10: begin
+                if (overlay_queue_count == 2'd0) begin
+                    overlay_queue_data[0]  <= input_data;
+                    overlay_queue_start[0] <=
+                        (overlay_remaining == overlay_length);
+                    overlay_queue_last[0]  <=
+                        (overlay_remaining == 16'd1);
+                end
+                else begin
+                    overlay_queue_data[1]  <= input_data;
+                    overlay_queue_start[1] <=
+                        (overlay_remaining == overlay_length);
+                    overlay_queue_last[1]  <=
+                        (overlay_remaining == 16'd1);
+                end
+                overlay_queue_count <= overlay_queue_count + 2'd1;
+            end
+            2'b11: begin
+                if (overlay_queue_count == 2'd1) begin
+                    overlay_queue_data[0]  <= input_data;
+                    overlay_queue_start[0] <=
+                        (overlay_remaining == overlay_length);
+                    overlay_queue_last[0]  <=
+                        (overlay_remaining == 16'd1);
+                end
+                else begin
+                    overlay_queue_data[0]  <= overlay_queue_data[1];
+                    overlay_queue_start[0] <= overlay_queue_start[1];
+                    overlay_queue_last[0]  <= overlay_queue_last[1];
+                    overlay_queue_data[1]  <= input_data;
+                    overlay_queue_start[1] <=
+                        (overlay_remaining == overlay_length);
+                    overlay_queue_last[1]  <=
+                        (overlay_remaining == 16'd1);
+                end
+            end
+            default: begin end
+        endcase
 
         if (stream_pending && stream_ready)
             stream_pending <= 1'b0;
@@ -380,10 +439,6 @@ always @(posedge clk) begin
 
         S_OVERLAY_PAYLOAD:
             if (input_valid && input_ready) begin
-                overlay_data  <= input_data;
-                overlay_start <= (overlay_remaining == overlay_length);
-                overlay_last  <= (overlay_remaining == 16'd1);
-                overlay_valid <= 1'b1;
                 if (overlay_remaining == 16'd1) begin
                     overlay_remaining <= 16'd0;
                     state <= S_FILL;
