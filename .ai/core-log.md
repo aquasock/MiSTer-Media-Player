@@ -1,3 +1,36 @@
+## 862 COMMIT Unreleased ??? 2026-08-31T23:11:01-07:00
+
+#### Coming From:
+
+Unreleased bb3110d
+
+#### Purpose:
+
+Correct the two FPGA transport boundaries currently masked by the Main stream-hop delay and helper overlay-byte compensation.
+
+#### Outcome:
+
+The user's repeated chapter-forward and chapter-backward run captures ten software-successful DVD stream hops with complete random-access boundaries at sequence offset zero, intra offset 296 and following-reference offsets between 73,204 and 110,220 bytes, followed by the same hardware failure previously seen on intermittent menu reloads.  The checksum-valid schema-21 fallback snapshot accepts only 13,635 bytes in the new session, records zero sequence, reference, B, display or swap pictures, sees a P-picture before any frame-rate code and latches only phase-one probe error `0x0002`; this confirms that the decoder reset can consume residual pre-hop bytes because its 32 KiB dual-clock input FIFO is not reset at a new `ioctl_download` session.  The separately proven overlay compatibility fault remains an exact one-byte loss from each maximum-size data record, requiring the current helper to submit a second 86,422-byte candidate with duplicated record tails to reconstruct the authored 86,400-byte plane.  The user approves an RBF-only root correction for both boundaries while Main and helper behavior remain frozen.
+
+#### Next Steps:
+
+Reset and re-settle the MPEG input FIFO on every download rising edge, expose not-ready backpressure until asynchronous-clear release has synchronized into both FIFO clock domains, and add a focused regression proving stale queued words cannot cross into a new session or cause loss of its first word.  Replace the one-entry nonelastic overlay output slot with a timing-isolated two-entry retained queue so engine stalls cannot create the physical record-tail shortfall, strengthen the full 86,400-byte multi-record integration regression under sustained DDR stalls, then run the complete relevant Icarus suite and build one timing-clean Quartus RBF from the approved source while leaving Main, helper record generation, navigation semantics, decoder logic and rendering semantics unchanged.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+- rtl/mpeg2_stream_fifo.sv
+- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
+- tools/test_mpeg2_stream_fifo.sv
+- tools/test_dvd_overlay_integrated.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 861 COMMIT Unreleased bb3110d 2026-08-31T23:00:20-07:00
 
 #### Coming From:
@@ -1144,35 +1177,6 @@ Absolute-path readback verifies the intended artifact combination before interpr
 #### Next Steps:
 
 Keep the exact source-`53ccc04` Main, helper and frozen seed-20 RBF unchanged and do not use this failed session for further menu commands.  After user approval, make a bounded helper-only random-access correction that withholds every reset-causing DVD stream hop until complete independently decodable sequence context and an intra reference are present, add a real authored-disc regression reproducing the root call from the observed mid-first-play position and require its first outgoing video to decode cleanly, then rebuild only the helper and repeat `M`; do not change Main, RTL, QSF, the RBF or the separately open overlay-highlight path in that boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 822 COMMIT Unreleased 53ccc04 2026-08-31T08:18:13-07:00
-
-#### Coming From:
-
-Unreleased 53ccc04
-
-#### Purpose:
-
-Capture the first physical-disc selected-button result from the source-`53ccc04` helper and identify the exact installed artifact combination that produced it.
-
-#### Outcome:
-
-The user enters the Coming to America root menu with keyboard `M`, moves the selection to `SET UP` and reports that the barely visible indicator appears distorted.  The 795,417-byte 1920-by-1080 scaled capture `/tmp/entry822_setup_selected_distorted.png`, SHA-256 `3da0f2580528471e099035487beba1a2d0258d5cca4584b26633f055539dbc20`, preserves the menu background and shows a cyan-green selection rendered as sparse horizontal fragments across `SET UP`; the large black-and-white lower-left cadence telemetry block is the previously identified diagnostic overlay rather than the selected-button bitmap.  Its matching 2,679,653-byte helper log at SHA-256 `aad53eecef30d4b3e78ed114a5b15c05469e3073813f5506ab50d9f6f46b5df8` records a successful authored Right transition from button 1 to button 2 with exact rectangle 212,397 through 302,436 and selection palette `000feb80`, two menu commands, two subpicture overlay updates and no fatal or helper exit.  Absolute-path readback identifies a mixed deployment: the 904,564-byte installed helper is the exact source-`53ccc04` candidate at SHA-256 `29665e7dbe7790872988d0f0d05e26487f95550128f6719f148fab2d1114c09f`, and the 4,511,756-byte RBF remains the expected frozen seed-20 image at `02928bff70b25eb0e0b1a6b8f24afec0dfe687f2524754b33fe13f4ed3014e9d`, but the 1,174,492-byte installed Main is the older source-`a9899e0` binary at `a276aadcdc5aad4034bc40ee2dff52596fd44876156e24f16289d5a339411636` rather than source `53ccc04` Main at `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496`.  The valid button transition and correctly bounded but visibly fragmented highlight reject the visible-indicator hardware gate for this helper-and-RBF combination, while the mixed Main means menu-continuation activation and background preservation are not tested.
-
-#### Next Steps:
-
-Do not use this mixed installation to test submenu activation because the older Main retains the unconditional reset that can black the resident menu frame.  After user approval, replace only `/media/fat/MiSTer` with `/home/vash/MiSTer-Media-Player-53ccc04/host/build/MiSTer`, require SHA-256 `4015bb2a068bcc1644b7eb6ee99e29850666057576c3e7adb6750587dc03b496`, reboot and verify the running artifact combination before repeating the `SET UP` selection capture; if the same bounded horizontal fragmentation remains, keep Main and the helper frozen and isolate the overlay plane packing, line-cache addressing and authored SPU field layout before considering any FPGA change.
 
 #### Files Modified:
 
