@@ -45,6 +45,9 @@ POST_STILL_PENDING_RE = re.compile(
     rb"media_player_helper: DVD delayed activation remains pending "
     rb"after finite still"
 )
+POST_STILL_HOP_RE = re.compile(
+    rb"media_player_helper: DVD delayed activation stream hop before payload"
+)
 COMMAND_RE = re.compile(
     rb"media_source: (?:DVD|ISO) menu command="
     rb"(up|down|left|right|activate|root) pci_lbn=([0-9]+) "
@@ -180,6 +183,7 @@ def main():
     pending_discarded = {"activate": []}
     pending_payloads = []
     post_still_pending = 0
+    post_still_hops = 0
     root_random_access = []
     activation_random_access = []
     last_hop = None
@@ -208,7 +212,7 @@ def main():
                 activation_done = (pending_counts["activate"] and
                                    pending_payloads and
                                    post_still_pending and
-                                   hop_counts["activate"] and
+                                   post_still_hops and
                                    ready_events >= 2 and leave_events and
                                    not continue_events and
                                    activation_random_access and
@@ -302,6 +306,9 @@ def main():
                                      int(match.group(2))))
                             if POST_STILL_PENDING_RE.search(line):
                                 post_still_pending += 1
+                            if POST_STILL_HOP_RE.search(line):
+                                post_still_hops += 1
+                                last_hop = "activate"
                             match = COMMAND_RE.search(line)
                             if match:
                                 name = match.group(1).decode("ascii")
@@ -351,7 +358,7 @@ def main():
         activation_passed = (pending_counts["activate"] >= 1 and
                              pending_payloads and
                              post_still_pending >= 1 and
-                             hop_counts["activate"] >= 1 and
+                             post_still_hops >= 1 and
                              ready_events >= 2 and leave_events >= 1 and
                              continue_events == 0 and
                              continue_counts["activate"] == 0 and
@@ -389,6 +396,7 @@ def main():
           f"pending_discarded={pending_discarded['activate']} "
           f"pending_payloads={pending_payloads} "
           f"post_still_pending={post_still_pending} "
+          f"post_still_hops={post_still_hops} "
           f"visible_highlights={overlay_state['visible_highlights']} "
           f"highlight_pixels={overlay_state['highlight_pixels']} "
           f"commands={command_counts} transitions={direction_transitions} "
