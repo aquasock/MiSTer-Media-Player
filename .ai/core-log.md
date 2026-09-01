@@ -1,3 +1,32 @@
+## 857 COMMIT Unreleased 85cda13 2026-08-31T22:20:32-07:00
+
+#### Coming From:
+
+Unreleased 85cda13
+
+#### Purpose:
+
+Capture the physical Play result for the delayed-activation helper and identify why the title still does not enter its decoder barrier.
+
+#### Outcome:
+
+The user's physical test runs the source-`85cda13` path, proven by its unique `menu pending activate`, `DVD menu activation deferred` and authored-compensation diagnostics, but the video still freezes on the resident root-menu frame.  Main submits activation command `0x08` at 20.828591 seconds and the helper correctly leaves that request pending at first; an intermediate menu payload then causes the helper to send `MENU_CONTINUE` with reason `menu-payload`, which Main accepts at 21.000909 seconds, approximately 172 milliseconds after the command.  Only after that premature acknowledgment does libdvdnav announce the authored ten-second finite still.  At its expiry the helper reports menu leave and title subpicture stream 128, but `activation_pending` has already been cleared, so there is no delayed-activation hop, ready event, random-access reset or navigation-barrier release.  Main and the helper remain alive and continue submitting the concatenated title stream beyond 207 megabytes, reproducing entry 855 rather than a pause or disc stall.  The 655,681-byte screenshot at SHA-256 `4da4100a79b06e21e8867b61ac2f080f39b917fceb66a49e582524fb97d5ddf0` shows the frozen root-menu frame; its diagnostic raster corresponds to the 844-byte checksum-valid schema-21 snapshot at SHA-256 `5bd2e87048013102194aa7e02f6280ca1e0bf4c21d67da0e7edaaea7e372d30e`, and the matching 1,848,282-byte log has SHA-256 `37ddc328ec24edc5341ee82dfc035ac3be4f9dd11f2a7131cbf2bc1975b74515`.  Source `85cda13` is rejected on hardware because a payload between activation and the still is not proof of a menu continuation.
+
+#### Next Steps:
+
+Keep Main, RTL, QSF, the source-`f5f650f` RBF and authored-selector compensation frozen.  After user approval, make a bounded helper-only correction that retains `activation_pending` across ordinary menu payloads and resolves it only at a definitive boundary: an indefinite still acknowledges menu continuation, a finite still classifies title versus menu after `dvdnav_still_skip`, and an observed menu leave enters the existing ready/go barrier before title payload processing.  Remove the invalid menu-payload acknowledgment, strengthen regression coverage so payload-before-finite-still must still produce a delayed hop and second ready event, rebuild only the helper locally and repeat Play while waiting through the authored ten seconds.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 856 COMMIT Unreleased 85cda13 2026-08-31T22:00:52-07:00
 
 #### Coming From:
@@ -1151,35 +1180,6 @@ The user reports that keyboard `M` reaches the physical disc's menu, the arrow k
 #### Next Steps:
 
 Keep Main, RTL, QSF, RBF and Quartus frozen.  The next bounded helper-only cycle should log every direction and activation with the before and after button numbers, NAV logical-block number, authored neighbor and highlight rectangle, strengthen the native harness to require a real selection transition, and retain the NAV PCI associated with the displayed packet for button selection and activation instead of relying on libdvdnav's potentially ahead current PCI; rebuild and retest this same physical menu before expanding menu support.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 817 COMMIT Unreleased 0e70319 2026-08-31T06:43:56-07:00
-
-#### Coming From:
-
-Unreleased 0e70319
-
-#### Purpose:
-
-Verify that the user's manual helper replacement installed and launched the exact source-`0e70319` candidate before renewed menu testing.
-
-#### Outcome:
-
-Absolute-path FTP readback now reproduces `/media/fat/linux/MediaPlayer_Helper` as the expected 904,564-byte static ARMv7 executable at SHA-256 `c8a39413c5131ddfa26947013986e2088f0e72fa618f2ff6dd85fdb4bc7d3baf`, exactly matching `/home/vash/MiSTer-Media-Player-0e70319/host/build/MediaPlayer_Helper` on the build PC rather than entry 816's identically sized old helper at `a00173f6`.  Read-only SSH inspection reports remote mode `755` and one active helper process, PID 767; hashing `/proc/767/exe` independently returns the same full `c8a39413` digest, proving the running process was launched from the replacement rather than retaining the deleted predecessor inode.  This verifies deployment only and makes no repository source, Main, RBF, playback option or target-file change by the agent; menu hardware acceptance remains pending.
-
-#### Next Steps:
-
-With the exact source-`0e70319` helper now active, press keyboard `M` during first-play, test Up, Down, Left and Right at the root menu before pressing Space, and leave any resulting screen visible.  Require `discarded_block_tail` logs for successful root and activation hops, visible highlight movement wherever the authored menu links adjacent buttons, successful activation without the `0x0200` B-presentation raster, and continued native 480i; capture the matching screen and helper log before accepting the candidate.
 
 #### Files Modified:
 
