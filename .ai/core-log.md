@@ -1,3 +1,46 @@
+## 885 COMMIT Unreleased ??? 2026-09-01T21:54:05-07:00
+
+#### Coming From:
+
+Unreleased eb11247
+
+#### Purpose:
+
+Add responsive fixed ten-second, one-minute and five-minute seeking to every supported standalone audio-file format without changing FPGA logic or established video and DVD controls.
+
+#### Outcome:
+
+The approved helper/Main-only boundary will extend the source-`68f8f26` modifier-key commands to file-backed `.mp3`, `.wav`, `.flac` and `.ogg` playback.  The consumer-audio path will poll the private control socket between bounded PCM chunks, calculate saturated sample-frame targets, use codec-native random access, and cross the existing READY/GO download reset before emitting the new position so stale PCM and partial audio-interface records cannot survive a jump.  WAV, FLAC and Ogg Vorbis will retain their existing miniaudio decoders; standalone MP3 will move from the non-seekable streaming minimp3 path to miniaudio's bundled seek-aware MP3 backend while preserving the existing MPEG-1 Layer III channel and 44.1/48 kHz restrictions.  Audio-interface generation will restart at the absolute seek position, and ordinary arrows, pause, MPG seeking, DVD chapters and authored menus will remain unchanged.  RTL, RBF and Quartus remain outside the boundary.
+
+#### Next Steps:
+
+Commit and push this proposal, implement shared audio target arithmetic, controlled decoder seeking, the barrier callback and audio-interface position reset, advertise the capability and enable only the four supported audio extensions in patched Main.  Add deterministic target, UI-reset and end-to-end format regressions covering backward, forward and file-boundary clamps, then run strict native tests, codec output checks, the retained helper regressions, the local GNU 10.2 ARM helper build and the pinned-upstream patched Main build.  Commit only timing-independent helper and Main binaries for MiSTer testing; do not run Quartus or produce an RBF.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/Makefile
+- host/arm/audio_file_seek.c
+- host/arm/audio_file_seek.h
+- host/arm/audio_ui.c
+- host/arm/audio_ui.h
+- host/arm/consumer_audio.c
+- host/arm/consumer_audio.h
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_audio_file_seek.c
+- tools/test_audio_file_seek.py
+- tools/test_audio_ui_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 884 COMMIT Unreleased eb11247 2026-09-01T21:16:29-07:00
 
 #### Coming From:
@@ -1201,35 +1244,6 @@ The user defines the current source-`f5f650f` RBF as complete for the required p
 #### Next Steps:
 
 Exit the MediaPlayer core so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_PurpleSelector_924cb21`, restore executable mode if needed and verify the installed size and SHA-256.  Preserve the installed Main and RBF, restart the DVD, press `M` and move through every menu button; acceptance requires the menu to continue loading reliably and one solid purple selector rectangle to follow the arrow keys.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 845 COMMIT Unreleased 924cb21 2026-08-31T19:59:36-07:00
-
-#### Coming From:
-
-Unreleased 132ee3f
-
-#### Purpose:
-
-Evaluate the Main-only 500 millisecond stream-hop drain diagnostic across the user's repeated physical root-menu reloads without conflating video-hop stability with selector-plane delivery.
-
-#### Outcome:
-
-The user's updated physical capture contains fifteen consecutive `M` root-menu commands, fifteen ready barriers, fifteen chapter-barrier releases and fifteen measured drain intervals tightly bounded from 500,064 through 500,067 microseconds against the 500,000-microsecond target.  Every reload preserves the authored menu video, no schema-21 `0x0200` B-picture presentation failure or fatal transport event occurs, and the final screenshot remains on the correct menu instead of the former black raster, providing strong 15-of-15 evidence for residual pre-hop FIFO bytes as the intermittent video failure.  This does not yet satisfy entry 844's stated twenty-reload threshold, and it is not a clean selector result: the checksum-valid final matrix reports one rejected and zero accepted overlay commits, only 86,379 of 86,400 plane bytes, 10,797 complete DDR words plus three byte lanes, no plane publication and the sticky overlay-engine protocol flag `0x2000`; the Main trace independently sees the helper submit all 86,400 bytes with the expected `c23cad52` FNV-1a, so the absent selector is a separate FPGA-side overlay-delivery failure rather than recurrence of the menu-video fault.
-
-#### Next Steps:
-
-Preserve the working Main drain diagnostic and source-`f5f650f` RBF while treating the black-screen and selector faults independently.  Complete five additional consecutive root-menu reloads to close the predeclared twenty-hop video acceptance boundary, but first use the exact 21-byte physical shortfall and retained extractor handshake to define the smallest RBF diagnostic or correction for the intermittent overlay loss; require a fresh matrix with 86,400 plane bytes, 10,800 DDR words, one accepted and zero rejected commits, one plane publication, no `0x2000` flag and a visibly moving authored selector.
 
 #### Files Modified:
 
