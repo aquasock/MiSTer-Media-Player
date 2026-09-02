@@ -1,4 +1,4 @@
-## 877 COMMIT Unreleased ??? 2026-09-01T17:44:34-07:00
+## 877 COMMIT Unreleased 326382a 2026-09-01T17:44:34-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Perform the single permitted fitter reseed after the telemetry source passes reg
 
 #### Outcome:
 
-The exact source-`60d7c75` build completes synthesis in 2 minutes 26 seconds, fitting in 11 minutes 22 seconds and assembly with zero errors, but is rejected by the project timing gate at negative 0.164-nanosecond global setup slack in the HDMI output clock domain.  Dedicated 60 MHz decoder and 54 MHz video setup remain clean at positive 0.265 and 2.021 nanoseconds, and global hold, recovery, removal and minimum-pulse-width slacks remain positive at 0.220, 3.826, 0.603 and 0.925 nanoseconds.  The fit uses 34,466 ALMs, 53,977 registers, 4,187,203 block-memory bits in 535 RAM blocks and 70 DSP blocks.  The RBF is rejected and the previously accepted source-`5f00e35` artifact remains the rollback.
+The exact source-`60d7c75` build completes synthesis in 2 minutes 26 seconds, fitting in 11 minutes 22 seconds and assembly with zero errors, but is rejected by the project timing gate at negative 0.164-nanosecond global setup slack in the HDMI output clock domain.  Dedicated 60 MHz decoder and 54 MHz video setup remain clean at positive 0.265 and 2.021 nanoseconds, and global hold, recovery, removal and minimum-pulse-width slacks remain positive at 0.220, 3.826, 0.603 and 0.925 nanoseconds.  The fit uses 34,466 ALMs, 53,977 registers, 4,187,203 block-memory bits in 535 RAM blocks and 70 DSP blocks.  Source `326382a` changes only the fitter seed from 23 to 24 for the one permitted retry; the seed-23 RBF is rejected and the previously accepted source-`5f00e35` artifact remains the rollback.
 
 #### Next Steps:
 
