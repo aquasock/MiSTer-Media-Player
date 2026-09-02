@@ -1,3 +1,32 @@
+## 890 COMMIT Unreleased e05ede0 2026-09-02T01:45:42-07:00
+
+#### Coming From:
+
+Unreleased e05ede0
+
+#### Purpose:
+
+Record physical rejection of the oversized standalone-audio seek no-op and localize the apparently crashing black end state shared by FLAC and MPG playback.
+
+#### Outcome:
+
+The fresh 8,190,216-byte combined Main/helper log at SHA-256 `43714a1990debf89f5b455fbcc8636e7cf0e3b9199add230a506cba717ced8f8` proves that source `e05ede0` preserves three valid ten-second forward seeks, two valid one-minute forward seeks, one valid five-minute forward seek and four valid ten-second backward seeks, each with its READY/GO barrier and continued FLAC playback.  The final five-minute forward command at 132.644028 seconds is correctly rejected by the helper at frame 24,173,800 of 32,108,544, but patched Main has already toggled download, set `chapter_barrier` and begun discarding helper output before it sends every seek command.  Because the helper's boundary no-op sends neither READY nor a continuation event, Main never releases that barrier, submits no byte beyond 96,983,816 and repeatedly drains all later PCM and audio-interface records without hardware pacing; the helper consequently races through the remaining file and reaches EOF only 8.173783 seconds later.  It exits normally with wait status `0x0`, no signal, fatal report or transport fault, so this is not a process crash, but Main releases download and the 1,920-by-1,080 screenshot at SHA-256 `d29ecd17bc05dc3f2f280ad4ea2d85a6b69bc4b9d611efd648687dde93f12146` is completely black, reproducing the user's apparent end-of-file crash.  The user additionally reports the same visible behavior when an MPG reaches its end; there is no fresh MPG log in this result set, but static inspection confirms that every ordinary helper EOF, regardless of file type, calls Main's shared `finish_download`, deasserts download and therefore removes the resident presentation.  The unchanged 2,818-byte telemetry sidecar at SHA-256 `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004` contains no diagnostic matrix and adds no FPGA fault evidence.  This rejects `e05ede0` as a complete hardware fix, exposes the missing Main/helper seek-decision handshake that the helper-only real-file regression did not model and separately identifies the black clean-EOF presentation as a shared lifecycle policy rather than an MPG or audio decoder crash.
+
+#### Next Steps:
+
+Preserve the current timing-qualified RBF and treat two corrections as separate approval boundaries.  First, make seek decision a distinct helper/Main protocol phase: Main sends a requested jump without toggling download or discarding output, the helper reports an explicit no-op continuation when the target is the current boundary, and only a valid target's READY event makes Main reset download, discard the old session boundary and send GO; an integrated patched-Main regression must require zero reset, zero barrier and continued submitted output for exact-end and past-end requests while retaining exactly one reset and READY/GO barrier for every valid seek.  Second, after the user selects the desired clean-EOF behavior, change the shared Main lifecycle so normal FLAC, other standalone audio and MPG completion no longer looks like a crash, with focused coverage distinguishing a successful exit from a signaled or nonzero helper failure.  Build only the helper and patched Main locally, preserve the RBF and repeat physical FLAC plus MPG validation after the approved boundaries.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 889 COMMIT Unreleased e05ede0 2026-09-02T00:31:57-07:00
 
 #### Coming From:
@@ -1236,35 +1265,6 @@ Preserve the source-`f5f650f` RBF and source-`2de0717` pre-drain Main, and obtai
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 850 COMMIT Unreleased 4baf17a 2026-08-31T21:09:16-07:00
-
-#### Coming From:
-
-Unreleased 2de0717
-
-#### Purpose:
-
-Restore a visible moving purple selector with a helper-only dual-candidate plane that tolerates both physically observed overlay-transfer outcomes.
-
-#### Outcome:
-
-The user approves a software-only response to entry 849's exact recurring 21-byte shortfall while keeping the source-`f5f650f` RBF and source-`2de0717` pre-drain Main frozen.  Source `4baf17a` retains the probe helper's unchanged first config, 22-record, 86,400-byte all-`0x55` plane and commit, then immediately emits a second config and candidate containing 86,421 all-`0x55` bytes in the same 21 full 4,096-byte records plus a 405-byte final record before committing again.  A zero-loss transfer can publish the first candidate and safely reject the later oversized one without clearing the displayed plane, while the recurring loss of one byte from each full record leaves exactly 86,400 bytes in the second candidate for acceptance and publication.  This compensation is restricted to the opt-in solid-purple probe build and does not alter authored overlay pixels, DVD navigation, Main, the RBF, transport framing limits or normal helper behavior.  Strict native compilation and the focused fragmented-subpicture, selected-histogram, scheduled-stop, random-access and menu-hop regressions pass; a direct framing harness verifies exactly two configs, two commits, 22 data records per candidate, respective totals of 86,400 and 86,421 bytes, maximum payload 4,096, and final payloads 384 and 405.  The Raspberry Pi GNU 10.2.1 ARM toolchain builds `host/build/MediaPlayer_Helper_DualCandidate_4baf17a`, a 908,660-byte stripped static ARM EABI5 executable at SHA-256 `b6f642c0afd3aebda67b3f1c00aa7ba66057790b9305ed210d656cbdd65ae1cc`; it contains both the purple-probe and dual-candidate compensation markers and returns the complete protocol-one capability string when executed locally.
-
-#### Next Steps:
-
-Exit the MediaPlayer core so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_DualCandidate_4baf17a`, restore executable mode if needed and verify the installed size and SHA-256.  Preserve the installed source-`2de0717` Main and source-`f5f650f` RBF, restart the DVD, enter the menu and move through every button; physical acceptance requires at least one accepted overlay commit, a plane publication and a solid purple selector that follows directional input.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
 
 #### Status:
 
