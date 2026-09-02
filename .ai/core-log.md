@@ -1,3 +1,32 @@
+## 901 COMMIT Unreleased 78646bd 2026-09-02T06:48:08-07:00
+
+#### Coming From:
+
+Unreleased 78646bd
+
+#### Purpose:
+
+Record the first physical result for interruptible reserve discard and localize the remaining root-menu freeze to Main's pre-classification drain hold.
+
+#### Outcome:
+
+The user's golden physical-DVD run with the source-`78646bd` helper still freezes on the first `M`, but it no longer reaches the prior post-classification deadlock.  Main submits root command `0x09` at 5.389484 seconds after transferring 6,088,666 bytes, and the 179,060-byte log at SHA-256 `2877bfd845095dae6de6e2a0a55f01fcf3fd7255fde98f154a310a9d3964a461` ends immediately without libdvdnav's command, hop or continuation diagnostic, the new reserve-discard completion, `READY`, download reset or `GO`.  The 382,102-byte screenshot at SHA-256 `ea2f2ff083b18310376c1ff9142fcad6ff79eeceb8ea66b84d49a6f929a5ce1e` is another intact resident frame rather than decoder corruption, and the 675-byte schema-21 sidecar at SHA-256 `ebc29db93702f67d2d2a73d12d0de5cde6c252bf473da6da343ac29f3586342d` is checksum-valid.  Static control-flow comparison proves the earlier circular wait now occurs before command classification: Main returns from every poll while `navigation_pending`, the helper is blocked producing into the undrained reserve and pipe, and its single program-stream thread therefore cannot return to `control_read_command`; ordinary file seeking already avoids this exact failure by continuing media transfer while `seek_pending` until the helper decides between continuation and `READY`.  Source `78646bd` remains necessary for the later classified-hop discard boundary but is rejected alone on hardware.
+
+#### Next Steps:
+
+Preserve the source-`78646bd` helper, libdvdnav behavior, decoder, RTL, RBF and visualizer asset.  After user approval, make one bounded Main correction that treats unresolved DVD navigation like the existing unresolved seek decision: poll the control channel first, continue ordinary transfer while only `navigation_pending` remains, and stop immediately when `READY` converts it into the existing reset barrier; `MENU_CONTINUE` will retain byte-exact uninterrupted output, while a stream hop can only send old-session bytes before the helper's reserve discard and Main's subsequent reset remove them.  Extend the modeled Main lifecycle test to require submitted bytes during unresolved navigation, zero discard or reset on continuation, and exactly one reset plus `GO` on `READY`; apply and compile the complete patch stack against pinned upstream, build only a new Main locally, and repeat the same first `M` with the source-`78646bd` helper.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 900 COMMIT Unreleased 78646bd 2026-09-02T06:26:43-07:00
 
 #### Coming From:
@@ -1274,34 +1303,5 @@ The user should preserve the installed source-`2de0717` Main and source-`bb3110d
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 861 COMMIT Unreleased bb3110d 2026-08-31T23:00:20-07:00
-
-#### Coming From:
-
-Unreleased bb3110d
-
-#### Purpose:
-
-Accept the post-still pending-activation helper on physical hardware for DVD Play entering continuous title playback.
-
-#### Outcome:
-
-The user reports that Play now works, and the physical source-`bb3110d` capture satisfies the targeted delayed-activation boundary.  Main submits activation command `0x08` at 13.526823 seconds; the helper retains it across 89 menu payloads and the authored ten-second still, reports `remains pending after finite still`, then observes menu leave and announces `stream hop before payload` without sending any menu-continuation acknowledgment.  Main receives menu leave and the navigation-ready event at 23.684043 and 23.684121 seconds, the existing barrier releases with zero discarded pending bytes, and the helper retains a complete random-access group at sequence, intra and following-reference offsets 0, 296 and 71,632.  The session then sustains title playback for more than 114 scheduler seconds, reaches 83,205,235 title-video bytes and 117,486,034 total submitted bytes, and records no fatal transport, helper or barrier event.  The 815,401-byte screenshot at SHA-256 `53715e69484d7a711ed106004048dc4b0ed14e01e3c2c48dd963317cfc0ddffb` visibly shows the moving feature-title credit rather than the resident menu; the matching 3,509,286-byte log has SHA-256 `c542e36ed059031e62ce1603e581b684c25a144b8635917de15071a7138191d7`, and the 805-byte checksum-valid schema-21 snapshot at SHA-256 `431dc8517d5fe3738f1e980ad21f1014575dacc9a8e31f2c3f29d9398858f853` reports zero decoder error flags.  This physically accepts source `bb3110d` for the Play transition with the source-`2de0717` Main, source-`f5f650f` RBF and authored selector compensation unchanged.
-
-#### Next Steps:
-
-Preserve `host/build/MediaPlayer_Helper_PostStillPending_bb3110d`, the installed source-`2de0717` Main and source-`f5f650f` RBF as the accepted DVD menu and title-activation baseline.  The user may continue exploratory menu, chapter, return-to-menu and title-playback testing; collect a fresh screenshot, telemetry and helper log for any reproducible failure, but do not change the accepted three-file combination merely for the expected authored ten-second Play still.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
