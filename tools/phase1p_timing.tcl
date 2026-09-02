@@ -85,6 +85,18 @@ create_timing_summary \
 check_timing \
     -file "$output_dir/phase1p_check_timing.rpt"
 
+# Capture the actual global setup gate with full routing detail.  This keeps
+# framework HDMI/scaler failures visible alongside the decoder/video reports
+# instead of requiring an ad-hoc TimeQuest script after a rejected fit.
+report_timing \
+    -setup \
+    -npaths 100 \
+    -nworst 5 \
+    -detail full_path \
+    -show_routing \
+    -multi_corner \
+    -file "$output_dir/phase1p_global_setup.rpt"
+
 # ---------------------------------------------------------------------------
 # All paths ending in the 60 MHz decoder domain.
 #
@@ -195,6 +207,7 @@ puts ""
 puts "Phase 1P timing extraction complete."
 puts "Reports written to:"
 puts "  $output_dir/phase1p_decoder_setup.rpt"
+puts "  $output_dir/phase1p_global_setup.rpt"
 puts "  $output_dir/phase1p_decoder_setup_diverse.rpt"
 puts "  $output_dir/phase1p_decoder_same_clock_setup.rpt"
 puts "  $output_dir/phase1p_decoder_same_clock_setup_diverse.rpt"
