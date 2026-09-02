@@ -1,3 +1,32 @@
+## 892 COMMIT Unreleased 4063cf0 2026-09-02T02:40:18-07:00
+
+#### Coming From:
+
+Unreleased 4063cf0
+
+#### Purpose:
+
+Record physical rejection of the clean standalone-audio EOF presentation and localize the distorted retained frame.
+
+#### Outcome:
+
+The fresh physical standalone-audio run rejects source `4063cf0` as a complete EOF fix while confirming that its Main lifecycle correction works: all 14 requested seeks receive one helper READY event and one Main reset, playback reaches natural EOF, the helper exits normally with status zero, Main records `finish reason=eof-retained` with download still asserted and no control, transport, read or process failure occurs.  The 2,527,165-byte combined log at SHA-256 `d66ccd4e85d476bd47c8c148ce707b4c3f440b986800d0946e91eddc82349503` instead proves that the final synchronous UI function starts command `0x10` at stream offset 33,322,040 while the ordinary UI frame opened at offset 33,186,232 still has only 24 of 127 data records, or 98,304 of 518,400 bytes, submitted.  The FPGA audio-UI receiver rejects a second BEGIN while `frame_open` is set but preserves the old write index, then accepts enough bytes from the new full frame to finish and commit a hybrid YUV buffer; the 19,322-byte 1,920-by-1,080 screenshot at SHA-256 `c5aac8ce6de56d320b913907206c13ae7f80ff7ad43402117241aa88a68b83b2` visibly shows the resulting shifted and repeated interface planes.  This is a helper publication-state fault introduced by the exact-final-frame addition, not a decoder crash, seek reset, failed clean-EOF retention or FPGA timing fault.  The 2,818-byte telemetry sidecar at SHA-256 `53805e1c7c4f1f4d44f0f0fa390382eb331781268afda439bb41aac8ac8e8456` contains no supported telemetry matrix and adds no contrary evidence.  MPG natural EOF was not exercised by this result set.
+
+#### Next Steps:
+
+Obtain approval for a helper-only correction that makes final UI completion drain the already-open projected final frame from its current byte offset through one COMMIT instead of resetting host state and emitting a second BEGIN.  Extend the renderer regression to complete a partially published final frame with exactly one BEGIN, 127 total data records, one COMMIT, full progress and zero remaining time, and make the real-helper parser reject nested BEGIN events so this hardware failure is reproducible locally.  Rebuild only the ARM helper, preserve source-`4063cf0` Main and the timing-qualified RBF, then repeat standalone-audio natural EOF and separately verify that an ordinary MPG retains its final frame.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 891 COMMIT Unreleased 4063cf0 2026-09-02T01:51:36-07:00
 
 #### Coming From:
@@ -1241,35 +1270,6 @@ The user's refreshed physical capture proves source `413ace2` closes the compens
 #### Next Steps:
 
 Exit the MediaPlayer core so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_AuthoredSelector_330d103`, restore executable mode if needed and verify the installed size and SHA-256.  Preserve the installed source-`2de0717` Main and source-`f5f650f` RBF, restart the DVD, enter the menu and move through every button; physical acceptance requires one accepted commit, one plane publication and a correctly shaped authored selector that follows every directional input.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 852 COMMIT Unreleased 413ace2 2026-08-31T21:22:44-07:00
-
-#### Coming From:
-
-Unreleased 4baf17a
-
-#### Purpose:
-
-Close the physically measured final one-byte selector deficit with a helper-only compensated-candidate adjustment.
-
-#### Outcome:
-
-The user approves preserving the proven source-`f5f650f` RBF, source-`2de0717` pre-drain Main and unchanged first 86,400-byte probe candidate while increasing only the second probe candidate from 86,421 to 86,422 all-`0x55` bytes.  Source `413ace2` makes that one-byte correction and updates its diagnostic marker; the compensated candidate still uses 21 full 4,096-byte records, with only the final payload increasing from 405 to 406 bytes.  Strict native compilation and the focused fragmented-subpicture, selected-histogram, scheduled-stop, random-access and menu-hop regressions pass.  A direct framing harness verifies exactly two candidates of 86,400 and 86,422 bytes, 22 data records each, maximum payload 4,096, and final payloads of 384 and 406.  The Raspberry Pi GNU 10.2.1 ARM toolchain builds `host/build/MediaPlayer_Helper_DualCandidate22_413ace2`, a 908,660-byte stripped static ARM EABI5 executable at SHA-256 `beb698b86b46e4a937871637ad6f0b4e5878ae0c2c3eff7dde1c0afabd75b8f4`; it contains the solid-magenta probe and `extra_bytes=22` compensation markers and returns the complete protocol-one capability string when executed locally.  The correction remains restricted to the opt-in purple-probe helper and does not modify normal authored overlays, navigation, Main, the RBF or protocol limits.
-
-#### Next Steps:
-
-Exit the MediaPlayer core so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_DualCandidate22_413ace2`, restore executable mode if needed and verify the installed size and SHA-256.  Preserve the installed source-`2de0717` Main and source-`f5f650f` RBF, restart the DVD, enter the menu and move through every button; physical acceptance requires the second candidate to reach exactly 86,400 bytes and 10,800 DDR words, at least one accepted commit, one plane publication and a solid purple selector following directional input.
 
 #### Files Modified:
 
