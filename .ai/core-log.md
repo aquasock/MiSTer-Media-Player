@@ -1,3 +1,33 @@
+## 902 COMMIT Unreleased ??? 2026-09-02T06:50:22-07:00
+
+#### Coming From:
+
+Unreleased 78646bd
+
+#### Purpose:
+
+Keep Main draining ordinary DVD output until an unresolved navigation command is classified as continuation or stream hop.
+
+#### Outcome:
+
+Approved plan: remove only `navigation_pending` from Main's post-control barrier return condition so unresolved DVD navigation follows the existing seek-decision behavior.  Main will poll the private control channel first on every media poll and continue submitting old-session bytes while no decision is available; `MENU_CONTINUE` clears the pending state without a download reset, while `READY` atomically changes the state to `chapter_barrier`, lowers download and returns before any further transfer so the established pipe discard and `GO` sequence remains unchanged.  The source-`78646bd` helper will continue canceling any classified hop's blocked reserve suffix; the decoder, helper protocol, libdvdnav policy, visualizer, RTL and RBF remain unchanged.
+
+#### Next Steps:
+
+Extend the modeled Main lifecycle regression with a DVD navigation state that proves unresolved commands keep submitting, menu continuation performs no reset, discard or `GO`, and stream-hop `READY` performs exactly one reset and `GO` before fresh output.  Add a patch marker for the precise return condition, apply the complete Main patch stack to pinned upstream, compile and audit the resulting ARMv7 executable with the local GNU 10.2.1 toolchain, and provide only the new Main for the same first-`M` golden-disc test with `MediaPlayer_Helper_NavDiscard_78646bd` retained.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_main_seek_lifecycle.cpp
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 901 COMMIT Unreleased 78646bd 2026-09-02T06:48:08-07:00
 
 #### Coming From:
@@ -1265,39 +1295,6 @@ Exit MediaPlayer so its current helper stops, replace only `/media/fat/linux/Med
 - host/arm/ac3_resync.h
 - tools/test_ac3_resync.c
 - tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 862 COMMIT Unreleased 1bf06db 2026-08-31T23:11:01-07:00
-
-#### Coming From:
-
-Unreleased bb3110d
-
-#### Purpose:
-
-Correct the two FPGA transport boundaries currently masked by the Main stream-hop delay and helper overlay-byte compensation.
-
-#### Outcome:
-
-The user's repeated chapter-forward and chapter-backward run captures ten software-successful DVD stream hops with complete random-access boundaries followed by the same hardware failure previously seen on intermittent menu reloads: the checksum-valid schema-21 fallback accepts only 13,635 bytes, records zero sequence or picture progress, sees a P-picture before any frame-rate code and latches only phase-one probe error `0x0002`.  Source `1bf06db` now asynchronously clears the 32 KiB mixed-width input FIFO on every download rising edge, stretches that clear in the write domain, relies on the primitive's independent read and write release synchronizers, withdraws both legacy wait and burst readiness until an additional 32 write-clock settle cycles complete, and preserves the rolling accepted-word counter and digest used by Main's verifier.  The same source replaces the physical one-byte-per-maximum-record overlay boundary and its helper compensation requirement with a timing-isolated two-entry retained extractor queue that keeps byte and boundary fields stable, absorbs the transition into DDR backpressure and has no combinational engine-ready path.  Six focused and retained Icarus regressions pass, including stale old-session bytes followed by an exact first new word, a nonuniform 86,400-byte plane across 22 records under sustained DDR stalls, metadata retention, engine write/read and blend, DDR arbitration and schema-21 triggering.  A clean exact-commit Quartus Prime 17.0.2 seed-20 build completes synthesis, fitting, assembly and timing with zero errors; global setup, hold, recovery, removal and minimum-pulse-width slacks are positive at 0.129, 0.245, 3.481, 0.437 and 0.925 nanoseconds, while the dedicated 60 MHz decoder and 54 MHz video checks have 0.831 and 1.753 nanoseconds of setup slack and zero violated paths.  The fit uses 34,752 ALMs, 54,655 registers, 4,187,011 block-memory bits and 70 DSP blocks.  Local `output_files/MediaPlayer_20260831_1bf06db.rbf` is byte-identical to the build-PC result at 4,458,716 bytes and SHA-256 `b315309c8fb72b20d5cf1e690ba36808804bd1549a142b98ea73d121554ba63c`; Main and helper source and binaries remain unchanged.
-
-#### Next Steps:
-
-The user should preserve the installed source-`2de0717` Main and source-`bb3110d` compensated helper, copy only `output_files/MediaPlayer_20260831_1bf06db.rbf` to the MiSTer as a new rollback-safe file, verify its size and SHA-256, and load it.  Restart the disc and exercise at least twenty mixed boundaries using repeated `M`, forward and backward chapter skips, Play through the authored still and return to menu; acceptance requires every completed hop to show moving video without the 800-by-600 `0x0002` diagnostic raster, the authored selector to remain visible and movable, and schema 21 to show the ordinary first 86,400-byte overlay candidate accepted and published before the still-installed oversized compensation candidate is safely rejected.  After that physical proof, remove the no-longer-needed helper compensation in a separate helper-only cleanup and repeat one menu-selector check without changing this RBF or Main.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-- rtl/mpeg2_stream_fifo.sv
-- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
-- tools/test_mpeg2_stream_fifo.sv
-- tools/test_dvd_overlay_integrated.sv
 
 #### Status:
 
