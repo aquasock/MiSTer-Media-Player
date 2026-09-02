@@ -1,3 +1,32 @@
+## 881 COMMIT Unreleased dfe1057 2026-09-01T19:17:39-07:00
+
+#### Coming From:
+
+Unreleased dfe1057
+
+#### Purpose:
+
+Bundle the timing-qualified telemetry build as a release-format community-test archive without creating a semantic-version release.
+
+#### Outcome:
+
+`host/build/MiSTer_Media_Player_dfe1057.zip` follows the current public-package layout with the date-coded `MediaPlayer_20260901.rbf`, patched `MiSTer`, `linux/MediaPlayer_Helper`, `SHA256SUMS`, installation and source-provenance notes, the project licence and all currently bundled dependency licences.  The archive contains the qualified source-`dfe1057` seed-24 RBF, the matched telemetry-aware Main and the unchanged hardware-accepted helper; their respective SHA-256 values are `6389fa57b2d642b5b4e85980c6ccf8746ea8d20869cbe480f80b0ea172bcdb4b`, `74b354977d3ce56c0ad27c90089936d303258a869fa75fa73c80ef6a2edbfd29` and `5de3178711e7893d23ad75e22f1ef19a7905454bf48fc71c9bf98a95db6977a4`.  Fresh extraction preserves executable mode on Main and the helper, all thirteen internal checksum checks pass, ZIP integrity reports no error, and the 3,321,895-byte archive has SHA-256 `38b43973499027cf5788833d8e86a067acaa2dd0acd337e97b8399a0022646ba`.
+
+#### Next Steps:
+
+Distribute the archive explicitly as an unreleased `dfe1057` community test and retain the source-`5f00e35` runtime set as rollback.  Testers should install all three packaged runtime files, reboot, report the source identifier with MPG, DVD, standalone-audio and menu observations, and verify that Telemetry Off creates neither the diagnostic raster nor `/tmp/MediaPlayer_ARM.log` while enabling Telemetry before playback retains both diagnostic paths; community results do not mark the source Passed until the user's current MiSTer test accepts it.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 880 COMMIT Unreleased dfe1057 2026-09-01T18:30:20-07:00
 
 #### Coming From:
@@ -1198,35 +1227,6 @@ Build and verify one uniquely named ARM Main from exact source `64f5156`, then p
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 841 COMMIT Unreleased f5f650f 2026-08-31T19:20:09-07:00
-
-#### Coming From:
-
-Unreleased 647c36e
-
-#### Purpose:
-
-Build and qualify the ordinary ARM helper that restores the authored DVD selector while preserving the accepted Main and RBF.
-
-#### Outcome:
-
-The exact clean checkout `f5f650f87109193e90c664175b1785e721134d26` on build PC `10.10.0.42` builds the normal native helper with strict warnings and passes its capability smoke test plus the focused fragmented-subpicture, selected-histogram, scheduled-stop, random-access and menu-hop regressions.  The same exact source builds the ordinary ARM helper without defining `MMP_DVD_OVERLAY_PROBE` under MiSTer's pinned GNU 10.2.1 toolchain.  `/home/vash/MiSTer-Media-Player-f5f650f/host/build/MediaPlayer_Helper` is a 908,660-byte stripped static 32-bit ARM EABI5 hard-float executable with no dynamic section, contains no `probe=solid-index1-magenta` marker and has SHA-256 `7818463017de063ba72846429c60816b967444b0137dcd2f156d9902ae96e96b`.  The artifact is copied byte-identically to local `host/build/MediaPlayer_Helper` for the user's manual transfer.  No repository source, Main, RBF, MiSTer file, running process or playback setting changes during this build.
-
-#### Next Steps:
-
-The user will exit the MediaPlayer core so the probe helper is no longer running, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper`, create no backup, preserve Main and `/media/fat/MediaPlayer_20260831_f5f650f.rbf`, restore executable mode if the transfer client clears it, and verify the installed file is 908,660 bytes with SHA-256 `7818463017de063ba72846429c60816b967444b0137dcd2f156d9902ae96e96b`.  Restart the DVD, enter the root menu and move among all four buttons; acceptance requires the solid magenta rectangle to disappear and the sparse authored highlight to follow the selector, after which collect a fresh screenshot and helper log.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
