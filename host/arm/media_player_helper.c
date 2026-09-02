@@ -3345,6 +3345,9 @@ static int audio_file_request_seek(void *opaque, uint64_t current_frame,
                 "at boundary current=%llu length=%llu rate=%u\n",
                 *seconds, (unsigned long long)current_frame,
                 (unsigned long long)length_frames, rate_hz);
+        if (control_send(state->control_fd,
+                         MEDIA_PLAYER_CONTROL_SEEK_CONTINUE) < 0)
+            return -1;
         return 0;
     }
     state->seek_pending = 1;
@@ -3920,6 +3923,14 @@ done:
     output.hold_active = 0;
     if (success && !output.pcm && hold_flush(&output, 0) < 0)
         success = 0;
+    if (success && output.audio_ui &&
+        audio_ui_complete(output.audio_ui, output.pcm_emitted_frames,
+                          (unsigned)output.hold_rate_hz,
+                          emit_audio_ui_record, &output) < 0) {
+        fprintf(stderr,
+                "media_player_helper: final audio UI output failed\n");
+        success = 0;
+    }
     if (success && output.audio_frames && !output.pcm &&
         emit_pcm_end(&output) < 0)
         success = 0;

@@ -286,7 +286,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,881 @@
+@@ -0,0 +1,920 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -325,10 +325,12 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +static bool chapter_barrier = false;
 +static bool chapter_download_rearmed = false;
 +static bool navigation_pending = false;
++static bool seek_pending = false;
 +static bool chapter_controls = false;
 +static bool seek_controls = false;
 +static bool menu_controls = false;
 +static bool menu_active = false;
++static bool retain_clean_eof = false;
 +static unsigned char playback_index = 0;
 +
 +enum
@@ -352,6 +354,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	MEDIA_CONTROL_MENU_ENTER = 0x82,
 +	MEDIA_CONTROL_MENU_LEAVE = 0x83,
 +	MEDIA_CONTROL_MENU_CONTINUE = 0x84,
++	MEDIA_CONTROL_SEEK_CONTINUE = 0x85,
 +	MEDIA_CONTROL_ERROR = 0xff
 +};
 +
@@ -511,7 +514,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	                     !strcasecmp(extension, ".ogg"));
 +}
 +
-+static void finish_download(const char *reason)
++static void finish_download(const char *reason, bool release_download)
 +{
 +	pending_size = pending_offset = 0;
 +	pending_eof = false;
@@ -529,20 +532,24 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +		close(control_fd);
 +		control_fd = -1;
 +	}
-+	if (download_active)
++	if (download_active && release_download)
 +	{
 +		user_io_set_download(0);
 +		download_active = 0;
 +		diagnostic_write("download released\n");
 +	}
++	else if (download_active)
++		diagnostic_write("clean EOF resident presentation retained\n");
 +	playback_paused = false;
 +	chapter_barrier = false;
 +	chapter_download_rearmed = false;
 +	navigation_pending = false;
++	seek_pending = false;
 +	chapter_controls = false;
 +	seek_controls = false;
 +	menu_controls = false;
 +	menu_active = false;
++	retain_clean_eof = false;
 +}
 +
 +static void stop_with_reason(const char *reason)
@@ -552,7 +559,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +
 +	if (helper_fd >= 0 || helper_pid > 0 || download_active)
 +		diagnostic_write("stop reason=%s pid=%d\n", reason, (int)helper_pid);
-+	finish_download(reason);
++	finish_download(reason, true);
 +	if (helper_pid > 0)
 +	{
 +		int killed = kill(-helper_pid, SIGTERM);
@@ -691,6 +698,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	chapter_barrier = false;
 +	chapter_download_rearmed = false;
 +	navigation_pending = false;
++	seek_pending = false;
 +	menu_active = false;
 +	menu_controls = !strncasecmp(source_spec, "dvdmenu:", 8) ||
 +	                !strncasecmp(source_spec, "isomenu:", 8);
@@ -704,6 +712,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	                 !strcasecmp(source_extension, ".wav") ||
 +	                 !strcasecmp(source_extension, ".flac") ||
 +	                 !strcasecmp(source_extension, ".ogg"));
++	retain_clean_eof = !strncasecmp(source_spec, "file:", 5);
 +	user_io_set_index(index);
 +	user_io_file_info(".M2V");
 +	user_io_set_download(1);
@@ -796,7 +805,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	ssize_t count;
 +	uint64_t discarded = 0;
 +
-+	if ((!chapter_barrier && !navigation_pending) ||
++	if ((!chapter_barrier && !navigation_pending && !seek_pending) ||
 +	    control_fd < 0 || helper_fd < 0) return;
 +	count = read(control_fd, &event, sizeof(event));
 +	if (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
@@ -805,6 +814,41 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +		stop_with_reason("control-read-error");
 +		return;
 +	}
++	if (seek_pending && count == 1)
++	{
++		if (event == MEDIA_CONTROL_SEEK_CONTINUE)
++		{
++			seek_pending = false;
++			diagnostic_write("seek continued without reset\n");
++			return;
++		}
++		if (event == MEDIA_CONTROL_READY)
++		{
++			seek_pending = false;
++			if (download_active)
++			{
++				user_io_set_download(0);
++				download_active = 0;
++			}
++			pending_size = pending_offset = 0;
++			pending_eof = false;
++			burst_state = {};
++			user_io_set_index(playback_index);
++			user_io_file_info(".M2V");
++			user_io_set_download(1);
++			download_active = 1;
++			download_assert_us = monotonic_us();
++			chapter_download_rearmed = true;
++			chapter_barrier = true;
++			diagnostic_write("seek target ready; download reset\n");
++		}
++		else
++		{
++			if (!handle_control_event(event)) return;
++			return;
++		}
++	}
++	if (seek_pending) return;
 +	if (navigation_pending && count == 1)
 +	{
 +		if (event == MEDIA_CONTROL_MENU_CONTINUE)
@@ -887,7 +931,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +
 +	if (input == MEDIAPLAYER_INPUT_PLAY_PAUSE)
 +	{
-+		if (chapter_barrier || navigation_pending) return 1;
++		if (chapter_barrier || navigation_pending || seek_pending) return 1;
 +		playback_paused = !playback_paused;
 +		diagnostic_write("playback %s submitted=%llu\n",
 +		                 playback_paused ? "paused" : "resumed",
@@ -906,7 +950,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +		                  input == MEDIAPLAYER_INPUT_MENU_RIGHT ? MEDIA_CONTROL_MENU_RIGHT :
 +		                  input == MEDIAPLAYER_INPUT_MENU_ACTIVATE ? MEDIA_CONTROL_MENU_ACTIVATE :
 +		                  MEDIA_CONTROL_ROOT_MENU;
-+		if (chapter_barrier || navigation_pending || playback_paused) return 1;
++		if (chapter_barrier || navigation_pending || seek_pending || playback_paused) return 1;
 +		if (command != MEDIA_CONTROL_MENU_ACTIVATE && command != MEDIA_CONTROL_ROOT_MENU)
 +		{
 +			if (!send_control(command)) stop_with_reason("menu-command-error");
@@ -921,7 +965,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	if (input >= MEDIAPLAYER_INPUT_SEEK_BACK_10 &&
 +	    input <= MEDIAPLAYER_INPUT_SEEK_FORWARD_300)
 +	{
-+		if (chapter_barrier || navigation_pending || playback_paused) return 1;
++		if (chapter_barrier || navigation_pending || seek_pending || playback_paused) return 1;
 +		uint8_t command =
 +			input == MEDIAPLAYER_INPUT_SEEK_BACK_10 ? MEDIA_CONTROL_SEEK_BACK_10 :
 +			input == MEDIAPLAYER_INPUT_SEEK_FORWARD_10 ? MEDIA_CONTROL_SEEK_FORWARD_10 :
@@ -935,21 +979,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +			input == MEDIAPLAYER_INPUT_SEEK_BACK_60 ? -60 :
 +			input == MEDIAPLAYER_INPUT_SEEK_FORWARD_60 ? 60 :
 +			input == MEDIAPLAYER_INPUT_SEEK_BACK_300 ? -300 : 300;
-+		if (download_active)
-+		{
-+			user_io_set_download(0);
-+			download_active = 0;
-+		}
-+		pending_size = pending_offset = 0;
-+		pending_eof = false;
-+		burst_state = {};
-+		user_io_set_index(playback_index);
-+		user_io_file_info(".M2V");
-+		user_io_set_download(1);
-+		download_active = 1;
-+		download_assert_us = monotonic_us();
-+		chapter_download_rearmed = true;
-+		chapter_barrier = true;
++		seek_pending = true;
 +		if (!send_control(command))
 +		{
 +			stop_with_reason("seek-command-error");
@@ -964,7 +994,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	if (input != MEDIAPLAYER_INPUT_PREVIOUS &&
 +	    input != MEDIAPLAYER_INPUT_NEXT)
 +		return 0;
-+	if (chapter_barrier || navigation_pending || playback_paused ||
++	if (chapter_barrier || navigation_pending || seek_pending || playback_paused ||
 +	    !chapter_controls) return 1;
 +
 +	uint8_t command = input == MEDIAPLAYER_INPUT_PREVIOUS ?
@@ -1073,23 +1103,27 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +		}
 +		if (pending_eof && pending_size == pending_offset)
 +		{
-+			finish_download("eof");
++			int status = 0;
++			pid_t result = helper_pid > 0 ?
++				waitpid(helper_pid, &status, 0) : -1;
++			int wait_errno = result < 0 ? errno : 0;
++			bool clean = result == helper_pid && WIFEXITED(status) &&
++			             WEXITSTATUS(status) == 0;
++			bool retain = clean && retain_clean_eof;
 +			if (helper_pid > 0)
 +			{
-+				int status = 0;
-+				pid_t result = waitpid(helper_pid, &status, 0);
-+				int wait_errno = result < 0 ? errno : 0;
 +				diagnostic_write("child wait=%d status=0x%x wait_errno=%d exited=%d exit_code=%d signaled=%d signal=%d\n",
 +				                 (int)result, status, wait_errno,
 +				                 WIFEXITED(status),
 +				                 WIFEXITED(status) ? WEXITSTATUS(status) : -1,
 +				                 WIFSIGNALED(status),
 +				                 WIFSIGNALED(status) ? WTERMSIG(status) : 0);
-+				if (result == helper_pid &&
-+				    (!WIFEXITED(status) || WEXITSTATUS(status)))
-+					printf("MediaPlayer: ARM helper exited with an error\n");
 +				helper_pid = -1;
 +			}
++			finish_download(clean ? (retain ? "eof-retained" : "eof") :
++			                         "helper-error", !retain);
++			if (!clean)
++				printf("MediaPlayer: ARM helper exited with an error\n");
 +			diagnostic_write("transfer complete submitted=%llu reads=%u\n",
 +			                 (unsigned long long)submitted_bytes, read_events);
 +			diagnostic_close();
@@ -1141,13 +1175,18 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +
 +void mediaplayer_poll()
 +{
-+	if (helper_fd < 0) return;
-+	if (chapter_barrier || navigation_pending)
++	if (helper_fd < 0)
++	{
++		if (download_active && !mediaplayer_is_core())
++			finish_download("core-changed", true);
++		return;
++	}
++	if (chapter_barrier || navigation_pending || seek_pending)
 +	{
 +		chapter_barrier_poll();
-+		if (helper_fd < 0 || chapter_barrier) return;
++		if (helper_fd < 0 || chapter_barrier || navigation_pending) return;
 +	}
-+	if (!navigation_pending) control_event_poll();
++	if (!navigation_pending && !seek_pending) control_event_poll();
 +	if (helper_fd < 0) return;
 +	if (playback_paused) return;
 +	if (diagnostic_fd >= 0)

@@ -1,6 +1,7 @@
 #include "audio_ui.h"
 #include "media_player_protocol.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -243,10 +244,43 @@ static unsigned progress_width(const struct audio_ui *ui)
     return low;
 }
 
+static uint64_t rounded_up_seconds(uint64_t frames, unsigned rate_hz)
+{
+    uint64_t seconds;
+
+    if (!frames || !rate_hz)
+        return 0;
+    seconds = frames / rate_hz;
+    return seconds + (frames % rate_hz != 0u);
+}
+
+static void format_time(char *text, size_t size, uint64_t seconds)
+{
+    uint64_t minutes = seconds / 60u;
+
+    (void)snprintf(text, size, "%02llu:%02llu",
+                   (unsigned long long)minutes,
+                   (unsigned long long)(seconds % 60u));
+}
+
 static void render_frame(struct audio_ui *ui)
 {
+    char elapsed[32];
+    char remaining[32];
+    char timing[96];
     unsigned filled_width = progress_width(ui);
     unsigned row;
+    uint64_t elapsed_seconds = ui->rate_hz ?
+        ui->position_pcm_frames / ui->rate_hz : 0;
+    uint64_t remaining_frames =
+        ui->length_pcm_frames > ui->position_pcm_frames ?
+        ui->length_pcm_frames - ui->position_pcm_frames : 0;
+
+    format_time(elapsed, sizeof(elapsed), elapsed_seconds);
+    format_time(remaining, sizeof(remaining),
+                rounded_up_seconds(remaining_frames, ui->rate_hz));
+    (void)snprintf(timing, sizeof(timing),
+                   "ELAPSED %s / REMAIN %s", elapsed, remaining);
 
     /* Full 4:3 composition, inset for consumer-CRT overscan. */
     fill_rect(ui, 0, 0, AUDIO_UI_WIDTH, AUDIO_UI_HEIGHT,
@@ -290,7 +324,7 @@ static void render_frame(struct audio_ui *ui)
                       UI_TRACK_Y, UI_CB, UI_CR);
     }
 
-    /* Transport and time placeholders follow the supplied composition. */
+    /* Transport plus the absolute track-relative time display. */
     fill_rect(ui, 210, 364, 94, 34, UI_PANEL_ALT_Y, UI_CB, UI_CR);
     border_rect(ui, 210, 364, 94, 34, 2,
                 UI_ACCENT_Y, UI_ACCENT_CB, UI_ACCENT_CR);
@@ -309,8 +343,7 @@ static void render_frame(struct audio_ui *ui)
     draw_centered_text(ui, 440, 378, 94, "NEXT", 1, UI_TEXT_Y);
 
     draw_text(ui, 576, 378, "PLAYLIST --:--", 1, UI_MUTED_Y);
-    draw_text(ui, 210, 412, "ELAPSED 00:00 / REMAIN --:--",
-              1, UI_TEXT_Y);
+    draw_text(ui, 210, 412, timing, 1, UI_TEXT_Y);
     draw_text(ui, 610, 412, "TRACK --:--", 1, UI_MUTED_Y);
 
     /* Absolute decoder-frame position scaled across the track duration. */
@@ -435,6 +468,43 @@ int audio_ui_seek(struct audio_ui *ui, uint64_t emitted_pcm_frames,
     ui->chunk_index = 0;
     ui->state = AUDIO_UI_BEGIN;
     render_frame(ui);
+    return 0;
+}
+
+int audio_ui_complete(struct audio_ui *ui, uint64_t emitted_pcm_frames,
+                      unsigned rate_hz, audio_ui_record_writer writer,
+                      void *opaque)
+{
+    size_t offset;
+
+    if (!ui || !writer || !ui->length_pcm_frames ||
+        (rate_hz != 44100u && rate_hz != 48000u) ||
+        (ui->rate_hz && ui->rate_hz != rate_hz))
+        return -1;
+    ui->rate_hz = rate_hz;
+    ui->position_pcm_frames = ui->length_pcm_frames;
+    ui->frame_start_pcm = emitted_pcm_frames;
+    ui->service_started = 1;
+    ui->offset = 0;
+    ui->chunk_index = 0;
+    ui->state = AUDIO_UI_BEGIN;
+    render_frame(ui);
+    if (writer(opaque, MEDIA_PLAYER_AUDIO_UI_BEGIN, NULL, 0) < 0)
+        return -1;
+    for (offset = 0; offset < AUDIO_UI_FRAME_BYTES;
+         offset += AUDIO_UI_DATA_BYTES) {
+        size_t count = AUDIO_UI_FRAME_BYTES - offset;
+
+        if (count > AUDIO_UI_DATA_BYTES)
+            count = AUDIO_UI_DATA_BYTES;
+        if (writer(opaque, MEDIA_PLAYER_AUDIO_UI_DATA,
+                   ui->frame + offset, count) < 0)
+            return -1;
+    }
+    if (writer(opaque, MEDIA_PLAYER_AUDIO_UI_COMMIT, NULL, 0) < 0)
+        return -1;
+    ui->sequence++;
+    ui->state = AUDIO_UI_BEGIN;
     return 0;
 }
 

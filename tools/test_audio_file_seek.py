@@ -20,6 +20,7 @@ GO = 0x03
 SEEK_BACK_10 = 0x0A
 SEEK_FORWARD_10 = 0x0B
 SEEK_FORWARD_60 = 0x0D
+SEEK_CONTINUE = 0x85
 SEEK_RE = re.compile(
     rb"audio seek ([+-]10) seconds current=([0-9]+) target=([0-9]+) "
     rb"length=([0-9]+) rate=([0-9]+)"
@@ -31,6 +32,28 @@ IGNORED_RE = re.compile(
 DURATION_RE = re.compile(
     rb"audio UI duration frames=([0-9]+) rate=([0-9]+)"
 )
+PCM_MARKER = 0xB1
+PCM_END_MARKER = 0xB6
+DISPLAY_MARKER = 0xB9
+AUDIO_UI_BEGIN = 0x10
+AUDIO_UI_DATA = 0x11
+AUDIO_UI_COMMIT = 0x12
+AUDIO_UI_FRAME_BYTES = 720 * 480 * 3 // 2
+
+
+TIME_GLYPHS = {
+    "0": (14, 17, 19, 21, 25, 17, 14),
+    "1": (4, 12, 4, 4, 4, 4, 14),
+    "2": (14, 17, 1, 2, 4, 8, 31),
+    "3": (30, 1, 1, 14, 1, 1, 30),
+    "4": (2, 6, 10, 18, 31, 2, 2),
+    "5": (31, 16, 16, 30, 1, 1, 30),
+    "6": (14, 16, 16, 30, 17, 17, 14),
+    "7": (31, 1, 2, 4, 8, 8, 8),
+    "8": (14, 17, 17, 14, 17, 17, 14),
+    "9": (14, 17, 17, 15, 1, 1, 14),
+    ":": (0, 4, 4, 0, 4, 4, 0),
+}
 
 
 def make_fixture(directory: Path, extension: str, rate: int,
@@ -61,6 +84,65 @@ def drain_fd(fd: int, capture: bytearray | None = None) -> int:
     return total
 
 
+def final_audio_ui_frame(stream: bytes) -> bytes:
+    offset = 0
+    current = bytearray()
+    final = b""
+
+    while offset < len(stream):
+        if stream[offset:offset + 3] != b"\x00\x00\x01":
+            raise RuntimeError(f"unframed helper output at byte {offset}")
+        code = stream[offset + 3]
+        if code == PCM_MARKER:
+            frames = (stream[offset + 4] >> 2) & 0x1F
+            offset += 5 + frames * 4
+            continue
+        if code == PCM_END_MARKER:
+            offset += 4
+            continue
+        if code != DISPLAY_MARKER:
+            raise RuntimeError(
+                f"unexpected audio-only marker 0x{code:02x} at {offset}"
+            )
+        size = int.from_bytes(stream[offset + 4:offset + 6], "big")
+        end = offset + 6 + size
+        if size < 1 or end > len(stream):
+            raise RuntimeError(f"truncated display record at byte {offset}")
+        command = stream[offset + 6]
+        payload = stream[offset + 7:end]
+        if command == AUDIO_UI_BEGIN:
+            current.clear()
+        elif command == AUDIO_UI_DATA:
+            current.extend(payload)
+        elif command == AUDIO_UI_COMMIT:
+            if len(current) != AUDIO_UI_FRAME_BYTES:
+                raise RuntimeError(
+                    f"audio UI committed {len(current)} bytes"
+                )
+            final = bytes(current)
+        offset = end
+    if not final:
+        raise RuntimeError("audio UI emitted no complete frame")
+    return final
+
+
+def check_time(frame: bytes, x: int, y: int, seconds: int) -> None:
+    text = f"{seconds // 60:02d}:{seconds % 60:02d}"
+
+    for index, character in enumerate(text):
+        rows = TIME_GLYPHS[character]
+        for row, bits in enumerate(rows):
+            for column in range(5):
+                expected = 220 if bits & (1 << (4 - column)) else 16
+                actual = frame[(y + row) * 720 + x + index * 6 + column]
+                if actual != expected:
+                    raise RuntimeError(
+                        f"timer {text} raster mismatch at "
+                        f"{x + index * 6 + column},{y + row}: "
+                        f"{actual} != {expected}"
+                    )
+
+
 def run_fixture(helper: Path, fixture: Path) -> None:
     parent, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
     process = subprocess.Popen(
@@ -80,6 +162,7 @@ def run_fixture(helper: Path, fixture: Path) -> None:
     selector.register(process.stderr, selectors.EVENT_READ, "stderr")
     selector.register(parent, selectors.EVENT_READ, "control")
     error_output = bytearray()
+    stream_output = bytearray()
     output_bytes = 0
     after_go_bytes = 0
     forward_sent = False
@@ -87,13 +170,14 @@ def run_fixture(helper: Path, fixture: Path) -> None:
     overshoot_sent = False
     overshoot_output_start = 0
     ready_count = 0
+    continue_count = 0
     deadline = time.monotonic() + 20.0
 
     try:
         while process.poll() is None and time.monotonic() < deadline:
             for key, _ in selector.select(0.1):
                 if key.data == "stdout":
-                    count = drain_fd(process.stdout.fileno())
+                    count = drain_fd(process.stdout.fileno(), stream_output)
                     output_bytes += count
                     if ready_count == 1:
                         after_go_bytes += count
@@ -106,12 +190,16 @@ def run_fixture(helper: Path, fixture: Path) -> None:
                         event = b""
                     if event == bytes((READY,)):
                         ready_count += 1
-                        output_bytes += drain_fd(process.stdout.fileno())
+                        output_bytes += drain_fd(
+                            process.stdout.fileno(), stream_output
+                        )
                         parent.send(bytes((GO,)))
                         if ready_count == 2 and not overshoot_sent:
                             parent.send(bytes((SEEK_FORWARD_60,)))
                             overshoot_sent = True
                             overshoot_output_start = output_bytes
+                    elif event == bytes((SEEK_CONTINUE,)):
+                        continue_count += 1
                     elif event:
                         raise RuntimeError(
                             f"{fixture.suffix}: unexpected control {event.hex()}"
@@ -128,7 +216,7 @@ def run_fixture(helper: Path, fixture: Path) -> None:
             process.kill()
             process.wait()
             raise RuntimeError(f"{fixture.suffix}: helper timed out")
-        drain_fd(process.stdout.fileno())
+        output_bytes += drain_fd(process.stdout.fileno(), stream_output)
         drain_fd(process.stderr.fileno(), error_output)
     finally:
         selector.close()
@@ -142,10 +230,12 @@ def run_fixture(helper: Path, fixture: Path) -> None:
     matches = SEEK_RE.findall(error_output)
     ignored = IGNORED_RE.findall(error_output)
     durations = DURATION_RE.findall(error_output)
-    if ready_count != 2 or len(matches) != 2 or len(ignored) != 1:
+    if (ready_count != 2 or continue_count != 1 or len(matches) != 2 or
+            len(ignored) != 1):
         raise RuntimeError(
             f"{fixture.suffix}: expected two barriers/seeks and one "
             f"barrier-free end no-op, got ready={ready_count} "
+            f"continue={continue_count} "
             f"seeks={len(matches)} ignored={len(ignored)}:\n"
             + error_output.decode(errors="replace")
         )
@@ -187,8 +277,18 @@ def run_fixture(helper: Path, fixture: Path) -> None:
         raise RuntimeError(
             f"{fixture.suffix}: playback did not continue after end no-op"
         )
+    final_frame = final_audio_ui_frame(stream_output)
+    duration_seconds = duration_frames // duration_rate
+    check_time(final_frame, 258, 412, duration_seconds)
+    check_time(final_frame, 348, 412, 0)
+    if (final_frame[444 * 720 + 34] != 178 or
+            final_frame[444 * 720 + 685] != 178):
+        raise RuntimeError(
+            f"{fixture.suffix}: final progress bar is not complete"
+        )
     print(
         f"audio file seek {fixture.suffix}: PASS ready={ready_count} "
+        f"continue={continue_count} "
         f"duration={duration_frames}/{duration_rate} "
         f"output={output_bytes} bytes"
     )

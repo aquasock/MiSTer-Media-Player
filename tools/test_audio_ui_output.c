@@ -15,7 +15,10 @@ struct capture {
     unsigned commits;
     unsigned layout_checks;
     unsigned expected_progress[3];
+    unsigned expected_elapsed[3];
+    unsigned expected_remaining[3];
     int check_layout_enabled;
+    int check_time_enabled;
     int failed;
     int layout_failed;
 };
@@ -37,6 +40,57 @@ static uint32_t fnv1a(const uint8_t *data, size_t size)
 static uint8_t frame_y(const uint8_t *frame, unsigned x, unsigned y)
 {
     return frame[(size_t)y * AUDIO_UI_WIDTH + x];
+}
+
+static const uint8_t *time_glyph_rows(char character)
+{
+    static const uint8_t digits[][7] = {
+        {14, 17, 19, 21, 25, 17, 14},
+        {4, 12, 4, 4, 4, 4, 14},
+        {14, 17, 1, 2, 4, 8, 31},
+        {30, 1, 1, 14, 1, 1, 30},
+        {2, 6, 10, 18, 31, 2, 2},
+        {31, 16, 16, 30, 1, 1, 30},
+        {14, 16, 16, 30, 17, 17, 14},
+        {31, 1, 2, 4, 8, 8, 8},
+        {14, 17, 17, 14, 17, 17, 14},
+        {14, 17, 17, 15, 1, 1, 14}
+    };
+    static const uint8_t colon[7] = {0, 4, 4, 0, 4, 4, 0};
+
+    if (character >= '0' && character <= '9')
+        return digits[(unsigned)(character - '0')];
+    return character == ':' ? colon : NULL;
+}
+
+static int check_time_value(const uint8_t *frame, unsigned x, unsigned y,
+                            unsigned seconds)
+{
+    char text[32];
+    unsigned index;
+
+    (void)snprintf(text, sizeof(text), "%02u:%02u",
+                   seconds / 60u, seconds % 60u);
+    for (index = 0; text[index]; ++index) {
+        const uint8_t *rows = time_glyph_rows(text[index]);
+        unsigned row;
+
+        if (!rows)
+            return 1;
+        for (row = 0; row < 7u; ++row) {
+            unsigned column;
+
+            for (column = 0; column < 5u; ++column) {
+                uint8_t expected = rows[row] & (1u << (4u - column)) ?
+                                   220u : 16u;
+
+                if (frame_y(frame, x + index * 6u + column,
+                            y + row) != expected)
+                    return 1;
+            }
+        }
+    }
+    return 0;
 }
 
 static void check_layout(struct capture *capture)
@@ -63,6 +117,14 @@ static void check_layout(struct capture *capture)
         failed |= frame_y(frame, 33u + progress, 444) != 178u;
     if (progress <= 652u)
         failed |= frame_y(frame, 34u + progress, 444) != 42u;
+    if (capture->check_time_enabled) {
+        failed |= check_time_value(
+            frame, 258u, 412u,
+            capture->expected_elapsed[capture->commits]);
+        failed |= check_time_value(
+            frame, 348u, 412u,
+            capture->expected_remaining[capture->commits]);
+    }
     capture->layout_checks++;
     capture->layout_failed |= failed;
 }
@@ -130,7 +192,10 @@ static int run_rate(unsigned rate_hz, uint64_t frame_limit)
     struct audio_ui *ui = NULL;
     struct capture capture = {
         .expected_progress = {163u, 326u, 489u},
-        .check_layout_enabled = 1
+        .expected_elapsed = {1u, 2u, 3u},
+        .expected_remaining = {3u, 2u, 1u},
+        .check_layout_enabled = 1,
+        .check_time_enabled = 1
     };
     uint64_t frames;
 
@@ -180,7 +245,10 @@ static int run_seek_reset(void)
     struct capture before = {0};
     struct capture after = {
         .expected_progress = {247u, 0u, 0u},
-        .check_layout_enabled = 1
+        .expected_elapsed = {38u, 0u, 0u},
+        .expected_remaining = {62u, 0u, 0u},
+        .check_layout_enabled = 1,
+        .check_time_enabled = 1
     };
     uint64_t emitted = 0;
 
@@ -230,7 +298,10 @@ static int run_complete_progress(void)
     struct audio_ui *ui = NULL;
     struct capture capture = {
         .expected_progress = {652u, 0u, 0u},
-        .check_layout_enabled = 1
+        .expected_elapsed = {100u, 0u, 0u},
+        .expected_remaining = {0u, 0u, 0u},
+        .check_layout_enabled = 1,
+        .check_time_enabled = 1
     };
     uint64_t emitted = 0;
 
@@ -240,13 +311,10 @@ static int run_complete_progress(void)
         audio_ui_destroy(ui);
         return 1;
     }
-    while (!capture.commits) {
-        emitted += 16;
-        if (audio_ui_service(ui, emitted, 44100u,
-                             capture_record, &capture) < 0) {
-            audio_ui_destroy(ui);
-            return 1;
-        }
+    if (audio_ui_complete(ui, emitted, 44100u,
+                          capture_record, &capture) < 0) {
+        audio_ui_destroy(ui);
+        return 1;
     }
     if (capture.failed || capture.layout_failed ||
         capture.layout_checks != 1u || capture.commits != 1u) {
@@ -257,7 +325,7 @@ static int run_complete_progress(void)
         audio_ui_destroy(ui);
         return 1;
     }
-    puts("audio UI complete progress PASS position=100s progress=652/652");
+    puts("audio UI complete PASS elapsed=100s remaining=0s progress=652/652");
     audio_ui_destroy(ui);
     return 0;
 }

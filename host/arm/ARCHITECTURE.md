@@ -36,11 +36,13 @@ and demux/audio/scheduler queues are discarded behind the existing READY/GO
 download barrier. The normal random-access filter then withholds output until
 it has a sequence header, an I picture, and the following reference picture.
 Standalone `.mp3`, `.wav`, `.flac` and `.ogg` files accept the same fixed
-jumps. Their decoders poll the control channel between bounded PCM chunks,
-seek on the output sample-frame timeline, and restart the audio-interface
-publisher at the absolute target behind the same READY/GO reset. A forward
-target at or beyond the exact end is consumed as a no-op before that barrier,
-preserving the current decoder and display session. Raw `.m2v`, ISO, and
+jumps. Their decoders poll the control channel between bounded PCM chunks and
+decide the output sample-frame target while Main continues submitting the
+active session. A valid target returns READY, after which Main resets download,
+drains the old boundary and sends GO; the helper then restarts the
+audio-interface publisher at the absolute target. A forward target at or beyond
+the exact end returns an explicit continuation event with no reset or output
+discard, preserving the current decoder and display session. Raw `.m2v`, ISO, and
 optical-disc routes reject these seek commands in this boundary.
 
 Menu-mode sources use the same channel for directional, activate and root-menu
@@ -166,10 +168,14 @@ placeholder remains inside a 32-pixel horizontal and approximately 24-pixel
 vertical CRT-safe margin. A fixed bitmap font is part of the renderer; it does
 not parse tags, artwork or playlists. Once miniaudio has established the exact
 output-frame length, a one-time consumer callback configures that length in the
-renderer. The bar uses the absolute output-frame position, projects it to the
-next one-hertz publication and rescales it after every fixed seek. Publication
-remains an atomic inactive-bank swap; no duration metadata crosses the FPGA
-protocol because the helper resolves the bar entirely into pixels.
+renderer. The bar and elapsed/remaining counters use the absolute output-frame
+position, project it to the next one-hertz publication and rescale together
+after every fixed seek. Elapsed time truncates completed seconds; remaining
+time rounds a partial second up. At successful track completion the helper
+publishes one exact final frame with full progress and zero remaining time.
+Publication remains an atomic inactive-bank swap; no duration metadata crosses
+the FPGA protocol because the helper resolves the presentation entirely into
+pixels.
 
 Standalone `.mp3` is an audio-only use of the same output contract: miniaudio's
 bundled MP3 backend skips stream metadata, decodes MPEG-1 Layer III mono or
@@ -280,8 +286,12 @@ budget checked between steps even when logging is unavailable. This is a work
 budget, not a hard realtime bound: a status transaction, current step, scheduler
 preemption, logging and the existing terminal/child cleanup can extend a call.
 Short odd pipe reads retain their last byte until another read or EOF; only the
-true final byte is padded. EOF releases download only after pending bytes drain.
-Cancellation, read errors and core changes discard pending state before restart.
+true final byte is padded. After pending bytes drain, a zero-status helper EOF
+for an ordinary `file:` source closes the host process and control resources but
+leaves download asserted so the final MPG frame or completed audio interface
+remains resident. ISO/DVD routes keep their existing download-release lifecycle.
+A nonzero or signaled helper exit, cancellation, read error or core change also
+releases download and discards pending state before restart.
 
 An acknowledged status transaction follows each batch, after the final low and
 select release, so the FIO pipeline drains before the snapshot. Main checks
