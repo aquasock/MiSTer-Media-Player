@@ -1,3 +1,37 @@
+## 897 COMMIT Unreleased 5327358 2026-09-02T05:57:42-07:00
+
+#### Coming From:
+
+Unreleased 532bd8e
+
+#### Purpose:
+
+Smooth the accepted audio visualizer's loudness response without changing its underlying animation, transport or decoder path.
+
+#### Outcome:
+
+Source `5327358` preserves the exact two-second radial animation and its accepted darkest and brightest grades while expanding the synchronized pack from four to eight linearly interpolated grades.  The helper now separates the RMS target from the emitted grade, applies a one-eighth deadband around seven fixed thresholds and moves by at most one adjacent grade when each independent three-picture GOP begins, so near-threshold audio cannot chatter and a large loudness change becomes a bounded ramp of roughly one grade per 100 milliseconds.  Strict focused, AddressSanitizer and UndefinedBehaviorSanitizer tests prove fast attack, slow decay, hysteresis and the one-step maximum; GCC analyzer passes, and the audited 3,560,506-byte pack contains 160 valid indexed GOPs with payloads from 15,918 through 27,389 bytes and a deliberately switched stream that FFmpeg decodes without error.  Native and exact GNU 10.2 ARMv7 real-helper runs pass MP3, WAV, FLAC and Ogg Vorbis with two seek barriers, one boundary continuation, overlay inactivity clear and 378 through 381 decodable selected pictures; the unchanged no-pack fallback also passes all four formats.  The final 961,956-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_VisualizerSmooth_5327358` has SHA-256 `a7fb85e60882ba40ee5363cd467bb8daa3cfe97cd419b46fae253e8d6500a04d`, and `host/build/MediaPlayer_Visualizer_5327358.mmpvis` has SHA-256 `d4625fadb089ba84f3d9e64b1ff104db3e8ebc65a96b35e14b3727f165ec31d3`; Main, the protocol, RTL and the timing-qualified RBF are unchanged.
+
+#### Next Steps:
+
+Exit MediaPlayer so its helper stops, replace `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_VisualizerSmooth_5327358`, restore executable mode if needed, and replace `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` with `host/build/MediaPlayer_Visualizer_5327358.mmpvis`, verifying both recorded sizes and hashes while preserving the installed source-`532bd8e` Main and current timing-qualified RBF.  Replay the same dynamic FLAC passage through quiet, moderate, loud and peak sections; acceptance requires the unchanged gently blending radial animation and dark-to-bright correlation, but each loudness response must now appear as a smooth short pulse or ramp without the prior abrupt grade cuts or near-threshold flicker.  Confirm user activity still restores the interface and another ten seconds reveals the visualizer, then capture a fresh screenshot and telemetry-enabled log for acceptance or any remaining response issue.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_visualizer.c
+- host/arm/audio_visualizer.h
+- tools/generate-audio-visualizer.py
+- tools/test_audio_visualizer.c
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 896 COMMIT Unreleased 532bd8e 2026-09-02T05:42:18-07:00
 
 #### Coming From:
@@ -1266,35 +1300,6 @@ The user should exit MediaPlayer so its helper process stops, manually replace o
 
 - host/arm/media_player_helper.c
 - tools/test_dvd_menu_navigation.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 857 COMMIT Unreleased 85cda13 2026-08-31T22:20:32-07:00
-
-#### Coming From:
-
-Unreleased 85cda13
-
-#### Purpose:
-
-Capture the physical Play result for the delayed-activation helper and identify why the title still does not enter its decoder barrier.
-
-#### Outcome:
-
-The user's physical test runs the source-`85cda13` path, proven by its unique `menu pending activate`, `DVD menu activation deferred` and authored-compensation diagnostics, but the video still freezes on the resident root-menu frame.  Main submits activation command `0x08` at 20.828591 seconds and the helper correctly leaves that request pending at first; an intermediate menu payload then causes the helper to send `MENU_CONTINUE` with reason `menu-payload`, which Main accepts at 21.000909 seconds, approximately 172 milliseconds after the command.  Only after that premature acknowledgment does libdvdnav announce the authored ten-second finite still.  At its expiry the helper reports menu leave and title subpicture stream 128, but `activation_pending` has already been cleared, so there is no delayed-activation hop, ready event, random-access reset or navigation-barrier release.  Main and the helper remain alive and continue submitting the concatenated title stream beyond 207 megabytes, reproducing entry 855 rather than a pause or disc stall.  The 655,681-byte screenshot at SHA-256 `4da4100a79b06e21e8867b61ac2f080f39b917fceb66a49e582524fb97d5ddf0` shows the frozen root-menu frame; its diagnostic raster corresponds to the 844-byte checksum-valid schema-21 snapshot at SHA-256 `5bd2e87048013102194aa7e02f6280ca1e0bf4c21d67da0e7edaaea7e372d30e`, and the matching 1,848,282-byte log has SHA-256 `37ddc328ec24edc5341ee82dfc035ac3be4f9dd11f2a7131cbf2bc1975b74515`.  Source `85cda13` is rejected on hardware because a payload between activation and the still is not proof of a menu continuation.
-
-#### Next Steps:
-
-Keep Main, RTL, QSF, the source-`f5f650f` RBF and authored-selector compensation frozen.  After user approval, make a bounded helper-only correction that retains `activation_pending` across ordinary menu payloads and resolves it only at a definitive boundary: an indefinite still acknowledges menu continuation, a finite still classifies title versus menu after `dvdnav_still_skip`, and an observed menu leave enters the existing ready/go barrier before title payload processing.  Remove the invalid menu-payload acknowledgment, strengthen regression coverage so payload-before-finite-still must still produce a delayed hop and second ready event, rebuild only the helper locally and repeat Play while waiting through the authored ten seconds.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
