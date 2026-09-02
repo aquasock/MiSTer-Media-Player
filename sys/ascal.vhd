@@ -484,6 +484,7 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_copyv : unsigned(0 TO 14);
 	SIGNAL o_adrs : unsigned(31 DOWNTO 0); -- Avalon address
 	SIGNAL o_adrs_pre : natural RANGE 0 TO 2**24-1;
+	SIGNAL o_adrs_line_burst : unsigned(31 DOWNTO 0);
 	SIGNAL o_stride : unsigned(13 DOWNTO 0);
 	SIGNAL o_adrsa,o_adrsb,o_rline : std_logic;
 	SIGNAL o_ad,o_ad1,o_ad2,o_ad3 : natural RANGE 0 TO 2*BLEN-1;
@@ -1061,7 +1062,8 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_poly_phase_b,o_poly_phase_b2,o_poly_phase_b3 : poly_phase_t;
 	SIGNAL o_v_poly_phase, o_v_poly_phase_g, o_v_poly_phase_b : poly_phase_interp_t;
 	SIGNAL o_v_poly_phase2, o_h_poly_phase, o_poly_phase, o_poly_phase1 : poly_phase_interp_t;
-	SIGNAL o_v_poly_pix, o_h_poly_pix, o_h_lum_pix, o_v_lum_pix : type_pix;
+	SIGNAL o_v_poly_pix, o_h_poly_pix, o_h_lum_pix : type_pix;
+	SIGNAL o_v_lum_rg_max, o_v_lum_b : unsigned(7 DOWNTO 0);
 	SIGNAL o_poly_lum, o_poly_lum1 : unsigned(7 DOWNTO 0);
 	SIGNAL o_poly_lerp_ta, o_poly_lerp_tb : signed(9 DOWNTO 0);
 	SIGNAL o_h_poly_t,o_h_poly_t2,o_v_poly_t   : type_poly_t;
@@ -1074,10 +1076,11 @@ ARCHITECTURE rtl OF ascal IS
 	-- duplicates, not delays: identical input, identical timing, so the only
 	-- change is that the fitter may place a copy beside the C8 mux.
 	-- dont_merge stops Quartus folding them back into one register.
-	SIGNAL o_v_poly_use_adaptive_c8, o_h_poly_use_adaptive_c8 : std_logic;
+	SIGNAL o_v_poly_use_adaptive_c8 : std_logic;
+	SIGNAL o_h_poly_use_adaptive_c8_effective : std_logic;
 	ATTRIBUTE dont_merge : boolean;
 	ATTRIBUTE dont_merge OF o_v_poly_use_adaptive_c8 : SIGNAL IS true;
-	ATTRIBUTE dont_merge OF o_h_poly_use_adaptive_c8 : SIGNAL IS true;
+	ATTRIBUTE dont_merge OF o_h_poly_use_adaptive_c8_effective : SIGNAL IS true;
 	ATTRIBUTE dont_merge OF o_v_poly_phase : SIGNAL IS true;
 	ATTRIBUTE dont_merge OF o_v_poly_phase_g : SIGNAL IS true;
 	ATTRIBUTE dont_merge OF o_v_poly_phase_b : SIGNAL IS true;
@@ -2240,6 +2243,13 @@ BEGIN
 				o_adrs_pre<=to_integer(o_vacpt) * to_integer(o_stride);
 			END IF;
 
+			-- Entry 880: prepare the normal line-plus-burst sum during the
+			-- existing sREAD request cycle.  o_adrsa consumes it one cycle
+			-- later, preserving the Avalon request edge while removing this
+			-- adder from the conditional o_adrs mux.
+			o_adrs_line_burst<=to_unsigned(o_adrs_pre,32) +
+									to_unsigned(o_hbcpt * N_BURST,32);
+
 			IF o_adrsa='1' THEN
 				IF o_fload=2 THEN
 					o_adrs<=to_unsigned(o_hbcpt * N_BURST,32);
@@ -2248,7 +2258,7 @@ BEGIN
 					o_adrs<=to_unsigned(o_hbcpt * N_BURST,32) + o_stride;
 					o_alt<="0100";
 				ELSE
-					o_adrs<=to_unsigned(o_adrs_pre + (o_hbcpt * N_BURST),32);
+					o_adrs<=o_adrs_line_burst;
 					o_alt<=altx(o_vacptl + 1);
 				END IF;
 			END IF;
@@ -2454,7 +2464,12 @@ BEGIN
 			o_v_poly_use_adaptive <= to_std_logic((o_vmode(2 DOWNTO 0)/="000") AND (o_v_poly_adaptive = '1'));
 			o_h_poly_use_adaptive <= to_std_logic((o_hmode(2 DOWNTO 0)/="000") AND (o_h_poly_adaptive = '1'));
 			o_v_poly_use_adaptive_c8 <= to_std_logic((o_vmode(2 DOWNTO 0)/="000") AND (o_v_poly_adaptive = '1'));
-			o_h_poly_use_adaptive_c8 <= to_std_logic((o_hmode(2 DOWNTO 0)/="000") AND (o_h_poly_adaptive = '1'));
+			-- Entry 880: preserve the original vertical-over-horizontal
+			-- priority in a register so the vertical enable is not also a
+			-- late input to every horizontal C8 coefficient mux.
+			o_h_poly_use_adaptive_c8_effective <= to_std_logic(
+				((o_hmode(2 DOWNTO 0)/="000") AND (o_h_poly_adaptive = '1')) AND
+				NOT ((o_vmode(2 DOWNTO 0)/="000") AND (o_v_poly_adaptive = '1')));
 			o_v_poly_addr<=to_integer(o_vfrac(11 DOWNTO 12-FRAC));
 
 			-- C3 / HC3 / VC4
@@ -2471,7 +2486,13 @@ BEGIN
 			END IF;
 
 			IF o_v_poly_use_adaptive='1' THEN
-				o_poly_lum<=poly_lum(o_v_lum_pix);
+				-- The R/G maximum was registered in the existing vertical
+				-- pixel stage.  Only the final B comparison remains here.
+				IF o_v_lum_b > o_v_lum_rg_max THEN
+					o_poly_lum<=o_v_lum_b;
+				ELSE
+					o_poly_lum<=o_v_lum_rg_max;
+				END IF;
 				o_a_poly_addr<=o_v_poly_addr;
 			ELSIF o_h_poly_use_adaptive='1' THEN
 				o_poly_lum<=poly_lum(o_h_lum_pix);
@@ -2521,7 +2542,8 @@ BEGIN
 				o_v_poly_phase<=o_poly_phase1;
 				o_v_poly_phase_g<=o_poly_phase1;
 				o_v_poly_phase_b<=o_poly_phase1;
-			ELSIF o_h_poly_use_adaptive_c8 = '1' THEN
+			END IF;
+			IF o_h_poly_use_adaptive_c8_effective = '1' THEN
 				o_h_poly_phase<=o_poly_phase1;
 			END IF;
 
@@ -3042,7 +3064,14 @@ BEGIN
 
 				-- POLYPHASE ---------------------------------------
 				-- C3 : Setup luminance
-				o_v_lum_pix<=o_vpix_inner(0);
+				-- Entry 880: split the adaptive maximum across the existing
+				-- pixel and coefficient stages without changing its sample age.
+				IF o_vpix_inner(0).r > o_vpix_inner(0).g THEN
+					o_v_lum_rg_max<=o_vpix_inner(0).r;
+				ELSE
+					o_v_lum_rg_max<=o_vpix_inner(0).g;
+				END IF;
+				o_v_lum_b<=o_vpix_inner(0).b;
 
 				-- C4-C9 in PolyFetch
 
