@@ -1229,7 +1229,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	if (chapter_barrier || navigation_pending || seek_pending)
 +	{
 +		chapter_barrier_poll();
-+		if (helper_fd < 0 || chapter_barrier || navigation_pending) return;
++		if (helper_fd < 0 || chapter_barrier) return;
 +	}
 +	if (!navigation_pending && !seek_pending) control_event_poll();
 +	if (helper_fd < 0) return;

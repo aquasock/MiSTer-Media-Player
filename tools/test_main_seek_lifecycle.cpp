@@ -9,9 +9,15 @@ enum class ControlEvent {
     seek_continue
 };
 
+enum class NavigationEvent {
+    ready,
+    menu_continue
+};
+
 struct MainLifecycle {
     bool download_active = true;
     bool seek_pending = false;
+    bool navigation_pending = false;
     bool chapter_barrier = false;
     bool playback_paused = false;
     bool replay_ready = false;
@@ -37,6 +43,13 @@ struct MainLifecycle {
         seek_pending = true;
     }
 
+    void request_navigation()
+    {
+        if (navigation_pending || chapter_barrier)
+            throw "overlapping navigation";
+        navigation_pending = true;
+    }
+
     void control(ControlEvent event)
     {
         if (!seek_pending)
@@ -46,6 +59,21 @@ struct MainLifecycle {
             return;
         }
         seek_pending = false;
+        download_active = false;
+        ++resets;
+        chapter_barrier = true;
+        download_active = true;
+        ++go_commands;
+        chapter_barrier = false;
+    }
+
+    void navigation_control(NavigationEvent event)
+    {
+        if (!navigation_pending)
+            throw "unexpected navigation decision";
+        navigation_pending = false;
+        if (event == NavigationEvent::menu_continue)
+            return;
         download_active = false;
         ++resets;
         chapter_barrier = true;
@@ -114,7 +142,8 @@ static int require_patch_markers(const char *path)
         "retain ? \"eof-replay-ready\" : \"eof\"",
         "replay ready and paused; press Play to restart",
         "audio_visualizer_controls &&",
-        "activity-command-error"
+        "activity-command-error",
+        "if (helper_fd < 0 || chapter_barrier) return;"
     };
     std::ifstream input(path);
 
@@ -167,6 +196,41 @@ int main(int argc, char **argv)
     failed |= require(boundary.discards == 0,
                       "seek decision phase discarded active output");
 
+    MainLifecycle menu_continue_boundary;
+    menu_continue_boundary.submit(4096);
+    menu_continue_boundary.request_navigation();
+    menu_continue_boundary.submit(8192);
+    menu_continue_boundary.navigation_control(
+        NavigationEvent::menu_continue);
+    menu_continue_boundary.submit(16384);
+    failed |= require(menu_continue_boundary.download_active &&
+                          !menu_continue_boundary.navigation_pending &&
+                          !menu_continue_boundary.chapter_barrier,
+                      "menu continuation left a pending state");
+    failed |= require(menu_continue_boundary.resets == 0 &&
+                          menu_continue_boundary.discards == 0 &&
+                          menu_continue_boundary.go_commands == 0,
+                      "menu continuation reset or discarded output");
+    failed |= require(menu_continue_boundary.submitted == 28672,
+                      "unresolved navigation stopped submitted output");
+
+    MainLifecycle navigation_hop_boundary;
+    navigation_hop_boundary.submit(4096);
+    navigation_hop_boundary.request_navigation();
+    navigation_hop_boundary.submit(8192);
+    navigation_hop_boundary.navigation_control(NavigationEvent::ready);
+    navigation_hop_boundary.submit(16384);
+    failed |= require(navigation_hop_boundary.download_active &&
+                          !navigation_hop_boundary.navigation_pending &&
+                          !navigation_hop_boundary.chapter_barrier,
+                      "navigation hop did not leave playback active");
+    failed |= require(navigation_hop_boundary.resets == 1 &&
+                          navigation_hop_boundary.go_commands == 1,
+                      "navigation hop did not use one reset and GO");
+    failed |= require(navigation_hop_boundary.discards == 0 &&
+                          navigation_hop_boundary.submitted == 28672,
+                      "navigation decision phase lost submitted output");
+
     boundary.helper_eof(true, true);
     failed |= require(boundary.download_active && boundary.replay_ready &&
                           boundary.playback_paused,
@@ -207,6 +271,7 @@ int main(int argc, char **argv)
     if (failed)
         return 1;
     std::cout << "main seek lifecycle PASS no-op_resets=0 valid_resets=1 "
+                 "navigation=drain-until-decision "
                  "clean_eof=replay-ready play=relaunch "
                  "failed_eof=released\n";
     return 0;
