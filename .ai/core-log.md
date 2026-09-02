@@ -1,4 +1,4 @@
-## 888 COMMIT Unreleased ??? 2026-09-01T23:49:02-07:00
+## 888 COMMIT Unreleased e580270 2026-09-01T23:49:02-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make the standalone-audio progress bar represent the current absolute track posi
 
 #### Outcome:
 
-The user physically accepts the source-`9397fa7` full-screen 4:3 layout but reports that its moving progress bar does not track the audio file's duration.  The accepted helper already obtains exact output-frame lengths for MP3, WAV and FLAC and already carries the absolute target frame through each audio seek, while the UI currently discards the length and renders `position_seconds % 60`.  Focused integration exposed that miniaudio's callback-based Ogg Vorbis backend uses push mode and returns a successful zero length, so this boundary will also add file-end seeking to the local media-source abstraction and read only the final bounded Ogg page's authoritative granule position rather than scanning or decoding the whole file.  A one-time decoder-to-UI duration callback will retain an absolute UI position in PCM frames and scale that position safely across the existing 652-pixel interior so ordinary playback and fixed seeks both produce true file-relative progress for all four formats.  The bar's geometry, one-hertz frame cadence, bounded UI interleaving, atomic publication, codecs, audio priority, controls, Main, RTL, RBF, video and DVD paths will remain unchanged; elapsed, remaining and track-duration text will remain placeholders.
+Source `e580270` replaces the accepted layout's repeating one-minute activity ruler with true track-relative progress for standalone MP3, WAV, FLAC and Ogg Vorbis playback.  Once the decoder establishes its output-frame length, a one-time consumer callback configures the UI; the renderer retains the absolute PCM-frame position, projects it to the next one-hertz publication, rescales after every fixed seek and clamps at the exact end.  An overflow-safe binary search maps even a `UINT64_MAX` timeline across the existing 652-pixel interior without wide-integer target support.  MP3, WAV and FLAC use miniaudio's reported length; callback-mode Ogg Vorbis returns a successful zero length, so file media sources now support end-relative seeking and the consumer reads at most the final 65,307-byte Ogg page, requiring a version-zero end-of-stream page ending exactly at EOF and using its authoritative granule position without scanning or decoding the whole file.  Strict and AddressSanitizer/UndefinedBehaviorSanitizer renderer tests pass at 44.1 and 48 kHz with exact one-quarter, one-half, 37-second seek, complete and maximum-64-bit progress checks; their first two frame hashes are `ea64e99d` and `eb334e45`.  Clean and fully instrumented real-helper regressions pass forward and backward seeking for all four formats while matching the UI duration to the decoder timeline; each twelve-second fixture reports 529,200/44,100 or 576,000/48,000 frames as appropriate.  The inspected deterministic YCbCr preview has SHA-256 `9fc41135e21762c078b570b553defe05b3fb9db8cbaabdb25cc480fc94157ad7`, and its PNG conversion has SHA-256 `242ea03862c9f20a48f329e0cd6f5144654057b781e0840940af3f1cc2ecfb5e`.  The GNU 10.2 build produces the 953,764-byte static ARMv7 helper `host/build/MediaPlayer_Helper_AudioProgress_e580270` with SHA-256 `e18854df1f64c6dd61b50c6f7b3463f2e88f5f1ad5f89f9213369a9e7c9295b4`; the accepted layout, displayed time placeholders, one-hertz cadence, bounded interleaving, atomic publication, codecs, audio priority, controls, Main, RTL, RBF, video and DVD paths remain unchanged.
 
 #### Next Steps:
 
-Commit and push this proposal after the authorized ring-buffer rotation, implement duration configuration and overflow-safe progress scaling in the helper, and extend the deterministic renderer regression for empty, proportional, seeked and complete bar states.  Extend the real-helper four-format seek regression to require that each decoder's reported duration reaches the UI, run strict and sanitizer tests, then build and verify a uniquely named static ARMv7 helper with the local GNU 10.2 toolchain.  Deliver only the helper for MiSTer testing and preserve the accepted Main and timing-qualified RBF.
+Exit MediaPlayer, install `host/build/MediaPlayer_Helper_AudioProgress_e580270` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, and preserve the installed source-`72bdccc` Main and timing-qualified RBF.  Re-enter the core and play a track with a known duration long enough to distinguish file-relative motion from the former one-minute repeat; acceptance requires the bar to begin near zero, advance monotonically in proportion to the full track, jump to the correct fraction after ten-second, one-minute and five-minute seeks in either direction, and approach the right edge at the end while audio remains clean.  Spot-check MP3, WAV, FLAC and Ogg Vorbis where practical, then report hardware acceptance or enable telemetry before playback and collect a fresh screenshot and helper/Main log for any discrepancy.
 
 #### Files Modified:
 
@@ -32,7 +32,7 @@ Commit and push this proposal after the authorized ring-buffer rotation, impleme
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
