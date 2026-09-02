@@ -1,3 +1,32 @@
+## 878 COMMIT Unreleased 326382a 2026-09-01T18:02:25-07:00
+
+#### Coming From:
+
+Unreleased 326382a
+
+#### Purpose:
+
+Record the final permitted seed-24 telemetry build result and stop without distributing a timing-rejected RBF.
+
+#### Outcome:
+
+Exact source `326382a` passes all ten focused and retained Icarus regressions covering default-hidden and live telemetry visibility, progressive cadence and geometry, 480p and 480i output timing, the complete 64,800-word audio-interface upload, DDR arbitration, DVD-overlay extraction, engine, integrated stalled-DDR delivery and schema-21 snapshot triggering.  The strict native helper, static ARMv7 helper and patched ARMv7 Main builds also succeed, with both generated Main patches applying cleanly to pinned upstream `0a8fb44`.  Quartus Prime 17.0.2 seed 24 completes synthesis in 2 minutes 25 seconds, fitting in 12 minutes 24 seconds and assembly with zero errors, but is rejected at negative 0.978-nanosecond global setup slack while global hold, recovery, removal and minimum-pulse-width slacks remain positive at 0.254, 3.432, 0.395 and 0.925 nanoseconds.  Dedicated 60 MHz decoder and 54 MHz video setup are violation-free at positive 0.555 and 1.128 nanoseconds.  The fit uses 34,587 ALMs, 53,873 registers, 4,187,203 block-memory bits in 535 RAM blocks and 70 DSP blocks.  The 4,465,712-byte generated RBF is rejected and remains only on the build PC; no new RBF or Main is collected locally, and the accepted source-`5f00e35` RBF/helper pair remains untouched.
+
+#### Next Steps:
+
+Pause at source `326382a` under the one-reseed limit.  Resume only with explicit user approval for a timing-correction cycle; first inspect the global HDMI-domain failing paths from both rejected placements, then choose a structural or constraint correction rather than another blind seed and require all ten simulations plus a fully positive timing gate before collecting the telemetry RBF and Main for physical validation.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 877 COMMIT Unreleased 326382a 2026-09-01T17:44:34-07:00
 
 #### Coming From:
