@@ -1,4 +1,4 @@
-## 904 COMMIT Unreleased ??? 2026-09-02T07:11:06-07:00
+## 904 COMMIT Unreleased fddab62 2026-09-02T07:11:06-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Keep reserve-backed physical-DVD output independent from the nonblocking descrip
 
 #### Outcome:
 
-Approved plan: make helper output ownership exclusive so a physical-DVD output reserve drains or discards its own records without subsequently calling `fflush` on the unused `FILE` that names the same nonblocking descriptor.  Validation of the accepted boundary found that libdvdnav's default informational logger writes to stdout and is the concrete source of the buffered stdio bytes seen by hardware, so the helper will use libdvdnav's supported logger callback to route every diagnostic level to stderr before the reserve is created and keep stdout media-only.  Normal barriers will select reserve drain or stdio flush, reserve-discard barriers will report completion immediately after the reserve acknowledges cancellation, and shutdown will remember whether the reserve owned video output so destroying it is not followed by a redundant stdio flush.  A production-path regression will fill a nonblocking pipe through the reserve while retaining a buffered stdio sentinel and require navigation discard to succeed rather than reproduce the hardware `EAGAIN`, and the menu-hop regression will require the installed libdvdnav callback to emit on stderr without touching stdout; ordinary file, ISO, split-output and PCM paths will retain their existing stdio flushes.  Main source `46638c7`, the output-reserve worker, libdvdnav navigation policy, decoder, visualizer, RTL and RBF remain unchanged.
+Source `fddab62` makes helper output ownership exclusive and fixes the hardware root cause rather than masking its symptom.  Libdvdnav's default informational logger was buffering diagnostics on media stdout; the helper now uses the supported `dvdnav_open2` and `dvdnav_open_stream2` logger callback to route every diagnostic level to stderr before playback, while reserve-backed barriers select reserve drain or discard without also flushing that nonblocking descriptor's unused stdio stream and shutdown remembers reserve ownership.  The focused production regression fills the nonblocking pipe while retaining a buffered stdio sentinel: source `2bd8447` reproduces `flushing ownership navigation barrier failed: Resource temporarily unavailable`, while `fddab62` cancels 262,144 reserve bytes, leaves stdio untouched through shutdown and preserves the sentinel for an independent later flush.  One hundred strict repetitions of that path reconstruct the exact 86,400-byte overlay plane, and one hundred logger/menu-hop repetitions prove diagnostics never reach stdout and preserve immediate and delayed transition classifications.  One hundred stalled-sink reserve runs, output staging, random-access, fragmented-SPU, AC-3 recovery, Program Stream and audio-file seek, audio UI and visualizer regressions pass; reserve, staging, logger/menu-hop and production ownership paths also pass AddressSanitizer and UndefinedBehaviorSanitizer, and the reserve passes GCC analyzer.  The strict native helper builds and all four audio formats pass real READY/GO visualizer integration.  Local GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_MediaOnly_fddab62` at SHA-256 `f191264565c89e1e1115eae9a3debe186b9bf4b35556350e59bc53f88460a8e0`; it has no dynamic section and contains the media-only logger, reserve-discard and complete protocol-one capability markers.  Main source `46638c7`, the output-reserve worker, libdvdnav navigation policy, decoder, visualizer, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Implement the stderr logger callback and mutually exclusive ownership branches, document the invariant, then run the logger-routing and new production helper-output regressions repeatedly together with stalled-sink reserve discard, exact overlay reconstruction, output staging, immediate and delayed DVD menu-hop, random-access, fragmented-SPU, AC-3 recovery, Program Stream seek, audio UI and visualizer regressions.  Run strict optimized, sanitizer and analyzer checks where supported, build the native helper and confirm capabilities, then use the local GNU 10.2.1 toolchain to build and audit one exact static ARMv7 helper for a repeated early-root-menu hardware test while retaining Main `46638c7`.
+Exit MediaPlayer so the old helper stops, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_MediaOnly_fddab62`, preserve executable mode, and retain Main `MiSTer_NavDrain_46638c7`, the current visualizer asset and RBF.  Reboot, start the golden physical DVD with telemetry, and press `M` once early enough to reproduce the rejected run; acceptance requires libdvdnav diagnostics in the helper log, a navigation-reserve discard, `READY`, exactly one Main reset and `GO`, a surviving helper and a displayed root menu without `Resource temporarily unavailable`.  Then move and activate the authored selector, return to playback, press `M` again after sustained playback, exercise `N` and `P` once each, and return fresh results for physical acceptance.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Implement the stderr logger callback and mutually exclusive ownership branches, 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
