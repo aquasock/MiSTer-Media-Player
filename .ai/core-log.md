@@ -10,16 +10,18 @@ Keep reserve-backed physical-DVD output independent from the nonblocking descrip
 
 #### Outcome:
 
-Approved plan: make helper output ownership exclusive so a physical-DVD output reserve drains or discards its own records without subsequently calling `fflush` on the unused `FILE` that names the same nonblocking descriptor.  Normal barriers will select reserve drain or stdio flush, reserve-discard barriers will report completion immediately after the reserve acknowledges cancellation, and shutdown will remember whether the reserve owned video output so destroying it is not followed by a redundant stdio flush.  A production-path regression will fill a nonblocking pipe through the reserve while retaining a buffered stdio sentinel and require navigation discard to succeed rather than reproduce the hardware `EAGAIN`; ordinary file, ISO, split-output and PCM paths will retain their existing stdio flushes.  Main source `46638c7`, the output-reserve worker, libdvdnav policy, decoder, visualizer, RTL and RBF remain unchanged.
+Approved plan: make helper output ownership exclusive so a physical-DVD output reserve drains or discards its own records without subsequently calling `fflush` on the unused `FILE` that names the same nonblocking descriptor.  Validation of the accepted boundary found that libdvdnav's default informational logger writes to stdout and is the concrete source of the buffered stdio bytes seen by hardware, so the helper will use libdvdnav's supported logger callback to route every diagnostic level to stderr before the reserve is created and keep stdout media-only.  Normal barriers will select reserve drain or stdio flush, reserve-discard barriers will report completion immediately after the reserve acknowledges cancellation, and shutdown will remember whether the reserve owned video output so destroying it is not followed by a redundant stdio flush.  A production-path regression will fill a nonblocking pipe through the reserve while retaining a buffered stdio sentinel and require navigation discard to succeed rather than reproduce the hardware `EAGAIN`, and the menu-hop regression will require the installed libdvdnav callback to emit on stderr without touching stdout; ordinary file, ISO, split-output and PCM paths will retain their existing stdio flushes.  Main source `46638c7`, the output-reserve worker, libdvdnav navigation policy, decoder, visualizer, RTL and RBF remain unchanged.
 
 #### Next Steps:
 
-Implement the mutually exclusive ownership branches and document the invariant, then run the new production helper-output regression repeatedly together with stalled-sink reserve discard, exact overlay reconstruction, output staging, immediate and delayed DVD menu-hop, random-access, fragmented-SPU, AC-3 recovery, Program Stream seek, audio UI and visualizer regressions.  Run strict optimized, sanitizer and analyzer checks where supported, build the native helper and confirm capabilities, then use the local GNU 10.2.1 toolchain to build and audit one exact static ARMv7 helper for a repeated early-root-menu hardware test while retaining Main `46638c7`.
+Implement the stderr logger callback and mutually exclusive ownership branches, document the invariant, then run the logger-routing and new production helper-output regressions repeatedly together with stalled-sink reserve discard, exact overlay reconstruction, output staging, immediate and delayed DVD menu-hop, random-access, fragmented-SPU, AC-3 recovery, Program Stream seek, audio UI and visualizer regressions.  Run strict optimized, sanitizer and analyzer checks where supported, build the native helper and confirm capabilities, then use the local GNU 10.2.1 toolchain to build and audit one exact static ARMv7 helper for a repeated early-root-menu hardware test while retaining Main `46638c7`.
 
 #### Files Modified:
 
 - host/arm/ARCHITECTURE.md
 - host/arm/media_player_helper.c
+- host/arm/media_source.c
+- tools/test_dvd_menu_hop.c
 - tools/test_dvd_overlay_output.c
 
 #### Status:
