@@ -1,3 +1,40 @@
+## 888 COMMIT Unreleased ??? 2026-09-01T23:49:02-07:00
+
+#### Coming From:
+
+Unreleased 9397fa7
+
+#### Purpose:
+
+Make the standalone-audio progress bar represent the current absolute track position instead of repeating once per minute.
+
+#### Outcome:
+
+The user physically accepts the source-`9397fa7` full-screen 4:3 layout but reports that its moving progress bar does not track the audio file's duration.  The accepted helper already obtains an exact output-frame length from miniaudio for every supported standalone MP3, WAV, FLAC and Ogg Vorbis file and already carries the absolute target frame through each audio seek, while the UI currently discards the length and renders `position_seconds % 60`.  This boundary will add a one-time decoder-to-UI duration callback, retain an absolute UI position in PCM frames, and scale that position safely across the existing 652-pixel interior so ordinary playback and fixed seeks both produce true file-relative progress.  The bar's geometry, one-hertz frame cadence, bounded UI interleaving, atomic publication, codecs, audio priority, controls, Main, RTL, RBF, video and DVD paths will remain unchanged; elapsed, remaining and track-duration text will remain placeholders.
+
+#### Next Steps:
+
+Commit and push this proposal after the authorized ring-buffer rotation, implement duration configuration and overflow-safe progress scaling in the helper, and extend the deterministic renderer regression for empty, proportional, seeked and complete bar states.  Extend the real-helper four-format seek regression to require that each decoder's reported duration reaches the UI, run strict and sanitizer tests, then build and verify a uniquely named static ARMv7 helper with the local GNU 10.2 toolchain.  Deliver only the helper for MiSTer testing and preserve the accepted Main and timing-qualified RBF.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_ui.c
+- host/arm/audio_ui.h
+- host/arm/consumer_audio.c
+- host/arm/consumer_audio.h
+- host/arm/media_player_helper.c
+- tools/test_audio_file_seek.py
+- tools/test_audio_ui_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 887 COMMIT Unreleased 9397fa7 2026-09-01T23:40:06-07:00
 
 #### Coming From:
@@ -1221,36 +1258,6 @@ Keep the source-`f5f650f` RBF and source-`2de0717` pre-drain Main frozen, and ob
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 848 COMMIT Unreleased 2de0717 2026-08-31T20:44:17-07:00
-
-#### Coming From:
-
-Unreleased aab7d09
-
-#### Purpose:
-
-Restore the last physically proven moving-purple selector userspace combination while keeping the accepted source-`f5f650f` RBF frozen.
-
-#### Outcome:
-
-The source-`aab7d09` physical test keeps menu video stable and proves the expected helper, Main and schema-21 overlay-capable RBF behaviors are active, but the 4,000-byte helper packetization worsens the rejected plane from the prior 21-byte deficit to 4,220 missing bytes: Main still submits 22 ordered records and all 86,400 all-`0x55` bytes with the expected hash, while the FPGA engine receives 82,180 bytes, rejects the commit and publishes no plane.  The user explicitly prioritizes a working selector over the newer menu-reliability drain if both cannot yet coexist.  Source `2de0717` restores the helper's physically proven 4,096-byte record framing and removes only Main's later 500-millisecond stream-hop drain, making both source files byte-identical to the entry-840 successful selector combination while preserving overlay tracing, navigation and the frozen source-`f5f650f` RBF.  Strict native compilation and the focused subpicture, random-access and menu-hop regressions pass, and the restored framing emits exactly 22 records carrying all 86,400 bytes with 4,096-byte maximum payloads and a 384-byte final payload.  The Raspberry Pi GNU 10.2.1 ARM toolchain builds `host/build/MediaPlayer_Helper_PurpleSelector_2de0717`, a 908,660-byte stripped static ARM EABI5 executable at SHA-256 `fd5d46f116ec41224ff9dd4c13fb62453a009ec462de9ab9b1bdfa794ff2b26c`, and `host/build/MiSTer_SelectorProven_2de0717`, a 1,178,588-byte stripped dynamic ARM EABI5 executable at SHA-256 `872050d44266d74c28e302a54336f409426fbca235ce3384c3b1735eb1aa6356`.  Both hashes exactly match the binaries used by the successful entry-840 hardware test.  The helper returns the complete protocol-one capability string and contains the required `probe=solid-index1-magenta` marker.  No RBF was built or changed; `output_files/MediaPlayer_20260831_f5f650f.rbf` remains 4,456,796 bytes at SHA-256 `4c57f9350b3c553d322395d0d4c0f7cc78dc14f8d7be863a251c83d10af647f7`.
-
-#### Next Steps:
-
-Exit the MediaPlayer core so the running helper stops, manually replace `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_PurpleSelector_2de0717` and replace `/media/fat/MiSTer` with local `host/build/MiSTer_SelectorProven_2de0717`, restore executable mode if needed and verify both installed hashes.  Reboot because Main changed, load the existing `MediaPlayer_20260831_f5f650f.rbf`, restart the DVD, press `M` and move through every menu button.  Hardware acceptance requires one accepted and zero rejected overlay commit, all 86,400 plane bytes, one plane publication and a visible purple selector following directional input; intermittent menu-load failure remains an accepted temporary tradeoff for this restoration boundary and may be retried or cleared by rebooting.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- host/main_mister/0001-mediaplayer-arm-loader.patch
 
 #### Status:
 
