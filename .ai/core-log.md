@@ -1,3 +1,33 @@
+## 879 COMMIT Unreleased ??? 2026-09-01T18:08:06-07:00
+
+#### Coming From:
+
+Unreleased 326382a
+
+#### Purpose:
+
+Close the telemetry build's HDMI-domain setup timing structurally without changing decoder, presentation or telemetry behavior.
+
+#### Outcome:
+
+The user approves a timing-correction cycle after both permitted telemetry placements failed only in the framework HDMI domain.  A new read-only one-hundred-path TimeQuest report from the retained seed-24 fit confirms that all reported setup violations are inside `ascal`; the worst path is a zero-logic 6.862-nanosecond route from the shared cycle-two outer-pixel register to its cycle-eight queue destination, while the next nineteen paths are zero-logic routes from one shared vertical-polyphase coefficient bit to widely separated RGB DSP inputs.  The correction will use same-cycle physical duplicates at those two high-fanout boundaries and will add a permanent global detailed-path report to the existing timing extractor; it will not insert pipeline latency, alter pixel values, touch the decoder/helper/Main protocol or relax a timing constraint.
+
+#### Next Steps:
+
+Commit and push this proposal, implement dedicated cycle-eight outer-pixel storage plus per-color vertical-polyphase coefficient copies with `dont_merge` preservation, extend the TimeQuest extractor with a full global setup report, then rerun all ten retained RTL regressions and perform one clean exact-source seed-24 Quartus build.  Accept and collect artifacts only if global setup, hold, recovery, removal and minimum-pulse-width timing are all positive and the dedicated 60 MHz decoder and 54 MHz video reports contain no violations; otherwise stop for new evidence rather than reseeding.
+
+#### Files Modified:
+
+- sys/ascal.vhd
+- tools/phase1p_timing.tcl
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 878 COMMIT Unreleased 326382a 2026-09-01T18:02:25-07:00
 
 #### Coming From:
@@ -119,7 +149,6 @@ None.
 - [x] Passed
 
 ---
-
 ## 874 COMMIT Unreleased 5f00e35 2026-09-01T07:09:16-07:00
 
 #### Coming From:
@@ -1199,123 +1228,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 839 COMMIT Unreleased f5f650f 2026-08-31T16:56:30-07:00
-
-#### Coming From:
-
-Unreleased 667d284
-
-#### Purpose:
-
-Build and qualify the exact source-`f5f650f` retained DVD overlay handshake correction for physical MiSTer testing.
-
-#### Outcome:
-
-The exact clean source checkout `f5f650f87109193e90c664175b1785e721134d26` passes the strengthened metadata extractor regression, the complete 86,400-byte integrated stalled-DDR regression, and the retained overlay-engine, DDR-arbiter and schema-21 snapshot regressions under Icarus Verilog on build PC `10.10.0.42`.  Quartus Prime 17.0.2 seed 20 completes synthesis, fitting, assembly and the project timing gate with zero errors; global setup, hold, recovery, removal and minimum-pulse-width slacks are respectively positive at 0.321, 0.243, 3.618, 0.605 and 0.925 nanoseconds, while the dedicated 60 MHz decoder and 54 MHz video checks have 0.491 and 1.385 nanoseconds of setup slack and no violations.  The fit uses 34,710 ALMs, 54,437 registers, 4,187,011 block-memory bits and 70 DSP blocks.  The uniquely preserved `output_files/MediaPlayer_20260831_f5f650f.rbf` is 4,456,796 bytes with SHA-256 `4c57f9350b3c553d322395d0d4c0f7cc78dc14f8d7be863a251c83d10af647f7`, identical on the build PC and in the local workspace.  No Main, helper, MiSTer installation, media or playback setting changes at this build boundary.
-
-#### Next Steps:
-
-Preserve the installed Main and helper, upload only `MediaPlayer_20260831_f5f650f.rbf` as a new file rather than overwriting the current rollback, load that core, restart the DVD, enter the root menu and move the selector several times.  Require visible opaque-magenta highlight pixels, then wait at least two seconds and collect fresh telemetry, screenshot and Main/helper log; schema 21 should report one good and zero bad commits, one plane publication, 86,400 submitted and accepted plane bytes, 10,800 DDR words and nonzero alpha and magenta sample counters.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 838 COMMIT Unreleased f5f650f 2026-08-31T16:39:27-07:00
-
-#### Coming From:
-
-Unreleased 6dbbaf6
-
-#### Purpose:
-
-Preserve the repaired DVD overlay handshake while restoring positive global setup timing after the first exact-source fit.
-
-#### Outcome:
-
-Exact source `4821744` remains functionally accepted by all five focused overlay simulations, but its clean Quartus Prime 17.0.2 seed-20 build is rejected by the project timing gate at global setup slack negative 0.441 nanoseconds.  The dedicated 60 MHz decoder and 54 MHz video domains remain violation-free at positive 0.557 and 2.529 nanoseconds, and hold, recovery, removal and minimum-pulse-width slacks remain positive.  A read-only fifty-path TimeQuest report proves every reported violation is the unrelated HDMI-domain scaler path from `ascal|o_vacpt` through its address DSP terminals, while the changed elastic extractor slot added a simultaneous ready-transfer replacement path into upstream readiness and perturbed packing.  Source `f5f650f` retains every overlay byte but makes the one-entry output slot non-elastic: upstream stops whenever the slot is occupied and resumes on the cycle after the engine accepts it, removing the new combinational ready path at the cost of one harmless decoder-clock bubble per overlay byte.  The strengthened extractor and complete 86,400-byte integrated stalled-DDR tests pass again, as do the retained engine, arbiter and snapshot regressions, with the integrated test still requiring all 10,800 DDR writes, an accepted plane publication and opaque-magenta video output.
-
-#### Next Steps:
-
-Check out exact source `f5f650f` on build PC `10.10.0.42`, rerun all five focused regressions from that clean source, then perform a second clean Quartus Prime 17.0.2 seed-20 build.  Reject any RBF unless global setup, hold, recovery, removal and minimum-pulse-width timing are all positive and both dedicated decoder and video timing reports contain no violations.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 837 COMMIT Unreleased 4821744 2026-08-31T16:18:01-07:00
-
-#### Coming From:
-
-Unreleased 6e0df01
-
-#### Purpose:
-
-Prevent loss of DVD overlay plane bytes when the FPGA overlay engine backpressures the in-band metadata extractor for a DDR write.
-
-#### Outcome:
-
-The user approves and source `4821744` implements the RBF-only correction after physical schema 21 proves 4,238 of 86,400 known-pattern plane bytes disappear specifically between the extractor output and the overlay engine, causing one rejected commit, zero plane publications and zero alpha or magenta samples.  The extractor's overlay output is now a conventional retained valid, data, start and last slot that remains stable until an actual ready transfer, permits replacement in the same cycle only when the current byte is accepted, and leaves the upstream FIFO stopped whenever that slot cannot advance.  The strengthened extractor regression proves all record fields remain stable across alternating ready stalls.  A new integrated regression drives the complete config, 22 data records, 86,400 all-`0x55` plane bytes and commit through the extractor and engine under deterministic DDR writer stalls; it requires exactly 10,800 accepted writes, byte-exact first and last DDR words, one accepted and zero rejected commits, one plane publication and opaque-magenta video output.  The integrated test and retained extractor, engine, DDR-arbiter and schema-21 snapshot tests all pass under Icarus Verilog on build PC `10.10.0.42`, with warnings limited to inherited timescales.  Main, the helper, the B9 record format, DDR addressing, cache policy, palette, rectangle, blend function and schema-21 observability remain unchanged.
-
-#### Next Steps:
-
-Check out exact source `4821744` on build PC `10.10.0.42`, rerun all five focused overlay regressions from that clean source, perform one clean Quartus Prime 17.0.2 seed-20 build, require positive setup, hold, recovery, removal and minimum-pulse-width timing, and preserve a uniquely named replacement RBF while leaving the installed Main, helper and source-`d4ed809` rollback unchanged.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
-- tools/test_dvd_overlay_metadata.sv
-- tools/test_dvd_overlay_integrated.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 836 COMMIT Unreleased d4ed809 2026-08-31T16:15:48-07:00
-
-#### Coming From:
-
-Unreleased 43a1c22
-
-#### Purpose:
-
-Use the first physical schema-21 capture to localize the invisible known-pattern DVD highlight within the FPGA overlay pipeline.
-
-#### Outcome:
-
-The checksum-valid 883-byte schema-21 capture at SHA-256 `c146d2775a491c4ce8a652a9370a80fe718e0ff55109a546b40cc9d09b19c86b` proves that the extractor presents one config, 22 data records, one commit and two style records to the overlay engine, but only 82,162 of the required 86,400 plane bytes arrive.  The engine completes 10,270 DDR words and retains two further byte lanes instead of the required 10,800 complete words, sets its protocol-error flag, counts one rejected and zero accepted commits, leaves the display bank unchanged and publishes no plane.  It nevertheless publishes both styles with visible and menu flags, exact rectangle 135,397 through 208,436 and internal opaque-magenta entry one `ffff00ff`; the video domain receives three style or clear publications, saturates the row-tag counter, observes 5,989,983 row-matched samples and 51,800 samples inside the highlight rectangle, but sees exactly zero nonzero-alpha and zero opaque-magenta samples because the rejected commit leaves it reading the initial zero-valued plane bank.  Capture reason one fires after the intended 59,999,999 settle clocks.  The independently saved Main/helper log at SHA-256 `8ed4759ce04eee7794706239609a9fdfa134cdf5fe7c16211e534bbf77e02db0` still proves all 86,400 all-`0x55` bytes entered the FPGA ingress FIFO with FNV-1a `f8555d45`, zero order errors and `probe_complete=1`; the 1,920-by-1,080 screenshot at SHA-256 `b3606148234c83f7fe35d8b9f36d05fa3441b74a4ac3222db90720a629158d71` visibly confirms no magenta overlay.  Static inspection identifies the loss mechanism: `mpeg2_h262_inband_metadata` registers each overlay byte as a one-cycle pulse while gating its input with the overlay engine's current combinational ready signal, so on a cycle that the engine accepts the eighth byte and raises its registered DDR-write pending state, the extractor can already consume and schedule the following byte against the old ready value; that pulse is presented while the engine is not ready and has no retained-valid storage.  The fault is therefore the extractor-to-engine ready/valid boundary inside the FPGA, not Main, the ingress FIFO, DDR arbitration, row-cache publication or the final compositor.
-
-#### Next Steps:
-
-After user approval, replace the pulse-only overlay output with a conventional retained valid/data/start/last register whose valid bit clears only on an actual engine-ready transfer, derive extractor input readiness from the availability of that output slot, and add an integrated regression that drives the complete 86,400-byte plane through the extractor and engine while injecting DDR writer stalls.  Require exactly 86,400 engine plane bytes, 10,800 accepted DDR writes, one accepted and zero rejected commits, one plane publication, nonzero alpha and opaque-magenta video samples, then build a timing-clean RBF without changing Main, the helper, the record protocol or rendering semantics.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
