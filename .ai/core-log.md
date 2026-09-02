@@ -1,4 +1,4 @@
-## 885 COMMIT Unreleased ??? 2026-09-01T21:54:05-07:00
+## 885 COMMIT Unreleased 72bdccc 2026-09-01T21:54:05-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add responsive fixed ten-second, one-minute and five-minute seeking to every sup
 
 #### Outcome:
 
-The approved helper/Main-only boundary will extend the source-`68f8f26` modifier-key commands to file-backed `.mp3`, `.wav`, `.flac` and `.ogg` playback.  The consumer-audio path will poll the private control socket between bounded PCM chunks, calculate saturated sample-frame targets, use codec-native random access, and cross the existing READY/GO download reset before emitting the new position so stale PCM and partial audio-interface records cannot survive a jump.  WAV, FLAC and Ogg Vorbis will retain their existing miniaudio decoders; standalone MP3 will move from the non-seekable streaming minimp3 path to miniaudio's bundled seek-aware MP3 backend while preserving the existing MPEG-1 Layer III channel and 44.1/48 kHz restrictions.  Audio-interface generation will restart at the absolute seek position, and ordinary arrows, pause, MPG seeking, DVD chapters and authored menus will remain unchanged.  RTL, RBF and Quartus remain outside the boundary.
+Source `512b5eb` implements the approved helper/Main-only boundary and source `72bdccc` corrects the generated Main patch's new-file hunk length after the first exact build exposed truncation, making `72bdccc` the final build source.  File-backed `.mp3`, `.wav`, `.flac` and `.ogg` playback now accepts the source-`68f8f26` Alt, Ctrl and Ctrl-plus-Alt fixed jumps through bounded control polling, saturated sample-frame target arithmetic, codec-native random access and the existing READY/GO download reset; the helper flushes pre-jump output and restarts any partial audio-interface update at the absolute target before new PCM is emitted.  WAV, FLAC and Ogg Vorbis retain their miniaudio decoders, while standalone MP3 uses miniaudio's bundled seek-aware backend with sixty-four seek points and preserves the existing MPEG-1 Layer III mono/stereo and 44.1/48 kHz restrictions.  Strict target and UI-reset tests, AddressSanitizer and UndefinedBehaviorSanitizer checks, deterministic real-helper forward/backward seek regressions for all four formats, retained Program Stream random-access, AC-3 recovery, DVD random-access, DVD subpicture, output-reserve and output-stage tests all pass; both Main patches apply to pinned upstream `0a8fb44`, and the full GNU 10.2 ARM helper and Main builds succeed.  The 953,764-byte static ARMv7 helper `host/build/MediaPlayer_Helper_AudioSeek_72bdccc` has SHA-256 `bcd3cbae9d30115784d0f3de5aef9e38b84f58d7ced0a45378ae67101ce94b22`, and the 1,178,588-byte dynamic ARMv7 Main `host/build/MiSTer_AudioSeek_72bdccc` has SHA-256 `b0e5d1f941559139daf82dfe1f03db6fcc3d41d36b48cae527d7c787c99aac05`.  Ordinary arrows, pause, MPG seeking, DVD chapters, authored menus, RTL, RBF and Quartus remain unchanged.
 
 #### Next Steps:
 
-Commit and push this proposal, implement shared audio target arithmetic, controlled decoder seeking, the barrier callback and audio-interface position reset, advertise the capability and enable only the four supported audio extensions in patched Main.  Add deterministic target, UI-reset and end-to-end format regressions covering backward, forward and file-boundary clamps, then run strict native tests, codec output checks, the retained helper regressions, the local GNU 10.2 ARM helper build and the pinned-upstream patched Main build.  Commit only timing-independent helper and Main binaries for MiSTer testing; do not run Quartus or produce an RBF.
+Exit MediaPlayer, install `host/build/MediaPlayer_Helper_AudioSeek_72bdccc` as `/media/fat/linux/MediaPlayer_Helper` and `host/build/MiSTer_AudioSeek_72bdccc` as `/media/fat/MiSTer`, preserve executable modes and the current timing-qualified RBF, then reboot because Main changed.  During each supported standalone audio format, verify Alt+Left/Right, Ctrl+Left/Right and Ctrl+Alt+Left/Right repeatedly in both directions, including clamping near the beginning and end; acceptance requires a prompt clean restart at the expected position, uninterrupted synchronized audio, a correctly restarted progress display and normal playback afterward.  Retest one ordinary MPG seek, pause, one DVD chapter change and authored-menu arrows to prove the unchanged paths, then report hardware acceptance or enable telemetry before playback and collect fresh helper/Main diagnostics for any failure.
 
 #### Files Modified:
 
@@ -36,7 +36,7 @@ Commit and push this proposal, implement shared audio target arithmetic, control
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
