@@ -1,4 +1,4 @@
-## 893 COMMIT Unreleased ??? 2026-09-02T02:46:35-07:00
+## 893 COMMIT Unreleased 09b1d28 2026-09-02T02:46:35-07:00
 
 #### Coming From:
 
@@ -10,17 +10,18 @@ Replace ordinary-file clean-EOF retention with a replay-ready paused state while
 
 #### Outcome:
 
-The approved Main/helper boundary will treat a clean ordinary MPG or standalone-audio EOF as a logical rewind: Main will preserve the last valid resident frame, retain the selected source and index in a replay-ready paused state, and make the next Play input launch that source from byte zero through the normal fresh-download path.  Selecting another file, explicitly stopping or leaving the core will clear the replay state, while ISO/DVD and failure teardown remain unchanged.  The helper will complete standalone audio by draining the already-open projected final UI frame from its current byte offset through exactly one COMMIT rather than issuing the nested BEGIN that physical evidence proved creates a hybrid YUV frame.  Main, helper and tests change; RTL, RBF, codecs, DVD behavior and accepted timing remain unchanged.
+Source `09b1d28` makes a clean ordinary MPG or standalone-audio EOF replay-ready and paused while preserving the final valid resident frame; the next Play input relaunches the retained source and index through the normal fresh-download path from byte zero, while selecting another file, explicitly stopping, leaving the core, a failed helper exit and ISO/DVD completion clear or bypass replay state as appropriate.  Standalone audio now completes by draining the already-open projected final UI frame from its current byte offset through exactly one COMMIT, eliminating the nested BEGIN and hybrid YUV frame demonstrated by entry 892 while preserving exact full progress, final elapsed time and zero remaining time.  Strict focused seek, Program Stream, AC-3, DVD, staging, renderer and modeled Main lifecycle tests pass, sanitizer coverage passes, the patch applies to pinned upstream and the exact-source ARMv7 Main compiles, and the final ARM helper passes real MP3, WAV, FLAC and Ogg runs with valid transaction boundaries and exact final UI state.  GNU 10.2 produced the 957,860-byte static ARMv7 helper `host/build/MediaPlayer_Helper_ReplayReady_09b1d28` with SHA-256 `380ca98301de0a0b2ae84cede46523a5254fbf8046bd9868f76c2a02653f46c3` and the 1,182,692-byte ARMv7 Main `host/build/MiSTer_ReplayReady_09b1d28` with SHA-256 `6c6ace67a1114d609ca339e0aa11cb71756a149257896169c8d72f7cab75c784`; RTL, RBF, codecs, DVD behavior and accepted timing are unchanged.
 
 #### Next Steps:
 
-Implement retained replay source ownership and EOF Play handling in patched Main, add lifecycle coverage for clean file EOF, replay launch, explicit stop, core change, failed EOF and non-file EOF, and require no nested audio-UI BEGIN in both partial-renderer and real-helper tests.  Verify elapsed, remaining and progress still reach exact completion, rerun strict and sanitizer suites plus real MP3, WAV, FLAC and Ogg playback, apply and compile the Main patch against pinned upstream, then build ARMv7 helper and Main artifacts locally for user transfer with the timing-qualified RBF preserved.
+Install both `host/build/MediaPlayer_Helper_ReplayReady_09b1d28` as `/media/fat/linux/MediaPlayer_Helper` with executable mode and `host/build/MiSTer_ReplayReady_09b1d28` as `/media/fat/MiSTer`, preserving the current timing-qualified RBF.  On hardware, let a standalone audio file reach natural EOF and confirm that the final undistorted UI remains visible with full progress, correct elapsed time and zero remaining time, then press Play and require the same file to restart from the beginning; repeat natural EOF and Play restart with an ordinary MPG, and confirm that an oversized standalone-audio seek remains a no-op without interrupting playback.  Report acceptance or place fresh Main/helper logs and a screenshot in `.ai/current_results` for any discrepancy.
 
 #### Files Modified:
 
 - README.md
 - host/arm/ARCHITECTURE.md
 - host/arm/audio_ui.c
+- host/arm/audio_ui.h
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - tools/test_audio_file_seek.py
 - tools/test_audio_ui_output.c
@@ -28,7 +29,7 @@ Implement retained replay source ownership and EOF Play handling in patched Main
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
