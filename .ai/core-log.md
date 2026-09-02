@@ -1,3 +1,32 @@
+## 896 COMMIT Unreleased 532bd8e 2026-09-02T05:42:18-07:00
+
+#### Coming From:
+
+Unreleased 532bd8e
+
+#### Purpose:
+
+Record the first physical audio-visualizer result and localize its visible color and brightness snapping.
+
+#### Outcome:
+
+The user's physical FLAC run accepts the source-`532bd8e` visualizer as a functional and visually appealing MPEG background: the synchronized radial color pattern moves continuously, the ten-second inactivity path reaches it, and the 708,093-byte screenshot at SHA-256 `8bcc72a81f281ff1eab5b5b4efeda0fad9c2ef036ce0dcfb2d90d2f04b6b9e64` shows a clean decoded frame with the two-bit interface overlay and visible telemetry.  The matching 1,893,060-byte Main/helper log at SHA-256 `4418b5547d4e7791cc2c2695668522d8578f9bf1cec0fa7fae96a720ea31e9d4` proves the intended visualizer asset loaded, a 44.1-kHz FLAC session remained active through approximately 64.7 seconds and Main continued submitting media without a helper, transport or decoder failure; the 766-byte checksum-valid schema-21 word dump has SHA-256 `4ee1a9cd22d31b63663002b49963dc9cc5346060c532b5b2b453cdc90426a8cc`.  Hardware rejects only the response quality: color or brightness appears to snap unpredictably while the underlying pattern changes gently.  Static localization shows that the prototype selects one of four widely separated brightness, contrast and saturation grades at every independent three-picture GOP from an RMS envelope with fixed thresholds and no hysteresis, so ordinary threshold crossings create the observed abrupt cuts; this is deterministic loudness quantization rather than damaged MPEG data or random decoder behavior.
+
+#### Next Steps:
+
+Preserve Main, RTL, the timing-qualified RBF, the inactivity and overlay paths, and the legal synchronized independent-GOP architecture.  After user approval, refine only the helper and generated visualizer asset to use eight closely spaced grades across the accepted range, threshold hysteresis and a one-grade-per-GOP slew limit so rapid loudness changes become short ramps and near-threshold material cannot chatter; add deterministic attack, decay, deadband and maximum-step tests, rebuild the ARM helper and asset locally, verify the deliberately switched stream with FFmpeg, then repeat the same dynamic FLAC passage and require continuous motion with visibly smoother loudness-correlated pulses and no abrupt grade cuts.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 895 COMMIT Unreleased 532bd8e 2026-09-02T04:45:00-07:00
 
 #### Coming From:
@@ -1266,39 +1295,6 @@ Keep Main, RTL, QSF, the source-`f5f650f` RBF and authored-selector compensation
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 856 COMMIT Unreleased 85cda13 2026-08-31T22:00:52-07:00
-
-#### Coming From:
-
-Unreleased 330d103
-
-#### Purpose:
-
-Make authored Play activation enter the existing decoder reset barrier when its menu-to-title transition is delayed by a finite still.
-
-#### Outcome:
-
-Source `85cda13` introduces an explicit pending result for an activation that still reports menu title zero, discards its stale source boundary but defers the continuation acknowledgment so Main's existing navigation request remains pending through an authored finite still.  At still expiry the source refreshes libdvdnav title state: a title exit invalidates the boundary and enters the existing ready/go decoder barrier, while a transition that remains in a menu acknowledges continuation and preserves the resident frame.  Indefinite stills acknowledge immediately, and a menu payload that appears without a still is acknowledged before processing; an immediate title payload is retained across the barrier by saving its start code.  The strict native helper builds with `-Werror`, the focused transition test proves pending, finite-still hop and finite-still continuation boundaries, the random-access and fragmented-subpicture regressions pass, and the real-image harness now offers a delayed-activation gate requiring menu leave, a second ready event, a post-activation random-access group and subsequent title bytes.  The Raspberry Pi GNU 10.2.1 ARM toolchain builds a 908,660-byte static stripped ARMv7 helper at `host/build/MediaPlayer_Helper_DelayedPlay_85cda13`, SHA-256 `7b4af55c0de6c88a8be110693476c07e4bebf41fd4cd19bdd88cc5e6471392f2`, with authored-selector compensation and no dynamic section.  Main and the source-`f5f650f` RBF are unchanged.
-
-#### Next Steps:
-
-The user should exit MediaPlayer so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_DelayedPlay_85cda13`, restore executable mode if needed and verify the 908,660-byte size and recorded SHA-256.  Preserve the installed source-`2de0717` Main and source-`f5f650f` RBF, restart the disc, enter the root menu, leave Play selected and press Space once; wait through the authored ten-second still.  Physical acceptance requires a pending activation followed by menu leave, one clean ready/go barrier and moving title video, then a return to the menu with the authored selector still visible and movable.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- host/arm/media_source.c
-- host/arm/media_source.h
-- tools/test_dvd_menu_hop.c
-- tools/test_dvd_menu_navigation.py
 
 #### Status:
 
