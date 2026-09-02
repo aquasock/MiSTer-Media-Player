@@ -103,9 +103,13 @@ memory.
 Physical-DVD program output also crosses a record-aware 4 MiB reserve before
 Main's pipe. Its writer owns the output descriptor in nonblocking mode, retains
 ordinary records and priority ordering exactly under backpressure, and restores
-the descriptor flags at teardown. Once libdvdnav definitively classifies a
-navigation stream hop, reserve discard may cancel the unwritten suffix of the
-record stalled in the full pipe as well as queued records; Main discards the
+the descriptor flags at teardown. Libdvdnav diagnostics are routed through its
+logger callback to stderr before playback begins, leaving stdout media-only.
+While that reserve exists it exclusively owns video output: barriers drain or
+discard reserve records and never also flush the unused stdio stream naming the
+same nonblocking descriptor. Once libdvdnav definitively classifies a navigation
+stream hop, reserve discard may cancel the unwritten suffix of the record stalled
+in the full pipe as well as queued records; Main discards the
 already-written prefix during the existing ready/go barrier. A menu command
 that resolves as a continuation never requests that discard, so its output is
 still delivered byte-for-byte without a reset.

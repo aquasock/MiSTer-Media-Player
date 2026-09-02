@@ -7,6 +7,9 @@
  */
 #include "../host/arm/media_source.c"
 
+#include <stdarg.h>
+#include <unistd.h>
+
 static int require(int condition, const char *message)
 {
     if (condition)
@@ -15,11 +18,65 @@ static int require(int condition, const char *message)
     return 1;
 }
 
+static void invoke_navigation_log(const char *format, ...)
+{
+    va_list arguments;
+
+    va_start(arguments, format);
+    dvd_navigation_log(NULL, DVDNAV_LOGGER_LEVEL_INFO, format, arguments);
+    va_end(arguments);
+}
+
+static int test_navigation_logger(void)
+{
+    int descriptors[2] = {-1, -1};
+    int saved_stdout = -1;
+    uint8_t unexpected;
+    ssize_t count = -1;
+    int failed = 0;
+
+    if (pipe(descriptors) < 0) {
+        fprintf(stderr, "dvd menu hop: logger pipe failed\n");
+        return 1;
+    }
+    fflush(stdout);
+    saved_stdout = dup(STDOUT_FILENO);
+    if (saved_stdout < 0 || dup2(descriptors[1], STDOUT_FILENO) < 0) {
+        fprintf(stderr, "dvd menu hop: logger capture failed\n");
+        failed = 1;
+        goto done;
+    }
+    close(descriptors[1]);
+    descriptors[1] = -1;
+    invoke_navigation_log("logger-route %d", 7);
+    fflush(stdout);
+    if (dup2(saved_stdout, STDOUT_FILENO) < 0) {
+        fprintf(stderr, "dvd menu hop: logger restore failed\n");
+        failed = 1;
+        goto done;
+    }
+    close(saved_stdout);
+    saved_stdout = -1;
+    count = read(descriptors[0], &unexpected, sizeof(unexpected));
+    failed |= require(count == 0,
+                      "libdvdnav diagnostic reached media stdout");
+
+done:
+    if (saved_stdout >= 0) {
+        (void)dup2(saved_stdout, STDOUT_FILENO);
+        close(saved_stdout);
+    }
+    if (descriptors[1] >= 0)
+        close(descriptors[1]);
+    close(descriptors[0]);
+    return failed;
+}
+
 int main(void)
 {
     struct iso_source_state state;
     size_t discarded;
-    int failed = 0;
+    int failed = test_navigation_logger();
 
     memset(&state, 0, sizeof(state));
     state.block_offset = 513;

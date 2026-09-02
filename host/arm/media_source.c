@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -187,6 +188,16 @@ static int iso_stream_read(void *opaque, void *data, int size)
     return (int)count;
 }
 
+static void dvd_navigation_log(void *opaque, dvdnav_logger_level_t level,
+                               const char *format, va_list arguments)
+{
+    (void)opaque;
+    (void)level;
+    fputs("libdvdnav: ", stderr);
+    vfprintf(stderr, format, arguments);
+    fputc('\n', stderr);
+}
+
 static int dvd_navigation_open(struct iso_source_state *state)
 {
     dvdnav_stream_cb callbacks = {
@@ -194,12 +205,15 @@ static int dvd_navigation_open(struct iso_source_state *state)
         iso_stream_read,
         NULL
     };
+    static const dvdnav_logger_cb logger = {dvd_navigation_log};
     dvdnav_status_t status;
 
     if (state->direct_device)
-        status = dvdnav_open(&state->navigation, state->device_path);
+        status = dvdnav_open2(&state->navigation, state, &logger,
+                              state->device_path);
     else
-        status = dvdnav_open_stream(&state->navigation, state, &callbacks);
+        status = dvdnav_open_stream2(&state->navigation, state, &logger,
+                                     &callbacks);
     if (status != DVDNAV_STATUS_OK)
         return -1;
     if (dvdnav_set_readahead_flag(state->navigation,

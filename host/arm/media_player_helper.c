@@ -540,10 +540,13 @@ static int cancel_activation_stage(struct output_state *output,
 
 static int flush_output(struct output_state *output, const char *what)
 {
-    if (output->reserve && output_reserve_drain(output->reserve) < 0) {
-        fprintf(stderr, "media_player_helper: draining %s failed: %s\n",
-                what, strerror(errno));
-        return -1;
+    if (output->reserve) {
+        if (output_reserve_drain(output->reserve) < 0) {
+            fprintf(stderr, "media_player_helper: draining %s failed: %s\n",
+                    what, strerror(errno));
+            return -1;
+        }
+        return 0;
     }
     if (output->video && fflush(output->video) == EOF) {
         fprintf(stderr, "media_player_helper: flushing %s failed: %s\n",
@@ -562,11 +565,6 @@ static int discard_reserved_output(struct output_state *output,
         return flush_output(output, what);
     if (output_reserve_discard(output->reserve, &discarded) < 0) {
         fprintf(stderr, "media_player_helper: discarding %s failed: %s\n",
-                what, strerror(errno));
-        return -1;
-    }
-    if (output->video && fflush(output->video) == EOF) {
-        fprintf(stderr, "media_player_helper: flushing %s failed: %s\n",
                 what, strerror(errno));
         return -1;
     }
@@ -3691,6 +3689,8 @@ static int process_ogg_stream(struct media_source *input,
 
 static int finish_output(struct output_state *output, int success)
 {
+    int reserve_owned_video = output->reserve != NULL;
+
     if (output->reserve) {
         if (output_reserve_destroy(output->reserve) < 0) {
             fprintf(stderr,
@@ -3700,7 +3700,7 @@ static int finish_output(struct output_state *output, int success)
         }
         output->reserve = NULL;
     }
-    if (flush_output(output, "final output") < 0)
+    if (!reserve_owned_video && flush_output(output, "final output") < 0)
         success = 0;
     if (output->pcm) {
         if (fclose(output->pcm) == EOF)
