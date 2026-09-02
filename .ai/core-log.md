@@ -1,4 +1,4 @@
-## 894 COMMIT Unreleased ??? 2026-09-02T03:50:37-07:00
+## 894 COMMIT Unreleased 7e152d5 2026-09-02T03:50:37-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Center the standalone-audio elapsed and remaining displays and replace the disab
 
 #### Outcome:
 
-The standalone-audio timing row will become three balanced fields spanning the progress-bar width: elapsed time, total track time and remaining time, each centered independently on the same vertical baseline so changing digit counts do not disturb the composition.  Total time will derive from the helper's existing PCM-frame length and sample rate, using the same partial-second rounding convention as remaining time so the displayed duration covers the complete decoded track.  Renderer and real-helper regressions will verify field placement, vertical alignment and total-time values during ordinary playback, after seeking and at clean completion; Main, replay behavior, transport protocol, RTL and the timing-qualified RBF remain unchanged.
+Source `7e152d5` replaces the combined left-aligned timing string and disabled track placeholder with three independently centered fields spanning the progress-bar width: `ELAPSED`, `TRACK` and `REMAIN`, all rendered with the same font scale on vertical baseline 412.  The fixed track duration derives from decoded PCM-frame length and sample rate and rounds partial final seconds up like remaining time, while elapsed retains completed-second truncation.  Pixel-level regressions verify all three values at their computed horizontal centers during 44.1 and 48 kHz playback, after seeking and at a fractional-second clean completion where elapsed is 100 seconds, total is 101 seconds and remaining is zero; the renderer and full helper pass AddressSanitizer/UndefinedBehaviorSanitizer coverage, and native plus final ARM real-helper runs pass MP3, WAV, FLAC and Ogg with exact final values and valid transaction boundaries.  GNU 10.2 produced the 957,860-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_TrackTime_7e152d5` with SHA-256 `495606437ef2d855546d8a1906b8a375b8666984f10a9e267f7d563ee9f75859`; the source-`09b1d28` Main, replay behavior, protocol, RTL and timing-qualified RBF are unchanged.
 
 #### Next Steps:
 
-Implement the three centered and vertically aligned timing fields in the standalone-audio renderer, extend pixel-level layout checks to locate every formatted value within its assigned region on one baseline and verify the total duration remains constant across playback, seeks and clean EOF, update the user and host architecture documentation, then rerun strict renderer coverage, sanitizer coverage and real MP3, WAV, FLAC and Ogg helper tests.  Commit and build a helper-only ARMv7 artifact locally for user transfer while preserving the source-`09b1d28` Main and current timing-qualified RBF.
+Exit MediaPlayer so the running helper stops, install `host/build/MediaPlayer_Helper_TrackTime_7e152d5` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, and preserve `host/build/MiSTer_ReplayReady_09b1d28` as `/media/fat/MiSTer` plus the current timing-qualified RBF.  Play a standalone audio file and confirm that elapsed, total track and remaining time are horizontally centered in three balanced regions and vertically aligned on one baseline, that total remains fixed while elapsed and remaining update and seek correctly, and that clean EOF still shows full progress with zero remaining before Play restarts the file.  Report hardware acceptance or place a fresh screenshot and Main/helper log in `.ai/current_results` for any discrepancy.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Implement the three centered and vertically aligned timing fields in the standal
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
