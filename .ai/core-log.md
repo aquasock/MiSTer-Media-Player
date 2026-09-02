@@ -1,4 +1,4 @@
-## 886 COMMIT Unreleased ??? 2026-09-01T22:56:38-07:00
+## 886 COMMIT Unreleased 9397fa7 2026-09-01T22:56:38-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Replace the initial standalone-audio diagnostic composition with the approved fu
 
 #### Outcome:
 
-The user reports that source `72bdccc` fixed audio seeking works great in hardware and elects to defer its visible full-screen reset flash; the six captured READY/GO seek barriers complete successfully, and static tracing establishes that the flash is the shared new-download reset clearing audio-interface `mode_active` until the next full frame commits rather than a seeking failure.  The approved next boundary will use the supplied one-page `Presentation1.pdf` only as a visual reference and will redraw the ARM-generated 720-by-480 interface as a full-screen 4:3 composition inside CRT-safe overscan margins: a square album-art placeholder and title, artist and album placeholders on the left; a current-playlist placeholder on the right; previous, play/pause and next controls below; track and playlist time placeholders; and a full-width bottom progress bar.  A small fixed bitmap font and deterministic shapes will remain entirely inside the helper's existing YCbCr frame generation, while actual tag parsing, album-art decoding, playlist management, time calculation, control behavior and scrubbing remain deferred.  The one-hertz update cadence, sample-clock-driven progress motion, atomic inactive-bank publication, audio priority, seeking, codecs, Main, RTL, RBF and video/DVD paths will remain unchanged.
+Source `9397fa7` replaces the standalone-audio diagnostic composition with the approved full-screen 720-by-480 interface authored for 4:3 CRT display.  A 224-by-200 raster-pixel album-art placeholder, physically square at the mode's 8:9 pixel aspect, and title, artist and album placeholders occupy the left column; a six-row current-playlist placeholder occupies the right; previous, play/pause and next controls, track and playlist time placeholders, and a full-width progress bar complete the lower area inside 32-pixel horizontal and approximately 24-pixel vertical safe margins.  A deterministic built-in 5-by-7 font supplies the static labels, while the existing one-minute sample-clock progress motion, one-hertz update cadence, bounded interleaving and atomic inactive-bank publication are retained.  Actual tag parsing, album-art decoding, playlist management, duration calculation, control behavior and scrubbing remain deferred.  Exact layout-region checks and frame hashes pass at 48 and 44.1 kHz under strict native compilation and AddressSanitizer/UndefinedBehaviorSanitizer; UI seek-reset and real-helper `.mp3`, `.wav`, `.flac` and `.ogg` forward/backward seek regressions also pass.  The inspected deterministic YCbCr preview has SHA-256 `cdee861ec163331526bf1f6749eca81975e86373c529d0d946ef7f0b20f087f5` and its PNG conversion has SHA-256 `22b364cd5cad02e78bd03e1679be3cefe49fcc066d732ec3a6c2fcf9a2f23d8a`.  The GNU 10.2 build produces the 953,764-byte static ARMv7 helper `host/build/MediaPlayer_Helper_AudioLayout_9397fa7` with SHA-256 `517543f9f47b3ca7b42a4646c542347902d2fa2de5feb2ae628ae4a53df7dc7c`; Main, RTL, RBF, codecs, seeking, video and DVD behavior are unchanged.
 
 #### Next Steps:
 
-Commit and push this proposal after the authorized ring-buffer rotation, implement the CRT-safe 4:3 coordinates and placeholder text in `audio_ui.c`, update the user and architecture descriptions, and strengthen the renderer regression with stable layout-region and frame-change checks.  Produce and inspect a deterministic 720-by-480 preview, run strict native and sanitizer UI tests plus the retained audio-seek regression, then build and verify a uniquely named static ARMv7 helper with the local GNU 10.2 toolchain.  Deliver only the helper for MiSTer testing and preserve the installed Main and timing-qualified RBF.
+Exit MediaPlayer, install `host/build/MediaPlayer_Helper_AudioLayout_9397fa7` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, and preserve the installed `MiSTer_AudioSeek_72bdccc` Main and timing-qualified RBF.  Re-enter the core and test at least one standalone audio file on the intended 4:3 CRT: verify that all panel borders and labels remain visible outside overscan, the album-art placeholder appears physically square, the progress bar advances once per second, and audio plus fixed seeking remain clean.  Also spot-check one 16:9 display mode for acceptable pillarbox/stretch behavior, then report hardware acceptance or capture a screenshot and fresh telemetry if any presentation or playback regression appears.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Commit and push this proposal after the authorized ring-buffer rotation, impleme
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
