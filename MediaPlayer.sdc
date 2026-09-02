@@ -211,14 +211,14 @@ set_false_path \
     -to [get_keepers {*|mpeg2_new_framebuffer_phase_error_sync[0]}]
 
 # Native diagnostic menu controls originate in the framework status bus and
-# enter explicit two-stage video-domain synchronizers. Cut only their
-# asynchronous source-to-stage-zero paths.
+# enter explicit video-domain synchronizers. Cut only their asynchronous
+# source-to-stage-zero paths.
 set_false_path \
     -from [get_keepers {*|hps_io:hps_io|status[123]}] \
     -to   [get_keepers {*|native_timing_pattern_sync[0]}]
 set_false_path \
     -from [get_keepers {*|hps_io:hps_io|status[125]}] \
-    -to   [get_keepers {*|native_timing_pattern_motion_sync[0]}]
+    -to   [get_keepers {*|telemetry_visible_sync[0]}]
 
 # MiSTer's framework treats the 20 MHz system controls and raster pipeline as
 # separate functional clock domains. The old harmonic 20/40 MHz pair happened

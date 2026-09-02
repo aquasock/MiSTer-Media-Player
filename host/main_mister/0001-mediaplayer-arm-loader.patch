@@ -269,7 +269,7 @@ new file mode 100644
 index 0000000..d828649
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,801 @@
+@@ -0,0 +1,821 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -431,16 +431,14 @@ index 0000000..d828649
 +	}
 +}
 +
-+static void diagnostic_open(const char *source_spec, unsigned char index)
++static void diagnostic_open(const char *source_spec, unsigned char index,
++                            bool enabled)
 +{
 +	diagnostic_close();
 +	burst_state = {};
 +	pending_size = pending_offset = 0;
 +	pending_eof = false;
 +	transfer_events = 0;
-+	diagnostic_fd = open(diagnostic_path,
-+	                     O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC,
-+	                     0644);
 +	submitted_bytes = 0;
 +	read_events = 0;
 +	would_block_events = 0;
@@ -448,6 +446,14 @@ index 0000000..d828649
 +	download_assert_us = 0;
 +	first_byte_seen = 0;
 +	transfer_profile = {};
++	if (!enabled)
++	{
++		(void)unlink(diagnostic_path);
++		return;
++	}
++	diagnostic_fd = open(diagnostic_path,
++	                     O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC,
++	                     0644);
 +	diagnostic_write("start source=%s index=%u core=%s alternate=%s\n",
 +	                 source_spec, (unsigned)index,
 +	                 user_io_get_core_name(), user_io_get_core_name(1));
@@ -560,6 +566,7 @@ index 0000000..d828649
 +	int control_pair[2];
 +	pid_t pid;
 +	const char *audio_out;
++	bool telemetry_enabled;
 +
 +	if (!mediaplayer_is_core() || !source_spec || !*source_spec) return 0;
 +	/*
@@ -569,8 +576,9 @@ index 0000000..d828649
 +	 * fork, and fix the mode for this playback.
 +	 */
 +	audio_out = user_io_status_get("[126]") ? "spdif" : "hdmi";
++	telemetry_enabled = user_io_status_get("[125]");
 +	mediaplayer_stop();
-+	diagnostic_open(source_spec, index);
++	diagnostic_open(source_spec, index, telemetry_enabled);
 +	if (pipe(pipefd) < 0)
 +	{
 +		diagnostic_write("pipe failed errno=%d message=%s\n", errno, strerror(errno));
@@ -605,7 +613,19 @@ index 0000000..d828649
 +
 +		(void)setpgid(0, 0);
 +		(void)dup2(pipefd[1], STDOUT_FILENO);
-+		if (diagnostic_fd >= 0) (void)dup2(diagnostic_fd, STDERR_FILENO);
++		if (diagnostic_fd >= 0)
++			(void)dup2(diagnostic_fd, STDERR_FILENO);
++		else
++		{
++			int null_fd = open("/dev/null", O_WRONLY | O_CLOEXEC);
++			if (null_fd >= 0)
++			{
++				(void)dup2(null_fd, STDERR_FILENO);
++				if (null_fd != STDERR_FILENO) close(null_fd);
++			}
++			else
++				close(STDERR_FILENO);
++		}
 +		close(pipefd[0]);
 +		close(pipefd[1]);
 +		close(control_pair[0]);

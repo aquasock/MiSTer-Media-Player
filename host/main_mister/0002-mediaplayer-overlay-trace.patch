@@ -104,14 +104,14 @@ diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplay
  		profile_summary();
  		(void)fsync(diagnostic_fd);
  		close(diagnostic_fd);
-@@ -165,6 +242,7 @@ static void diagnostic_open(const char *source_spec, unsigned char index)
+@@ -168,6 +245,7 @@ static void diagnostic_open(const char *source_spec, unsigned char index,
  	pending_size = pending_offset = 0;
  	pending_eof = false;
  	transfer_events = 0;
 +	media_overlay_trace_reset(&overlay_trace, overlay_trace_event, NULL);
- 	diagnostic_fd = open(diagnostic_path,
- 	                     O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC,
- 	                     0644);
+ 	submitted_bytes = 0;
+ 	read_events = 0;
+ 	would_block_events = 0;
 @@ -738,6 +816,8 @@ static void mediaplayer_poll_inner()
  			stop_with_reason("transport-fault"); return;
  		}

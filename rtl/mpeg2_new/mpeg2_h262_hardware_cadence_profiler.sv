@@ -116,6 +116,7 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire [15:0] error_flags,input wire [11:0] h_pos,
     input wire [11:0] v_pos,input wire [7:0] base_r,
     input wire [7:0] base_g,input wire [7:0] base_b,input wire base_de,
+    input wire telemetry_visible,
     output reg [7:0] video_r,output reg [7:0] video_g,
     output reg [7:0] video_b,output wire snapshot_ready
 );
@@ -1351,6 +1352,17 @@ always @(posedge clk_video)begin
 end
 assign snapshot_ready=snapshot_ready_sync[2];
 
+// Entry 876: capture remains unconditional so a production session can be
+// inspected after the fact, but its raster is a saved, default-off OSD choice.
+// Synchronize that slow control before it gates any clk_video presentation.
+(* altera_attribute="-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] telemetry_visible_sync;
+always @(posedge clk_video)begin
+    if(reset_video)telemetry_visible_sync<=3'b000;
+    else telemetry_visible_sync<={telemetry_visible_sync[1:0],telemetry_visible};
+end
+wire telemetry_visible_video=telemetry_visible_sync[2];
+
 reg [42:0] overlay_shift;
 reg [31:0] overlay_row_word;
 wire [11:0] overlay_y=OVERLAY_Y;
@@ -1428,7 +1440,8 @@ end
 always @(posedge clk_video)begin
     if(reset_video)overlay_shift<=0;
     else if(pixel_ce&&h_pos==0)begin
-        if(snapshot_ready&&(v_pos>=overlay_y)&&(v_pos<overlay_y+OVERLAY_HEIGHT))
+        if(telemetry_visible_video&&snapshot_ready&&
+           (v_pos>=overlay_y)&&(v_pos<overlay_y+OVERLAY_HEIGHT))
             overlay_shift<={4'b1010,overlay_row_index,overlay_row_word,
                            ^overlay_row_word};
         else overlay_shift<=0;
@@ -1438,7 +1451,8 @@ always @(posedge clk_video)begin
 end
 always @* begin
     video_r=base_r;video_g=base_g;video_b=base_b;
-    if(snapshot_ready&&base_de&&(h_pos>=OVERLAY_X)&&
+    if(telemetry_visible_video&&snapshot_ready&&base_de&&
+       (h_pos>=OVERLAY_X)&&
        (h_pos<OVERLAY_X+OVERLAY_WIDTH)&&(v_pos>=overlay_y)&&
        (v_pos<overlay_y+OVERLAY_HEIGHT))begin
         video_r=overlay_shift[42]?8'hff:8'h00;

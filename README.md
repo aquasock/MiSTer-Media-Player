@@ -76,7 +76,10 @@ consume FPGA M10K memory.
 The development menu separates `Run DVD-Video`, `Open MPEG-2 Video`, and
 `Open WAV, MP3, FLAC, OGG` so each picker exposes only its relevant files.
 Aspect Ratio defaults to 16:9 with 4:3 as the alternate; Deinterlacer Mode
-offers Bob and Weave. The Audio Test and Audio Output choices are unchanged.
+offers Bob and Weave. Telemetry defaults to Off for normal playback; turning it
+On reveals the internally captured hardware snapshot and enables the combined
+Main/helper diagnostic log on the next playback start. The Audio Test and Audio
+Output choices are unchanged.
 
 For `.iso` and `.dvd` playback, player-one Left and Right select the previous
 or next chapter and Start toggles pause/resume while the MiSTer OSD is closed.
@@ -209,9 +212,13 @@ DTS has no decoder here at all.
 Use real DVD material to check the audio mode that matters for playback. HDMI
 decodes AC-3 to stereo, while S/PDIF passes AC-3 or DTS to an external decoder.
 
-On the MiSTer, `/tmp/MediaPlayer_ARM.log` records the selected output mode and
-the chosen audio substream, so a log proves which path ran. It is a single fixed
-path, so retrieve it before playing anything else or the next file overwrites it.
+With Telemetry enabled before playback starts, the MiSTer RAM file
+`/tmp/MediaPlayer_ARM.log` records the selected output mode and chosen audio
+substream, so a log proves which path ran. It is a single fixed path, so retrieve
+it before playing anything else or the next file overwrites it. Telemetry Off
+creates no log, removes a stale log at the next playback start and sends helper
+diagnostics to `/dev/null`; changing only the visible hardware overlay remains
+live while playback is running.
 
 ## Architecture
 
