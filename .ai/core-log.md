@@ -1,3 +1,33 @@
+## 884 COMMIT Unreleased ??? 2026-09-01T21:16:29-07:00
+
+#### Coming From:
+
+Unreleased 68f8f26
+
+#### Purpose:
+
+Add semantic schema-21 overlay telemetry decoding and deterministic regression coverage without rebuilding or changing any MiSTer runtime component.
+
+#### Outcome:
+
+The approved host-tool-only boundary will teach `tools/decode-hardware-telemetry.py` that schema 21 retains the common cadence, terminal and schema-20 audio words but replaces words 37 through 54 with overlay-pipeline evidence.  It will decode record, byte, publication, rectangle, palette, pixel-sample and capture-trigger fields without reinterpreting overlay magic as native deadline counts, while schemas 1 through 20 remain behaviorally unchanged.  A deterministic Python regression will use the exact checksum-valid 64-word snapshot extracted from the accepted source-`68f8f26` seek screenshot and synthetic nonzero overlay words to cover both the ordinary-video fallback and authored-overlay layouts.  RTL, RBF, ARM helper, patched Main and target files remain untouched.
+
+#### Next Steps:
+
+Commit and push this proposal, implement the schema-specific parser branch and human-readable plus JSON reporting, add strict known-word regressions for schema-20 compatibility and schema-21 overlay interpretation, and run Python syntax, unit and direct-image decoding checks.  Finish as a source and project-control update only; no ARM compiler, Quartus build, MiSTer transfer, reboot or hardware rerun is required because the accepted screenshot is the immutable input to this host decoder.
+
+#### Files Modified:
+
+- tools/decode-hardware-telemetry.py
+- tools/test_hardware_telemetry.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 883 COMMIT Unreleased 68f8f26 2026-09-01T21:11:53-07:00
 
 #### Coming From:
@@ -1200,35 +1230,6 @@ The user's updated physical capture contains fifteen consecutive `M` root-menu c
 #### Next Steps:
 
 Preserve the working Main drain diagnostic and source-`f5f650f` RBF while treating the black-screen and selector faults independently.  Complete five additional consecutive root-menu reloads to close the predeclared twenty-hop video acceptance boundary, but first use the exact 21-byte physical shortfall and retained extractor handshake to define the smallest RBF diagnostic or correction for the intermittent overlay loss; require a fresh matrix with 86,400 plane bytes, 10,800 DDR words, one accepted and zero rejected commits, one plane publication, no `0x2000` flag and a visibly moving authored selector.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 844 COMMIT Unreleased 924cb21 2026-08-31T19:48:07-07:00
-
-#### Coming From:
-
-Unreleased c787835
-
-#### Purpose:
-
-Build and verify the Main-only 500 millisecond stream-hop drain diagnostic for physical FIFO-residue testing.
-
-#### Outcome:
-
-The exact clean source checkout `924cb217c1617a3c466df28094616758c3ad2644` on build PC `10.10.0.42` applies both pinned Main patches in order and builds Main successfully with MiSTer's pinned GNU 10.2.1 ARM toolchain.  The uniquely preserved `/home/vash/MiSTer-Media-Player-924cb21/host/build/MiSTer_StreamHopDrain_924cb21` and local `host/build/MiSTer_StreamHopDrain_924cb21` are byte-identical 1,178,588-byte stripped dynamically linked 32-bit ARM EABI5 executables at SHA-256 `6f49f425dae7e789c2f54b919fcc99fdb0f804e0ebbb60996f7c235e799bdf65`; the binary contains the required `stream hop drain release_to_rearm_us` marker.  The source checkout remains clean, and no helper, RBF, MiSTer installation, media or running process changes during this build.
-
-#### Next Steps:
-
-The user will manually replace only `/media/fat/MiSTer` with local `host/build/MiSTer_StreamHopDrain_924cb21`, restore executable mode if needed, verify the exact size and SHA-256, and reboot while preserving the installed ordinary helper and source-`f5f650f` RBF.  Start the physical DVD and perform at least twenty consecutive `M` root-menu reloads; acceptance requires every completed hop to log `release_to_rearm_us` at or above 500,000, continued menu video and selector operation, and no schema-21 `0x0200` raster, while any recurrence rejects residual FIFO drain as a sufficient remedy.
 
 #### Files Modified:
 
