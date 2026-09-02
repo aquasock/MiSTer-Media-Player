@@ -1,4 +1,4 @@
-## 895 COMMIT Unreleased ??? 2026-09-02T04:45:00-07:00
+## 895 COMMIT Unreleased 532bd8e 2026-09-02T04:45:00-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Prototype an inactivity-triggered standalone-audio visualizer by coupling PCM lo
 
 #### Outcome:
 
-The approved boundary will leave the H.262 decoder, FPGA interpretation and RBF unchanged: a deterministic tool will encode one seamless 720-by-480 loop at four color and brightness intensities as aligned short closed GOPs, package the independently decodable GOPs with a validated index, and the ARM helper will select only whole legal GOPs using a fast-attack, slow-decay PCM loudness envelope.  During standalone MP3, WAV, FLAC and Ogg playback the helper will continuously feed this ordinary elementary video underneath a packed two-bit rendition of the accepted player interface; the existing DVD overlay hardware will keep the interface visible until ten seconds of playback pass without user activity, hide it to reveal the visualizer, restore it after activity, and retain elapsed, total, remaining and progress updates without entering the sticky audio-UI framebuffer mode.  Main will add one standalone-audio activity notification because pause and resume currently remain private to its transport hold; seeks already traverse the control channel and will also reset inactivity.  Missing or invalid visualizer assets will fall back to the current audio-only interface, and ordinary video, Program Stream and DVD paths will remain unchanged.
+Source `532bd8e` adds a deterministic four-level visualizer pack generator and a bounded ARM runtime that validates every indexed payload as one sequence-led, closed, intra-starting legal H.262 GOP, computes a fast-attack and slow-decay stereo RMS envelope, selects a complete synchronized color grade at each loop phase, and admits at most 4,096 video bytes at a PCM boundary with two GOPs of lead.  The accepted player interface is quantized into the existing opaque two-bit DVD overlay, remains visible with elapsed, total, remaining and progress updates, clears after ten emitted-audio seconds without activity, restores from its resident plane when Main reports pause or resume, and republishes completely after every seek reset and at clean EOF; a missing or invalid pack retains the prior full-color framebuffer UI.  The generated 1,751,247-byte pack has twenty three-picture GOPs at each of four levels, its deliberately level-switched stream decodes without FFmpeg errors as 720-by-480 at 30000/1001, and a twelve-second modeled transport measured approximately 0.49 MB/s including PCM, video and overlay against the prior physical path's approximately 0.82 MB/s.  Strict unit, sanitizer, fallback and real-helper regressions pass; native and exact ARMv7 helpers pass MP3, WAV, FLAC and Ogg with two READY/GO seeks, one boundary continuation, post-reset overlay republishing, one inactivity clear and 369 to 375 decodable selected pictures, while the patched Main applies to pinned upstream and compiles with GNU 10.2.  GNU 10.2 produced the 961,956-byte static ARMv7 helper `host/build/MediaPlayer_Helper_Visualizer_532bd8e` at SHA-256 `6b7079525f87907e8c45241f28501cd8ee01eae00b0ebcf1357b9b1c03f1d836`, the 1,182,692-byte ARMv7 Main `host/build/MiSTer_Visualizer_532bd8e` at SHA-256 `f2da76ee4882faa0192e086ca12882959c3bb26fea403de0facfc3c73c768d57`, and `host/build/MediaPlayer_Visualizer_532bd8e.mmpvis` at SHA-256 `2024e8d4e4536bb45662d9e8787d3cf098583442bc24d6aa12a73a4db4dbf85a`; the H.262 decoder, display protocol, RTL and timing-qualified RBF are unchanged.
 
 #### Next Steps:
 
-Implement and strictly validate the indexed asset loader, GOP phase and level selection, bounded PCM-interleaved video delivery, overlay conversion and publication state, inactivity and activity transitions, seek reset, clean EOF presentation and fallback path.  Add deterministic asset generation plus parser, loudness, transport and modeled Main regressions; decode every selectable concatenation with FFmpeg, run sanitizers, build the exact ARM helper and patched Main locally, and produce the generated visualizer pack for MiSTer testing while preserving the current RBF.
+Exit MediaPlayer, install `host/build/MediaPlayer_Helper_Visualizer_532bd8e` as `/media/fat/linux/MediaPlayer_Helper`, `host/build/MiSTer_Visualizer_532bd8e` as `/media/fat/MiSTer`, and `host/build/MediaPlayer_Visualizer_532bd8e.mmpvis` as `/media/fat/linux/MediaPlayer_Visualizer.mmpvis`, preserve executable mode on the two programs and the current timing-qualified RBF, then reboot because Main changed.  Play a dynamic standalone audio track and require the normal player interface for the first ten seconds, a seamless moving background afterward, visible color and brightness response to quiet, normal, loud and peak passages without damaged frames, interface restoration and a fresh ten-second delay after resume or seek, correct timers after seeking, and a completed interface at clean EOF before Play restarts the file.  Spot-check all four standalone formats and temporarily rename the pack once to confirm fallback to the accepted full-color screen; report acceptance or place fresh Main/helper logs and screenshots in `.ai/current_results` for any failure.
 
 #### Files Modified:
 
@@ -36,7 +36,7 @@ Implement and strictly validate the indexed asset loader, GOP phase and level se
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
