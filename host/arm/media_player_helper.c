@@ -314,6 +314,7 @@ struct audio_state {
     int a52_synced;
     size_t ac3_resync_bytes;
     unsigned ac3_resync_events;
+    uint32_t unsupported_private_audio_mask;
     uint8_t *data;
     size_t size;
     size_t capacity;
@@ -1627,6 +1628,8 @@ static void reset_audio_for_navigation(struct audio_state *audio)
     enum audio_output selected_output = audio->output;
     int selected_a52_substream = audio->a52_substream;
     int selected_dts_substream = audio->dts_substream;
+    uint32_t unsupported_private_audio_mask =
+        audio->unsupported_private_audio_mask;
 
     if (audio->a52)
         a52_free(audio->a52);
@@ -1636,6 +1639,8 @@ static void reset_audio_for_navigation(struct audio_state *audio)
     audio->output = selected_output;
     audio->a52_substream = selected_a52_substream;
     audio->dts_substream = selected_dts_substream;
+    audio->unsupported_private_audio_mask =
+        unsupported_private_audio_mask;
     mp3dec_init(&audio->decoder);
     fprintf(stderr,
             "media_player_helper: navigation audio retained codec=%d "
@@ -3136,11 +3141,21 @@ static int process_private_pes(struct media_source *input,
     }
     if (payload_offset < length && packet[payload_offset] >= 0x90u &&
         packet[payload_offset] <= 0xafu) {
-        fprintf(stderr,
-                "media_player_helper: unsupported Program Stream private "
-                "audio substream 0x%02x; MPEG Layer II, AC-3 or DTS is "
-                "required\n",
-                packet[payload_offset]);
+        unsigned substream = packet[payload_offset];
+        uint32_t bit = UINT32_C(1) << (substream - 0x90u);
+
+        if (!(audio->unsupported_private_audio_mask & bit)) {
+            const char *kind = substream >= 0xa0u && substream <= 0xa7u ?
+                               "DVD LPCM" : "private audio";
+
+            fprintf(stderr,
+                    "media_player_helper: skipping unsupported %s "
+                    "substream 0x%02x; video and navigation continue "
+                    "without this audio\n",
+                    kind, substream);
+            audio->unsupported_private_audio_mask |= bit;
+        }
+        result = 0;
         goto done;
     }
     result = 0;

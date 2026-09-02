@@ -78,6 +78,13 @@ int main(void)
     size_t discarded;
     int failed = test_navigation_logger();
 
+    failed |= require(iso_menu_identity_is_root(0, DVD_MENU_Root),
+                      "active root menu was not recognized");
+    failed |= require(!iso_menu_identity_is_root(0, DVD_MENU_Audio),
+                      "non-root submenu was suppressed");
+    failed |= require(!iso_menu_identity_is_root(1, DVD_MENU_Root),
+                      "title playback was mistaken for the root menu");
+
     memset(&state, 0, sizeof(state));
     state.block_offset = 513;
     state.block_size = DVD_VIDEO_LB_LEN;

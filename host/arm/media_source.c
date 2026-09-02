@@ -991,6 +991,11 @@ static int iso_menu_direction_target(pci_t *pci, int32_t button,
     }
 }
 
+static int iso_menu_identity_is_root(int32_t title, int32_t part)
+{
+    return title == 0 && part == DVD_MENU_Root;
+}
+
 static void iso_log_menu_command(struct iso_source_state *state,
                                  enum media_source_dvd_command command,
                                  pci_t *pci, int32_t before, int target,
@@ -1077,6 +1082,18 @@ static int iso_menu_command(struct iso_source_state *state,
         }
         break;
     case MEDIA_SOURCE_DVD_ROOT_MENU:
+        {
+            int32_t title = 0;
+            int32_t part = 0;
+
+            if (dvdnav_current_title_info(state->navigation, &title, &part) ==
+                    DVDNAV_STATUS_OK &&
+                iso_menu_identity_is_root(title, part)) {
+                iso_log_menu_command(state, command, pci, before, target,
+                                     before, "already-root");
+                return MEDIA_SOURCE_DVD_MENU_CONTINUE;
+            }
+        }
         status = dvdnav_menu_call(state->navigation, DVD_MENU_Root);
         if (status == DVDNAV_STATUS_OK) {
             if (dvdnav_get_current_highlight(state->navigation, &after) !=

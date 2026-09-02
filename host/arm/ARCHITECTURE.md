@@ -155,8 +155,10 @@ share a compilation unit:
    control channel protocol one omits. AC-3 is downmixed to stereo by liba52
    using the stream's own coefficients. DTS on substreams 0x88-0x8F is
    passthrough only, since no DTS decoder is present; a DTS track selected for
-   HDMI output is refused rather than played as silence. DVD LPCM is still
-   later.
+   HDMI output is refused rather than played as silence. Unsupported private
+   audio substreams 0x90-0xAF, including DVD LPCM, are skipped without ending
+   video or navigation, so a menu may remain usable without its audio. DVD LPCM
+   decoding is still later.
 5. Audio output: `--audio-out hdmi` (default) sends decoded stereo to HDMI.
    `--audio-out spdif` sends decoded MP2, MP3, WAV, FLAC and Ogg Vorbis stereo as ordinary
    S/PDIF PCM. For AC-3 and DTS it bypasses the decode stage and emits IEC 61937
