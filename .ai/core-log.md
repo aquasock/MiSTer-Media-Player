@@ -1,4 +1,33 @@
-## 879 COMMIT Unreleased ??? 2026-09-01T18:08:06-07:00
+## 880 COMMIT Unreleased ??? 2026-09-01T18:30:20-07:00
+
+#### Coming From:
+
+Unreleased 40dd64d
+
+#### Purpose:
+
+Remove the nine residual HDMI setup violations by shortening the three remaining ASCAL logic-depth clusters without adding visible latency.
+
+#### Outcome:
+
+The first structural fit removes both targeted cross-device zero-logic path families and reduces global setup failure from negative 0.978 to negative 0.138 nanoseconds, leaving nine marginal paths in three unrelated but explicit `ascal` clusters.  The residual paths are the normal line-address addition from the registered stride product, the cascaded RGB maximum used for vertical adaptive-polyphase luminance, and the vertical-priority term feeding the horizontal adaptive coefficient mux.  The second correction will register the normal line-plus-burst address during the already existing request-preparation cycle, split the vertical RGB maximum across its already existing pixel and coefficient stages, and precompute the horizontal adaptive enable with the same vertical-over-horizontal priority; all three preserve the current sampled values, state-machine request edge and scaler pipeline alignment.
+
+#### Next Steps:
+
+Commit and push this proposal, implement the three targeted `ascal` transformations, rerun all ten exact-source RTL regressions, and perform one clean seed-24 Quartus build.  Require positive global setup, hold, recovery, removal and minimum-pulse-width margins plus violation-free 60 MHz decoder and 54 MHz video reports before collecting an RBF; if timing still fails, inspect the permanent global report and stop rather than reseeding.
+
+#### Files Modified:
+
+- sys/ascal.vhd
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 879 COMMIT Unreleased 40dd64d 2026-09-01T18:08:06-07:00
 
 #### Coming From:
 
@@ -10,11 +39,11 @@ Close the telemetry build's HDMI-domain setup timing structurally without changi
 
 #### Outcome:
 
-The user approves a timing-correction cycle after both permitted telemetry placements failed only in the framework HDMI domain.  A new read-only one-hundred-path TimeQuest report from the retained seed-24 fit confirms that all reported setup violations are inside `ascal`; the worst path is a zero-logic 6.862-nanosecond route from the shared cycle-two outer-pixel register to its cycle-eight queue destination, while the next nineteen paths are zero-logic routes from one shared vertical-polyphase coefficient bit to widely separated RGB DSP inputs.  The correction will use same-cycle physical duplicates at those two high-fanout boundaries and will add a permanent global detailed-path report to the existing timing extractor; it will not insert pipeline latency, alter pixel values, touch the decoder/helper/Main protocol or relax a timing constraint.
+Source `40dd64d` gives cycle-eight its own same-edge outer-pixel register, supplies the vertical red, green and blue DSP groups from independent value-identical coefficient registers protected from merging, and permanently adds a routed one-hundred-path global setup report to the existing TimeQuest extractor.  All ten exact-source telemetry, progressive cadence, framebuffer geometry, output timing, audio-interface, DDR-arbiter, DVD-overlay metadata, engine, integrated delivery and snapshot regressions pass.  Quartus Prime 17.0.2 seed 24 completes synthesis in 2 minutes 24 seconds, fitting in 12 minutes 23 seconds and assembly with zero errors; the targeted negative 0.978-nanosecond outer-pixel route and nineteen negative 0.581-nanosecond shared-coefficient routes disappear, while global setup improves to negative 0.138 nanoseconds with only nine residual `ascal` violations.  Global hold, recovery, removal and minimum-pulse-width margins remain positive at 0.248, 3.710, 0.477 and 0.925 nanoseconds, and the dedicated 60 MHz decoder and 54 MHz video setup checks are clean at positive 0.717 and 1.573 nanoseconds.  The fit uses 34,681 ALMs, 54,549 registers, 4,187,203 block-memory bits in 535 RAM blocks and 70 DSP blocks; its RBF remains rejected on the build PC.
 
 #### Next Steps:
 
-Commit and push this proposal, implement dedicated cycle-eight outer-pixel storage plus per-color vertical-polyphase coefficient copies with `dont_merge` preservation, extend the TimeQuest extractor with a full global setup report, then rerun all ten retained RTL regressions and perform one clean exact-source seed-24 Quartus build.  Accept and collect artifacts only if global setup, hold, recovery, removal and minimum-pulse-width timing are all positive and the dedicated 60 MHz decoder and 54 MHz video reports contain no violations; otherwise stop for new evidence rather than reseeding.
+Proceed through entry 880's separately recorded second structural correction for the nine measured residual paths, retaining seed 24 and every accepted source-`5f00e35` artifact.  Do not collect or distribute the source-`40dd64d` RBF.
 
 #### Files Modified:
 
@@ -23,7 +52,7 @@ Commit and push this proposal, implement dedicated cycle-eight outer-pixel stora
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1199,34 +1228,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 840 COMMIT Unreleased f5f650f 2026-08-31T19:16:30-07:00
-
-#### Coming From:
-
-Unreleased 648c0ed
-
-#### Purpose:
-
-Accept the retained DVD overlay transfer repair on physical hardware and define the helper-only boundary that restores the authored menu selector.
-
-#### Outcome:
-
-The user's physical source-`f5f650f` capture accepts the repaired RBF for its targeted transfer fault.  The checksum-valid schema-21 snapshot at SHA-256 `f218fbd3946c0b59db43b6aa46a86059a90adbb70750fb18dfc1f030ae55829e` reports one config, 22 data records, one commit, two styles, one clear, zero rejected commits, one accepted commit and one plane publication; all 86,400 plane bytes reach the engine, all 10,800 DDR words complete with byte lane zero, and the engine is ready with no protocol error or pending publication.  The video domain counts 88,800 highlighted samples, all 88,800 with nonzero alpha and all 88,800 opaque magenta.  The 1,920-by-1,080 screenshot at SHA-256 `ed6e5b3920d5007ff0176bb6d5f2e20124c25888c8820dc22ef0fa13f1ed77fa` contains exactly 34,560 magenta pixels in one 320-by-108 rectangle from output coordinate 830,876 through 1,149,983, precisely scaling the helper log's current DVD rectangle 311,389 through 430,436.  The 2,286,369-byte Main/helper log at SHA-256 `3167ce45cd803779dcfe328a9235f9fb0c7e74a558e6b9a3b4a20c41f4a338d7` records successful style movement among the authored button rectangles.  The solid rectangle is the intentionally installed `MMP_DVD_OVERLAY_PROBE` helper output, while ordinary source already emits the real decoded two-bit plane and authored palette; no further RBF or source correction is indicated for this selector restoration.
-
-#### Next Steps:
-
-From an exact clean source-`f5f650f` checkout on build PC `10.10.0.42`, run the focused subpicture, random-access and menu-hop regressions, build the ordinary ARM helper without `MMP_DVD_OVERLAY_PROBE`, and verify it is a stripped static ARMv7 executable with no dynamic section.  Preserve Main and `MediaPlayer_20260831_f5f650f.rbf`, stop the running helper by exiting the core, replace only `/media/fat/linux/MediaPlayer_Helper` under the user's no-backup policy, verify the installed bytes by readback, then restart the DVD and require a sparse authored selector that follows all menu choices without any solid magenta rectangle.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
