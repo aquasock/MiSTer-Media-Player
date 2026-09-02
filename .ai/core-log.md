@@ -1,3 +1,46 @@
+## 895 COMMIT Unreleased ??? 2026-09-02T04:45:00-07:00
+
+#### Coming From:
+
+Unreleased 7e152d5
+
+#### Purpose:
+
+Prototype an inactivity-triggered standalone-audio visualizer by coupling PCM loudness to synchronized legal MPEG-2 loop variants while preserving the normal player interface and existing decoder behavior.
+
+#### Outcome:
+
+The approved boundary will leave the H.262 decoder, FPGA interpretation and RBF unchanged: a deterministic tool will encode one seamless 720-by-480 loop at four color and brightness intensities as aligned short closed GOPs, package the independently decodable GOPs with a validated index, and the ARM helper will select only whole legal GOPs using a fast-attack, slow-decay PCM loudness envelope.  During standalone MP3, WAV, FLAC and Ogg playback the helper will continuously feed this ordinary elementary video underneath a packed two-bit rendition of the accepted player interface; the existing DVD overlay hardware will keep the interface visible until ten seconds of playback pass without user activity, hide it to reveal the visualizer, restore it after activity, and retain elapsed, total, remaining and progress updates without entering the sticky audio-UI framebuffer mode.  Main will add one standalone-audio activity notification because pause and resume currently remain private to its transport hold; seeks already traverse the control channel and will also reset inactivity.  Missing or invalid visualizer assets will fall back to the current audio-only interface, and ordinary video, Program Stream and DVD paths will remain unchanged.
+
+#### Next Steps:
+
+Implement and strictly validate the indexed asset loader, GOP phase and level selection, bounded PCM-interleaved video delivery, overlay conversion and publication state, inactivity and activity transitions, seek reset, clean EOF presentation and fallback path.  Add deterministic asset generation plus parser, loudness, transport and modeled Main regressions; decode every selectable concatenation with FFmpeg, run sanitizers, build the exact ARM helper and patched Main locally, and produce the generated visualizer pack for MiSTer testing while preserving the current RBF.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/Makefile
+- host/arm/audio_ui.c
+- host/arm/audio_ui.h
+- host/arm/audio_visualizer.c
+- host/arm/audio_visualizer.h
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/generate-audio-visualizer.py
+- tools/test_audio_file_seek.py
+- tools/test_audio_ui_output.c
+- tools/test_audio_visualizer.c
+- tools/test_main_seek_lifecycle.cpp
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 894 COMMIT Unreleased 7e152d5 2026-09-02T03:50:37-07:00
 
 #### Coming From:
@@ -1256,35 +1299,6 @@ The user should exit MediaPlayer so the running helper stops, manually replace o
 - host/arm/media_source.h
 - tools/test_dvd_menu_hop.c
 - tools/test_dvd_menu_navigation.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 855 COMMIT Unreleased 330d103 2026-08-31T21:55:35-07:00
-
-#### Coming From:
-
-Unreleased 330d103
-
-#### Purpose:
-
-Diagnose why activating Play with Spacebar leaves the DVD menu frame frozen instead of starting the title.
-
-#### Outcome:
-
-The user's fresh physical run selects Play and presses Spacebar, which Main correctly remaps to menu activation command `0x08` at diagnostic time 11.117172 seconds with playback unpaused.  The helper successfully calls `dvdnav_button_activate` on button one, but because `dvdnav_current_title_info` still reports menu title zero immediately after the call, it classifies the action as an overlay-only menu continuation; Main receives that acknowledgment at 11.147338 seconds and deliberately preserves the resident menu frame.  Libdvdnav then reports an authored ten-second finite still.  At 21.157916 seconds the helper completes the still, reports menu leave, switches to subpicture stream 128, resynchronizes AC-3 and begins producing the movie, but it never sends a ready event, enters a navigation barrier or rearms the random-access filter at this delayed menu-to-title boundary.  Main consequently keeps the original decoder session while continuing to read and submit title bytes; the log reaches more than 115 MB submitted at 56.624699 seconds, proving this is neither a paused player, stopped disc nor helper starvation.  The 729,689-byte screenshot at SHA-256 `13a938c828b3d622d1853d76324f712dfa5d7664309ffeecc51ca630ed576ec0` still shows the resident menu frame after the authored still has expired and the selector has been cleared.  The matching 1,137,918-byte helper/Main log has SHA-256 `a0cf8f1ca89b3d4c6a5e2b4f18515ec987484dcc76ee30db42474b5aa7916fcf`; its timeline localizes the fault to delayed activation classification.  The 844-byte checksum-valid schema-21 snapshot at SHA-256 `26bb7bf3ecc1411b7457995883dbde7e52ac25d008d0b03bba035856768e3e7b` retains the accepted authored-selector plane evidence and introduces no separate selector regression.  Static source inspection confirms that `media_source_dvd_still_skip` clears the still but does not report a menu-to-title hop, so `wait_dvd_still` resumes inside the old session instead of invoking Main's already proven ready/go reset barrier.  Main, the authored selector compensation and the source-`f5f650f` RBF are not implicated.
-
-#### Next Steps:
-
-Obtain approval for a helper-only delayed-transition correction: after a finite still is skipped, refresh libdvdnav title state and classify a menu-to-title change as `MEDIA_SOURCE_DVD_STREAM_HOP`, invalidate the current source boundary and make `wait_dvd_still` enter the existing ready/go navigation barrier before any title bytes are emitted.  Add focused regressions that distinguish a finite still remaining inside a menu from a finite still exiting to a title, extend the real-image navigation test to require the delayed second ready event and post-barrier title video, build only the helper locally with authored selector compensation, and preserve Main and the RBF.  Physical acceptance requires Play to retain its authored ten-second still, then start moving title video after one clean barrier with no selector regression.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
