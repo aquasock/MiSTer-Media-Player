@@ -1,4 +1,4 @@
-## 876 COMMIT Unreleased ??? 2026-09-01T17:15:50-07:00
+## 876 COMMIT Unreleased 60d7c75 2026-09-01T17:15:50-07:00
 
 #### Coming From:
 
@@ -10,17 +10,19 @@ Add a default-off production telemetry mode that preserves internal schema-21 ca
 
 #### Outcome:
 
-The approved boundary assigns unused OSD status bit 125 to a saved `Telemetry` option whose zero default is Off.  FPGA schema-21 counters, capture timing and snapshot contents remain live in both modes, but a synchronized video-domain visibility gate prevents the diagnostic raster from compositing unless the option is On.  Main reads the same bit before each helper launch: Off opens no diagnostic log, removes any stale RAM-backed `/tmp/MediaPlayer_ARM.log`, makes Main diagnostic writes no-ops and redirects helper standard error to `/dev/null`, while On retains the existing combined Main/helper log.  The mode must not alter media bytes, decoder scheduling, PCM delivery, DVD navigation, audio-interface rendering or diagnostic schemas.
+Source `60d7c75` assigns unused saved OSD status bit 125 to `Telemetry`, defaulting its zero state to Off.  FPGA schema-21 counters, capture timing and snapshot contents remain unconditional, while a three-stage video-domain synchronizer gates only diagnostic raster composition and an updated first-stage timing exception replaces the obsolete status-125 target from the deleted diagnostic generator.  Main samples the same bit before each helper launch: Off opens no diagnostic log, removes any stale RAM-backed `/tmp/MediaPlayer_ARM.log`, makes Main diagnostic writes no-ops and redirects helper standard error to `/dev/null`, while On retains the existing combined Main/helper log.  Both generated Main patches apply in order to pinned upstream `0a8fb44` and the resulting complete ARM translation unit builds successfully with GNU 10.2; the new focused RTL regression covers hidden capture, live reveal and re-hide.  Media bytes, decoder scheduling, PCM delivery, DVD navigation, audio-interface rendering and diagnostic schemas are unchanged.
 
 #### Next Steps:
 
-Implement the shared OSD boundary in the top level, profiler and generated Main patch, document that FPGA visibility changes live while ARM logging selection applies at the next playback start, and add focused regression coverage for default-hidden, live-visible and re-hidden telemetry plus enabled and disabled host logging.  Build strict native and ARM Main/helper artifacts, run retained media and overlay regressions, then build one timing-qualified RBF from the accepted seed-23 baseline before asking the user to install the matched RBF, Main and helper set and verify zero `/tmp/MediaPlayer_ARM.log` creation with Telemetry Off.
+Push exact source `60d7c75`, run the focused visibility test and retained media, audio-interface, overlay and DDR regressions on build PC `10.10.0.42`, build strict native and ARM Main/helper artifacts, then build one timing-qualified RBF from the accepted seed-23 baseline.  Preserve the matched RBF and Main locally for user transfer, then require physical MPG, DVD and standalone-audio playback with no visible stripe or `/tmp/MediaPlayer_ARM.log` at Telemetry Off, plus a retained visible stripe and combined log after enabling Telemetry before playback.
 
 #### Files Modified:
 
 - MediaPlayer.sv
+- MediaPlayer.sdc
 - README.md
 - host/main_mister/0001-mediaplayer-arm-loader.patch
+- host/main_mister/0002-mediaplayer-overlay-trace.patch
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - tools/test_telemetry_visibility.sv
 
