@@ -100,6 +100,16 @@ producer/consumer totals are diagnostic output. ISO and ordinary file sources
 remain synchronous and byte-identical, and none of this buffer consumes FPGA
 memory.
 
+Physical-DVD program output also crosses a record-aware 4 MiB reserve before
+Main's pipe. Its writer owns the output descriptor in nonblocking mode, retains
+ordinary records and priority ordering exactly under backpressure, and restores
+the descriptor flags at teardown. Once libdvdnav definitively classifies a
+navigation stream hop, reserve discard may cancel the unwritten suffix of the
+record stalled in the full pipe as well as queued records; Main discards the
+already-written prefix during the existing ready/go barrier. A menu command
+that resolves as a continuation never requests that discard, so its output is
+still delivered byte-for-byte without a reset.
+
 The menu routes instead preserve libdvdnav first-play behavior, VM domain
 transitions, authored finite or indefinite stills, button state, CLUT changes
 and root-menu calls. DVD private-stream subpicture packets are reassembled and

@@ -3,6 +3,8 @@
 #include "output_reserve.h"
 
 #include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -11,11 +13,13 @@
 
 #define OUTPUT_RESERVE_WRITE_CHUNK (64u * 1024u)
 #define OUTPUT_RESERVE_PRIORITY_BYTES (256u * 1024u)
+#define OUTPUT_RESERVE_POLL_MS 10
 
 /*
  * One bit per queued byte marks the final byte of each producer write.  The
  * writer may split that record into bounded system calls, but it never changes
- * lanes until the complete record reaches the pipe.  An overlay can therefore
+ * lanes until the complete record reaches the pipe.  Only an explicit stream-
+ * hop discard may cancel an unwritten suffix.  An overlay can therefore
  * overtake queued media without landing inside an in-band PCM record.
  */
 struct output_ring {
@@ -28,6 +32,8 @@ struct output_ring {
 
 struct output_reserve {
     int fd;
+    int fd_flags;
+    int restore_fd_flags;
     struct output_ring normal;
     struct output_ring priority;
     int stopping;
@@ -142,6 +148,22 @@ static void reserve_fail_locked(struct output_reserve *reserve, int error)
     pthread_cond_broadcast(&reserve->writable);
 }
 
+static int reserve_discard_locked(struct output_reserve *reserve,
+                                  size_t active_written)
+{
+    size_t discarded = ring_discard(&reserve->normal) +
+                       ring_discard(&reserve->priority);
+
+    if (active_written > discarded) {
+        reserve_fail_locked(reserve, EPROTO);
+        return -1;
+    }
+    reserve->discarded_bytes = discarded - active_written;
+    reserve->discard_requested = 0;
+    pthread_cond_broadcast(&reserve->writable);
+    return 0;
+}
+
 static void *output_reserve_worker(void *opaque)
 {
     struct output_reserve *reserve = opaque;
@@ -150,6 +172,7 @@ static void *output_reserve_worker(void *opaque)
         struct output_ring *ring;
         size_t record_size;
         size_t record_written = 0;
+        int record_discarded = 0;
 
         pthread_mutex_lock(&reserve->mutex);
         while (!reserve->normal.count && !reserve->priority.count &&
@@ -160,17 +183,8 @@ static void *output_reserve_worker(void *opaque)
             pthread_mutex_unlock(&reserve->mutex);
             break;
         }
-        /*
-         * A discard requested during a write is observed only after that
-         * complete producer record reaches the pipe.  Main discards pipe
-         * bytes across a navigation barrier, while no framed output is ever
-         * split or left internally half-consumed.
-         */
         if (reserve->discard_requested) {
-            reserve->discarded_bytes = ring_discard(&reserve->normal) +
-                                        ring_discard(&reserve->priority);
-            reserve->discard_requested = 0;
-            pthread_cond_broadcast(&reserve->writable);
+            (void)reserve_discard_locked(reserve, 0);
             pthread_mutex_unlock(&reserve->mutex);
             continue;
         }
@@ -190,10 +204,23 @@ static void *output_reserve_worker(void *opaque)
         pthread_mutex_unlock(&reserve->mutex);
 
         while (record_written < record_size) {
+            struct pollfd output_poll = {reserve->fd, POLLOUT, 0};
             size_t index = (ring->head + record_written) % ring->capacity;
             size_t chunk = ring->capacity - index;
             size_t remaining = record_size - record_written;
             ssize_t result;
+
+            pthread_mutex_lock(&reserve->mutex);
+            if (reserve->discard_requested) {
+                if (reserve_discard_locked(reserve, record_written) < 0) {
+                    pthread_mutex_unlock(&reserve->mutex);
+                    return NULL;
+                }
+                record_discarded = 1;
+                pthread_mutex_unlock(&reserve->mutex);
+                break;
+            }
+            pthread_mutex_unlock(&reserve->mutex);
 
             if (chunk > remaining)
                 chunk = remaining;
@@ -207,11 +234,19 @@ static void *output_reserve_worker(void *opaque)
             }
             if (result < 0 && errno == EINTR)
                 continue;
+            if (result < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+                result = poll(&output_poll, 1, OUTPUT_RESERVE_POLL_MS);
+                if (result >= 0 || errno == EINTR)
+                    continue;
+            }
             pthread_mutex_lock(&reserve->mutex);
             reserve_fail_locked(reserve, result < 0 ? errno : EIO);
             pthread_mutex_unlock(&reserve->mutex);
             return NULL;
         }
+
+        if (record_discarded)
+            continue;
 
         pthread_mutex_lock(&reserve->mutex);
         ring_remove_record(ring, record_size);
@@ -243,8 +278,19 @@ int output_reserve_create(struct output_reserve **reserve_out, int fd,
         return -1;
     }
     reserve->fd = fd;
+    reserve->fd_flags = fcntl(fd, F_GETFL);
+    if (reserve->fd_flags < 0 ||
+        fcntl(fd, F_SETFL, reserve->fd_flags | O_NONBLOCK) < 0) {
+        ring_free(&reserve->priority);
+        ring_free(&reserve->normal);
+        free(reserve);
+        return -1;
+    }
+    reserve->restore_fd_flags = !(reserve->fd_flags & O_NONBLOCK);
     result = pthread_mutex_init(&reserve->mutex, NULL);
     if (result) {
+        if (reserve->restore_fd_flags)
+            (void)fcntl(fd, F_SETFL, reserve->fd_flags);
         errno = result;
         ring_free(&reserve->priority);
         ring_free(&reserve->normal);
@@ -253,6 +299,8 @@ int output_reserve_create(struct output_reserve **reserve_out, int fd,
     }
     result = pthread_cond_init(&reserve->readable, NULL);
     if (result) {
+        if (reserve->restore_fd_flags)
+            (void)fcntl(fd, F_SETFL, reserve->fd_flags);
         errno = result;
         pthread_mutex_destroy(&reserve->mutex);
         ring_free(&reserve->priority);
@@ -262,6 +310,8 @@ int output_reserve_create(struct output_reserve **reserve_out, int fd,
     }
     result = pthread_cond_init(&reserve->writable, NULL);
     if (result) {
+        if (reserve->restore_fd_flags)
+            (void)fcntl(fd, F_SETFL, reserve->fd_flags);
         errno = result;
         pthread_cond_destroy(&reserve->readable);
         pthread_mutex_destroy(&reserve->mutex);
@@ -273,6 +323,8 @@ int output_reserve_create(struct output_reserve **reserve_out, int fd,
     result = pthread_create(&reserve->thread, NULL,
                             output_reserve_worker, reserve);
     if (result) {
+        if (reserve->restore_fd_flags)
+            (void)fcntl(fd, F_SETFL, reserve->fd_flags);
         errno = result;
         pthread_cond_destroy(&reserve->writable);
         pthread_cond_destroy(&reserve->readable);
@@ -403,6 +455,11 @@ int output_reserve_destroy(struct output_reserve *reserve)
     if (pthread_join(reserve->thread, NULL) && !result) {
         result = -1;
         saved_errno = EIO;
+    }
+    if (reserve->restore_fd_flags &&
+        fcntl(reserve->fd, F_SETFL, reserve->fd_flags) < 0 && !result) {
+        result = -1;
+        saved_errno = errno;
     }
     pthread_cond_destroy(&reserve->writable);
     pthread_cond_destroy(&reserve->readable);
