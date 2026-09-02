@@ -1,3 +1,32 @@
+## 887 COMMIT Unreleased 9397fa7 2026-09-01T23:40:06-07:00
+
+#### Coming From:
+
+Unreleased 9397fa7
+
+#### Purpose:
+
+Record physical acceptance of the full-screen 4:3 CRT-safe standalone-audio interface layout.
+
+#### Outcome:
+
+The user reports that everything looked great on MiSTer, physically accepting source `9397fa7` and its helper-only audio-interface layout with playback behavior unchanged.  The fresh 8,308-byte 1,920-by-1,080 screenshot at SHA-256 `511b79f7badd1b9a3c660ba547d735a0dcc865fdfd62a50a45488c398b5c18bc` visibly contains the complete album-art and metadata column, six-row playlist, transport controls, time placeholders and active full-width progress bar without a clipped panel or label.  The matching 4,575,874-byte helper/Main log at SHA-256 `02dbd13e504e7816eae2ee25a790d291b503bdc31a2648aa04dd5860b2cd2345` covers approximately 74.7 seconds of 44.1-kHz FLAC playback, identifies the 720-by-480 BT.601 audio UI, records 74 complete UI commits at a 1.005-second average interval and includes four successful ten-second seek commands without a fatal helper or transport event.  Its 76 begin, 9,725 data and 74 commit records include expected partial-frame restarts around seeking and the live capture endpoint.  Main's overlay-only trace formatter calls audio-UI commands `0x10`, `0x11` and `0x12` `overlay_submit unknown` and increments its local `order_errors` diagnostic because that formatter predates the audio-UI protocol; the successfully rendered frames prove these labels are not FPGA publication failures.  The 2,818-byte `telemetry.txt` at SHA-256 `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004` correctly reports that no supported telemetry matrix can be extracted from the clean audio-interface screenshot, so it supplies no decoder-word snapshot and does not contradict the visual and transport acceptance.
+
+#### Next Steps:
+
+Preserve source `9397fa7`, `host/build/MediaPlayer_Helper_AudioLayout_9397fa7`, the installed source-`72bdccc` Main and the timing-qualified RBF as the accepted standalone-audio layout baseline.  Continue ordinary audio, MPEG Program Stream and DVD testing without enabling telemetry unless diagnostic evidence is needed; a later approved boundary may populate artwork, tags, playlist entries and true duration-relative time fields while retaining this accepted 4:3 geometry and playback behavior.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 886 COMMIT Unreleased 9397fa7 2026-09-01T22:56:38-07:00
 
 #### Coming From:
@@ -1222,35 +1251,6 @@ Exit the MediaPlayer core so the running helper stops, manually replace `/media/
 
 - host/arm/media_player_helper.c
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 847 COMMIT Unreleased aab7d09 2026-08-31T20:27:44-07:00
-
-#### Coming From:
-
-Unreleased 924cb21
-
-#### Purpose:
-
-Restore the proven moving solid-purple DVD menu selector with a helper-only overlay-packet compatibility workaround while preserving the accepted Main and frozen RBF.
-
-#### Outcome:
-
-The latest physical capture proves that the installed probe helper still generates the correct opaque-magenta index-one palette and moving authored button rectangles and that Main receives and submits a complete 86,400-byte all-index-one plane with 22 ordered data records, the expected hash and no source corruption.  The FPGA nevertheless receives only 86,379 plane bytes and rejects the commit without publishing a plane; the exact 21-byte deficit equals one byte for each of the 21 maximum-size 4,096-byte data records, while the final short record is accounted for.  Source `aab7d09` changes only the helper's overlay data chunk from 4,096 to 4,000 payload bytes, carrying the identical plane in 21 full records plus one 2,400-byte record while keeping every command-plus-payload record below the failing 4,097-byte edge; Main, selector generation, palette, protocol, total bytes and RBF remain unchanged.  The strict native purple-probe build and capability smoke test pass together with the focused fragmented-SPU, selected-histogram, scheduled-stop, random-access and menu-hop regressions and a framing check for exactly 22 records and 86,400 bytes.  The user's local GNU 10.2.1 ARM toolchain produces the 908,660-byte stripped static 32-bit ARM EABI5 `host/build/MediaPlayer_Helper_PurpleSelector_aab7d09` at SHA-256 `5f0bbe70fd8da1a85de39ef5a9a47917606b685b3e7a2b330ca7343db4285c1c`; it contains the `probe=solid-index1-magenta` marker and returns the complete protocol-one capability string when executed on the Raspberry Pi.
-
-#### Next Steps:
-
-Exit the MediaPlayer core so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_PurpleSelector_aab7d09`, restore executable mode if needed and verify the installed size and SHA-256.  Preserve the installed Main and RBF, restart the DVD, press `M` and move through every menu button; acceptance requires reliable menu loading, a visible purple rectangle that follows every directional selection, 86,400 received plane bytes, one accepted and zero rejected commits and one published plane.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
 
 #### Status:
 
