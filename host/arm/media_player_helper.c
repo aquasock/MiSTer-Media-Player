@@ -5,6 +5,7 @@
 #include "minimp3.h"
 #include "a52.h"
 #include "ac3_resync.h"
+#include "audio_file_seek.h"
 #include "mm_accel.h"
 #include "consumer_audio.h"
 #include "audio_ui.h"
@@ -3321,10 +3322,9 @@ static int audio_file_request_seek(void *opaque, uint64_t current_frame,
                                    int *seconds)
 {
     struct audio_file_control_state *state = opaque;
+    uint64_t target_frame;
     int command;
 
-    (void)current_frame;
-    (void)rate_hz;
     if (state->control_fd < 0)
         return 0;
     command = control_read_command(state->control_fd);
@@ -3335,6 +3335,16 @@ static int audio_file_request_seek(void *opaque, uint64_t current_frame,
             fprintf(stderr,
                     "media_player_helper: ignoring unexpected audio-file "
                     "control 0x%02x\n", command);
+        return 0;
+    }
+    target_frame = audio_file_seek_target(current_frame, length_frames,
+                                          rate_hz, *seconds);
+    if (target_frame == current_frame) {
+        fprintf(stderr,
+                "media_player_helper: ignoring audio seek %+d seconds "
+                "at boundary current=%llu length=%llu rate=%u\n",
+                *seconds, (unsigned long long)current_frame,
+                (unsigned long long)length_frames, rate_hz);
         return 0;
     }
     state->seek_pending = 1;

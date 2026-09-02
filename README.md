@@ -96,7 +96,9 @@ Ctrl+Left/Right jumps 1 minute, and Ctrl+Alt+Left/Right jumps 5 minutes. Program
 Streams use a sparse video-PTS index; standalone audio uses the decoder's PCM
 sample timeline. Both paths use the same clean READY/GO download barrier so no
 pre-jump bytes or partial audio-interface frame crosses the reset. These
-controls do not apply to raw `.m2v`, DVD ISO images, or optical discs.
+controls do not apply to raw `.m2v`, DVD ISO images, or optical discs. A
+standalone-audio forward jump that would reach or pass the exact end is ignored
+so playback does not terminate into a blank screen.
 
 In an authored DVD menu, the player-one D-pad moves the highlight, A or Start
 activates it, and Select calls the root menu. Keyboard arrows, Enter (including

@@ -32,8 +32,17 @@ int main(void)
                                               48000u, -300) == 0,
                       "five-minute beginning clamp");
     failed |= require(audio_file_seek_target(500u * 48000u, length,
-                                              48000u, 300) == length,
-                      "five-minute end clamp");
+                                              48000u, 300) ==
+                      500u * 48000u,
+                      "five-minute end overshoot no-op");
+    failed |= require(audio_file_seek_target(540u * 48000u, length,
+                                              48000u, 60) ==
+                      540u * 48000u,
+                      "exact-end forward seek no-op");
+    failed |= require(audio_file_seek_target(599u * 48000u, length,
+                                              48000u, 10) ==
+                      599u * 48000u,
+                      "past-end forward seek no-op");
     failed |= require(audio_file_seek_target(UINT64_MAX, UINT64_MAX,
                                               UINT32_MAX, INT32_MAX) ==
                       UINT64_MAX, "overflow-safe end clamp");
@@ -41,6 +50,6 @@ int main(void)
                       "out-of-range current position clamp");
     if (failed)
         return 1;
-    puts("audio file seek: fixed targets and boundary clamps pass");
+    puts("audio file seek: fixed targets and boundary no-ops pass");
     return 0;
 }

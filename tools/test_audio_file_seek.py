@@ -19,8 +19,13 @@ READY = 0x81
 GO = 0x03
 SEEK_BACK_10 = 0x0A
 SEEK_FORWARD_10 = 0x0B
+SEEK_FORWARD_60 = 0x0D
 SEEK_RE = re.compile(
     rb"audio seek ([+-]10) seconds current=([0-9]+) target=([0-9]+) "
+    rb"length=([0-9]+) rate=([0-9]+)"
+)
+IGNORED_RE = re.compile(
+    rb"ignoring audio seek \+60 seconds at boundary current=([0-9]+) "
     rb"length=([0-9]+) rate=([0-9]+)"
 )
 DURATION_RE = re.compile(
@@ -79,6 +84,8 @@ def run_fixture(helper: Path, fixture: Path) -> None:
     after_go_bytes = 0
     forward_sent = False
     backward_sent = False
+    overshoot_sent = False
+    overshoot_output_start = 0
     ready_count = 0
     deadline = time.monotonic() + 20.0
 
@@ -101,6 +108,10 @@ def run_fixture(helper: Path, fixture: Path) -> None:
                         ready_count += 1
                         output_bytes += drain_fd(process.stdout.fileno())
                         parent.send(bytes((GO,)))
+                        if ready_count == 2 and not overshoot_sent:
+                            parent.send(bytes((SEEK_FORWARD_60,)))
+                            overshoot_sent = True
+                            overshoot_output_start = output_bytes
                     elif event:
                         raise RuntimeError(
                             f"{fixture.suffix}: unexpected control {event.hex()}"
@@ -129,11 +140,13 @@ def run_fixture(helper: Path, fixture: Path) -> None:
             + error_output.decode(errors="replace")
         )
     matches = SEEK_RE.findall(error_output)
+    ignored = IGNORED_RE.findall(error_output)
     durations = DURATION_RE.findall(error_output)
-    if ready_count != 2 or len(matches) != 2:
+    if ready_count != 2 or len(matches) != 2 or len(ignored) != 1:
         raise RuntimeError(
-            f"{fixture.suffix}: expected two barriers/seeks, got "
-            f"ready={ready_count} seeks={len(matches)}:\n"
+            f"{fixture.suffix}: expected two barriers/seeks and one "
+            f"barrier-free end no-op, got ready={ready_count} "
+            f"seeks={len(matches)} ignored={len(ignored)}:\n"
             + error_output.decode(errors="replace")
         )
     if len(durations) != 1:
@@ -159,6 +172,21 @@ def run_fixture(helper: Path, fixture: Path) -> None:
                 f"{fixture.suffix}: UI duration {duration_frames}/{duration_rate} "
                 f"does not match seek timeline {length_frames}/{rate_hz}"
             )
+    ignored_current, ignored_length, ignored_rate = map(int, ignored[0])
+    if ignored_current >= ignored_length:
+        raise RuntimeError(
+            f"{fixture.suffix}: end no-op arrived outside playable range "
+            f"{ignored_current}/{ignored_length}"
+        )
+    if ignored_rate != duration_rate:
+        raise RuntimeError(
+            f"{fixture.suffix}: end no-op rate {ignored_rate} does not "
+            f"match timeline rate {duration_rate}"
+        )
+    if output_bytes - overshoot_output_start < 4096:
+        raise RuntimeError(
+            f"{fixture.suffix}: playback did not continue after end no-op"
+        )
     print(
         f"audio file seek {fixture.suffix}: PASS ready={ready_count} "
         f"duration={duration_frames}/{duration_rate} "

@@ -38,8 +38,10 @@ it has a sequence header, an I picture, and the following reference picture.
 Standalone `.mp3`, `.wav`, `.flac` and `.ogg` files accept the same fixed
 jumps. Their decoders poll the control channel between bounded PCM chunks,
 seek on the output sample-frame timeline, and restart the audio-interface
-publisher at the absolute target behind the same READY/GO reset. Raw `.m2v`,
-ISO, and optical-disc routes reject these seek commands in this boundary.
+publisher at the absolute target behind the same READY/GO reset. A forward
+target at or beyond the exact end is consumed as a no-op before that barrier,
+preserving the current decoder and display session. Raw `.m2v`, ISO, and
+optical-disc routes reject these seek commands in this boundary.
 
 Menu-mode sources use the same channel for directional, activate and root-menu
 commands. Root calls and button activations that enter a title use the ready/go

@@ -20,7 +20,12 @@ uint64_t audio_file_seek_target(uint64_t current_frame,
         delta = magnitude * rate_hz;
     if (seconds < 0)
         return delta >= current_frame ? 0 : current_frame - delta;
+    /*
+     * Reaching the exact end produces no PCM and ends the helper immediately.
+     * Keep the current position instead so an oversized forward jump is a
+     * genuine no-op rather than an apparent playback freeze.
+     */
     if (delta >= length_frames - current_frame)
-        return length_frames;
+        return current_frame;
     return current_frame + delta;
 }
