@@ -1,3 +1,36 @@
+## 894 COMMIT Unreleased ??? 2026-09-02T03:50:37-07:00
+
+#### Coming From:
+
+Unreleased 09b1d28
+
+#### Purpose:
+
+Center the standalone-audio elapsed and remaining displays and replace the disabled track-time placeholder with the decoded track duration.
+
+#### Outcome:
+
+The standalone-audio timing row will become three balanced fields spanning the progress-bar width: elapsed time, total track time and remaining time, each centered independently on the same vertical baseline so changing digit counts do not disturb the composition.  Total time will derive from the helper's existing PCM-frame length and sample rate, using the same partial-second rounding convention as remaining time so the displayed duration covers the complete decoded track.  Renderer and real-helper regressions will verify field placement, vertical alignment and total-time values during ordinary playback, after seeking and at clean completion; Main, replay behavior, transport protocol, RTL and the timing-qualified RBF remain unchanged.
+
+#### Next Steps:
+
+Implement the three centered and vertically aligned timing fields in the standalone-audio renderer, extend pixel-level layout checks to locate every formatted value within its assigned region on one baseline and verify the total duration remains constant across playback, seeks and clean EOF, update the user and host architecture documentation, then rerun strict renderer coverage, sanitizer coverage and real MP3, WAV, FLAC and Ogg helper tests.  Commit and build a helper-only ARMv7 artifact locally for user transfer while preserving the source-`09b1d28` Main and current timing-qualified RBF.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_ui.c
+- tools/test_audio_file_seek.py
+- tools/test_audio_ui_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 893 COMMIT Unreleased 09b1d28 2026-09-02T02:46:35-07:00
 
 #### Coming From:
@@ -1257,34 +1290,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 854 COMMIT Unreleased 330d103 2026-08-31T21:50:21-07:00
-
-#### Coming From:
-
-Unreleased 330d103
-
-#### Purpose:
-
-Accept the helper-only authored DVD selector compensation on physical hardware.
-
-#### Outcome:
-
-The user reports that the restored selector looks correct, and the direct capture confirms a clean authored crown-shaped highlight over the menu rather than the diagnostic magenta rectangle or prior speckles.  The 776,392-byte 1,920-by-1,080 screenshot at SHA-256 `603c7e3755e48eed0dc7cab5cb7f507c914c6b84343be623867592d784a6646b` preserves the menu background and shows the authored green-gold selector at Special Features.  The 2,693,429-byte helper/Main log at SHA-256 `931923f98e7bfa329fadaf6f41c204167da6ac49fa62d544e6b68b7271943994` contains the source-`330d103` authored-compensation marker, authored palette `00000000/316a5988/316a59bb/316a59ff`, nontransparent sparse-plane histograms and successful movement through all four buttons, including eleven Right transitions and one Left transition.  The 844-byte schema-21 snapshot at SHA-256 `87a953b3ed49e1711cb0773ea531540a8b85f9d2a9922c10a5e353ab9c0a8ea0` passes all prefix, row, index, parity and XOR checks with checksum `786cc6b3`; it reports two configs, 44 data records, two commits, one expected rejected standard candidate, one accepted compensated candidate, one plane publication and exactly 86,400 received bytes in the accepted candidate.  The video domain records 88,430 highlighted samples, 8,370 nonzero-alpha samples and zero opaque-magenta samples, independently distinguishing the sparse authored artwork from the removed probe.  This physically accepts source `330d103` for the menu-selector goal with the source-`2de0717` Main and source-`f5f650f` RBF unchanged.
-
-#### Next Steps:
-
-Preserve `host/build/MediaPlayer_Helper_AuthoredSelector_330d103` together with the installed source-`2de0717` Main and source-`f5f650f` RBF as the accepted DVD menu baseline.  Treat the selector restoration as complete; any later work should begin from this exact three-file combination and must not reopen the RBF or replace the authored compensation without new physical evidence.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
