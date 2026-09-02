@@ -1,4 +1,4 @@
-## 902 COMMIT Unreleased ??? 2026-09-02T06:50:22-07:00
+## 902 COMMIT Unreleased 46638c7 2026-09-02T06:50:22-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Keep Main draining ordinary DVD output until an unresolved navigation command is
 
 #### Outcome:
 
-Approved plan: remove only `navigation_pending` from Main's post-control barrier return condition so unresolved DVD navigation follows the existing seek-decision behavior.  Main will poll the private control channel first on every media poll and continue submitting old-session bytes while no decision is available; `MENU_CONTINUE` clears the pending state without a download reset, while `READY` atomically changes the state to `chapter_barrier`, lowers download and returns before any further transfer so the established pipe discard and `GO` sequence remains unchanged.  The source-`78646bd` helper will continue canceling any classified hop's blocked reserve suffix; the decoder, helper protocol, libdvdnav policy, visualizer, RTL and RBF remain unchanged.
+Source `46638c7` removes only `navigation_pending` from Main's post-control barrier return condition so unresolved DVD navigation follows the existing seek-decision behavior.  Main polls the private control channel first on every media poll and continues submitting old-session bytes while no decision is available; `MENU_CONTINUE` clears the pending state without a download reset, while `READY` atomically changes the state to `chapter_barrier`, lowers download and returns before any further transfer so the established pipe discard and `GO` sequence remains unchanged.  The modeled lifecycle proves that unresolved navigation continues submitting, menu continuation performs no reset, discard or `GO`, and stream-hop `READY` performs exactly one reset and `GO`; the strict test passes both optimized and AddressSanitizer/UndefinedBehaviorSanitizer builds.  Both Main patches apply in order to pinned upstream `0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f`, and local GNU 10.2.1 produced the 1,182,692-byte stripped ARMv7 hard-float executable `host/build/MiSTer_NavDrain_46638c7` at SHA-256 `e387a2283bd55e1d44d263c110ac6b068df7ef6554b810451cad9aca8321c827`.  The source-`78646bd` helper remains byte-identical at SHA-256 `aea920527750897528e06700ddf15eb0ce3429f56878af1cb016f6385e0da59b`; the decoder, helper protocol, libdvdnav policy, visualizer, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Extend the modeled Main lifecycle regression with a DVD navigation state that proves unresolved commands keep submitting, menu continuation performs no reset, discard or `GO`, and stream-hop `READY` performs exactly one reset and `GO` before fresh output.  Add a patch marker for the precise return condition, apply the complete Main patch stack to pinned upstream, compile and audit the resulting ARMv7 executable with the local GNU 10.2.1 toolchain, and provide only the new Main for the same first-`M` golden-disc test with `MediaPlayer_Helper_NavDiscard_78646bd` retained.
+Exit MediaPlayer, replace only `/media/fat/MiSTer` with `host/build/MiSTer_NavDrain_46638c7`, preserve executable mode, retain the source-`78646bd` helper and existing visualizer asset/RBF, then reboot.  On the golden physical DVD, press `M` once early enough to reproduce the rejected pre-classification freeze and once after sustained playback; each classified hop must complete reserve discard, navigation `READY`, one Main reset and one `GO` without freezing.  Then activate the authored menu choice, exercise previous and next chapter once each, and return fresh telemetry-enabled results for physical acceptance.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Extend the modeled Main lifecycle regression with a DVD navigation state that pr
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
