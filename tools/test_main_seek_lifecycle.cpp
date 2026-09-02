@@ -13,10 +13,14 @@ struct MainLifecycle {
     bool download_active = true;
     bool seek_pending = false;
     bool chapter_barrier = false;
+    bool playback_paused = false;
+    bool replay_ready = false;
     std::uint64_t submitted = 0;
     unsigned resets = 0;
     unsigned discards = 0;
     unsigned go_commands = 0;
+    unsigned replay_launches = 0;
+    unsigned releases = 0;
 
     void submit(std::uint64_t bytes)
     {
@@ -52,8 +56,37 @@ struct MainLifecycle {
 
     void helper_eof(bool clean, bool file_source)
     {
-        if (!clean || !file_source)
+        if (clean && file_source) {
+            replay_ready = true;
+            playback_paused = true;
+        } else {
             download_active = false;
+            replay_ready = false;
+            playback_paused = false;
+            ++releases;
+        }
+    }
+
+    void play()
+    {
+        if (!replay_ready)
+            throw "play without replay-ready state";
+        download_active = false;
+        ++resets;
+        download_active = true;
+        replay_ready = false;
+        playback_paused = false;
+        ++replay_launches;
+    }
+
+    void stop()
+    {
+        if (download_active) {
+            download_active = false;
+            ++releases;
+        }
+        replay_ready = false;
+        playback_paused = false;
     }
 };
 
@@ -72,10 +105,13 @@ static int require_patch_markers(const char *path)
         "seek_pending = true;",
         "seek continued without reset",
         "seek target ready; download reset",
-        "retain_clean_eof = !strncasecmp(source_spec, \"file:\", 5)",
+        "retain_clean_eof = seek_controls;",
+        "playback_source_spec = requested_source;",
         "bool retain = clean && retain_clean_eof;",
-        "retain ? \"eof-retained\" : \"eof\"",
-        "clean EOF resident presentation retained"
+        "replay_ready = arm_replay;",
+        "input != MEDIAPLAYER_INPUT_PLAY_PAUSE || !replay_ready",
+        "retain ? \"eof-replay-ready\" : \"eof\"",
+        "replay ready and paused; press Play to restart"
     };
     std::ifstream input(path);
 
@@ -129,19 +165,46 @@ int main(int argc, char **argv)
                       "seek decision phase discarded active output");
 
     boundary.helper_eof(true, true);
-    failed |= require(boundary.download_active,
-                      "clean EOF did not retain presentation");
+    failed |= require(boundary.download_active && boundary.replay_ready &&
+                          boundary.playback_paused,
+                      "clean file EOF did not arm paused replay");
+    boundary.play();
+    failed |= require(boundary.download_active && !boundary.replay_ready &&
+                          !boundary.playback_paused &&
+                          boundary.replay_launches == 1 &&
+                          boundary.resets == 2,
+                      "Play did not relaunch clean file from a fresh reset");
+
+    MainLifecycle stopped_boundary;
+    stopped_boundary.helper_eof(true, true);
+    stopped_boundary.stop();
+    failed |= require(!stopped_boundary.download_active &&
+                          !stopped_boundary.replay_ready &&
+                          !stopped_boundary.playback_paused,
+                      "explicit stop retained replay state");
+
+    MainLifecycle core_change_boundary;
+    core_change_boundary.helper_eof(true, true);
+    core_change_boundary.stop();
+    failed |= require(!core_change_boundary.download_active &&
+                          !core_change_boundary.replay_ready,
+                      "core change retained replay state");
+
     MainLifecycle dvd_boundary;
     dvd_boundary.helper_eof(true, false);
-    failed |= require(!dvd_boundary.download_active,
+    failed |= require(!dvd_boundary.download_active &&
+                          !dvd_boundary.replay_ready,
                       "non-file EOF changed DVD lifecycle");
-    boundary.helper_eof(false, true);
-    failed |= require(!boundary.download_active,
+    MainLifecycle failed_boundary;
+    failed_boundary.helper_eof(false, true);
+    failed |= require(!failed_boundary.download_active &&
+                          !failed_boundary.replay_ready,
                       "failed EOF retained presentation");
     failed |= require_patch_markers(argv[1]);
     if (failed)
         return 1;
     std::cout << "main seek lifecycle PASS no-op_resets=0 valid_resets=1 "
-                 "clean_eof=retained failed_eof=released\n";
+                 "clean_eof=replay-ready play=relaunch "
+                 "failed_eof=released\n";
     return 0;
 }

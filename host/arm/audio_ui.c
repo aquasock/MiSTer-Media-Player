@@ -475,35 +475,45 @@ int audio_ui_complete(struct audio_ui *ui, uint64_t emitted_pcm_frames,
                       unsigned rate_hz, audio_ui_record_writer writer,
                       void *opaque)
 {
-    size_t offset;
+    size_t count;
 
     if (!ui || !writer || !ui->length_pcm_frames ||
         (rate_hz != 44100u && rate_hz != 48000u) ||
         (ui->rate_hz && ui->rate_hz != rate_hz))
         return -1;
     ui->rate_hz = rate_hz;
-    ui->position_pcm_frames = ui->length_pcm_frames;
     ui->frame_start_pcm = emitted_pcm_frames;
     ui->service_started = 1;
-    ui->offset = 0;
-    ui->chunk_index = 0;
-    ui->state = AUDIO_UI_BEGIN;
-    render_frame(ui);
-    if (writer(opaque, MEDIA_PLAYER_AUDIO_UI_BEGIN, NULL, 0) < 0)
+    if (ui->state == AUDIO_UI_BEGIN) {
+        ui->position_pcm_frames = ui->length_pcm_frames;
+        render_frame(ui);
+        if (writer(opaque, MEDIA_PLAYER_AUDIO_UI_BEGIN, NULL, 0) < 0)
+            return -1;
+        ui->state = AUDIO_UI_DATA;
+    } else if (ui->position_pcm_frames != ui->length_pcm_frames) {
+        /* A partially uploaded frame cannot be restarted without FPGA reset. */
         return -1;
-    for (offset = 0; offset < AUDIO_UI_FRAME_BYTES;
-         offset += AUDIO_UI_DATA_BYTES) {
-        size_t count = AUDIO_UI_FRAME_BYTES - offset;
-
+    }
+    while (ui->state == AUDIO_UI_DATA) {
+        count = AUDIO_UI_FRAME_BYTES - ui->offset;
         if (count > AUDIO_UI_DATA_BYTES)
             count = AUDIO_UI_DATA_BYTES;
         if (writer(opaque, MEDIA_PLAYER_AUDIO_UI_DATA,
-                   ui->frame + offset, count) < 0)
+                   ui->frame + ui->offset, count) < 0)
             return -1;
+        ui->offset += count;
+        ui->chunk_index++;
+        if (ui->offset == AUDIO_UI_FRAME_BYTES)
+            ui->state = AUDIO_UI_COMMIT;
     }
+    if (ui->state != AUDIO_UI_COMMIT)
+        return -1;
     if (writer(opaque, MEDIA_PLAYER_AUDIO_UI_COMMIT, NULL, 0) < 0)
         return -1;
     ui->sequence++;
+    ui->position_pcm_frames = ui->length_pcm_frames;
+    ui->offset = 0;
+    ui->chunk_index = 0;
     ui->state = AUDIO_UI_BEGIN;
     return 0;
 }

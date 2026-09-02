@@ -286,7 +286,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,920 @@
+@@ -0,0 +1,950 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -331,6 +331,8 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +static bool menu_controls = false;
 +static bool menu_active = false;
 +static bool retain_clean_eof = false;
++static bool replay_ready = false;
++static std::string playback_source_spec;
 +static unsigned char playback_index = 0;
 +
 +enum
@@ -516,6 +518,8 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +
 +static void finish_download(const char *reason, bool release_download)
 +{
++	const bool arm_replay = !release_download && retain_clean_eof &&
++	                        !playback_source_spec.empty();
 +	pending_size = pending_offset = 0;
 +	pending_eof = false;
 +	diagnostic_write("finish reason=%s fd=%d download=%d submitted=%llu reads=%u would_block=%u\n",
@@ -539,8 +543,9 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +		diagnostic_write("download released\n");
 +	}
 +	else if (download_active)
-+		diagnostic_write("clean EOF resident presentation retained\n");
-+	playback_paused = false;
++		diagnostic_write("clean EOF resident presentation retained replay_ready=%d\n",
++		                 arm_replay);
++	playback_paused = arm_replay;
 +	chapter_barrier = false;
 +	chapter_download_rearmed = false;
 +	navigation_pending = false;
@@ -550,6 +555,9 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	menu_controls = false;
 +	menu_active = false;
 +	retain_clean_eof = false;
++	replay_ready = arm_replay;
++	if (!arm_replay)
++		playback_source_spec.clear();
 +}
 +
 +static void stop_with_reason(const char *reason)
@@ -599,8 +607,10 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	pid_t pid;
 +	const char *audio_out;
 +	bool telemetry_enabled;
++	std::string requested_source;
 +
 +	if (!mediaplayer_is_core() || !source_spec || !*source_spec) return 0;
++	requested_source = source_spec;
 +	/*
 +	 * The AC-3 decoder runs in the helper, so only the helper can choose
 +	 * between decoded stereo and an IEC 61937 burst. Read the same OSD bit
@@ -610,7 +620,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	audio_out = user_io_status_get("[126]") ? "spdif" : "hdmi";
 +	telemetry_enabled = user_io_status_get("[125]");
 +	mediaplayer_stop();
-+	diagnostic_open(source_spec, index, telemetry_enabled);
++	diagnostic_open(requested_source.c_str(), index, telemetry_enabled);
 +	if (pipe(pipefd) < 0)
 +	{
 +		diagnostic_write("pipe failed errno=%d message=%s\n", errno, strerror(errno));
@@ -666,7 +676,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +			close(diagnostic_fd);
 +		execl(helper_path, "MediaPlayer_Helper", "--protocol", "1",
 +		      "--audio-out", audio_out, "--control-fd", control_fd_text,
-+		      "--source", source_spec, (char *)NULL);
++		      "--source", requested_source.c_str(), (char *)NULL);
 +		fprintf(stderr, "MediaPlayer: cannot start %s: %s\n", helper_path, strerror(errno));
 +		_exit(127);
 +	}
@@ -699,20 +709,24 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	chapter_download_rearmed = false;
 +	navigation_pending = false;
 +	seek_pending = false;
++	replay_ready = false;
 +	menu_active = false;
-+	menu_controls = !strncasecmp(source_spec, "dvdmenu:", 8) ||
-+	                !strncasecmp(source_spec, "isomenu:", 8);
-+	chapter_controls = menu_controls || !strncasecmp(source_spec, "dvd:", 4) ||
-+	                   !strncasecmp(source_spec, "iso:", 4);
-+	const char *source_extension = strrchr(source_spec, '.');
-+	seek_controls = !strncasecmp(source_spec, "file:", 5) && source_extension &&
++	menu_controls = !strncasecmp(requested_source.c_str(), "dvdmenu:", 8) ||
++	                !strncasecmp(requested_source.c_str(), "isomenu:", 8);
++	chapter_controls = menu_controls ||
++	                   !strncasecmp(requested_source.c_str(), "dvd:", 4) ||
++	                   !strncasecmp(requested_source.c_str(), "iso:", 4);
++	const char *source_extension = strrchr(requested_source.c_str(), '.');
++	seek_controls = !strncasecmp(requested_source.c_str(), "file:", 5) &&
++	                source_extension &&
 +	                (!strcasecmp(source_extension, ".mpg") ||
 +	                 !strcasecmp(source_extension, ".mpeg") ||
 +	                 !strcasecmp(source_extension, ".mp3") ||
 +	                 !strcasecmp(source_extension, ".wav") ||
 +	                 !strcasecmp(source_extension, ".flac") ||
 +	                 !strcasecmp(source_extension, ".ogg"));
-+	retain_clean_eof = !strncasecmp(source_spec, "file:", 5);
++	retain_clean_eof = seek_controls;
++	playback_source_spec = requested_source;
 +	user_io_set_index(index);
 +	user_io_file_info(".M2V");
 +	user_io_set_download(1);
@@ -720,7 +734,8 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	download_assert_us = monotonic_us();
 +	diagnostic_write("download asserted index=%u pid=%d\n",
 +	                 (unsigned)index, (int)helper_pid);
-+	printf("MediaPlayer: streaming %s through ARM helper\n", source_spec);
++	printf("MediaPlayer: streaming %s through ARM helper\n",
++	       requested_source.c_str());
 +	return 1;
 +}
 +
@@ -917,7 +932,20 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +
 +int mediaplayer_input(unsigned input, int pressed, int osd_visible)
 +{
-+	if (helper_fd < 0 || osd_visible || !mediaplayer_is_core()) return 0;
++	if (osd_visible || !mediaplayer_is_core()) return 0;
++	if (helper_fd < 0)
++	{
++		if (input != MEDIAPLAYER_INPUT_PLAY_PAUSE || !replay_ready) return 0;
++		if (!pressed) return 1;
++		std::string source = playback_source_spec;
++		unsigned char index = playback_index;
++		replay_ready = false;
++		playback_paused = false;
++		printf("MediaPlayer: replay starting from beginning\n");
++		if (!mediaplayer_start_source(source.c_str(), index))
++			printf("MediaPlayer: replay failed to start\n");
++		return 1;
++	}
 +	if (input >= MEDIAPLAYER_INPUT_MENU_UP &&
 +	    input <= MEDIAPLAYER_INPUT_MENU_ACTIVATE &&
 +	    (!menu_controls || !menu_active)) return 0;
@@ -1120,7 +1148,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +				                 WIFSIGNALED(status) ? WTERMSIG(status) : 0);
 +				helper_pid = -1;
 +			}
-+			finish_download(clean ? (retain ? "eof-retained" : "eof") :
++			finish_download(clean ? (retain ? "eof-replay-ready" : "eof") :
 +			                         "helper-error", !retain);
 +			if (!clean)
 +				printf("MediaPlayer: ARM helper exited with an error\n");
@@ -1128,6 +1156,8 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +			                 (unsigned long long)submitted_bytes, read_events);
 +			diagnostic_close();
 +			printf("MediaPlayer: stream transfer finished\n");
++			if (retain)
++				printf("MediaPlayer: replay ready and paused; press Play to restart\n");
 +			return;
 +		}
 +		uint32_t available = pending_size - pending_offset;

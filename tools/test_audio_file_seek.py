@@ -84,12 +84,17 @@ def drain_fd(fd: int, capture: bytearray | None = None) -> int:
     return total
 
 
-def final_audio_ui_frame(stream: bytes) -> bytes:
+def final_audio_ui_frame(stream: bytes, reset_offsets: list[int]) -> bytes:
     offset = 0
     current = bytearray()
     final = b""
+    frame_open = False
+    reset_points = set(reset_offsets)
 
     while offset < len(stream):
+        if offset in reset_points:
+            current.clear()
+            frame_open = False
         if stream[offset:offset + 3] != b"\x00\x00\x01":
             raise RuntimeError(f"unframed helper output at byte {offset}")
         code = stream[offset + 3]
@@ -111,16 +116,34 @@ def final_audio_ui_frame(stream: bytes) -> bytes:
         command = stream[offset + 6]
         payload = stream[offset + 7:end]
         if command == AUDIO_UI_BEGIN:
+            if frame_open:
+                raise RuntimeError(
+                    f"nested audio UI BEGIN at byte {offset} with "
+                    f"{len(current)} frame bytes pending"
+                )
             current.clear()
+            frame_open = True
         elif command == AUDIO_UI_DATA:
+            if not frame_open:
+                raise RuntimeError(f"audio UI DATA without BEGIN at byte {offset}")
             current.extend(payload)
         elif command == AUDIO_UI_COMMIT:
+            if not frame_open:
+                raise RuntimeError(
+                    f"audio UI COMMIT without BEGIN at byte {offset}"
+                )
             if len(current) != AUDIO_UI_FRAME_BYTES:
                 raise RuntimeError(
                     f"audio UI committed {len(current)} bytes"
                 )
             final = bytes(current)
+            current.clear()
+            frame_open = False
         offset = end
+    if frame_open:
+        raise RuntimeError(
+            f"audio UI ended with {len(current)} uncommitted frame bytes"
+        )
     if not final:
         raise RuntimeError("audio UI emitted no complete frame")
     return final
@@ -171,6 +194,7 @@ def run_fixture(helper: Path, fixture: Path) -> None:
     overshoot_output_start = 0
     ready_count = 0
     continue_count = 0
+    reset_offsets: list[int] = []
     deadline = time.monotonic() + 20.0
 
     try:
@@ -193,6 +217,7 @@ def run_fixture(helper: Path, fixture: Path) -> None:
                         output_bytes += drain_fd(
                             process.stdout.fileno(), stream_output
                         )
+                        reset_offsets.append(len(stream_output))
                         parent.send(bytes((GO,)))
                         if ready_count == 2 and not overshoot_sent:
                             parent.send(bytes((SEEK_FORWARD_60,)))
@@ -277,7 +302,7 @@ def run_fixture(helper: Path, fixture: Path) -> None:
         raise RuntimeError(
             f"{fixture.suffix}: playback did not continue after end no-op"
         )
-    final_frame = final_audio_ui_frame(stream_output)
+    final_frame = final_audio_ui_frame(stream_output, reset_offsets)
     duration_seconds = duration_frames // duration_rate
     check_time(final_frame, 258, 412, duration_seconds)
     check_time(final_frame, 348, 412, 0)

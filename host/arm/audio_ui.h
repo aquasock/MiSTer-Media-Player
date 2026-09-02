@@ -33,7 +33,7 @@ int audio_ui_service(struct audio_ui *ui, uint64_t emitted_pcm_frames,
 int audio_ui_seek(struct audio_ui *ui, uint64_t emitted_pcm_frames,
                   unsigned rate_hz, uint64_t position_pcm_frames);
 
-/* Publish one exact final-duration frame for clean end-of-track retention. */
+/* Drain the projected final-duration frame without restarting an open upload. */
 int audio_ui_complete(struct audio_ui *ui, uint64_t emitted_pcm_frames,
                       unsigned rate_hz, audio_ui_record_writer writer,
                       void *opaque);

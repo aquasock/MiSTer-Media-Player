@@ -100,7 +100,10 @@ download reset and GO barrier, so no pre-jump bytes or partial audio-interface
 frame crosses that reset. These
 controls do not apply to raw `.m2v`, DVD ISO images, or optical discs. A
 standalone-audio forward jump that would reach or pass the exact end is ignored
-with an explicit continuation response and no download reset.
+with an explicit continuation response and no download reset. At clean EOF,
+Main keeps the final valid MPG frame or standalone-audio interface resident and
+enters a replay-ready paused state; the next Start or Space press launches the
+same file again from the beginning.
 
 In an authored DVD menu, the player-one D-pad moves the highlight, A or Start
 activates it, and Select calls the root menu. Keyboard arrows, Enter (including
@@ -281,9 +284,9 @@ exact output-frame length scales the bar against the current absolute PCM-frame
 position, including after a fixed seek. Elapsed time uses the absolute completed
 seconds and remaining time rounds up partial final seconds so it reaches
 `00:00` only on the exact completed frame. Clean helper EOF retains that final
-interface instead of replacing it with black. Artwork, tags, playlist entries,
-playlist/track summary fields and arbitrary-position scrubbing remain later
-boundaries.
+interface instead of replacing it with black, then the next Play input restarts
+the file from the beginning. Artwork, tags, playlist entries, playlist/track
+summary fields and arbitrary-position scrubbing remain later boundaries.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`host/arm/ARCHITECTURE.md`](host/arm/ARCHITECTURE.md) for design details.
 

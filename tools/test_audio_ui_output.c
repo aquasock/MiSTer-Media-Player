@@ -304,6 +304,8 @@ static int run_complete_progress(void)
         .check_time_enabled = 1
     };
     uint64_t emitted = 0;
+    unsigned partial_records = 24u;
+    unsigned record;
 
     if (audio_ui_create(&ui) < 0 ||
         audio_ui_set_track_length(ui, 100u * 44100u, 44100u) < 0 ||
@@ -311,21 +313,37 @@ static int run_complete_progress(void)
         audio_ui_destroy(ui);
         return 1;
     }
+    if (audio_ui_service(ui, emitted, 44100u,
+                         capture_record, &capture) < 0) {
+        audio_ui_destroy(ui);
+        return 1;
+    }
+    emitted += 44100u;
+    for (record = 0; record < partial_records; ++record) {
+        if (audio_ui_service(ui, emitted, 44100u,
+                             capture_record, &capture) < 0) {
+            audio_ui_destroy(ui);
+            return 1;
+        }
+    }
     if (audio_ui_complete(ui, emitted, 44100u,
                           capture_record, &capture) < 0) {
         audio_ui_destroy(ui);
         return 1;
     }
-    if (capture.failed || capture.layout_failed ||
-        capture.layout_checks != 1u || capture.commits != 1u) {
+    if (capture.failed || capture.layout_failed || capture.begins != 1u ||
+        capture.data_records != 127u || capture.layout_checks != 1u ||
+        capture.commits != 1u) {
         fprintf(stderr,
-                "audio UI complete progress mismatch commits=%u layout=%u/%d\n",
-                capture.commits, capture.layout_checks,
-                capture.layout_failed);
+                "audio UI partial complete mismatch begins=%u data=%u "
+                "commits=%u layout=%u/%d\n",
+                capture.begins, capture.data_records, capture.commits,
+                capture.layout_checks, capture.layout_failed);
         audio_ui_destroy(ui);
         return 1;
     }
-    puts("audio UI complete PASS elapsed=100s remaining=0s progress=652/652");
+    puts("audio UI partial complete PASS begins=1 data=127 commits=1 "
+         "elapsed=100s remaining=0s progress=652/652");
     audio_ui_destroy(ui);
     return 0;
 }

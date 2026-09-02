@@ -172,7 +172,9 @@ renderer. The bar and elapsed/remaining counters use the absolute output-frame
 position, project it to the next one-hertz publication and rescale together
 after every fixed seek. Elapsed time truncates completed seconds; remaining
 time rounds a partial second up. At successful track completion the helper
-publishes one exact final frame with full progress and zero remaining time.
+drains the already-open projected final frame from its current record boundary
+through one commit, producing full progress and zero remaining time without a
+nested frame start.
 Publication remains an atomic inactive-bank swap; no duration metadata crosses
 the FPGA protocol because the helper resolves the presentation entirely into
 pixels.
@@ -287,11 +289,14 @@ budget, not a hard realtime bound: a status transaction, current step, scheduler
 preemption, logging and the existing terminal/child cleanup can extend a call.
 Short odd pipe reads retain their last byte until another read or EOF; only the
 true final byte is padded. After pending bytes drain, a zero-status helper EOF
-for an ordinary `file:` source closes the host process and control resources but
-leaves download asserted so the final MPG frame or completed audio interface
-remains resident. ISO/DVD routes keep their existing download-release lifecycle.
-A nonzero or signaled helper exit, cancellation, read error or core change also
-releases download and discards pending state before restart.
+for an ordinary MPG or standalone-audio `file:` source closes the host process
+and control resources but leaves download asserted so the final MPG frame or
+completed audio interface remains resident. Main retains that source and index
+as a replay-ready paused state; the next Play input performs a normal fresh
+launch from byte zero. Selecting another file, explicit stop or core change
+clears replay readiness. ISO/DVD routes keep their existing download-release
+lifecycle, and a nonzero or signaled helper exit, cancellation or read error
+also releases download and discards pending state before restart.
 
 An acknowledged status transaction follows each batch, after the final low and
 select release, so the FIO pipeline drains before the snapshot. Main checks
