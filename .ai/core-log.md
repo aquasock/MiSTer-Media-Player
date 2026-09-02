@@ -1,4 +1,4 @@
-## 891 COMMIT Unreleased ??? 2026-09-02T01:51:36-07:00
+## 891 COMMIT Unreleased 4063cf0 2026-09-02T01:51:36-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make valid and boundary standalone-file seeks transactional, preserve the reside
 
 #### Outcome:
 
-The approved helper/Main-only boundary will separate seek decision from decoder reset so Main leaves the active download and output path untouched until the helper either returns an explicit no-op continuation or announces a valid target with READY.  Main will reset and drain only the valid-target case before GO, while exact-end and past-end requests will continue uninterrupted.  Successful helper EOF will retain the final resident MPG frame or completed standalone-audio interface instead of deasserting download into black, while nonzero, signaled and transport failures retain explicit teardown.  The audio interface will render stable elapsed and remaining `MM:SS` values from the same absolute PCM-frame timeline already driving duration-relative progress, including correct updates after forward and backward seeks and exact completion.  RTL, RBF, codecs, DVD behavior and accepted timing remain unchanged.
+Source `4063cf0` adds the `audio-file-seek-v2` continuation event and makes Main defer every file-seek reset until the helper returns READY, so exact-end and past-end standalone-audio requests now complete with zero resets while valid standalone-audio and Program Stream targets retain one reset and GO barrier.  Main distinguishes a clean ordinary `file:` helper exit from errors and leaves download asserted for the final MPG frame or completed audio interface; ISO/DVD EOF, nonzero or signaled exits, transport failures, explicit stop and core changes retain teardown.  The audio renderer now derives elapsed floor-seconds and remaining ceiling-seconds from its absolute PCM timeline, republishes both after seeks and synchronously commits an exact full-progress, zero-remaining frame before clean audio EOF.  Strict focused tests pass for seek arithmetic, Program Stream indexing, AC-3 resynchronization, DVD random access, menu hops, SPU, output reserve/staging, UI rendering and modeled Main lifecycle; the renderer and real helper also pass AddressSanitizer/UndefinedBehaviorSanitizer coverage, and native plus final ARM real-file runs pass MP3, WAV, FLAC and Ogg with two valid READY/GO seeks, one continuation no-op and exact final timers.  The patched Main applies to pinned upstream and compiles as ARMv7.  GNU 10.2 produced the 957,860-byte static ARMv7 helper `host/build/MediaPlayer_Helper_SeekEOFTime_4063cf0` with SHA-256 `3263c64789add0cbcba67410f08dee2b65441331c82e2b36978b3fa956a3d485` and the 1,178,588-byte ARMv7 Main `host/build/MiSTer_SeekEOFTime_4063cf0` with SHA-256 `a513ca83b806c61593283c215384d2a397a44d791a0c9841d7f2f288b1d20fef`; RTL, RBF, codecs and accepted timing are unchanged.
 
 #### Next Steps:
 
-Implement the bounded protocol and UI changes, add an integrated Main-state regression covering no-op and valid seek decisions plus clean and failed EOF, extend renderer and real-helper tests for elapsed and remaining values at start, progress, seeks and completion, and rerun retained Program Stream, standalone-audio, DVD and output-path regressions.  Apply the generated Main patches to pinned upstream, build strict native and sanitizer targets, then build static ARMv7 helper and patched Main artifacts locally on the Raspberry Pi for user transfer with the current timing-qualified RBF.
+Exit MediaPlayer and install `host/build/MediaPlayer_Helper_SeekEOFTime_4063cf0` as `/media/fat/linux/MediaPlayer_Helper` with executable mode and `host/build/MiSTer_SeekEOFTime_4063cf0` as `/media/fat/MiSTer`, preserving the current timing-qualified RBF.  Validate one valid forward and backward seek plus an oversized forward no-op in standalone audio, confirm elapsed, remaining and progress move together and reach exact completion without black, then play an ordinary MPG through natural EOF and require its final frame to remain instead of black.  Report hardware acceptance or place fresh Main/helper logs and a screenshot in `.ai/current_results` for any discrepancy; DVD behavior needs only a smoke check because its lifecycle and RBF are unchanged.
 
 #### Files Modified:
 
@@ -31,7 +31,7 @@ Implement the bounded protocol and UI changes, add an integrated Main-state regr
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
