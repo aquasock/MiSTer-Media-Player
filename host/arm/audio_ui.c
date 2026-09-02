@@ -12,6 +12,21 @@
 #define AUDIO_UI_CHUNKS \
     ((AUDIO_UI_FRAME_BYTES + AUDIO_UI_DATA_BYTES - 1u) / AUDIO_UI_DATA_BYTES)
 
+#define UI_BG_Y 16u
+#define UI_PANEL_Y 30u
+#define UI_PANEL_ALT_Y 38u
+#define UI_TRACK_Y 42u
+#define UI_ACCENT_Y 112u
+#define UI_PROGRESS_Y 178u
+#define UI_TEXT_Y 220u
+#define UI_MUTED_Y 116u
+#define UI_CB 128u
+#define UI_CR 128u
+#define UI_ACCENT_CB 146u
+#define UI_ACCENT_CR 104u
+#define UI_PROGRESS_CB 166u
+#define UI_PROGRESS_CR 78u
+
 enum audio_ui_state {
     AUDIO_UI_BEGIN,
     AUDIO_UI_DATA,
@@ -67,6 +82,106 @@ static void border_rect(struct audio_ui *ui, unsigned x, unsigned y,
     fill_rect(ui, x + width - thickness, y, thickness, height, luma, cb, cr);
 }
 
+struct audio_ui_glyph {
+    char character;
+    uint8_t rows[7];
+};
+
+static const struct audio_ui_glyph audio_ui_glyphs[] = {
+    {'A', {14, 17, 17, 31, 17, 17, 17}},
+    {'B', {30, 17, 17, 30, 17, 17, 30}},
+    {'C', {14, 17, 16, 16, 16, 17, 14}},
+    {'D', {30, 17, 17, 17, 17, 17, 30}},
+    {'E', {31, 16, 16, 30, 16, 16, 31}},
+    {'F', {31, 16, 16, 30, 16, 16, 16}},
+    {'G', {14, 17, 16, 23, 17, 17, 15}},
+    {'H', {17, 17, 17, 31, 17, 17, 17}},
+    {'I', {31, 4, 4, 4, 4, 4, 31}},
+    {'J', {7, 2, 2, 2, 18, 18, 12}},
+    {'K', {17, 18, 20, 24, 20, 18, 17}},
+    {'L', {16, 16, 16, 16, 16, 16, 31}},
+    {'M', {17, 27, 21, 21, 17, 17, 17}},
+    {'N', {17, 25, 21, 19, 17, 17, 17}},
+    {'O', {14, 17, 17, 17, 17, 17, 14}},
+    {'P', {30, 17, 17, 30, 16, 16, 16}},
+    {'Q', {14, 17, 17, 17, 21, 18, 13}},
+    {'R', {30, 17, 17, 30, 20, 18, 17}},
+    {'S', {15, 16, 16, 14, 1, 1, 30}},
+    {'T', {31, 4, 4, 4, 4, 4, 4}},
+    {'U', {17, 17, 17, 17, 17, 17, 14}},
+    {'V', {17, 17, 17, 17, 17, 10, 4}},
+    {'W', {17, 17, 17, 21, 21, 21, 10}},
+    {'X', {17, 17, 10, 4, 10, 17, 17}},
+    {'Y', {17, 17, 10, 4, 4, 4, 4}},
+    {'Z', {31, 1, 2, 4, 8, 16, 31}},
+    {'0', {14, 17, 19, 21, 25, 17, 14}},
+    {'1', {4, 12, 4, 4, 4, 4, 14}},
+    {'2', {14, 17, 1, 2, 4, 8, 31}},
+    {'3', {30, 1, 1, 14, 1, 1, 30}},
+    {'4', {2, 6, 10, 18, 31, 2, 2}},
+    {'5', {31, 16, 16, 30, 1, 1, 30}},
+    {'6', {14, 16, 16, 30, 17, 17, 14}},
+    {'7', {31, 1, 2, 4, 8, 8, 8}},
+    {'8', {14, 17, 17, 14, 17, 17, 14}},
+    {'9', {14, 17, 17, 15, 1, 1, 14}},
+    {':', {0, 4, 4, 0, 4, 4, 0}},
+    {'-', {0, 0, 0, 31, 0, 0, 0}},
+    {'/', {1, 1, 2, 4, 8, 16, 16}}
+};
+
+static const uint8_t *glyph_rows(char character)
+{
+    size_t index;
+
+    for (index = 0; index < sizeof(audio_ui_glyphs) /
+                                 sizeof(audio_ui_glyphs[0]); ++index) {
+        if (audio_ui_glyphs[index].character == character)
+            return audio_ui_glyphs[index].rows;
+    }
+    return NULL;
+}
+
+static unsigned text_width(const char *text, unsigned scale)
+{
+    size_t length = strlen(text);
+
+    return length ? (unsigned)(length * 6u - 1u) * scale : 0u;
+}
+
+static void draw_text(struct audio_ui *ui, unsigned x, unsigned y,
+                      const char *text, unsigned scale, uint8_t luma)
+{
+    while (*text) {
+        const uint8_t *rows = glyph_rows(*text);
+        unsigned row;
+
+        if (rows) {
+            for (row = 0; row < 7u; ++row) {
+                unsigned column;
+
+                for (column = 0; column < 5u; ++column) {
+                    if (rows[row] & (1u << (4u - column)))
+                        fill_rect(ui, x + column * scale, y + row * scale,
+                                  scale, scale, luma, UI_CB, UI_CR);
+                }
+            }
+        }
+        x += 6u * scale;
+        ++text;
+    }
+}
+
+static void draw_centered_text(struct audio_ui *ui, unsigned x, unsigned y,
+                               unsigned width, const char *text,
+                               unsigned scale, uint8_t luma)
+{
+    unsigned width_pixels = text_width(text, scale);
+
+    draw_text(ui, x + (width > width_pixels ?
+                      (width - width_pixels) / 2u : 0u),
+              y, text, scale, luma);
+}
+
 static void draw_play(struct audio_ui *ui, unsigned x, unsigned y,
                       unsigned size, uint8_t luma, uint8_t cb, uint8_t cr)
 {
@@ -82,38 +197,80 @@ static void draw_play(struct audio_ui *ui, unsigned x, unsigned y,
 
 static void render_frame(struct audio_ui *ui)
 {
-    unsigned progress_width = (ui->position_seconds % 60u) * 300u / 59u;
-    unsigned tick;
+    unsigned progress_width =
+        (ui->position_seconds % 60u) * 652u / 59u;
+    unsigned row;
 
-    fill_rect(ui, 0, 0, AUDIO_UI_WIDTH, AUDIO_UI_HEIGHT, 24, 138, 120);
+    /* Full 4:3 composition, inset for consumer-CRT overscan. */
+    fill_rect(ui, 0, 0, AUDIO_UI_WIDTH, AUDIO_UI_HEIGHT,
+              UI_BG_Y, UI_CB, UI_CR);
 
-    /* Reserved 280x280 album-art viewport. */
-    fill_rect(ui, 40, 40, 280, 280, 38, 132, 124);
-    border_rect(ui, 40, 40, 280, 280, 4, 112, 146, 104);
-    border_rect(ui, 56, 56, 248, 248, 2, 64, 138, 116);
+    /* Left column: square artwork and the three reserved tag fields. */
+    /* 224x200 raster pixels is square at the 4:3 mode's 8:9 pixel aspect. */
+    fill_rect(ui, 32, 24, 224, 200, UI_PANEL_Y, UI_CB, UI_CR);
+    border_rect(ui, 32, 24, 224, 200, 2,
+                UI_ACCENT_Y, UI_ACCENT_CB, UI_ACCENT_CR);
+    draw_centered_text(ui, 32, 40, 224, "ALBUM ART", 2, UI_TEXT_Y);
+    border_rect(ui, 48, 66, 192, 138, 2,
+                UI_MUTED_Y, UI_CB, UI_CR);
+    draw_centered_text(ui, 48, 124, 192, "ARTWORK", 2, UI_MUTED_Y);
 
-    /* Static transport/control panel. */
-    fill_rect(ui, 360, 72, 320, 224, 34, 136, 120);
-    border_rect(ui, 360, 72, 320, 224, 2, 76, 142, 108);
-    fill_rect(ui, 438, 164, 8, 64, 164, 158, 86);
-    draw_play(ui, 454, 164, 64, 190, 158, 82);
-    fill_rect(ui, 574, 164, 8, 64, 164, 158, 86);
-    draw_play(ui, 590, 164, 64, 190, 158, 82);
+    fill_rect(ui, 32, 236, 224, 116, UI_PANEL_Y, UI_CB, UI_CR);
+    border_rect(ui, 32, 236, 224, 116, 2,
+                UI_ACCENT_Y, UI_ACCENT_CB, UI_ACCENT_CR);
+    draw_text(ui, 46, 250, "TITLE: ---", 2, UI_TEXT_Y);
+    draw_text(ui, 46, 280, "ARTIST: ---", 2, UI_TEXT_Y);
+    draw_text(ui, 46, 310, "ALBUM: ---", 2, UI_TEXT_Y);
 
-    /* One-minute sample-clock activity/progress ruler. */
-    fill_rect(ui, 360, 356, 320, 28, 42, 134, 122);
-    border_rect(ui, 360, 356, 320, 28, 2, 94, 146, 102);
+    /* Right column: a static playlist reservation with one neutral selection. */
+    fill_rect(ui, 272, 24, 416, 328, UI_PANEL_Y, UI_CB, UI_CR);
+    border_rect(ui, 272, 24, 416, 328, 2,
+                UI_ACCENT_Y, UI_ACCENT_CB, UI_ACCENT_CR);
+    draw_text(ui, 288, 40, "CURRENT PLAYLIST", 2, UI_TEXT_Y);
+    fill_rect(ui, 288, 64, 384, 2, UI_MUTED_Y, UI_CB, UI_CR);
+    fill_rect(ui, 282, 76, 396, 34, UI_PANEL_ALT_Y, UI_CB, UI_CR);
+    for (row = 0; row < 6u; ++row) {
+        static const char *const tracks[] = {
+            "01  TRACK TITLE", "02  TRACK TITLE", "03  TRACK TITLE",
+            "04  TRACK TITLE", "05  TRACK TITLE", "06  TRACK TITLE"
+        };
+        unsigned y = 88u + row * 42u;
+
+        draw_text(ui, 294, y, tracks[row], 2,
+                  row ? UI_MUTED_Y : UI_TEXT_Y);
+        if (row != 5u)
+            fill_rect(ui, 288, y + 20u, 384, 1,
+                      UI_TRACK_Y, UI_CB, UI_CR);
+    }
+
+    /* Transport and time placeholders follow the supplied composition. */
+    fill_rect(ui, 210, 364, 94, 34, UI_PANEL_ALT_Y, UI_CB, UI_CR);
+    border_rect(ui, 210, 364, 94, 34, 2,
+                UI_ACCENT_Y, UI_ACCENT_CB, UI_ACCENT_CR);
+    draw_centered_text(ui, 210, 378, 94, "PREVIOUS", 1, UI_TEXT_Y);
+
+    fill_rect(ui, 316, 364, 112, 34, UI_PANEL_ALT_Y, UI_CB, UI_CR);
+    border_rect(ui, 316, 364, 112, 34, 2,
+                UI_ACCENT_Y, UI_ACCENT_CB, UI_ACCENT_CR);
+    draw_play(ui, 326, 373, 16,
+              UI_TEXT_Y, UI_CB, UI_CR);
+    draw_centered_text(ui, 342, 378, 80, "PLAY/PAUSE", 1, UI_TEXT_Y);
+
+    fill_rect(ui, 440, 364, 94, 34, UI_PANEL_ALT_Y, UI_CB, UI_CR);
+    border_rect(ui, 440, 364, 94, 34, 2,
+                UI_ACCENT_Y, UI_ACCENT_CB, UI_ACCENT_CR);
+    draw_centered_text(ui, 440, 378, 94, "NEXT", 1, UI_TEXT_Y);
+
+    draw_text(ui, 576, 378, "PLAYLIST --:--", 1, UI_MUTED_Y);
+    draw_text(ui, 210, 412, "ELAPSED 00:00 / REMAIN --:--",
+              1, UI_TEXT_Y);
+    draw_text(ui, 610, 412, "TRACK --:--", 1, UI_MUTED_Y);
+
+    /* The existing one-minute sample-clock motion now spans the full width. */
+    fill_rect(ui, 32, 438, 656, 14, UI_TRACK_Y, UI_CB, UI_CR);
     if (progress_width)
-        fill_rect(ui, 370, 366, progress_width, 8, 178, 166, 78);
-    for (tick = 0; tick <= 10; ++tick)
-        fill_rect(ui, 370 + tick * 30u, 386, 2, 10,
-                  tick <= (ui->position_seconds % 60u) / 6u ? 150 : 62,
-                  tick <= (ui->position_seconds % 60u) / 6u ? 158 : 136,
-                  tick <= (ui->position_seconds % 60u) / 6u ? 88 : 116);
-
-    /* Reserved lower status strip for later metadata text. */
-    fill_rect(ui, 40, 424, 640, 20, 36, 136, 120);
-    border_rect(ui, 40, 424, 640, 20, 2, 70, 142, 108);
+        fill_rect(ui, 34, 441, progress_width, 8,
+                  UI_PROGRESS_Y, UI_PROGRESS_CB, UI_PROGRESS_CR);
 }
 
 int audio_ui_create(struct audio_ui **result)

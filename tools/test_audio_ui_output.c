@@ -13,8 +13,13 @@ struct capture {
     unsigned begins;
     unsigned data_records;
     unsigned commits;
+    unsigned layout_checks;
+    int check_layout_enabled;
     int failed;
+    int layout_failed;
 };
+
+static const char *preview_path;
 
 static uint32_t fnv1a(const uint8_t *data, size_t size)
 {
@@ -26,6 +31,33 @@ static uint32_t fnv1a(const uint8_t *data, size_t size)
         hash *= 16777619u;
     }
     return hash;
+}
+
+static uint8_t frame_y(const uint8_t *frame, unsigned x, unsigned y)
+{
+    return frame[(size_t)y * AUDIO_UI_WIDTH + x];
+}
+
+static void check_layout(struct capture *capture)
+{
+    const uint8_t *frame = capture->frame;
+    int failed = 0;
+
+    failed |= frame_y(frame, 0, 0) != 16u;
+    failed |= frame_y(frame, 32, 24) != 112u;
+    failed |= frame_y(frame, 36, 28) != 30u;
+    failed |= frame_y(frame, 48, 66) != 116u;
+    failed |= frame_y(frame, 93, 40) != 220u;
+    failed |= frame_y(frame, 32, 236) != 112u;
+    failed |= frame_y(frame, 272, 24) != 112u;
+    failed |= frame_y(frame, 284, 78) != 38u;
+    failed |= frame_y(frame, 290, 40) != 220u;
+    failed |= frame_y(frame, 210, 364) != 112u;
+    failed |= frame_y(frame, 32, 438) != 42u;
+    failed |= frame_y(frame, 34, 444) !=
+              (capture->commits ? 178u : 42u);
+    capture->layout_checks++;
+    capture->layout_failed |= failed;
 }
 
 static int capture_record(void *opaque, uint8_t command,
@@ -56,6 +88,26 @@ static int capture_record(void *opaque, uint8_t command,
             capture->failed = 1;
             return -1;
         }
+        if (capture->check_layout_enabled)
+            check_layout(capture);
+        if (preview_path && capture->commits == 0u) {
+            FILE *preview = fopen(preview_path, "wb");
+            int write_failed;
+
+            if (!preview) {
+                capture->failed = 1;
+                return -1;
+            }
+            write_failed =
+                fwrite(capture->frame, 1, sizeof(capture->frame), preview) !=
+                    sizeof(capture->frame);
+            write_failed |= fclose(preview) != 0;
+            if (write_failed) {
+                capture->failed = 1;
+                return -1;
+            }
+            preview_path = NULL;
+        }
         capture->hashes[capture->commits] =
             fnv1a(capture->frame, sizeof(capture->frame));
         capture->commits++;
@@ -69,7 +121,7 @@ static int capture_record(void *opaque, uint8_t command,
 static int run_rate(unsigned rate_hz, uint64_t frame_limit)
 {
     struct audio_ui *ui = NULL;
-    struct capture capture = {0};
+    struct capture capture = {.check_layout_enabled = 1};
     uint64_t frames;
 
     if (audio_ui_create(&ui) < 0) {
@@ -89,12 +141,14 @@ static int run_rate(unsigned rate_hz, uint64_t frame_limit)
         capture.begins < capture.commits ||
         capture.data_records < capture.commits * 127u ||
         capture.hashes[0] == capture.hashes[1] ||
+        capture.layout_checks < 2u || capture.layout_failed ||
         audio_ui_committed_frames(ui) != capture.commits) {
         fprintf(stderr,
                 "audio UI %u Hz mismatch begins=%u data=%u commits=%u "
-                "hash0=%08x hash1=%08x api=%u\n",
+                "hash0=%08x hash1=%08x layout=%u/%d api=%u\n",
                 rate_hz, capture.begins, capture.data_records, capture.commits,
                 capture.hashes[0], capture.hashes[1],
+                capture.layout_checks, capture.layout_failed,
                 audio_ui_committed_frames(ui));
         audio_ui_destroy(ui);
         return 1;
@@ -152,8 +206,14 @@ static int run_seek_reset(void)
     return 0;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (argc == 3 && !strcmp(argv[1], "--dump-yuv"))
+        preview_path = argv[2];
+    else if (argc != 1) {
+        fprintf(stderr, "usage: %s [--dump-yuv OUTPUT]\n", argv[0]);
+        return 2;
+    }
     if (run_rate(48000u, 110000u) != 0)
         return 1;
     if (run_rate(44100u, 100000u) != 0)

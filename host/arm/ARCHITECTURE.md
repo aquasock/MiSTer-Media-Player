@@ -155,6 +155,17 @@ share a compilation unit:
    record extraction. Overlay plane data is split into records no larger than
    4,096 payload bytes and becomes visible only after an explicit commit.
 
+For standalone audio, the helper renders one limited-range BT.601 planar
+720-by-480 frame per sample-clock second and interleaves at most one bounded UI
+record after each PCM record. The framebuffer is composed for a 4:3 display:
+its 224-by-200-raster-pixel artwork box is physically square at the mode's 8:9
+pixel aspect, and every album, metadata, playlist, transport, time and progress
+placeholder remains inside a 32-pixel horizontal and approximately 24-pixel
+vertical CRT-safe margin. A fixed bitmap font is part of the renderer; it does
+not parse tags, artwork or playlists. Publication remains an atomic inactive-
+bank swap, and the full-width progress placeholder retains the existing
+one-minute sample-clock motion.
+
 Standalone `.mp3` is an audio-only use of the same output contract: miniaudio's
 bundled MP3 backend skips stream metadata, decodes MPEG-1 Layer III mono or
 stereo at 44.1 or 48 kHz, provides sample-position seeking for CBR and VBR, and
