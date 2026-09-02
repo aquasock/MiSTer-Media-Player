@@ -1,3 +1,32 @@
+## 907 COMMIT Unreleased 8c90e2d 2026-09-02T08:26:19-07:00
+
+#### Coming From:
+
+Unreleased 8c90e2d
+
+#### Purpose:
+
+Bundle the source-`8c90e2d` DVD menu compatibility helper with its matched runtime set and physical-drive launcher for hardware testing.
+
+#### Outcome:
+
+`host/build/MiSTer_Media_Player_8c90e2d.zip` contains the exact static ARMv7 helper from source `8c90e2d`, source-`46638c7` Main, source-`5327358` visualizer pack, timing-qualified source-`dfe1057` `MediaPlayer_20260901.rbf`, `games/MediaPlayer/USB DVD Drive.dvd`, installation and source-provenance notes, the project licence and all seven bundled dependency licences.  A fresh extraction contains sixteen files, all fifteen manifest entries pass SHA-256 verification, both executables retain mode 755, the helper and launcher are byte-identical to their verified source artifacts, and ZIP integrity reports no errors.  The 6,481,417-byte archive has SHA-256 `02ce7dae21297423c1ac1fc0afe45744d8a8ab431e3bfcc9dec9347f85216a0d`.
+
+#### Next Steps:
+
+Extract the archive to the MiSTer paths documented in `INSTALL.txt`, preserve the installed rollback files, reboot because the matched Main is included, and run the source-`8c90e2d` Blazing Saddles redundant-root test, the forum disc's LPCM-menu survival and AC-3 title test, and ordinary Coming to America plus The Big Lebowski menu regressions before accepting the helper on hardware.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 906 COMMIT Unreleased 8c90e2d 2026-09-02T07:56:41-07:00
 
 #### Coming From:
@@ -1258,39 +1287,6 @@ Preserve source `22e780a` Main and helper because their speed and controls pass.
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 867 COMMIT Unreleased 22e780a 2026-09-01T01:55:58-07:00
-
-#### Coming From:
-
-Unreleased 58196d6
-
-#### Purpose:
-
-Remove avoidable reserved-output latency from DVD root and chapter hops while hiding any irreducible chapter transition behind the existing clean-start blank.
-
-#### Outcome:
-
-Source `44a1cc9` implements the approved host-only boundary and source `22e780a` corrects the generated Main patch's new-file hunk length after the first exact build exposed truncation, making `22e780a` the final build source.  The helper's atomic discard request waits only for a record already being written, drops every later queued normal and priority record, blocks concurrent producers until that boundary completes and reports the discarded byte count; root, previous and next navigation use it while activation and ordinary completion retain the existing exact drain.  Main now lowers and immediately reasserts download at an `N` or `P` key press, leaving the already installed FPGA startup blank active throughout helper seeking and stale-pipe discard, then sends go without a second reset; root and Play navigation retain their prior Main sequencing and the disc-authored ten-second still is unchanged.  The stalled-sink reserve regression passes 100 consecutive runs, preserving the complete active record and new post-discard record while dropping exactly 1,048,647 queued obsolete bytes, and also passes AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer validation.  Strict native helper and capabilities, AC-3 recovery, random access, subpicture, immediate and delayed menu-hop, plus 20 repeated production overlay-priority runs pass.  Both Main patches apply cleanly to pinned upstream `0a8fb44` and the complete Main ARM build succeeds.  The Raspberry Pi GNU 10.2.1 toolchain builds `host/build/MediaPlayer_Helper_NavBlank_22e780a`, a 912,756-byte static stripped ARMv7 EABI5 executable with no dynamic section at SHA-256 `a3c7ae74e5e40394b2931874ec3244bb805350626e3ea5160ba96a78a0ec9b60`, and `host/build/MiSTer_NavBlank_22e780a`, a 1,178,588-byte stripped dynamic ARMv7 EABI5 executable at SHA-256 `48dd016c5d83d8d2dbe8ab93794b01dd58d5dcf4fe424cda3c145b4dc1907ddb`.  RTL, the source-`1bf06db` RBF and Quartus are untouched.
-
-#### Next Steps:
-
-Exit MediaPlayer so its helper stops, replace `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_NavBlank_22e780a`, replace `/media/fat/MiSTer` with `host/build/MiSTer_NavBlank_22e780a`, restore executable modes if needed, verify both recorded sizes and hashes, and reboot because Main changed while preserving the source-`1bf06db` RBF.  Exercise repeated `M`, rapid forward and backward chapter runs, selector arrows and Play.  The log must show `navigation reserve discarded` for commands `0x09`, `0x01` and `0x02` plus `chapter startup blank rearmed` for previous and next; acceptance requires root and chapter command-to-barrier timing no slower than source `58196d6`, near-instant chapter changes where the drive permits, black rather than scrambled video until each first clean chapter picture, unchanged selector response, the authored Play still and continuing synchronized playback after aggressive seeking and an optical stall.  Capture a fresh helper/Main log, screenshot and telemetry for physical qualification.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- host/arm/output_reserve.c
-- host/arm/output_reserve.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_output_reserve.c
 
 #### Status:
 
