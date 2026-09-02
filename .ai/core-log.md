@@ -1,4 +1,4 @@
-## 900 COMMIT Unreleased ??? 2026-09-02T06:26:43-07:00
+## 900 COMMIT Unreleased 78646bd 2026-09-02T06:26:43-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make physical-DVD navigation discard interrupt an output record blocked on Main 
 
 #### Outcome:
 
-Approved plan: keep the helper output descriptor nonblocking inside the physical-DVD reserve worker, retry ordinary backpressure without changing byte order, priority or record boundaries, and let an explicit navigation discard cancel the unfinished portion of the current record together with the queued reserve only after libdvdnav has definitively classified a stream hop.  Main's existing barrier will discard any already-written prefix before `GO`, while a root or activation request that resolves as `MENU_CONTINUE` will never request reserve discard and will therefore retain its complete output byte-for-byte.  This is a helper-only transport correction; Main, libdvdnav policy, H.262 decoding, RTL, RBF and the visualizer remain unchanged.
+Source `78646bd` makes the physical-DVD reserve writer own its output descriptor in nonblocking mode, poll ordinary backpressure in bounded ten-millisecond intervals and restore the original descriptor flags at teardown.  Once libdvdnav definitively requests a stream-hop discard, the worker now cancels the unwritten suffix of an active record together with both queued lanes instead of waiting forever for Main to drain that record; Main's existing barrier still discards the already-written pipe prefix before `GO`, while a request resolved as `MENU_CONTINUE` never invokes discard and retains complete byte-exact delivery.  One hundred strict focused runs reproduce a full pipe with no reader, require discard in under 500 milliseconds, account for every pipe and canceled byte, reject stale bytes after the barrier and preserve ordinary records, priority order and descriptor flags; the same boundary passes AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer checks, and output staging passes one hundred retained runs.  Production overlay output passes twenty exact 86,400-byte reconstructions, and DVD menu-hop, random-access, fragmented-SPU, AC-3 recovery and Program Stream seek regressions pass.  The native helper builds and reports the complete protocol-one capability set.  GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_NavDiscard_78646bd` at SHA-256 `aea920527750897528e06700ddf15eb0ce3429f56878af1cb016f6385e0da59b`; it has no dynamic section, and Main, libdvdnav policy, H.262 decoding, RTL, RBF and the source-`5327358` visualizer asset are unchanged.
 
 #### Next Steps:
 
-Implement the interruptible nonblocking reserve worker and deterministic regression coverage for a completely filled pipe with an active multi-write record, requiring discard to finish without a reader and fresh post-barrier bytes to remain exact.  Retain the existing stalled-reader, priority, complete-record and ordinary discard tests, run strict native, sanitizer and analyzer validation, build a static stripped ARMv7 helper with the local GNU 10.2 toolchain, audit its identity and capabilities, and provide only that helper for an early and late `M`, menu activation and chapter-hop hardware test on the golden DVD.
+Exit MediaPlayer so the existing helper stops, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_NavDiscard_78646bd`, restore executable mode if needed, and verify the recorded size and SHA-256 while preserving the installed Main, visualizer asset and timing-qualified RBF.  On the golden physical DVD, press `M` once within approximately four seconds as in the rejected run and again after sustained playback; each stream hop must log reserve discard, navigation `READY`, Main reset and `GO` without freezing.  Then activate the authored menu choice, exercise previous and next chapter once each, and confirm a menu-space continuation retains its resident frame and selector without losing output; return fresh telemetry-enabled results for physical acceptance.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Implement the interruptible nonblocking reserve worker and deterministic regress
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
