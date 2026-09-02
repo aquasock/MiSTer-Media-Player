@@ -1,4 +1,4 @@
-## 884 COMMIT Unreleased ??? 2026-09-01T21:16:29-07:00
+## 884 COMMIT Unreleased eb11247 2026-09-01T21:16:29-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add semantic schema-21 overlay telemetry decoding and deterministic regression c
 
 #### Outcome:
 
-The approved host-tool-only boundary will teach `tools/decode-hardware-telemetry.py` that schema 21 retains the common cadence, terminal and schema-20 audio words but replaces words 37 through 54 with overlay-pipeline evidence.  It will decode record, byte, publication, rectangle, palette, pixel-sample and capture-trigger fields without reinterpreting overlay magic as native deadline counts, while schemas 1 through 20 remain behaviorally unchanged.  A deterministic Python regression will use the exact checksum-valid 64-word snapshot extracted from the accepted source-`68f8f26` seek screenshot and synthetic nonzero overlay words to cover both the ordinary-video fallback and authored-overlay layouts.  RTL, RBF, ARM helper, patched Main and target files remain untouched.
+Source `eb11247` teaches `tools/decode-hardware-telemetry.py` that schema 21 retains the common cadence, terminal and schema-20 audio words but replaces words 37 through 54 with overlay-pipeline evidence.  The decoder now reports record, byte, publication, rectangle, ABGR palette, video-sample and capture-trigger semantics without reinterpreting `OVL1` as native deadline counters, validates overlay magic and both protocol-error observations, and clearly marks the unavailable full-width cadence rate.  The new deterministic regression covers the exact checksum-valid 64-word accepted source-`68f8f26` screenshot, a synthetic active authored-menu transfer, protocol-error validation and unchanged schema-20 deadline/audio interpretation.  Python syntax, all four unit tests, JSON decoding, human-readable decoding and raw word-dump decoding passed against the accepted screenshot; it reported bounded no-commit fallback during ordinary video, ready engine state, zero protocol errors, zero transport blocks and zero recurring audio underruns.  RTL, RBF, ARM helper, patched Main and target files were untouched.
 
 #### Next Steps:
 
-Commit and push this proposal, implement the schema-specific parser branch and human-readable plus JSON reporting, add strict known-word regressions for schema-20 compatibility and schema-21 overlay interpretation, and run Python syntax, unit and direct-image decoding checks.  Finish as a source and project-control update only; no ARM compiler, Quartus build, MiSTer transfer, reboot or hardware rerun is required because the accepted screenshot is the immutable input to this host decoder.
+Use the schema-21 semantic decoder on a future authored DVD-menu capture to read the nonzero overlay counters directly.  No ARM compiler, Quartus build, MiSTer transfer, reboot or hardware rerun is required for this completed host-tool-only boundary.
 
 #### Files Modified:
 
@@ -23,8 +23,8 @@ Commit and push this proposal, implement the schema-specific parser branch and h
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 
