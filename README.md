@@ -22,6 +22,8 @@ The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.
 - Program Stream picture PTS driving the FPGA 90 kHz presentation timeline;
 - timestamp-indexed keyboard seeking for ordinary `.mpg` and `.mpeg` files in
   10-second, 1-minute, or 5-minute jumps;
+- sample-position keyboard seeking for standalone `.mp3`, `.wav`, `.flac` and
+  `.ogg` files with the same fixed jumps;
 - cadence as a mandatory floor: PTS may delay a picture but never presents it earlier than its encoded H.262 frame cadence;
 - hardware-qualified H.262 frame-rate codes 1 through 5: `24000/1001`, exact 24, 25, `30000/1001`, and exact 30 fps;
 - MPEG Layer II Program Stream audio and standalone MPEG-1 Layer III audio at 44.1 kHz and 48 kHz through an 8,192-frame stereo PCM FIFO;
@@ -88,11 +90,13 @@ or next chapter and Start toggles pause/resume while the MiSTer OSD is closed.
 On a keyboard, P and N select the previous and next chapter, and Space toggles
 pause/resume under the same OSD-closed guard.
 
-For ordinary file-backed `.mpg` and `.mpeg` playback, Alt+Left/Right jumps
-backward or forward 10 seconds, Ctrl+Left/Right jumps 1 minute, and
-Ctrl+Alt+Left/Right jumps 5 minutes. These controls use a sparse video-PTS
-index and the same clean READY/GO decoder barrier as chapter changes. They do
-not apply to raw `.m2v`, audio-only files, DVD ISO images, or optical discs.
+For ordinary file-backed `.mpg`, `.mpeg`, `.mp3`, `.wav`, `.flac` and `.ogg`
+playback, Alt+Left/Right jumps backward or forward 10 seconds,
+Ctrl+Left/Right jumps 1 minute, and Ctrl+Alt+Left/Right jumps 5 minutes. Program
+Streams use a sparse video-PTS index; standalone audio uses the decoder's PCM
+sample timeline. Both paths use the same clean READY/GO download barrier so no
+pre-jump bytes or partial audio-interface frame crosses the reset. These
+controls do not apply to raw `.m2v`, DVD ISO images, or optical discs.
 
 In an authored DVD menu, the player-one D-pad moves the highlight, A or Start
 activates it, and Select calls the root menu. Keyboard arrows, Enter (including
@@ -296,16 +300,17 @@ The build script pins minimp3, miniaudio, stb_vorbis, liba52, MiSTer Main, depen
 - Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV, FLAC and Ogg Vorbis converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III remain rejected; AAC is not enabled. Only the first Program Stream audio track is played; chapter changes retain that identity, while deliberate track switching needs a control channel that protocol one does not implement.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
-- The standalone-audio screen currently contains placeholder transport symbols and a repeating sample-clock activity ruler. Album artwork, metadata text, duration-relative progress, seeking, and FPGA-aware pause state are reserved but not implemented in this first display boundary.
+- The standalone-audio screen currently contains placeholder transport symbols and a repeating sample-clock activity ruler. Album artwork, metadata text, duration-relative progress, arbitrary-position scrubbing, and FPGA-aware pause state remain later display boundaries; fixed keyboard seeking is supported.
 - Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. Current `master` also implements 720x480-at-30000/1001 interlaced frame-picture I/P/B decoding with frame or field motion, frame or field DCT, per-picture `repeat_first_field`, and mixed ordinary-interlaced/progressive-film frame pictures, but this remains simulation-qualified until a clean fit and MiSTer playback pass. Field pictures and 576i remain rejected. DVD subtitle tracks and broader systems-layer behavior remain separate limitations.
 - Comprehensive playback pixel accuracy remains unqualified. Simulation comparisons cover decoder reconstruction, and a targeted hardware-screenshot comparison found the chroma-edge difference below; that comparison is not a full playback pixel-validation suite.
 - Sharp colour transitions show one blended pixel column that an independent software decoder does not produce, consistent with horizontal chroma upsampling in the display path. It is obvious on synthetic colour bars and subtle on ordinary material, and it is not specific to any picture type.
 - On material whose peak coded picture is large enough, one or two display slots are missed at that picture, shown as a repeated frame rather than a dropped one. This is a property of input buffer depth against peak picture size, not of the stream; the qualified full-length fixture hits it once, at a scene cut.
 - The framework scaler has little timing margin: seed 16 missed setup by 0.070 ns after audio routing changed; the seed-17 release has +0.243 ns worst setup. Future logic changes may expose the path again, and 93% M10K usage limits buffering headroom.
 - H.262 frame-rate codes 6 through 8 (50, 59.94, and 60 fps) are rejected.
-- Arbitrary-position scrubbing and seeking in raw `.m2v`, audio-only, DVD ISO,
-  and optical-disc playback are not implemented; ordinary `.mpg`/`.mpeg`
-  files provide only the fixed keyboard jumps documented above. DVD
+- Arbitrary-position scrubbing and seeking in raw `.m2v`, DVD ISO, and
+  optical-disc playback are not implemented; ordinary `.mpg`/`.mpeg` and
+  supported standalone-audio files provide only the fixed keyboard jumps
+  documented above. DVD
   title/angle/audio/subtitle-track selection, drive discovery beyond
   `/dev/sr0`, and software-controlled ejection are also not implemented.
   ARM-side pause/resume is a transport hold; until an FPGA pause state is
@@ -355,13 +360,13 @@ tools/mister.sh screenshot-stream 60 playback-frames
 
 ## Development roadmap
 
-Future work can extend the qualified envelope toward 50/59.94/60 fps, field-picture structures and 576i, broader Program Stream handling, additional audio codecs and multi-track selection, qualification of playback pixel accuracy against a software decoder, improved chroma presentation, an FPGA-native pause state, audio/DVD seeking and arbitrary-position scrubbing, DVD subtitle presentation and title/angle selection, optical-drive discovery, and qualification of native 480i through external HDMI-to-SDI hardware.
+Future work can extend the qualified envelope toward 50/59.94/60 fps, field-picture structures and 576i, broader Program Stream handling, additional audio codecs and multi-track selection, qualification of playback pixel accuracy against a software decoder, improved chroma presentation, an FPGA-native pause state, DVD seeking and arbitrary-position scrubbing, DVD subtitle presentation and title/angle selection, optical-drive discovery, and qualification of native 480i through external HDMI-to-SDI hardware.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
 ## Standards and design policy
 
-Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC 13818-2**. Program Stream, PES, and timing work uses **ITU-T H.222.0 / ISO/IEC 13818-1**. MPEG Layers II and III are decoded by the pinned minimp3 source; RIFF WAVE/FLAC decode, channel conversion and resampling use pinned miniaudio source; and its Ogg Vorbis backend uses pinned stb_vorbis source. DVD ISO access uses pinned libdvdcss, libdvdread and libdvdnav sources. These dependencies are compiled directly into the static helper binary; libdvdcss is an implementation dependency and does not establish DVD CSS conformance.
+Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC 13818-2**. Program Stream, PES, and timing work uses **ITU-T H.222.0 / ISO/IEC 13818-1**. Program Stream MPEG Layer II is decoded by the pinned minimp3 source; standalone MPEG Layer III and RIFF WAVE/FLAC decode, channel conversion, resampling and sample-position seeking use pinned miniaudio source, whose Ogg Vorbis backend uses pinned stb_vorbis source. DVD ISO access uses pinned libdvdcss, libdvdread and libdvdnav sources. These dependencies are compiled directly into the static helper binary; libdvdcss is an implementation dependency and does not establish DVD CSS conformance.
 
 AC-3 decode is performed by the pinned liba52 dependency, and IEC 61937 framing follows that standard for passthrough.
 

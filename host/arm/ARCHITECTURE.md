@@ -35,8 +35,11 @@ selected timestamp is clamped at file boundaries, the file is repositioned,
 and demux/audio/scheduler queues are discarded behind the existing READY/GO
 download barrier. The normal random-access filter then withholds output until
 it has a sequence header, an I picture, and the following reference picture.
-Raw `.m2v`, standalone audio, ISO, and optical-disc routes reject these seek
-commands in this boundary.
+Standalone `.mp3`, `.wav`, `.flac` and `.ogg` files accept the same fixed
+jumps. Their decoders poll the control channel between bounded PCM chunks,
+seek on the output sample-frame timeline, and restart the audio-interface
+publisher at the absolute target behind the same READY/GO reset. Raw `.m2v`,
+ISO, and optical-disc routes reject these seek commands in this boundary.
 
 Menu-mode sources use the same channel for directional, activate and root-menu
 commands. Root calls and button activations that enter a title use the ready/go
@@ -125,7 +128,8 @@ share a compilation unit:
    Layer III, RIFF WAVE, FLAC and Ogg Vorbis files, and AC-3 on private stream 1 substreams 0x80-0x87, all
    behind codec selection rather than output-specific decode paths. MPEG audio
    is decoded by the pinned minimp3 source compiled directly into the static
-   helper binary; MP3 support adds no runtime library. A Program Stream codec
+   helper binary. Standalone MP3 uses miniaudio's bundled seek-aware MP3
+   backend; neither path adds a runtime library. A Program Stream codec
    is decided by the first audio PES seen and the other is ignored for the
    rest of the session; chapter changes retain that established codec and
    private substream instead of selecting whichever PES arrives first after
@@ -151,12 +155,12 @@ share a compilation unit:
    record extraction. Overlay plane data is split into records no larger than
    4,096 payload bytes and becomes visible only after an explicit commit.
 
-Standalone `.mp3` is an audio-only use of the same output contract: the helper
-skips bounded ID3v2 and terminal ID3v1 metadata, decodes MPEG-1 Layer III mono
-or stereo at 44.1 or 48 kHz, and emits PCM records followed by the ordinary
-audio-end token. No H.262 bytes or picture timestamps are required. CBR and VBR
-share this path. MPEG-1 32 kHz and MPEG-2/2.5 lower-rate extensions are refused
-until a separately qualified helper-side resampler exists.
+Standalone `.mp3` is an audio-only use of the same output contract: miniaudio's
+bundled MP3 backend skips stream metadata, decodes MPEG-1 Layer III mono or
+stereo at 44.1 or 48 kHz, provides sample-position seeking for CBR and VBR, and
+emits PCM records followed by the ordinary audio-end token. No H.262 bytes or
+picture timestamps are required. MPEG-1 32 kHz and MPEG-2/2.5 lower-rate
+extensions remain refused.
 
 Standalone `.wav` uses the same audio-only contract. The pinned miniaudio WAV
 decoder reads through `media_source` callbacks in bounded chunks and converts
@@ -180,9 +184,9 @@ mono or multichannel Vorbis to signed 16-bit stereo, and emits at 44.1 or
 48 kHz. The decoder is compiled into the static helper and has no target-side
 runtime-library dependency.
 
-Previous and next chapter, fixed ordinary-Program-Stream jumps, and authored-menu
-commands use the private control protocol while Start pause/resume is a
-Main-side transport hold. Arbitrary scrubbing, audio/DVD seek, title, angle,
+Previous and next chapter, fixed ordinary-Program-Stream and standalone-audio
+jumps, and authored-menu commands use the private control protocol while Start
+pause/resume is a Main-side transport hold. Arbitrary scrubbing, DVD seek, title, angle,
 audio-track and subtitle-track commands remain deferred. The ARM-only pause
 does not suppress the FPGA audio FIFO underrun after its existing reserve
 drains; that product polish requires an explicit future core pause state.

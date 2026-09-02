@@ -3285,38 +3285,71 @@ static int process_elementary_stream(struct media_source *input,
     return media_source_error(input) ? -1 : 0;
 }
 
-static int process_mp3_stream(struct media_source *input,
-                              struct audio_state *audio,
-                              struct output_state *output)
-{
-    uint8_t prefix[10];
-    uint8_t buffer[16384];
-    size_t prefix_size = 0;
-    size_t count;
+struct audio_file_control_state {
+    struct output_state *output;
+    int control_fd;
+    int seek_pending;
+    int seek_seconds;
+    uint64_t length_frames;
+};
 
-    if (!claim_audio_codec(audio, AUDIO_CODEC_MP3) ||
-        read_mp3_prefix(input, prefix, &prefix_size) < 0)
+static int audio_file_request_seek(void *opaque, uint64_t current_frame,
+                                   uint64_t length_frames, unsigned rate_hz,
+                                   int *seconds)
+{
+    struct audio_file_control_state *state = opaque;
+    int command = control_read_command(state->control_fd);
+
+    (void)current_frame;
+    (void)rate_hz;
+    if (command < 0)
         return -1;
-    output->audio_only_mode = 1;
-    output->hold_active = 0;
-    output->scheduler_started = 1;
-    if (prefix_size && append_audio(audio, output, prefix, prefix_size) < 0)
-        return -1;
-    while ((count = media_source_read(input, buffer, sizeof(buffer))) != 0) {
-        if (append_audio(audio, output, buffer, count) < 0)
-            return -1;
+    if (!seek_command_seconds(command, seconds)) {
+        if (command)
+            fprintf(stderr,
+                    "media_player_helper: ignoring unexpected audio-file "
+                    "control 0x%02x\n", command);
+        return 0;
     }
-    if (media_source_error(input))
-        return -1;
-    /* ID3v1 is an exact 128-byte terminal tag and is not decoder input. */
-    if (audio->size >= 128u &&
-        !memcmp(audio->data + audio->size - 128u, "TAG", 3))
-        audio->size -= 128u;
-    return decode_audio_buffer(audio, output, 1);
+    state->seek_pending = 1;
+    state->seek_seconds = *seconds;
+    state->length_frames = length_frames;
+    return 1;
 }
 
-static int process_wav_stream(struct media_source *input,
-                              struct output_state *output)
+static int audio_file_complete_seek(void *opaque, uint64_t current_frame,
+                                    uint64_t target_frame, unsigned rate_hz)
+{
+    struct audio_file_control_state *state = opaque;
+
+    if (flush_output(state->output, "audio seek barrier") < 0)
+        return -1;
+    if (state->output->audio_ui &&
+        audio_ui_seek(state->output->audio_ui,
+                      state->output->pcm_emitted_frames,
+                      rate_hz, target_frame) < 0) {
+        fprintf(stderr, "media_player_helper: cannot reset audio UI for seek\n");
+        return -1;
+    }
+    if (control_send(state->control_fd, MEDIA_PLAYER_CONTROL_READY) < 0 ||
+        control_wait_for_go(state->control_fd) < 0) {
+        fprintf(stderr, "media_player_helper: audio seek barrier failed\n");
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: audio seek %+d seconds "
+            "current=%llu target=%llu length=%llu rate=%u\n",
+            state->seek_seconds,
+            (unsigned long long)current_frame,
+            (unsigned long long)target_frame,
+            (unsigned long long)state->length_frames, rate_hz);
+    state->seek_pending = 0;
+    return 0;
+}
+
+static int process_mp3_stream(struct media_source *input,
+                              struct output_state *output,
+                              const struct consumer_audio_control *control)
 {
     struct consumer_audio_info info = {0};
     char error[160];
@@ -3324,8 +3357,29 @@ static int process_wav_stream(struct media_source *input,
     output->audio_only_mode = 1;
     output->hold_active = 0;
     output->scheduler_started = 1;
-    if (consumer_audio_decode_wav(input, write_consumer_pcm, output, &info,
-                                  error, sizeof(error)) < 0) {
+    if (consumer_audio_decode_mp3(input, write_consumer_pcm, output, control,
+                                  &info, error, sizeof(error)) < 0) {
+        fprintf(stderr, "media_player_helper: %s\n", error);
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: MP3 %u channel(s) at %u Hz, output %u Hz\n",
+            info.source_channels, info.source_rate_hz, info.output_rate_hz);
+    return 0;
+}
+
+static int process_wav_stream(struct media_source *input,
+                              struct output_state *output,
+                              const struct consumer_audio_control *control)
+{
+    struct consumer_audio_info info = {0};
+    char error[160];
+
+    output->audio_only_mode = 1;
+    output->hold_active = 0;
+    output->scheduler_started = 1;
+    if (consumer_audio_decode_wav(input, write_consumer_pcm, output, control,
+                                  &info, error, sizeof(error)) < 0) {
         fprintf(stderr, "media_player_helper: %s\n", error);
         return -1;
     }
@@ -3336,7 +3390,8 @@ static int process_wav_stream(struct media_source *input,
 }
 
 static int process_flac_stream(struct media_source *input,
-                               struct output_state *output)
+                               struct output_state *output,
+                               const struct consumer_audio_control *control)
 {
     struct consumer_audio_info info = {0};
     char error[160];
@@ -3344,8 +3399,8 @@ static int process_flac_stream(struct media_source *input,
     output->audio_only_mode = 1;
     output->hold_active = 0;
     output->scheduler_started = 1;
-    if (consumer_audio_decode_flac(input, write_consumer_pcm, output, &info,
-                                   error, sizeof(error)) < 0) {
+    if (consumer_audio_decode_flac(input, write_consumer_pcm, output, control,
+                                   &info, error, sizeof(error)) < 0) {
         fprintf(stderr, "media_player_helper: %s\n", error);
         return -1;
     }
@@ -3356,7 +3411,8 @@ static int process_flac_stream(struct media_source *input,
 }
 
 static int process_ogg_stream(struct media_source *input,
-                              struct output_state *output)
+                              struct output_state *output,
+                              const struct consumer_audio_control *control)
 {
     struct consumer_audio_info info = {0};
     char error[160];
@@ -3364,8 +3420,8 @@ static int process_ogg_stream(struct media_source *input,
     output->audio_only_mode = 1;
     output->hold_active = 0;
     output->scheduler_started = 1;
-    if (consumer_audio_decode_ogg(input, write_consumer_pcm, output, &info,
-                                  error, sizeof(error)) < 0) {
+    if (consumer_audio_decode_ogg(input, write_consumer_pcm, output, control,
+                                  &info, error, sizeof(error)) < 0) {
         fprintf(stderr, "media_player_helper: %s\n", error);
         return -1;
     }
@@ -3412,6 +3468,14 @@ int main(int argc, char **argv)
     struct media_source input = {0};
     struct dvd_menu_state dvd_menu = {0};
     struct program_stream_seek_index seek_index = {0};
+    struct audio_file_control_state audio_file_control_state = {
+        &output, -1, 0, 0, 0
+    };
+    const struct consumer_audio_control audio_file_control = {
+        &audio_file_control_state,
+        audio_file_request_seek,
+        audio_file_complete_seek
+    };
     char source_error[512];
     uint8_t signature[4];
     int is_program_stream;
@@ -3521,6 +3585,7 @@ int main(int argc, char **argv)
                 "media_player_helper: control protocol %d fd=%d\n",
                 MEDIA_PLAYER_CONTROL_PROTOCOL_VERSION, control_fd);
     }
+    audio_file_control_state.control_fd = control_fd;
     if (media_source_open(&input, source_specification, source_error,
                           sizeof(source_error)) != MEDIA_SOURCE_OK) {
         fprintf(stderr, "media_player_helper: %s\n", source_error);
@@ -3635,16 +3700,20 @@ int main(int argc, char **argv)
                 "media_player_helper: audio UI 720x480p BT.601 frame enabled\n");
     }
     if (is_mp3) {
-        if (process_mp3_stream(&input, &audio, &output) < 0)
+        if (process_mp3_stream(&input, &output,
+                               control_fd >= 0 ? &audio_file_control : NULL) < 0)
             goto done;
     } else if (is_wav) {
-        if (process_wav_stream(&input, &output) < 0)
+        if (process_wav_stream(&input, &output,
+                               control_fd >= 0 ? &audio_file_control : NULL) < 0)
             goto done;
     } else if (is_flac) {
-        if (process_flac_stream(&input, &output) < 0)
+        if (process_flac_stream(&input, &output,
+                                control_fd >= 0 ? &audio_file_control : NULL) < 0)
             goto done;
     } else if (is_ogg) {
-        if (process_ogg_stream(&input, &output) < 0)
+        if (process_ogg_stream(&input, &output,
+                               control_fd >= 0 ? &audio_file_control : NULL) < 0)
             goto done;
     } else if (is_program_stream) {
         for (;;) {
@@ -3805,6 +3874,8 @@ int main(int argc, char **argv)
                 output.iso_pts_discontinuities);
 done:
     program_stream_seek_destroy(&seek_index);
+    if (audio_file_control_state.seek_pending && control_fd >= 0)
+        (void)control_send(control_fd, MEDIA_PLAYER_CONTROL_ERROR);
     if (control_fd >= 0)
         close(control_fd);
     if (audio.a52)

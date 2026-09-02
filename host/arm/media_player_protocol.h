@@ -57,6 +57,7 @@
     "flac-s16le-stereo-44100,flac-s16le-stereo-48000," \
     "ogg-vorbis-s16le-stereo-44100,ogg-vorbis-s16le-stereo-48000 " \
     "transport=inband-pcm-v1,inband-dvd-overlay-v1,inband-audio-ui-v1 " \
-    "controls=chapter-v1,pause-hold-v1,dvd-menu-v1,mpeg-ps-seek-v1"
+    "controls=chapter-v1,pause-hold-v1,dvd-menu-v1,mpeg-ps-seek-v1," \
+    "audio-file-seek-v1"
 
 #endif

@@ -107,11 +107,58 @@ static int run_rate(unsigned rate_hz, uint64_t frame_limit)
     return 0;
 }
 
+static int run_seek_reset(void)
+{
+    struct audio_ui *ui = NULL;
+    struct capture before = {0};
+    struct capture after = {0};
+    uint64_t emitted = 0;
+
+    if (audio_ui_create(&ui) < 0)
+        return 1;
+    while (!before.data_records) {
+        emitted += 16;
+        if (audio_ui_service(ui, emitted, 48000u,
+                             capture_record, &before) < 0) {
+            audio_ui_destroy(ui);
+            return 1;
+        }
+    }
+    if (audio_ui_seek(ui, emitted, 48000u, 37u * 48000u) < 0) {
+        audio_ui_destroy(ui);
+        return 1;
+    }
+    while (!after.commits) {
+        emitted += 16;
+        if (audio_ui_service(ui, emitted, 48000u,
+                             capture_record, &after) < 0) {
+            audio_ui_destroy(ui);
+            return 1;
+        }
+    }
+    if (after.failed || after.begins != 1u || after.data_records != 127u ||
+        after.commits != 1u || !after.hashes[0] ||
+        audio_ui_committed_frames(ui) != 1u) {
+        fprintf(stderr,
+                "audio UI seek reset mismatch begins=%u data=%u commits=%u "
+                "hash=%08x api=%u\n",
+                after.begins, after.data_records, after.commits,
+                after.hashes[0], audio_ui_committed_frames(ui));
+        audio_ui_destroy(ui);
+        return 1;
+    }
+    puts("audio UI seek reset PASS position=37s complete-frame restart");
+    audio_ui_destroy(ui);
+    return 0;
+}
+
 int main(void)
 {
     if (run_rate(48000u, 110000u) != 0)
         return 1;
     if (run_rate(44100u, 100000u) != 0)
+        return 1;
+    if (run_seek_reset() != 0)
         return 1;
     return 0;
 }

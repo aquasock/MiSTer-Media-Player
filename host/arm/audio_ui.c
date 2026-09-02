@@ -1,6 +1,7 @@
 #include "audio_ui.h"
 #include "media_player_protocol.h"
 
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,6 +23,7 @@ struct audio_ui {
     size_t offset;
     unsigned chunk_index;
     unsigned sequence;
+    unsigned position_seconds;
     unsigned rate_hz;
     uint64_t frame_start_pcm;
     enum audio_ui_state state;
@@ -80,7 +82,7 @@ static void draw_play(struct audio_ui *ui, unsigned x, unsigned y,
 
 static void render_frame(struct audio_ui *ui)
 {
-    unsigned progress_width = (ui->sequence % 60u) * 300u / 59u;
+    unsigned progress_width = (ui->position_seconds % 60u) * 300u / 59u;
     unsigned tick;
 
     fill_rect(ui, 0, 0, AUDIO_UI_WIDTH, AUDIO_UI_HEIGHT, 24, 138, 120);
@@ -105,9 +107,9 @@ static void render_frame(struct audio_ui *ui)
         fill_rect(ui, 370, 366, progress_width, 8, 178, 166, 78);
     for (tick = 0; tick <= 10; ++tick)
         fill_rect(ui, 370 + tick * 30u, 386, 2, 10,
-                  tick <= (ui->sequence % 60u) / 6u ? 150 : 62,
-                  tick <= (ui->sequence % 60u) / 6u ? 158 : 136,
-                  tick <= (ui->sequence % 60u) / 6u ? 88 : 116);
+                  tick <= (ui->position_seconds % 60u) / 6u ? 150 : 62,
+                  tick <= (ui->position_seconds % 60u) / 6u ? 158 : 136,
+                  tick <= (ui->position_seconds % 60u) / 6u ? 88 : 116);
 
     /* Reserved lower status strip for later metadata text. */
     fill_rect(ui, 40, 424, 640, 20, 36, 136, 120);
@@ -168,6 +170,7 @@ int audio_ui_service(struct audio_ui *ui, uint64_t emitted_pcm_frames,
         if (writer(opaque, MEDIA_PLAYER_AUDIO_UI_COMMIT, NULL, 0) < 0)
             return -1;
         ui->sequence++;
+        ui->position_seconds++;
         ui->offset = 0;
         ui->chunk_index = 0;
         ui->frame_start_pcm = emitted_pcm_frames;
@@ -191,6 +194,24 @@ int audio_ui_service(struct audio_ui *ui, uint64_t emitted_pcm_frames,
     ui->chunk_index++;
     if (ui->offset == AUDIO_UI_FRAME_BYTES)
         ui->state = AUDIO_UI_COMMIT;
+    return 0;
+}
+
+int audio_ui_seek(struct audio_ui *ui, uint64_t emitted_pcm_frames,
+                  unsigned rate_hz, uint64_t position_pcm_frames)
+{
+    uint64_t seconds;
+
+    if (!ui || (rate_hz != 44100u && rate_hz != 48000u))
+        return -1;
+    seconds = position_pcm_frames / rate_hz;
+    ui->position_seconds = seconds > UINT_MAX ? UINT_MAX : (unsigned)seconds;
+    ui->rate_hz = rate_hz;
+    ui->frame_start_pcm = emitted_pcm_frames;
+    ui->offset = 0;
+    ui->chunk_index = 0;
+    ui->state = AUDIO_UI_BEGIN;
+    render_frame(ui);
     return 0;
 }
 

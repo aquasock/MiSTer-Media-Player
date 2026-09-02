@@ -26,6 +26,9 @@ int audio_ui_service(struct audio_ui *ui, uint64_t emitted_pcm_frames,
                      unsigned rate_hz, audio_ui_record_writer writer,
                      void *opaque);
 
+int audio_ui_seek(struct audio_ui *ui, uint64_t emitted_pcm_frames,
+                  unsigned rate_hz, uint64_t position_pcm_frames);
+
 unsigned audio_ui_committed_frames(const struct audio_ui *ui);
 
 #endif

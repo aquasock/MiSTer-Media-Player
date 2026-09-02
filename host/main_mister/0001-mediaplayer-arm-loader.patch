@@ -699,7 +699,11 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	const char *source_extension = strrchr(source_spec, '.');
 +	seek_controls = !strncasecmp(source_spec, "file:", 5) && source_extension &&
 +	                (!strcasecmp(source_extension, ".mpg") ||
-+	                 !strcasecmp(source_extension, ".mpeg"));
++	                 !strcasecmp(source_extension, ".mpeg") ||
++	                 !strcasecmp(source_extension, ".mp3") ||
++	                 !strcasecmp(source_extension, ".wav") ||
++	                 !strcasecmp(source_extension, ".flac") ||
++	                 !strcasecmp(source_extension, ".ogg"));
 +	user_io_set_index(index);
 +	user_io_file_info(".M2V");
 +	user_io_set_download(1);

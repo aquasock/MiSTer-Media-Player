@@ -6,7 +6,6 @@
 #define MA_NO_ENCODING
 #define MA_NO_THREADING
 #define MA_NO_RUNTIME_LINKING
-#define MA_NO_MP3
 #define STB_VORBIS_HEADER_ONLY
 #include "stb_vorbis.c"
 #undef STB_VORBIS_HEADER_ONLY
@@ -15,6 +14,7 @@
 #include "miniaudio.h"
 #include "stb_vorbis.c"
 
+#include "audio_file_seek.h"
 #include "consumer_audio.h"
 
 #include <stdio.h>
@@ -69,6 +69,7 @@ static unsigned choose_output_rate(unsigned source_rate)
 static int consumer_audio_decode_miniaudio(
     struct media_source *source, ma_encoding_format encoding_format,
     const char *format_name, consumer_pcm_callback callback, void *opaque,
+    const struct consumer_audio_control *control, int restricted_mp3,
     struct consumer_audio_info *info, char *error, size_t error_size)
 {
     ma_decoder decoder;
@@ -77,6 +78,7 @@ static int consumer_audio_decode_miniaudio(
     ma_uint32 source_channels;
     ma_uint32 source_rate;
     unsigned output_rate;
+    ma_uint64 length_frames;
     int16_t pcm[CONSUMER_PCM_CHUNK_FRAMES * 2u];
     uint64_t total_frames = 0;
     ma_result result;
@@ -87,8 +89,9 @@ static int consumer_audio_decode_miniaudio(
         return -1;
     }
     memset(&decoder, 0, sizeof(decoder));
-    config = ma_decoder_config_init_default();
+    config = ma_decoder_config_init(ma_format_s16, 2, 0);
     config.encodingFormat = encoding_format;
+    config.seekPointCount = restricted_mp3 ? 64u : 0u;
     result = ma_decoder_init(source_read, source_seek, source, &config,
                              &decoder);
     if (result != MA_SUCCESS) {
@@ -96,39 +99,90 @@ static int consumer_audio_decode_miniaudio(
                          "not a supported %s file");
         return -1;
     }
-    result = ma_decoder_get_data_format(&decoder, &source_format,
-                                        &source_channels, &source_rate,
-                                        NULL, 0);
+    result = decoder.pBackend ?
+        ma_data_source_get_data_format(decoder.pBackend, &source_format,
+                                       &source_channels, &source_rate,
+                                       NULL, 0) : MA_ERROR;
     if (result != MA_SUCCESS || source_format == ma_format_unknown ||
         source_channels == 0 || source_channels > CONSUMER_MAX_CHANNELS ||
         source_rate < CONSUMER_MIN_RATE_HZ ||
-        source_rate > CONSUMER_MAX_RATE_HZ) {
+        source_rate > CONSUMER_MAX_RATE_HZ ||
+        (restricted_mp3 &&
+         ((source_channels != 1u && source_channels != 2u) ||
+          (source_rate != 44100u && source_rate != 48000u)))) {
         ma_decoder_uninit(&decoder);
         set_format_error(error, error_size, format_name,
                          "unsupported %s channel count or sample rate");
         return -1;
     }
     output_rate = choose_output_rate(source_rate);
-    ma_decoder_uninit(&decoder);
-    if (media_source_rewind(source) != 0) {
-        set_format_error(error, error_size, format_name,
-                         "cannot rewind %s source");
-        return -1;
+    if (decoder.outputSampleRate != output_rate) {
+        ma_decoder_uninit(&decoder);
+        if (media_source_rewind(source) != 0) {
+            set_format_error(error, error_size, format_name,
+                             "cannot rewind %s source");
+            return -1;
+        }
+        memset(&decoder, 0, sizeof(decoder));
+        config = ma_decoder_config_init(ma_format_s16, 2, output_rate);
+        config.encodingFormat = encoding_format;
+        config.seekPointCount = restricted_mp3 ? 64u : 0u;
+        config.resampling.linear.lpfOrder = 8;
+        result = ma_decoder_init(source_read, source_seek, source, &config,
+                                 &decoder);
+        if (result != MA_SUCCESS) {
+            set_format_error(error, error_size, format_name,
+                             "cannot initialize %s conversion");
+            return -1;
+        }
     }
-
-    memset(&decoder, 0, sizeof(decoder));
-    config = ma_decoder_config_init(ma_format_s16, 2, output_rate);
-    config.encodingFormat = encoding_format;
-    config.resampling.linear.lpfOrder = 8;
-    result = ma_decoder_init(source_read, source_seek, source, &config,
-                             &decoder);
+    result = ma_decoder_get_length_in_pcm_frames(&decoder, &length_frames);
     if (result != MA_SUCCESS) {
+        ma_decoder_uninit(&decoder);
         set_format_error(error, error_size, format_name,
-                         "cannot initialize %s conversion");
+                         "cannot determine %s duration");
         return -1;
     }
     for (;;) {
         ma_uint64 frames_read = 0;
+
+        if (control && control->request_seek) {
+            ma_uint64 current_frame;
+            int seconds = 0;
+            int request;
+
+            result = ma_decoder_get_cursor_in_pcm_frames(&decoder,
+                                                          &current_frame);
+            if (result != MA_SUCCESS) {
+                ma_decoder_uninit(&decoder);
+                set_format_error(error, error_size, format_name,
+                                 "cannot read %s playback position");
+                return -1;
+            }
+            request = control->request_seek(
+                control->opaque, current_frame, length_frames,
+                output_rate, &seconds);
+            if (request < 0) {
+                ma_decoder_uninit(&decoder);
+                set_format_error(error, error_size, format_name,
+                                 "cannot read %s seek control");
+                return -1;
+            }
+            if (request > 0) {
+                ma_uint64 target_frame = audio_file_seek_target(
+                    current_frame, length_frames, output_rate, seconds);
+
+                result = ma_decoder_seek_to_pcm_frame(&decoder, target_frame);
+                if (result != MA_SUCCESS || !control->complete_seek ||
+                    control->complete_seek(control->opaque, current_frame,
+                                           target_frame, output_rate) < 0) {
+                    ma_decoder_uninit(&decoder);
+                    set_format_error(error, error_size, format_name,
+                                     "cannot complete %s seek");
+                    return -1;
+                }
+            }
+        }
 
         result = ma_decoder_read_pcm_frames(&decoder, pcm,
                                             CONSUMER_PCM_CHUNK_FRAMES,
@@ -169,30 +223,44 @@ static int consumer_audio_decode_miniaudio(
 
 int consumer_audio_decode_wav(struct media_source *source,
                               consumer_pcm_callback callback, void *opaque,
+                              const struct consumer_audio_control *control,
                               struct consumer_audio_info *info,
                               char *error, size_t error_size)
 {
     return consumer_audio_decode_miniaudio(
-        source, ma_encoding_format_wav, "WAV", callback, opaque, info,
-        error, error_size);
+        source, ma_encoding_format_wav, "WAV", callback, opaque, control, 0,
+        info, error, error_size);
+}
+
+int consumer_audio_decode_mp3(struct media_source *source,
+                              consumer_pcm_callback callback, void *opaque,
+                              const struct consumer_audio_control *control,
+                              struct consumer_audio_info *info,
+                              char *error, size_t error_size)
+{
+    return consumer_audio_decode_miniaudio(
+        source, ma_encoding_format_mp3, "MP3", callback, opaque, control, 1,
+        info, error, error_size);
 }
 
 int consumer_audio_decode_flac(struct media_source *source,
                                consumer_pcm_callback callback, void *opaque,
+                               const struct consumer_audio_control *control,
                                struct consumer_audio_info *info,
                                char *error, size_t error_size)
 {
     return consumer_audio_decode_miniaudio(
-        source, ma_encoding_format_flac, "FLAC", callback, opaque, info,
-        error, error_size);
+        source, ma_encoding_format_flac, "FLAC", callback, opaque, control, 0,
+        info, error, error_size);
 }
 
 int consumer_audio_decode_ogg(struct media_source *source,
                               consumer_pcm_callback callback, void *opaque,
+                              const struct consumer_audio_control *control,
                               struct consumer_audio_info *info,
                               char *error, size_t error_size)
 {
     return consumer_audio_decode_miniaudio(
         source, ma_encoding_format_vorbis, "Ogg Vorbis", callback, opaque,
-        info, error, error_size);
+        control, 0, info, error, error_size);
 }
