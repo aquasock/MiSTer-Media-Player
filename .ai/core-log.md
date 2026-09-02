@@ -1,3 +1,32 @@
+## 903 COMMIT Unreleased 46638c7 2026-09-02T07:07:46-07:00
+
+#### Coming From:
+
+Unreleased 46638c7
+
+#### Purpose:
+
+Record the physical result for Main's unresolved-navigation drain correction and localize the remaining root-menu failure.
+
+#### Outcome:
+
+The user's golden physical-DVD run rejects source `46638c7`, but proves its Main correction removed the prior pre-classification deadlock.  Main sends root-menu command `0x09` at 8.639313 seconds after submitting 3,297,484 bytes; the helper immediately reports a successful libdvdnav root command and stream hop, Main continues through pipe-read events 205 through 209 and reaches 3,377,823 submitted bytes, then the helper reports `flushing navigation barrier failed: Resource temporarily unavailable`, closes stdout and exits with code one at 8.700876 seconds.  No navigation-reserve completion, `READY`, Main reset or `GO` follows.  The 234,438-byte log at SHA-256 `8be78e6d0944ee3ad894087acfeed43b4356bd7e428073ccb6ab8afc399c1500` therefore narrows the failure to the helper's redundant post-discard `fflush`: once the physical-DVD reserve exists, every video and overlay write bypasses stdio and uses the reserve, whose worker intentionally owns the underlying descriptor in nonblocking mode, yet `discard_reserved_output` flushes the unused `FILE` after a successful reserve discard and treats its `EAGAIN` as fatal.  The 339,869-byte screenshot at SHA-256 `402f425f293bcc3e514b9419ec078d2a7bf967d6db06011e93479587891e518c` shows the resident dark DVD frame with telemetry rather than new decoder corruption, and the 675-byte schema-21 sidecar at SHA-256 `5bbd46558cbd8e698b199e615352b5c026acd83a2fcd9a572dfb4f70a293f1fa` is checksum-valid with XOR `2ef579fc`.  Source `46638c7` is retained as the correct Main boundary but is not hardware-accepted with the source-`78646bd` helper.
+
+#### Next Steps:
+
+Preserve Main source `46638c7`, libdvdnav behavior, decoder, visualizer, RTL and RBF.  After user approval, make one helper-only ownership correction so reserve-backed output either drains or discards the reserve and never also flushes its unused stdio stream: make normal flush select reserve drain or `fflush` exclusively, remove the post-discard `fflush`, and remember reserve ownership through shutdown so destroying the reserve is not followed by another stdio flush.  Extend the production helper-output regression with a full nonblocking pipe and buffered stdio sentinel that reproduces the current fatal `EAGAIN`, while retaining the stalled-sink discard, exact-output, menu-hop, random-access, AC-3, seek and visualizer regressions; build only a new helper locally and repeat the same early root-menu command with Main `46638c7` retained.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 902 COMMIT Unreleased 46638c7 2026-09-02T06:50:22-07:00
 
 #### Coming From:
@@ -1262,39 +1291,6 @@ Exit MediaPlayer so its current helper stops, replace only `/media/fat/linux/Med
 - host/arm/output_reserve.c
 - host/arm/output_reserve.h
 - tools/test_output_reserve.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 863 COMMIT Unreleased 0318f70 2026-09-01T00:25:23-07:00
-
-#### Coming From:
-
-Unreleased 1bf06db
-
-#### Purpose:
-
-Remove the obsolete authored-selector compensation and make DVD chapter AC-3 recovery reject false sample-rate candidates without terminating playback.
-
-#### Outcome:
-
-Source `0318f70` removes the obsolete authored-selector compensation, so the production helper emits one configuration, exactly 86,400 authored plane bytes in 22 bounded records and one commit; a regression that invokes the production emitter reconstructs the byte-identical plane and rejects every extra record.  The same source distinguishes a clean unsupported AC-3 stream, which remains fatal, from a mismatched-rate sync candidate encountered after bytewise recovery has begun, which advances one byte and continues under the existing resynchronization limit; it also makes the shared recovery path safe when passthrough audio has no liba52 decoder.  The focused rate-policy, production-overlay, random-access, fragmented-subpicture and immediate/delayed-menu-hop regressions pass, as do strict native and optional solid-overlay-probe helper builds.  The Raspberry Pi GNU 10.2.1 toolchain builds exact source `0318f70` into `host/build/MediaPlayer_Helper_AC3Selector_0318f70`, a 908,660-byte static stripped ARMv7 EABI5 executable at SHA-256 `7d8778890c0cc3bf3444693736f3a9e9d22e615f78ffe0c0765c5fd4fb3257dc`; it has no dynamic section, contains the false-sync recovery and clean unsupported-rate diagnostics, and omits both authored-compensation and solid-magenta-probe markers.  Main and the source-`1bf06db` RBF are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer so its current helper stops, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_AC3Selector_0318f70`, restore executable mode if needed, and verify the 908,660-byte size and recorded SHA-256.  Preserve the installed source-`2de0717` Main and source-`1bf06db` RBF.  Restart the DVD, enter the menu and move the selector through several choices; acceptance requires one correctly aligned movable selector without the former duplicate or offset copy.  Then repeatedly cross the reproducible chapter-nine-to-chapter-ten boundary and exercise mixed forward/backward skips; acceptance requires moving playback, a surviving helper, no fatal unsupported-44.1-kHz exit, and, when the damaged boundary recurs, a false-sync rejection followed by the existing AC-3-resynchronized diagnostic.  Capture a fresh helper log, screenshot and telemetry for physical acceptance.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- host/arm/Makefile
-- host/arm/ac3_resync.h
-- tools/test_ac3_resync.c
-- tools/test_dvd_overlay_output.c
 
 #### Status:
 
