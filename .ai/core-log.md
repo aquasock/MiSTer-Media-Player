@@ -1,3 +1,37 @@
+## 889 COMMIT Unreleased e05ede0 2026-09-02T00:31:57-07:00
+
+#### Coming From:
+
+Unreleased e580270
+
+#### Purpose:
+
+Prevent oversized forward jumps in standalone audio files from terminating playback at the exact end and appearing to freeze the core.
+
+#### Outcome:
+
+The fresh hardware log localizes the reported Ogg incident to the shared audio seek boundary rather than the Ogg parser, decoder or FPGA: a sixty-second jump from frame 1,526,440 in a 3,309,167-frame 44.1-kHz file clamped to exact EOF, after which the helper exited normally with status zero and Main left a black display following its reset.  Source `e05ede0` makes any standalone-audio forward target that would reach or pass exact EOF resolve to the current frame, and the helper consumes that command before marking a seek pending, touching the decoder or entering the READY/GO reset barrier.  Focused strict and AddressSanitizer/UndefinedBehaviorSanitizer arithmetic tests cover exact-end, past-end and overflow cases; real-helper regressions against native and final ARM builds prove valid forward and backward seeks still use exactly two barriers while an oversized sixty-second jump uses no third barrier and playback continues for MP3, WAV, FLAC and Ogg Vorbis.  The GNU 10.2 build produces the 953,764-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_AudioSeekEOF_e05ede0` with SHA-256 `cdc9cb350c7f4e87aac2cd33a991d8bc32ff2ccd52d492fca41374abde0cbc4a`; Main, RTL, RBF, ordinary MPG seeking, DVD navigation and valid standalone-audio seeks are unchanged.
+
+#### Next Steps:
+
+Exit MediaPlayer and install `host/build/MediaPlayer_Helper_AudioSeekEOF_e05ede0` as `/media/fat/linux/MediaPlayer_Helper` with executable mode while preserving the installed source-`72bdccc` Main and timing-qualified RBF.  Reopen the short Ogg file and repeatedly issue one-minute and five-minute forward jumps that exceed its remaining duration; acceptance requires uninterrupted playback and an unchanged audio interface with no black-screen reset, then spot-check one valid backward and forward jump and another standalone format before reporting hardware acceptance or collecting fresh telemetry-enabled evidence for any discrepancy.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_file_seek.c
+- host/arm/media_player_helper.c
+- tools/test_audio_file_seek.c
+- tools/test_audio_file_seek.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 888 COMMIT Unreleased e580270 2026-09-01T23:49:02-07:00
 
 #### Coming From:
@@ -1231,35 +1265,6 @@ Exit the MediaPlayer core so the running helper stops, manually replace only `/m
 #### Files Modified:
 
 - host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 849 COMMIT Unreleased 2de0717 2026-08-31T21:06:18-07:00
-
-#### Coming From:
-
-Unreleased 2de0717
-
-#### Purpose:
-
-Evaluate the physically installed source-`2de0717` selector pair and localize the still-invisible purple overlay without changing the frozen RBF.
-
-#### Outcome:
-
-The fresh physical capture now proves the intended userspace combination is active: the helper repeatedly identifies `probe=solid-index1-magenta`, Main reports complete ordered 22-record, 86,400-byte all-`0x55` submissions with FNV-1a `f8555d45`, and the former 500-millisecond stream-hop drain marker is absent.  The 831-byte schema-21 snapshot at SHA-256 `2efc445ca659f6612aab8ca10b3a89baf78abfbf123a5c0726484b2063bb3450` passes all 64 row, index, parity and XOR checks with checksum `fe4049a3`, but the first commit still receives only 86,379 plane bytes: exactly one byte is absent from each of the 21 full 4,096-byte data records.  The engine completes 10,797 DDR words plus three byte lanes, sets its protocol-error flag, counts one rejected and zero accepted commits, publishes no plane, and therefore produces zero nonzero-alpha or opaque-magenta samples despite accepting the correct visible-menu style, rectangle 135,397 through 208,436 and opaque-magenta highlight entry one.  The matching 2,202,613-byte Main/helper log at SHA-256 `eae3f6296d082ef2fa4e45476d8b9f3ddcae48b3edf4b9d3d66c615122a068c2` records five complete overlay submissions and successful directional movement through the authored rectangles, while the 1,920-by-1,080 screenshot at SHA-256 `8855562bf166d734ebf335d8a981d94ef85f3492a492f49c07470e1382ea5068` shows the stable menu with no exact opaque-magenta pixels.  This rejects deployment mismatch and the Main drain as causes of the selector failure and establishes the recurring physical 21-byte loss as the current software compatibility boundary.
-
-#### Next Steps:
-
-Keep the source-`f5f650f` RBF and source-`2de0717` pre-drain Main frozen, and obtain approval for a helper-only dual-candidate probe frame: first emit the unchanged 86,400-byte plane so the previously observed zero-loss path can accept it, then emit an immediately following 86,421-byte all-`0x55` candidate using the same 21 full 4,096-byte records and a 405-byte final record so the recurring one-byte-per-full-record physical loss leaves exactly 86,400 accepted bytes.  Because a rejected later commit does not replace an already published plane, the two candidates cover both observed zero-loss and 21-byte-loss behavior without an RBF or Main change; build and physical validation must require at least one accepted commit, a plane publication and a visibly moving purple selector.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
