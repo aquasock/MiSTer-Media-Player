@@ -1,3 +1,41 @@
+## 891 COMMIT Unreleased ??? 2026-09-02T01:51:36-07:00
+
+#### Coming From:
+
+Unreleased e05ede0
+
+#### Purpose:
+
+Make valid and boundary standalone-file seeks transactional, preserve the resident presentation at clean EOF, and replace standalone-audio time placeholders with real elapsed and remaining counters.
+
+#### Outcome:
+
+The approved helper/Main-only boundary will separate seek decision from decoder reset so Main leaves the active download and output path untouched until the helper either returns an explicit no-op continuation or announces a valid target with READY.  Main will reset and drain only the valid-target case before GO, while exact-end and past-end requests will continue uninterrupted.  Successful helper EOF will retain the final resident MPG frame or completed standalone-audio interface instead of deasserting download into black, while nonzero, signaled and transport failures retain explicit teardown.  The audio interface will render stable elapsed and remaining `MM:SS` values from the same absolute PCM-frame timeline already driving duration-relative progress, including correct updates after forward and backward seeks and exact completion.  RTL, RBF, codecs, DVD behavior and accepted timing remain unchanged.
+
+#### Next Steps:
+
+Implement the bounded protocol and UI changes, add an integrated Main-state regression covering no-op and valid seek decisions plus clean and failed EOF, extend renderer and real-helper tests for elapsed and remaining values at start, progress, seeks and completion, and rerun retained Program Stream, standalone-audio, DVD and output-path regressions.  Apply the generated Main patches to pinned upstream, build strict native and sanitizer targets, then build static ARMv7 helper and patched Main artifacts locally on the Raspberry Pi for user transfer with the current timing-qualified RBF.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_ui.c
+- host/arm/audio_ui.h
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_audio_file_seek.py
+- tools/test_audio_ui_output.c
+- tools/test_main_seek_lifecycle.cpp
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 890 COMMIT Unreleased e05ede0 2026-09-02T01:45:42-07:00
 
 #### Coming From:
@@ -1236,35 +1274,6 @@ Exit the MediaPlayer core so the running helper stops, manually replace only `/m
 #### Files Modified:
 
 - host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 851 COMMIT Unreleased 4baf17a 2026-08-31T21:19:44-07:00
-
-#### Coming From:
-
-Unreleased 4baf17a
-
-#### Purpose:
-
-Evaluate the helper-only dual-candidate selector compensation on physical hardware and determine the remaining correction from direct pipeline evidence.
-
-#### Outcome:
-
-The user reports that menu loading is again intermittently incomplete but every subsequent `M` command restores it, an accepted consequence of retaining the pre-drain Main, and that small purple speckles are visible near the moving menu selection.  The 857-byte schema-21 snapshot at SHA-256 `4eb9b426d3535001b114b3779721384c1a9b05cb8a7301d04eb7d6e199444e9e` passes all row, index, parity and XOR checks with checksum `07e2e504` and captures exactly two configs, 44 data records, two commits and two styles from the first dual-candidate pair.  Main submits the intended complete 86,400-byte and 86,421-byte all-`0x55` candidates, but the engine receives 86,379 bytes from the standard candidate and 86,399 bytes from the compensated candidate: the first loses 21 bytes and the second loses 22, for 43 missing bytes across the pair.  Both commits are rejected, zero commits are accepted and no plane is published; the second candidate nevertheless reaches 10,799 complete DDR words plus seven byte lanes, exactly one byte short of the required 86,400.  The correct visible-menu style, rectangle 135,397 through 208,436 and opaque-magenta entry one are published while the display bank still contains uninitialized data, producing 73,418 magenta video samples and exactly 926 opaque-magenta screenshot pixels as sparse speckles rather than a valid selector plane.  The matching 4,359,882-byte Main/helper log at SHA-256 `f815529eb5cdd18c02d4d4cabaad0f83c15061aeb3f7424a375f0bdab55282c9` repeatedly proves both candidate sizes, valid framing and directional style movement, and the 1,920-by-1,080 screenshot at SHA-256 `a9d58cdf6cd935522906ef08c21ab0bff12836557f1eb655cdc95dac2a1e03df` visually confirms the localized speckles.  The loaded RBF has already physically rendered a complete purple bar, so this result does not reopen its compositor or scaling path; the dual-candidate strategy reaches the correct software boundary and misses acceptance by exactly one compensated byte.
-
-#### Next Steps:
-
-Preserve the source-`f5f650f` RBF and source-`2de0717` pre-drain Main, and obtain approval for a one-byte helper-only correction that changes the compensated probe candidate from 86,421 to 86,422 bytes and its final payload from 405 to 406 while retaining the standard first candidate unchanged.  Rebuild locally with the Raspberry Pi ARM toolchain and require physical telemetry to show the second candidate receive exactly 86,400 bytes, complete 10,800 DDR words, accept at least one commit, publish a plane and render a solid moving purple selector instead of speckles.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
