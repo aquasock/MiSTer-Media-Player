@@ -166,6 +166,14 @@ def check_time(frame: bytes, x: int, y: int, seconds: int) -> None:
                     )
 
 
+def centered_time_x(region_x: int, region_width: int,
+                    label: str, seconds: int) -> int:
+    value = f"{seconds // 60:02d}:{seconds % 60:02d}"
+    text_width = len(f"{label} {value}") * 6 - 1
+    return (region_x + (region_width - text_width) // 2
+            + (len(label) + 1) * 6)
+
+
 def run_fixture(helper: Path, fixture: Path) -> None:
     parent, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
     process = subprocess.Popen(
@@ -303,9 +311,26 @@ def run_fixture(helper: Path, fixture: Path) -> None:
             f"{fixture.suffix}: playback did not continue after end no-op"
         )
     final_frame = final_audio_ui_frame(stream_output, reset_offsets)
-    duration_seconds = duration_frames // duration_rate
-    check_time(final_frame, 258, 412, duration_seconds)
-    check_time(final_frame, 348, 412, 0)
+    elapsed_seconds = duration_frames // duration_rate
+    total_seconds = (duration_frames + duration_rate - 1) // duration_rate
+    check_time(
+        final_frame,
+        centered_time_x(32, 218, "ELAPSED", elapsed_seconds),
+        412,
+        elapsed_seconds,
+    )
+    check_time(
+        final_frame,
+        centered_time_x(250, 220, "TRACK", total_seconds),
+        412,
+        total_seconds,
+    )
+    check_time(
+        final_frame,
+        centered_time_x(470, 218, "REMAIN", 0),
+        412,
+        0,
+    )
     if (final_frame[444 * 720 + 34] != 178 or
             final_frame[444 * 720 + 685] != 178):
         raise RuntimeError(

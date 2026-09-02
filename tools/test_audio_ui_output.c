@@ -16,6 +16,7 @@ struct capture {
     unsigned layout_checks;
     unsigned expected_progress[3];
     unsigned expected_elapsed[3];
+    unsigned expected_total[3];
     unsigned expected_remaining[3];
     int check_layout_enabled;
     int check_time_enabled;
@@ -93,6 +94,21 @@ static int check_time_value(const uint8_t *frame, unsigned x, unsigned y,
     return 0;
 }
 
+static unsigned centered_time_x(unsigned region_x, unsigned region_width,
+                                const char *label, unsigned seconds)
+{
+    char value[32];
+    char text[64];
+    unsigned width;
+
+    (void)snprintf(value, sizeof(value), "%02u:%02u",
+                   seconds / 60u, seconds % 60u);
+    (void)snprintf(text, sizeof(text), "%s %s", label, value);
+    width = (unsigned)(strlen(text) * 6u - 1u);
+    return region_x + (region_width - width) / 2u +
+           ((unsigned)strlen(label) + 1u) * 6u;
+}
+
 static void check_layout(struct capture *capture)
 {
     const uint8_t *frame = capture->frame;
@@ -119,10 +135,22 @@ static void check_layout(struct capture *capture)
         failed |= frame_y(frame, 34u + progress, 444) != 42u;
     if (capture->check_time_enabled) {
         failed |= check_time_value(
-            frame, 258u, 412u,
+            frame,
+            centered_time_x(32u, 218u, "ELAPSED",
+                            capture->expected_elapsed[capture->commits]),
+            412u,
             capture->expected_elapsed[capture->commits]);
         failed |= check_time_value(
-            frame, 348u, 412u,
+            frame,
+            centered_time_x(250u, 220u, "TRACK",
+                            capture->expected_total[capture->commits]),
+            412u,
+            capture->expected_total[capture->commits]);
+        failed |= check_time_value(
+            frame,
+            centered_time_x(470u, 218u, "REMAIN",
+                            capture->expected_remaining[capture->commits]),
+            412u,
             capture->expected_remaining[capture->commits]);
     }
     capture->layout_checks++;
@@ -193,6 +221,7 @@ static int run_rate(unsigned rate_hz, uint64_t frame_limit)
     struct capture capture = {
         .expected_progress = {163u, 326u, 489u},
         .expected_elapsed = {1u, 2u, 3u},
+        .expected_total = {4u, 4u, 4u},
         .expected_remaining = {3u, 2u, 1u},
         .check_layout_enabled = 1,
         .check_time_enabled = 1
@@ -246,6 +275,7 @@ static int run_seek_reset(void)
     struct capture after = {
         .expected_progress = {247u, 0u, 0u},
         .expected_elapsed = {38u, 0u, 0u},
+        .expected_total = {100u, 0u, 0u},
         .expected_remaining = {62u, 0u, 0u},
         .check_layout_enabled = 1,
         .check_time_enabled = 1
@@ -299,6 +329,7 @@ static int run_complete_progress(void)
     struct capture capture = {
         .expected_progress = {652u, 0u, 0u},
         .expected_elapsed = {100u, 0u, 0u},
+        .expected_total = {101u, 0u, 0u},
         .expected_remaining = {0u, 0u, 0u},
         .check_layout_enabled = 1,
         .check_time_enabled = 1
@@ -308,8 +339,8 @@ static int run_complete_progress(void)
     unsigned record;
 
     if (audio_ui_create(&ui) < 0 ||
-        audio_ui_set_track_length(ui, 100u * 44100u, 44100u) < 0 ||
-        audio_ui_seek(ui, 0, 44100u, 99u * 44100u) < 0) {
+        audio_ui_set_track_length(ui, 100u * 44100u + 1u, 44100u) < 0 ||
+        audio_ui_seek(ui, 0, 44100u, 99u * 44100u + 1u) < 0) {
         audio_ui_destroy(ui);
         return 1;
     }
@@ -343,7 +374,7 @@ static int run_complete_progress(void)
         return 1;
     }
     puts("audio UI partial complete PASS begins=1 data=127 commits=1 "
-         "elapsed=100s remaining=0s progress=652/652");
+         "elapsed=100s total=101s remaining=0s progress=652/652");
     audio_ui_destroy(ui);
     return 0;
 }

@@ -170,8 +170,10 @@ not parse tags, artwork or playlists. Once miniaudio has established the exact
 output-frame length, a one-time consumer callback configures that length in the
 renderer. The bar and elapsed/remaining counters use the absolute output-frame
 position, project it to the next one-hertz publication and rescale together
-after every fixed seek. Elapsed time truncates completed seconds; remaining
-time rounds a partial second up. At successful track completion the helper
+after every fixed seek. Elapsed, total track and remaining time occupy three
+independently centered fields on the same baseline. Elapsed time truncates
+completed seconds; the fixed total and changing remaining time round a partial
+second up. At successful track completion the helper
 drains the already-open projected final frame from its current record boundary
 through one commit, producing full progress and zero remaining time without a
 nested frame start.

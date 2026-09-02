@@ -281,12 +281,14 @@ second. The interface lays out a physically square album-art viewport, title,
 artist and album fields, a current-playlist panel, transport controls, time
 fields and a full-width progress bar inside 4:3 CRT-safe margins. The decoder's
 exact output-frame length scales the bar against the current absolute PCM-frame
-position, including after a fixed seek. Elapsed time uses the absolute completed
-seconds and remaining time rounds up partial final seconds so it reaches
-`00:00` only on the exact completed frame. Clean helper EOF retains that final
-interface instead of replacing it with black, then the next Play input restarts
-the file from the beginning. Artwork, tags, playlist entries, playlist/track
-summary fields and arbitrary-position scrubbing remain later boundaries.
+position, including after a fixed seek. Elapsed, total track and remaining time
+occupy three independently centered fields on one baseline. Elapsed time uses
+the absolute completed seconds; total and remaining time round up partial final
+seconds, and remaining reaches `00:00` only on the exact completed frame. Clean
+helper EOF retains that final interface instead of replacing it with black,
+then the next Play input restarts the file from the beginning. Artwork, tags,
+playlist entries, playlist/track summary fields and arbitrary-position
+scrubbing remain later boundaries.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`host/arm/ARCHITECTURE.md`](host/arm/ARCHITECTURE.md) for design details.
 
@@ -314,7 +316,7 @@ The build script pins minimp3, miniaudio, stb_vorbis, liba52, MiSTer Main, depen
 - Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV, FLAC and Ogg Vorbis converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III remain rejected; AAC is not enabled. Only the first Program Stream audio track is played; chapter changes retain that identity, while deliberate track switching needs a control channel that protocol one does not implement.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
-- The standalone-audio screen contains a CRT-safe 4:3 composition for album artwork, title/artist/album tags, the current playlist, transport controls, elapsed/remaining time and a duration-relative progress bar. Elapsed/remaining time, fixed keyboard seeking and absolute progress tracking are active; artwork, metadata, playlist entries, playlist/track summary fields, arbitrary-position scrubbing and FPGA-aware pause state remain later display boundaries.
+- The standalone-audio screen contains a CRT-safe 4:3 composition for album artwork, title/artist/album tags, the current playlist, transport controls, centered elapsed/total/remaining time and a duration-relative progress bar. Track timing, fixed keyboard seeking and absolute progress tracking are active; artwork, metadata, playlist entries, playlist summary fields, arbitrary-position scrubbing and FPGA-aware pause state remain later display boundaries.
 - Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. Current `master` also implements 720x480-at-30000/1001 interlaced frame-picture I/P/B decoding with frame or field motion, frame or field DCT, per-picture `repeat_first_field`, and mixed ordinary-interlaced/progressive-film frame pictures, but this remains simulation-qualified until a clean fit and MiSTer playback pass. Field pictures and 576i remain rejected. DVD subtitle tracks and broader systems-layer behavior remain separate limitations.
 - Comprehensive playback pixel accuracy remains unqualified. Simulation comparisons cover decoder reconstruction, and a targeted hardware-screenshot comparison found the chroma-edge difference below; that comparison is not a full playback pixel-validation suite.
 - Sharp colour transitions show one blended pixel column that an independent software decoder does not produce, consistent with horizontal chroma upsampling in the display path. It is obvious on synthetic colour bars and subtle on ordinary material, and it is not specific to any picture type.

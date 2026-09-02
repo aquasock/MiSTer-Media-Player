@@ -266,8 +266,11 @@ static void format_time(char *text, size_t size, uint64_t seconds)
 static void render_frame(struct audio_ui *ui)
 {
     char elapsed[32];
+    char total[32];
     char remaining[32];
-    char timing[96];
+    char elapsed_timing[64];
+    char total_timing[64];
+    char remaining_timing[64];
     unsigned filled_width = progress_width(ui);
     unsigned row;
     uint64_t elapsed_seconds = ui->rate_hz ?
@@ -277,10 +280,16 @@ static void render_frame(struct audio_ui *ui)
         ui->length_pcm_frames - ui->position_pcm_frames : 0;
 
     format_time(elapsed, sizeof(elapsed), elapsed_seconds);
+    format_time(total, sizeof(total),
+                rounded_up_seconds(ui->length_pcm_frames, ui->rate_hz));
     format_time(remaining, sizeof(remaining),
                 rounded_up_seconds(remaining_frames, ui->rate_hz));
-    (void)snprintf(timing, sizeof(timing),
-                   "ELAPSED %s / REMAIN %s", elapsed, remaining);
+    (void)snprintf(elapsed_timing, sizeof(elapsed_timing),
+                   "ELAPSED %s", elapsed);
+    (void)snprintf(total_timing, sizeof(total_timing),
+                   "TRACK %s", total);
+    (void)snprintf(remaining_timing, sizeof(remaining_timing),
+                   "REMAIN %s", remaining);
 
     /* Full 4:3 composition, inset for consumer-CRT overscan. */
     fill_rect(ui, 0, 0, AUDIO_UI_WIDTH, AUDIO_UI_HEIGHT,
@@ -343,8 +352,9 @@ static void render_frame(struct audio_ui *ui)
     draw_centered_text(ui, 440, 378, 94, "NEXT", 1, UI_TEXT_Y);
 
     draw_text(ui, 576, 378, "PLAYLIST --:--", 1, UI_MUTED_Y);
-    draw_text(ui, 210, 412, timing, 1, UI_TEXT_Y);
-    draw_text(ui, 610, 412, "TRACK --:--", 1, UI_MUTED_Y);
+    draw_centered_text(ui, 32, 412, 218, elapsed_timing, 1, UI_TEXT_Y);
+    draw_centered_text(ui, 250, 412, 220, total_timing, 1, UI_TEXT_Y);
+    draw_centered_text(ui, 470, 412, 218, remaining_timing, 1, UI_TEXT_Y);
 
     /* Absolute decoder-frame position scaled across the track duration. */
     fill_rect(ui, 32, 438, 656, 14, UI_TRACK_Y, UI_CB, UI_CR);
