@@ -152,7 +152,7 @@ def decode_words(path: Path | str) -> list[int]:
 def parse_words(words: list[int]) -> dict[str, Any]:
     format_word = words[1]
     schema_version = (format_word >> 24) & 0xFF
-    if schema_version > 20:
+    if schema_version > 21:
         raise TelemetryDecodeError(f"unsupported telemetry schema {schema_version}")
     clock_hz = (format_word & 0xFFFF) * 1000
     counts = words[17]
@@ -579,26 +579,132 @@ def parse_words(words: list[int]) -> dict[str, Any]:
     }
 
     if schema_version >= 19:
-        # Words 37-62 now belong to deadline evidence. Never expose their bits
-        # as the retired framebuffer fields, even when a legacy marker matches.
+        # Schemas 19 and later retire the framebuffer-detail payload. Never
+        # expose reused words as framebuffer fields, even if a legacy marker
+        # happens to match.
         for key in result:
             if key.startswith("framebuffer_"):
                 result[key] = None
         result["display_pictures_8bit"] = result["display_pictures"]
         result["display_swaps_8bit"] = result["display_swaps"]
-        result["display_pictures"] = words[37] >> 16
-        result["display_swaps"] = words[37] & 0xFFFF
-        result["reference_pictures"] = words[38] >> 16
-        result["display_counts_saturated"] = (
-            result["display_pictures"] == 0xFFFF or
-            result["display_swaps"] == 0xFFFF
-        )
-        result["delivered_fps"] = (
-            result["display_swaps"] / cadence_seconds
-            if cadence_seconds and not result["display_counts_saturated"]
-            else None
-        )
-        result["deadline_gap_count"] = words[38] & 0xFFFF
+
+        if schema_version == 21:
+            # Entry 884: schema 21 overlays words 37..54 with authored-menu
+            # pipeline telemetry. The exact full-width display counters and
+            # deadline records are therefore unavailable in this schema.
+            overlay_counts = words[38]
+            overlay_commits = words[39]
+            overlay_publications = words[43]
+            overlay_state = words[44]
+            overlay_capture = words[54]
+            overlay_highlight = words[47]
+            result.update({
+                "display_counts_saturated": None,
+                "delivered_fps": None,
+                "deadline_scope": None,
+                "deadline_gap_count": None,
+                "deadline_records": [],
+                "overlay_scope": "authored_menu_pipeline",
+                "overlay_debug_magic": words[37],
+                "overlay_debug_magic_ascii": words[37].to_bytes(
+                    4, "big"
+                ).decode("ascii", errors="replace"),
+                "overlay_debug_magic_valid": words[37] == 0x4F564C31,
+                "overlay_config_records": overlay_counts & 0xFF,
+                "overlay_data_records": (overlay_counts >> 8) & 0xFF,
+                "overlay_commit_records": (overlay_counts >> 16) & 0xFF,
+                "overlay_style_records": (overlay_counts >> 24) & 0xFF,
+                "overlay_plane_publications": overlay_commits & 0xFF,
+                "overlay_commit_ok": (overlay_commits >> 8) & 0xFF,
+                "overlay_commit_bad": (overlay_commits >> 16) & 0xFF,
+                "overlay_clear_records": (overlay_commits >> 24) & 0xFF,
+                "overlay_record_bytes": words[40],
+                "overlay_plane_bytes": words[41],
+                "overlay_cache_rows": words[42] & 0xFFFF,
+                "overlay_writer_accepts": (words[42] >> 16) & 0xFFFF,
+                "overlay_style_publications": (
+                    overlay_publications >> 24
+                ) & 0xFF,
+                "overlay_memory_plane_publications": (
+                    overlay_publications >> 16
+                ) & 0xFF,
+                "overlay_video_publications": (
+                    overlay_publications >> 8
+                ) & 0xFF,
+                "overlay_memory_style_publish_pending": bool(
+                    overlay_publications & 1
+                ),
+                "overlay_memory_plane_publish_pending": bool(
+                    overlay_publications & 2
+                ),
+                "overlay_memory_protocol_error": bool(
+                    overlay_publications & 4
+                ),
+                "overlay_current_command": (overlay_state >> 24) & 0xFF,
+                "overlay_write_word_index": (overlay_state >> 10) & 0x3FFF,
+                "overlay_write_byte_lane": (overlay_state >> 7) & 0x7,
+                "overlay_display_bank": (overlay_state >> 6) & 1,
+                "overlay_published_visible": bool(overlay_state & (1 << 5)),
+                "overlay_published_menu": bool(overlay_state & (1 << 4)),
+                "overlay_plane_publish_pending": bool(
+                    overlay_state & (1 << 3)
+                ),
+                "overlay_style_publish_pending": bool(
+                    overlay_state & (1 << 2)
+                ),
+                "overlay_protocol_error": bool(overlay_state & (1 << 1)),
+                "overlay_record_ready": bool(overlay_state & 1),
+                "overlay_published_x1": (words[45] >> 16) & 0xFFFF,
+                "overlay_published_y1": words[45] & 0xFFFF,
+                "overlay_published_x2": (words[46] >> 16) & 0xFFFF,
+                "overlay_published_y2": words[46] & 0xFFFF,
+                "overlay_highlight_index1_abgr": overlay_highlight,
+                "overlay_highlight_index1_alpha": (
+                    overlay_highlight >> 24
+                ) & 0xFF,
+                "overlay_highlight_index1_blue": (
+                    overlay_highlight >> 16
+                ) & 0xFF,
+                "overlay_highlight_index1_green": (
+                    overlay_highlight >> 8
+                ) & 0xFF,
+                "overlay_highlight_index1_red": overlay_highlight & 0xFF,
+                "overlay_received_plane_bytes": words[48] & 0x1FFFF,
+                "overlay_video_row_tags": words[49] & 0xFFFF,
+                "overlay_video_row_matches": words[50],
+                "overlay_video_highlights": words[51],
+                "overlay_video_alpha": words[52],
+                "overlay_video_magenta": words[53],
+                "overlay_capture_reason_code": (overlay_capture >> 30) & 0x3,
+                "overlay_capture_reason": {
+                    1: "settled_overlay_commit",
+                    2: "bounded_no_commit_fallback",
+                }.get((overlay_capture >> 30) & 0x3, "unknown"),
+                "overlay_capture_armed": bool(overlay_capture & (1 << 29)),
+                "overlay_capture_commit_seen": bool(
+                    overlay_capture & (1 << 28)
+                ),
+                "overlay_capture_settle_cycles": overlay_capture & 0x0FFFFFFF,
+                "overlay_capture_settle_seconds": (
+                    (overlay_capture & 0x0FFFFFFF) / clock_hz
+                    if clock_hz else None
+                ),
+            })
+        else:
+            result["display_pictures"] = words[37] >> 16
+            result["display_swaps"] = words[37] & 0xFFFF
+            result["reference_pictures"] = words[38] >> 16
+            result["display_counts_saturated"] = (
+                result["display_pictures"] == 0xFFFF or
+                result["display_swaps"] == 0xFFFF
+            )
+            result["delivered_fps"] = (
+                result["display_swaps"] / cadence_seconds
+                if cadence_seconds and not result["display_counts_saturated"]
+                else None
+            )
+            result["deadline_gap_count"] = words[38] & 0xFFFF
+
         if schema_version >= 20:
             # Entry 693: the longest single stall of the shared transport byte
             # path is what the audio FIFO depth must cover; the underrun count
@@ -618,6 +724,9 @@ def parse_words(words: list[int]) -> dict[str, Any]:
                 "audio_fifo_floor", "audio_fifo_floor_ms",
             ):
                 result[key] = None
+        if schema_version == 21:
+            return result
+
         result["deadline_scope"] = "native_30000_1001_after_first_swap"
         result["deadline_records"] = []
         flag_bits = {
@@ -712,12 +821,25 @@ def validate(
             f"accepted {result['accepted_bytes']} bytes, expected {expected_bytes}"
         )
     if require_fps is not None and result["delivered_fps"] is None:
-        failures.append("exact delivered rate unavailable: display counters saturated")
+        failures.append(
+            "exact delivered rate unavailable: full-width display counters "
+            "are absent or saturated"
+        )
     elif require_fps is not None and result["delivered_fps"] + 1e-9 < require_fps:
         failures.append(
             f"delivered {result['delivered_fps']:.6f} fps, "
             f"required {require_fps:.6f} fps"
         )
+    if result.get("overlay_scope") is not None:
+        if not result["overlay_debug_magic_valid"]:
+            failures.append(
+                "bad overlay telemetry magic "
+                f"0x{result['overlay_debug_magic']:08x}"
+            )
+        if result["overlay_memory_protocol_error"]:
+            failures.append("overlay memory-domain protocol error")
+        if result["overlay_protocol_error"]:
+            failures.append("overlay engine protocol error")
     if result["framebuffer_write_read_scope"] is not None:
         if not result["framebuffer_write_read_first_expected_valid"]:
             failures.append("first-field accepted-write fingerprint is invalid")
@@ -765,12 +887,20 @@ def main() -> int:
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
-        print(
-            f"hardware cadence: {result['display_pictures']} pictures, "
-            f"{result['display_swaps']} intervals in "
-            f"{result['cadence_seconds']:.6f} s = "
-            f"{result['delivered_fps']} fps"
-        )
+        if result["delivered_fps"] is None:
+            print(
+                "hardware cadence: low-byte counters="
+                f"{result['display_pictures_8bit']} pictures/"
+                f"{result['display_swaps_8bit']} swaps in "
+                f"{result['cadence_seconds']:.6f} s; exact rate unavailable"
+            )
+        else:
+            print(
+                f"hardware cadence: {result['display_pictures']} pictures, "
+                f"{result['display_swaps']} intervals in "
+                f"{result['cadence_seconds']:.6f} s = "
+                f"{result['delivered_fps']} fps"
+            )
         print(
             "stalls: decoder={decoder_stall_cycles} "
             "presentation={presentation_stall_cycles} "
@@ -944,6 +1074,47 @@ def main() -> int:
             )
         if result["schema_version"] == 19:
             print(f"confirmed deadline gaps: {result['deadline_gap_count']}")
+        if result.get("overlay_scope") is not None:
+            print(
+                "overlay records: config={overlay_config_records} "
+                "data={overlay_data_records} commit={overlay_commit_records} "
+                "style={overlay_style_records} clear={overlay_clear_records}; "
+                "commit_ok/bad={overlay_commit_ok}/{overlay_commit_bad}; "
+                "plane_publications={overlay_plane_publications}".format(
+                    **result
+                )
+            )
+            print(
+                "overlay transfer: record_bytes={overlay_record_bytes} "
+                "plane_bytes={overlay_plane_bytes} "
+                "received={overlay_received_plane_bytes} "
+                "writer_accepts={overlay_writer_accepts} "
+                "cache_rows={overlay_cache_rows}; "
+                "publications style/plane/video="
+                "{overlay_style_publications}/"
+                "{overlay_memory_plane_publications}/"
+                "{overlay_video_publications}".format(**result)
+            )
+            print(
+                "overlay publication: visible={overlay_published_visible} "
+                "menu={overlay_published_menu} bank={overlay_display_bank} "
+                "rect=({overlay_published_x1},{overlay_published_y1})-"
+                "({overlay_published_x2},{overlay_published_y2}) "
+                "highlight1=0x{overlay_highlight_index1_abgr:08x}; "
+                "video row_tags/matches/highlights/alpha/magenta="
+                "{overlay_video_row_tags}/{overlay_video_row_matches}/"
+                "{overlay_video_highlights}/{overlay_video_alpha}/"
+                "{overlay_video_magenta}".format(**result)
+            )
+            print(
+                "overlay capture: reason={overlay_capture_reason} "
+                "armed={overlay_capture_armed} "
+                "commit_seen={overlay_capture_commit_seen} "
+                "settle={overlay_capture_settle_cycles}cy; "
+                "ready={overlay_record_ready} "
+                "protocol_error={overlay_protocol_error}/"
+                "{overlay_memory_protocol_error}".format(**result)
+            )
         if result.get("audio_underrun_count") is not None:
             longest = result["transport_block_longest_ms"]
             print(
