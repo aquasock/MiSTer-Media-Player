@@ -1,3 +1,32 @@
+## 899 COMMIT Unreleased 5327358 2026-09-02T06:23:24-07:00
+
+#### Coming From:
+
+Unreleased 5327358
+
+#### Purpose:
+
+Record the physical root-menu freeze and localize it to a circular wait at the DVD navigation output-reserve boundary.
+
+#### Outcome:
+
+The user's golden physical-DVD run starts successfully from `/dev/sr0`, inventories title one with 24 chapters, authenticates the disc, enters menu mode and submits 4,160,412 media bytes before Main sends root-menu command `0x09` at 4.024721 seconds.  Libdvdnav accepts the command, reports status `ok`, classifies a root stream hop at logical block 3395 and discards a 2,034-byte source-block tail, after which the helper log ends without the expected reserve-discard completion, navigation `READY`, Main download reset or `GO`; the 370,504-byte screenshot at SHA-256 `541ca0729e1eb2d4efe82823dc431540ca3d3177ac1821e48354d9f54c6da70f` consequently shows the last valid resident DVD frame rather than decoder corruption, and the matching 136,144-byte log has SHA-256 `7503f2162194a8547033ef1c1455077db0dd6a2bf2199cd337b017a78d4a0d2a`.  The 675-byte schema-21 telemetry sidecar at SHA-256 `1aac888676af9d1e6aa73af44e5ded3ab3737cb027c6cfdffc3a0b2c64b518c8` is checksum-valid.  Static localization identifies a timing-dependent circular wait inherited from the accepted DVD path: once `navigation_pending` is set, Main returns before draining helper stdout until it receives `READY`, while `output_reserve_discard` cannot let the helper send `READY` until its writer finishes the active record, and that writer can remain blocked on the undrained stdout pipe; pressing `M` early while the four-megabyte reserve is active exposes the race, independently of the audio-visualizer changes.
+
+#### Next Steps:
+
+Preserve libdvdnav behavior, the decoder, RTL, RBF, menu-continuation semantics and the accepted visualizer work.  After user approval, make one bounded navigation-transport correction that prevents the reserve writer from blocking discard completion while Main is waiting for `READY`, without discarding valid output when root or activation resolves as `MENU_CONTINUE`; add a deterministic filled-pipe regression that issues a root hop during an active multi-write record and requires bounded discard completion, exactly one `READY` and clean `GO`, retain the existing continuation case byte-for-byte, rebuild the helper and any required Main component locally, then repeat an early `M`, later `M`, activation and chapter-hop sequence on the golden disc.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 898 COMMIT Unreleased 5327358 2026-09-02T06:17:38-07:00
 
 #### Coming From:
@@ -1270,35 +1299,6 @@ The user should exit MediaPlayer so its helper process stops, manually replace o
 - host/arm/media_source.c
 - tools/test_dvd_menu_hop.c
 - tools/test_dvd_menu_navigation.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 859 COMMIT Unreleased 33d8151 2026-08-31T22:39:27-07:00
-
-#### Coming From:
-
-Unreleased 33d8151
-
-#### Purpose:
-
-Capture the physical Play result for the pending-payload helper and isolate the remaining delayed menu-to-title classification failure.
-
-#### Outcome:
-
-The user's physical source-`33d8151` run improves the visible result from a permanently resident menu frame to the authored ten-second pause followed by approximately one second of motion, but title playback then freezes permanently.  The unique pending-payload diagnostics prove that the intended 908,660-byte helper receives activation command `0x08`, keeps the request pending across 89 menu payloads and reaches the ten-second finite still.  At expiry, `dvdnav_still_skip` immediately samples `dvdnav_current_title_info` while it still reports title zero, so the helper sends `MENU_CONTINUE` with reason `finite-still-menu` and Main preserves the resident decoder session; only immediately afterward does libdvdnav report menu leave and subpicture stream 128.  Because that acknowledgment clears `activation_pending`, the observed menu leave cannot enter the existing ready/go barrier or rearm random access, yet Main and the helper remain alive and submit more than 257 megabytes of title data through 102 seconds.  The 724,552-byte screenshot at SHA-256 `ca0a97c23a78142ebbf2407287a0605468e427268fff4db0b28cd4988435cefa` shows the later frozen authored frame, the matching 1,937,579-byte log has SHA-256 `cbfa731889b1dfde1f2f109bef1ae7b4b4311ea4632f88deba80c865febd81c3`, and the 844-byte checksum-valid schema-21 snapshot has SHA-256 `ec4ceaaf5deee8fff354d187248264d8e96a4388ba42c1ce032b7c9060ac9697`.  This rejects source `33d8151` on hardware and proves that title zero immediately after a finite-still skip is ambiguous rather than proof of a menu continuation; Main, authored-selector compensation and the source-`f5f650f` RBF remain cleared.
-
-#### Next Steps:
-
-Keep Main, RTL, QSF, the source-`f5f650f` RBF and authored-selector compensation frozen.  After user approval, make a bounded helper-only correction that treats title zero immediately after a pending activation's finite-still skip as still pending, then resolves the request only after libdvdnav exposes the post-still boundary: an observed menu leave enters the existing ready/go barrier before the first title start code, while an indefinite still or another definitive menu state acknowledges continuation.  Strengthen the focused and real-image delayed-activation regressions to reproduce title zero at skip followed by menu leave, require no premature `MENU_CONTINUE`, one delayed stream hop, a second ready event, post-hop random access and title bytes, rebuild only the helper locally and repeat Play.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
