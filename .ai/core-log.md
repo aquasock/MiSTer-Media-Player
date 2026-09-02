@@ -1,3 +1,32 @@
+## 883 COMMIT Unreleased 68f8f26 2026-09-01T21:11:53-07:00
+
+#### Coming From:
+
+Unreleased 68f8f26
+
+#### Purpose:
+
+Record physical acceptance of ordinary MPEG Program Stream seeking and distinguish the fresh schema-21 screenshot from stale diagnostic sidecar files.
+
+#### Outcome:
+
+The user reports that source `68f8f26` seeking works perfectly on MiSTer, accepting the fixed ten-second, one-minute and five-minute ordinary `.mpg` jump boundary in hardware.  The fresh 329,184-byte 1,920-by-1,080 screenshot at SHA-256 `31f8765a08fc40e9c63191c3209d36460041d199518468e7e608f809011276e8` shows stable progressive video with the visible telemetry matrix after seeking.  Direct extraction from that image produces a complete 64-word schema-21 snapshot: every prefix, row index and parity bit passes and calculated XOR `7ea59e0a` matches word 63; hardware error flags, the recurring audio-underrun count and transport-block count are zero, while word 54 reports the expected thirty-second no-overlay fallback capture for ordinary video.  The uncertainty is a host reporting limitation rather than a malformed FPGA snapshot: `tools/decode-hardware-telemetry.py` can extract schema-21 words with `--word-dump` but its semantic parser deliberately rejects every schema above 20.  The supplied `telemetry.txt` and `MediaPlayer_ARM.log` retain morning timestamps, hashes `b8361d71fc79fb54a2459ee068ebb0e5397b15416b52e392a71d83ac6a975561` and `49ed6cf08da17fd05625ad2e4be516af2c155021cb2990ffa70fee6a74245303`, and pre-seek contents, so neither is attributed to this fresh hardware run.
+
+#### Next Steps:
+
+Preserve source `68f8f26`, `host/build/MediaPlayer_Helper_ProgramSeek_68f8f26`, `host/build/MiSTer_ProgramSeek_68f8f26` and the timing-qualified source-`dfe1057` RBF as the accepted ordinary-Program-Stream seeking baseline.  Treat semantic schema-21 decoding as a separate host-tool compatibility correction: if approved, extend the decoder for the overlay word layout without changing RTL or playback, add a known-image regression for checksum `7ea59e0a`, and make the screenshot collection script save a fresh semantic report while continuing to preserve raw word-dump evidence.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 882 COMMIT Unreleased 68f8f26 2026-09-01T20:31:54-07:00
 
 #### Coming From:
@@ -1208,35 +1237,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 843 COMMIT Unreleased 924cb21 2026-08-31T19:45:27-07:00
-
-#### Coming From:
-
-Unreleased 64f5156
-
-#### Purpose:
-
-Restore clean applicability of the pinned Main patch stack without changing the approved stream-hop drain experiment.
-
-#### Outcome:
-
-The exact source-`64f5156` Main build stops before compilation because the following overlay-trace patch retains context around the original transfer-profile declarations and the first patch inserted the new drain constants inside that context.  No compiler, link, binary or target result is produced.  Source `924cb21` relocates only those two declarations ahead of the retained context, preserving the same 500 millisecond behavior, log format, helper, RBF and submitted bytes; the complete first patch is structurally valid and whitespace-clean, and exact ARM compilation remains pending.
-
-#### Next Steps:
-
-Rebuild Main from exact source `924cb21` on build PC `10.10.0.42`, verify the resulting ARM executable and diagnostic marker, and then return to entry 842's unchanged twenty-hop physical acceptance test.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
