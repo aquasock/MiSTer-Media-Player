@@ -1,3 +1,36 @@
+## 906 COMMIT Unreleased ??? 2026-09-02T07:56:41-07:00
+
+#### Coming From:
+
+Unreleased fddab62
+
+#### Purpose:
+
+Preserve an already-active DVD root menu and keep unsupported private audio from terminating otherwise playable DVD navigation.
+
+#### Outcome:
+
+The approved helper-only boundary combines the source-`fddab62` Blazing Saddles finding with an independent forum-user failure.  Blazing Saddles enters its four-button root menu autonomously before `M`, after which the redundant root call resets Main and reaches an indefinite still without replacement MPEG background; the helper will query libdvdnav's current menu identity and acknowledge `M` without a VM jump or decoder barrier only when the root menu is already active, while title-to-root and submenu-to-root calls retain the existing hop.  The forum capture reaches a DVD menu at 10.178249 seconds after decoding AC-3 normally, then encounters private-stream substream `0xa0`, reports it unsupported and exits 1; Main drains the reserve until 11.532917 seconds and leaves the last Rhino frame under telemetry.  Substream `0xa0` is DVD LPCM, which remains outside the current decoder scope, so unsupported private audio in `0x90` through `0xaf` will be skipped with a bounded diagnostic instead of aborting the video and navigation session.  This intentionally permits a silent LPCM menu while preserving the established AC-3 selection for subsequent title playback.  The 207,073-byte forum log and 197,440-byte screenshot have SHA-256 `c80483d19004127c21de329b3c6c307ecd7a035d30db8592e45e8bcfc8b56d75` and `f59f45385e958b90fbf0314ffbbdebe4070a828a4e9a4e263ff69a238ddaaf96`.
+
+#### Next Steps:
+
+Add root-menu identity coverage for an active root, a non-root submenu and title playback, then add a deterministic ffmpeg-generated VOB regression whose private stream carries DVD LPCM `0xa0` and prove the current helper fails while the new helper keeps and completes its H.262 video with no fabricated PCM.  Run strict native, sanitizer and full helper regressions, build an exact static ARMv7 helper locally with the Raspberry Pi toolchain, verify its markers, architecture and hash, and leave Main, RTL, the visualizer and RBF unchanged.  Physical acceptance requires Blazing Saddles to retain its loaded background when `M` is pressed from its root menu, the forum disc to proceed through its LPCM menu without helper exit, and Coming to America plus The Big Lebowski to preserve normal menu entry, selector and title playback.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- host/arm/media_source.c
+- tools/test_dvd_menu_hop.c
+- tools/test_private_audio_skip.sh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 905 COMMIT Unreleased fddab62 2026-09-02T07:49:36-07:00
 
 #### Coming From:
@@ -1258,35 +1291,6 @@ Exit MediaPlayer so its helper stops, replace `/media/fat/linux/MediaPlayer_Help
 - host/arm/output_reserve.h
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - tools/test_output_reserve.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 866 COMMIT Unreleased 58196d6 2026-09-01T01:42:17-07:00
-
-#### Coming From:
-
-Unreleased 58196d6
-
-#### Purpose:
-
-Qualify the priority-overlay helper on physical hardware and isolate the remaining root-menu and Play response delays.
-
-#### Outcome:
-
-The user's physical source-`58196d6` capture accepts the 256-kibibyte priority overlay lane: the helper uniquely reports the four-megabyte normal reserve plus priority capacity, twelve directional changes visibly respond well, and Main receives each corresponding authored selector rectangle without overlay framing errors before activation.  Root-menu command `0x09` is submitted at 10.293811 seconds, the helper completes the root hop almost immediately, but Main does not receive navigation ready until 13.594761 seconds and releases the barrier at 13.595371 seconds, proving an artificial 3.301560-second wait while the helper drains obsolete normal-media reserve data.  Activation command `0x08` is submitted at 35.693855 seconds; its selector-clear style reaches Main at 36.073282 seconds, only 0.379427 seconds later, then the helper explicitly waits the disc-authored ten-second finite still and reports menu leave at 45.910168 seconds, so the 10.216313-second Play delay is authored navigation behavior rather than reserve or overlay latency.  More than twenty subsequent chapter barriers complete successfully and the user reports `N` and `P` remain fast.  The 4,062,817-byte log has SHA-256 `a1250d181338173b42b5d3817cf46accc40558ea78beb6227566c91373d09cf8`; the 541,595-byte screenshot and checksum-valid schema-21 telemetry have SHA-256 `01bed1b8cb9e28e0750eb563e1702d202fc1153d5fa84fd78d14ed083b717a4e` and `a6a90a2811ae5fcb2790621dc3ea7df2d5b02136127313054b57f3d961f56197`.
-
-#### Next Steps:
-
-Preserve Main, the RBF, the priority overlay lane and the existing `N` and `P` path.  After user approval, make a helper-only reserve-boundary change that finishes any record already being written, discards queued obsolete normal media for root-menu stream hops and lets Main's existing decoder barrier discard already-piped stale bytes, eliminating the artificial `M` drain without weakening the optical-stall reserve during ordinary playback.  Keep the authored ten-second finite Play still unless the user explicitly chooses immediate activation semantics; skipping that still is a separate DVD-navigation policy change and must retain the pending activation until libdvdnav exposes menu leave.  Validate reserve byte integrity, concurrent discard at every record boundary, menu overlay priority, root and delayed-activation hops, random access, AC-3 recovery and exact local ARM output before physical retest.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
