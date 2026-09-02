@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the indexed four-level legal H.262 loop used by audio playback."""
+"""Generate the indexed eight-level legal H.262 loop used by audio playback."""
 
 import argparse
 import pathlib
@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 
 MAGIC = b"MMPVIS1\0"
-LEVELS = 4
+LEVELS = 8
 GOPS = 20
 FRAMES_PER_GOP = 3
 FPS_NUM = 30000
@@ -23,12 +23,17 @@ SOURCE = (
     "cr='clip(128+52*cos(5*atan2(Y-H/2,X-W/2)-2*PI*N/60),16,240)'"
 )
 
-GRADES = (
-    "eq=brightness=-0.20:contrast=0.82:saturation=0.35",
-    "eq=brightness=-0.08:contrast=0.95:saturation=0.80",
-    "eq=brightness=0.03:contrast=1.12:saturation=1.35",
-    "eq=brightness=0.12:contrast=1.32:saturation=1.90",
-)
+GRADE_LOW = (-0.20, 0.82, 0.35)
+GRADE_HIGH = (0.12, 1.32, 1.90)
+
+
+def grade(level: int) -> str:
+    fraction = level / (LEVELS - 1)
+    brightness = GRADE_LOW[0] + (GRADE_HIGH[0] - GRADE_LOW[0]) * fraction
+    contrast = GRADE_LOW[1] + (GRADE_HIGH[1] - GRADE_LOW[1]) * fraction
+    saturation = GRADE_LOW[2] + (GRADE_HIGH[2] - GRADE_LOW[2]) * fraction
+    return (f"eq=brightness={brightness:.4f}:contrast={contrast:.4f}:"
+            f"saturation={saturation:.4f}")
 
 
 def start_codes(data: bytes, code: int) -> list[int]:
@@ -82,8 +87,8 @@ def main() -> int:
     variants = []
     with tempfile.TemporaryDirectory(prefix="mmp-visualizer-") as temporary:
         root = pathlib.Path(temporary)
-        for level, grade in enumerate(GRADES):
-            variants.append(split_gops(encode(args.ffmpeg, grade,
+        for level in range(LEVELS):
+            variants.append(split_gops(encode(args.ffmpeg, grade(level),
                                               root / f"level-{level}.m2v")))
         switched = root / "switched.m2v"
         switched.write_bytes(b"".join(

@@ -8,6 +8,12 @@
 #include <string.h>
 #include <unistd.h>
 
+#define TEST_GOPS 2u
+#define TEST_GOP_BYTES 24u
+#define TEST_ENTRIES (AUDIO_VISUALIZER_LEVELS * TEST_GOPS)
+#define TEST_FILE_BYTES (32u + TEST_ENTRIES * 8u + \
+                         TEST_ENTRIES * TEST_GOP_BYTES)
+
 static void put32(uint8_t *p, uint32_t value)
 {
     p[0] = (uint8_t)value;
@@ -16,46 +22,93 @@ static void put32(uint8_t *p, uint32_t value)
     p[3] = (uint8_t)(value >> 24);
 }
 
-struct capture { unsigned writes; unsigned level_byte; };
+struct capture {
+    unsigned writes;
+    unsigned levels[64];
+};
 
 static int capture_write(void *opaque, const uint8_t *data, size_t size)
 {
     struct capture *capture = opaque;
     if (size < 5 || memcmp(data, "\0\0\1\xb3", 4))
         return -1;
-    capture->writes++;
-    capture->level_byte = data[4];
+    if (capture->writes >= sizeof(capture->levels) / sizeof(capture->levels[0]))
+        return -1;
+    capture->levels[capture->writes++] = data[4];
+    return 0;
+}
+
+static void fill_stereo(int16_t *samples, size_t frames, int16_t value)
+{
+    size_t index;
+
+    for (index = 0; index < frames * 2u; ++index)
+        samples[index] = value;
+}
+
+static void analyze_many(struct audio_visualizer *visualizer,
+                         int16_t *samples, size_t frames, int16_t value,
+                         unsigned count)
+{
+    fill_stereo(samples, frames, value);
+    while (count--)
+        audio_visualizer_analyze(visualizer, samples, frames);
+}
+
+static int expect_levels(struct audio_visualizer *visualizer,
+                         struct capture *capture, uint64_t pcm_frames,
+                         const unsigned *expected, size_t count)
+{
+    size_t start = capture->writes;
+    size_t index;
+
+    for (index = 0; index < count; ++index) {
+        if (audio_visualizer_service(visualizer, pcm_frames, 48000,
+                                     capture_write, capture) != 1)
+            return -1;
+    }
+    for (index = 0; index < count; ++index) {
+        if (capture->levels[start + index] != expected[index])
+            return -1;
+    }
     return 0;
 }
 
 int main(void)
 {
     char path[] = "/tmp/mmp-visualizer-test-XXXXXX";
-    uint8_t file[32 + 4 * 2 * 8 + 4 * 2 * 24] = {0};
+    uint8_t file[TEST_FILE_BYTES] = {0};
     int16_t loud[2048 * 2];
     struct audio_visualizer *visualizer = NULL;
     struct capture capture = {0};
     char error[128];
     size_t index;
-    uint32_t offset = 32 + 4 * 2 * 8;
+    uint32_t offset = 32u + TEST_ENTRIES * 8u;
+    static const unsigned attack[] = {1, 2, 3, 4, 5, 6, 7, 7};
+    static const unsigned decay[] = {6, 5, 4, 3, 2, 1, 0, 0};
+    static const unsigned rise_to_two[] = {1, 2};
+    static const unsigned level_two[] = {2};
+    static const unsigned level_three[] = {3};
     int fd = mkstemp(path);
     FILE *stream;
 
     if (fd < 0)
         return 1;
     memcpy(file, "MMPVIS1\0", 8);
-    put32(file + 8, 1); put32(file + 12, 4); put32(file + 16, 2);
+    put32(file + 8, 1);
+    put32(file + 12, AUDIO_VISUALIZER_LEVELS);
+    put32(file + 16, TEST_GOPS);
     put32(file + 20, 1); put32(file + 24, 30000); put32(file + 28, 1001);
-    for (index = 0; index < 8; ++index) {
+    for (index = 0; index < TEST_ENTRIES; ++index) {
         put32(file + 32 + index * 8, offset);
-        put32(file + 36 + index * 8, 24);
+        put32(file + 36 + index * 8, TEST_GOP_BYTES);
         memcpy(file + offset, "\0\0\1\xb3", 4);
-        file[offset + 4] = (uint8_t)(index / 2);
+        file[offset + 4] = (uint8_t)(index / TEST_GOPS);
         memcpy(file + offset + 8, "\0\0\1\xb8", 4);
         file[offset + 15] = 0x40;
         memcpy(file + offset + 16, "\0\0\1\x00", 4);
         file[offset + 21] = 0x08;
-        offset += 24;
+        offset += TEST_GOP_BYTES;
     }
     stream = fdopen(fd, "wb");
     if (!stream || fwrite(file, 1, sizeof(file), stream) != sizeof(file) ||
@@ -66,13 +119,34 @@ int main(void)
         unlink(path);
         return 1;
     }
-    memset(loud, 0x40, sizeof(loud));
-    audio_visualizer_analyze(visualizer, loud, 2048);
-    if (audio_visualizer_level(visualizer) != 3 ||
-        audio_visualizer_service(visualizer, 16, 48000,
-                                 capture_write, &capture) != 1 ||
-        capture.level_byte != 3 || capture.writes != 1)
+    analyze_many(visualizer, loud, 2048, 16000, 2);
+    if (expect_levels(visualizer, &capture, 480000, attack,
+                      sizeof(attack) / sizeof(attack[0])) < 0 ||
+        audio_visualizer_level(visualizer) != 7)
         return 1;
+    analyze_many(visualizer, loud, 2048, 0, 64);
+    if (expect_levels(visualizer, &capture, 480000, decay,
+                      sizeof(decay) / sizeof(decay[0])) < 0 ||
+        audio_visualizer_level(visualizer) != 0)
+        return 1;
+
+    analyze_many(visualizer, loud, 2048, 1500, 64);
+    if (expect_levels(visualizer, &capture, 480000, rise_to_two,
+                      sizeof(rise_to_two) / sizeof(rise_to_two[0])) < 0)
+        return 1;
+    analyze_many(visualizer, loud, 2048, 1550, 64);
+    if (expect_levels(visualizer, &capture, 480000, level_two, 1) < 0)
+        return 1;
+    analyze_many(visualizer, loud, 2048, 1600, 64);
+    if (expect_levels(visualizer, &capture, 480000, level_three, 1) < 0)
+        return 1;
+    analyze_many(visualizer, loud, 2048, 1250, 64);
+    if (expect_levels(visualizer, &capture, 480000, level_three, 1) < 0)
+        return 1;
+    analyze_many(visualizer, loud, 2048, 1200, 64);
+    if (expect_levels(visualizer, &capture, 480000, level_two, 1) < 0)
+        return 1;
+
     if (audio_visualizer_take_overlay_action(visualizer, 479999, 48000) ||
         audio_visualizer_take_overlay_action(visualizer, 480000, 48000) != -1)
         return 1;
@@ -89,7 +163,8 @@ int main(void)
                                  capture_write, &capture) != 1 ||
         audio_visualizer_service(visualizer, 500048, 48000,
                                  capture_write, &capture) != 0 ||
-        capture.writes != 2)
+        capture.writes != 2 || capture.levels[0] != 2 ||
+        capture.levels[1] != 2)
         return 1;
     audio_visualizer_destroy(visualizer);
     unlink(path);

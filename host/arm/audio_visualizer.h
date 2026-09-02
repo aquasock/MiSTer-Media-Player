@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define AUDIO_VISUALIZER_LEVELS 4u
+#define AUDIO_VISUALIZER_LEVELS 8u
 #define AUDIO_VISUALIZER_SLICE_BYTES 4096u
 
 struct audio_visualizer;

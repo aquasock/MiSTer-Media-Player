@@ -12,6 +12,11 @@
 #define VISUALIZER_MAX_GOPS 120u
 #define VISUALIZER_LEAD_GOPS 2u
 #define VISUALIZER_IDLE_SECONDS 10u
+#define VISUALIZER_HYSTERESIS_DIVISOR 8u
+
+static const uint32_t level_thresholds[AUDIO_VISUALIZER_LEVELS - 1u] = {
+    450u, 700u, 1400u, 2500u, 4300u, 7000u, 10500u
+};
 
 struct visualizer_entry {
     uint32_t offset;
@@ -32,6 +37,7 @@ struct audio_visualizer {
     size_t current_size;
     size_t current_offset;
     uint32_t envelope;
+    unsigned target_level;
     unsigned level;
     uint64_t activity_frame;
     int overlay_visible;
@@ -233,9 +239,22 @@ void audio_visualizer_analyze(struct audio_visualizer *visualizer,
         visualizer->envelope = (visualizer->envelope + rms * 3u) / 4u;
     else
         visualizer->envelope = (visualizer->envelope * 7u + rms) / 8u;
-    visualizer->level = visualizer->envelope < 700u ? 0u :
-                        visualizer->envelope < 2500u ? 1u :
-                        visualizer->envelope < 7000u ? 2u : 3u;
+    while (visualizer->target_level + 1u < AUDIO_VISUALIZER_LEVELS) {
+        uint32_t threshold = level_thresholds[visualizer->target_level];
+        uint32_t hysteresis = threshold / VISUALIZER_HYSTERESIS_DIVISOR;
+
+        if (visualizer->envelope < threshold + hysteresis)
+            break;
+        visualizer->target_level++;
+    }
+    while (visualizer->target_level) {
+        uint32_t threshold = level_thresholds[visualizer->target_level - 1u];
+        uint32_t hysteresis = threshold / VISUALIZER_HYSTERESIS_DIVISOR;
+
+        if (visualizer->envelope > threshold - hysteresis)
+            break;
+        visualizer->target_level--;
+    }
 }
 
 static uint64_t due_gops(const struct audio_visualizer *visualizer,
@@ -267,6 +286,10 @@ int audio_visualizer_service(struct audio_visualizer *visualizer,
         if (visualizer->gops_sent >= due_gops(visualizer,
                                               emitted_pcm_frames, rate_hz))
             return 0;
+        if (visualizer->level < visualizer->target_level)
+            visualizer->level++;
+        else if (visualizer->level > visualizer->target_level)
+            visualizer->level--;
         entry_index = (size_t)visualizer->level * visualizer->gop_count +
                       (size_t)(visualizer->gops_sent % visualizer->gop_count);
         entry = &visualizer->entries[entry_index];
