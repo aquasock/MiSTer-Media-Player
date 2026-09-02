@@ -1,3 +1,32 @@
+## 905 COMMIT Unreleased fddab62 2026-09-02T07:49:36-07:00
+
+#### Coming From:
+
+Unreleased fddab62
+
+#### Purpose:
+
+Qualify the media-only DVD navigation barrier on physical hardware and isolate the remaining Blazing Saddles root-menu blank.
+
+#### Outcome:
+
+The user's physical source-`fddab62` capture accepts the media-only ownership fix: Blazing Saddles no longer terminates the helper, the root command at 13.035470 seconds discards 3,055,569 reserved bytes, navigation is ready 11.212 milliseconds later, and Main releases its decoder barrier after another 5.459 milliseconds without `Resource temporarily unavailable` or any helper error.  The disc enters a four-button menu autonomously at 11.938842 seconds, 1.096628 seconds before the user presses `M`; the root call then reports the same NAV PCI LBN 333, selected button 1 and highlight rectangle before resetting Main.  Libdvdnav re-emits the 86,400-byte overlay and reaches an indefinite menu still, but after that overlay commit every one of 245 pipe reads is at most 96 bytes and carries only overlay style records, so no replacement MPEG background follows the redundant same-menu hop and the decoder remains black.  This is distinct from the resolved output-ownership crash and from CSS setup: the helper survives for the remaining capture, while the user separately reports Coming to America and The Big Lebowski still load their menus.  The 4,153,418-byte log has SHA-256 `58b480f1d441d64729d14c1bc84e4604914c7b77c54308aad64d5f8375ca84d3`; the 559-byte black screenshot and telemetry decode failure have SHA-256 `9677a233b9b21aa34e041950e2ce422df808f6fa3a5db233eeb0c7f7bb98ee27` and `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004`.
+
+#### Next Steps:
+
+Preserve Main, the RBF, reserve discard, media-only ownership and normal authored menu hops.  After user approval, make the helper treat `M` as a no-op when libdvdnav already reports the root menu, retaining the queued or displayed MPEG background and current overlay rather than issuing a same-menu VM jump and decoder barrier; calls from title playback or a non-root submenu must continue through the existing hop path.  Add focused native coverage for root-menu identity, submenu-to-root transitions and title-to-root transitions, rerun all helper regressions and build a helper-only ARM artifact for physical retest.  On Blazing Saddles, allow its autonomous menu entry to finish and press `M` again while the root menu is active; acceptance requires the background and selector to remain visible, no decoder reset, responsive authored buttons and unchanged behavior on Coming to America and The Big Lebowski.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 904 COMMIT Unreleased fddab62 2026-09-02T07:11:06-07:00
 
 #### Coming From:
@@ -1258,39 +1287,6 @@ Preserve Main, the RBF, the priority overlay lane and the existing `N` and `P` p
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 865 COMMIT Unreleased 58196d6 2026-09-01T01:30:48-07:00
-
-#### Coming From:
-
-Unreleased 5ae655a
-
-#### Purpose:
-
-Preserve the physical-DVD output reserve while allowing menu overlay changes to bypass its multi-second normal-media backlog at complete record boundaries.
-
-#### Outcome:
-
-The user's physical source-`5ae655a` capture proves that the four-megabyte output reserve is active and leaves chapter `N` and `P` transitions as responsive as before, and the user cannot yet reproduce the original first-chapter audio dropout, but the run rejects its FIFO ordering for interactive menu use.  The helper handles Right at approximately 19.155498 seconds while Main receives the corresponding selector style at 24.194433 seconds, a 5.038935-second delay, then handles Left at approximately 26.065074 seconds while Main receives that style at 31.576002 seconds, a 5.510928-second delay; Activate reaches the helper in approximately 83 milliseconds, isolating the latency to the in-band overlay waiting behind queued A/V.  Source `58196d6` preserves the four-megabyte normal reserve, marks every complete producer write with a compact boundary map and adds a bounded 256-kibibyte FIFO priority lane serviced only between complete normal records, so an overlay cannot split PCM or another framed output.  Every overlay header and payload is now assembled into one priority record.  The focused stalled-pipe regression proves that a 49-byte priority update overtakes a four-megabyte normal backlog exactly after the already active two-megabyte test record while all 6,291,505 output bytes remain exact, passes 100 consecutive runs, and passes sanitizer and static-analyzer validation; the real production emitter also passes 20 repeated priority-drain runs while reconstructing its one configuration, 22 records and all 86,400 authored plane bytes exactly.  Strict native and optional solid-overlay-probe helper builds, full capabilities, AC-3 recovery, random access, subpicture and immediate/delayed menu-hop regressions pass.  The Raspberry Pi GNU 10.2.1 toolchain builds exact source `58196d6` into `host/build/MediaPlayer_Helper_MenuPriority_58196d6`, a 912,756-byte static stripped ARMv7 EABI5 executable at SHA-256 `759d01177f37d7b2d624a026ac3d8aa68a8f24ac72e1704e01f4d1e11d9bf649`; it has no dynamic section, contains the reserve-priority and false-sync recovery diagnostics, and omits authored-selector compensation and the solid-magenta overlay probe.  Main, RTL, the source-`1bf06db` RBF and Quartus are untouched.
-
-#### Next Steps:
-
-Exit MediaPlayer so its current helper stops, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_MenuPriority_58196d6`, restore executable mode if needed, and verify the 912,756-byte size and recorded SHA-256 while preserving the installed source-`2de0717` Main and source-`1bf06db` RBF.  The new log marker must report `DVD output reserve=4194304 bytes overlay_priority=262144 bytes`.  Enter the menu, rapidly move the selector among all buttons and activate Play; acceptance requires visually immediate correctly aligned selector changes rather than the measured five-second lag, reliable menu and Play transitions, and no overlay framing or plane corruption.  Then repeat rapid forward and backward chapter changes before playing chapter one continuously; acceptance also requires the previously retained fast `N` and `P` response, a surviving helper, no reproduced audio dropout through a comparable optical stall and continued A/V synchronization.  Capture a fresh helper log, screenshot and telemetry for physical acceptance.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- host/arm/output_reserve.c
-- host/arm/output_reserve.h
-- tools/test_dvd_overlay_output.c
-- tools/test_output_reserve.c
 
 #### Status:
 
