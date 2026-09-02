@@ -1,3 +1,36 @@
+## 876 COMMIT Unreleased ??? 2026-09-01T17:15:50-07:00
+
+#### Coming From:
+
+Unreleased 5f00e35
+
+#### Purpose:
+
+Add a default-off production telemetry mode that preserves internal schema-21 capture while suppressing both its visible raster and ARM/Main diagnostic logging.
+
+#### Outcome:
+
+The approved boundary assigns unused OSD status bit 125 to a saved `Telemetry` option whose zero default is Off.  FPGA schema-21 counters, capture timing and snapshot contents remain live in both modes, but a synchronized video-domain visibility gate prevents the diagnostic raster from compositing unless the option is On.  Main reads the same bit before each helper launch: Off opens no diagnostic log, removes any stale RAM-backed `/tmp/MediaPlayer_ARM.log`, makes Main diagnostic writes no-ops and redirects helper standard error to `/dev/null`, while On retains the existing combined Main/helper log.  The mode must not alter media bytes, decoder scheduling, PCM delivery, DVD navigation, audio-interface rendering or diagnostic schemas.
+
+#### Next Steps:
+
+Implement the shared OSD boundary in the top level, profiler and generated Main patch, document that FPGA visibility changes live while ARM logging selection applies at the next playback start, and add focused regression coverage for default-hidden, live-visible and re-hidden telemetry plus enabled and disabled host logging.  Build strict native and ARM Main/helper artifacts, run retained media and overlay regressions, then build one timing-qualified RBF from the accepted seed-23 baseline before asking the user to install the matched RBF, Main and helper set and verify zero `/tmp/MediaPlayer_ARM.log` creation with Telemetry Off.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+- README.md
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/test_telemetry_visibility.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 875 COMMIT Unreleased 5f00e35 2026-09-01T07:34:29-07:00
 
 #### Coming From:
