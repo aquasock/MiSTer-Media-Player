@@ -10,7 +10,7 @@ Make the standalone-audio progress bar represent the current absolute track posi
 
 #### Outcome:
 
-The user physically accepts the source-`9397fa7` full-screen 4:3 layout but reports that its moving progress bar does not track the audio file's duration.  The accepted helper already obtains an exact output-frame length from miniaudio for every supported standalone MP3, WAV, FLAC and Ogg Vorbis file and already carries the absolute target frame through each audio seek, while the UI currently discards the length and renders `position_seconds % 60`.  This boundary will add a one-time decoder-to-UI duration callback, retain an absolute UI position in PCM frames, and scale that position safely across the existing 652-pixel interior so ordinary playback and fixed seeks both produce true file-relative progress.  The bar's geometry, one-hertz frame cadence, bounded UI interleaving, atomic publication, codecs, audio priority, controls, Main, RTL, RBF, video and DVD paths will remain unchanged; elapsed, remaining and track-duration text will remain placeholders.
+The user physically accepts the source-`9397fa7` full-screen 4:3 layout but reports that its moving progress bar does not track the audio file's duration.  The accepted helper already obtains exact output-frame lengths for MP3, WAV and FLAC and already carries the absolute target frame through each audio seek, while the UI currently discards the length and renders `position_seconds % 60`.  Focused integration exposed that miniaudio's callback-based Ogg Vorbis backend uses push mode and returns a successful zero length, so this boundary will also add file-end seeking to the local media-source abstraction and read only the final bounded Ogg page's authoritative granule position rather than scanning or decoding the whole file.  A one-time decoder-to-UI duration callback will retain an absolute UI position in PCM frames and scale that position safely across the existing 652-pixel interior so ordinary playback and fixed seeks both produce true file-relative progress for all four formats.  The bar's geometry, one-hertz frame cadence, bounded UI interleaving, atomic publication, codecs, audio priority, controls, Main, RTL, RBF, video and DVD paths will remain unchanged; elapsed, remaining and track-duration text will remain placeholders.
 
 #### Next Steps:
 
@@ -25,6 +25,8 @@ Commit and push this proposal after the authorized ring-buffer rotation, impleme
 - host/arm/consumer_audio.c
 - host/arm/consumer_audio.h
 - host/arm/media_player_helper.c
+- host/arm/media_source.c
+- host/arm/media_source.h
 - tools/test_audio_file_seek.py
 - tools/test_audio_ui_output.c
 
