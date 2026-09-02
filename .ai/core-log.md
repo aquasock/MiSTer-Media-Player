@@ -1,3 +1,34 @@
+## 904 COMMIT Unreleased ??? 2026-09-02T07:11:06-07:00
+
+#### Coming From:
+
+Unreleased 46638c7
+
+#### Purpose:
+
+Keep reserve-backed physical-DVD output independent from the nonblocking descriptor's unused stdio stream at navigation barriers and shutdown.
+
+#### Outcome:
+
+Approved plan: make helper output ownership exclusive so a physical-DVD output reserve drains or discards its own records without subsequently calling `fflush` on the unused `FILE` that names the same nonblocking descriptor.  Normal barriers will select reserve drain or stdio flush, reserve-discard barriers will report completion immediately after the reserve acknowledges cancellation, and shutdown will remember whether the reserve owned video output so destroying it is not followed by a redundant stdio flush.  A production-path regression will fill a nonblocking pipe through the reserve while retaining a buffered stdio sentinel and require navigation discard to succeed rather than reproduce the hardware `EAGAIN`; ordinary file, ISO, split-output and PCM paths will retain their existing stdio flushes.  Main source `46638c7`, the output-reserve worker, libdvdnav policy, decoder, visualizer, RTL and RBF remain unchanged.
+
+#### Next Steps:
+
+Implement the mutually exclusive ownership branches and document the invariant, then run the new production helper-output regression repeatedly together with stalled-sink reserve discard, exact overlay reconstruction, output staging, immediate and delayed DVD menu-hop, random-access, fragmented-SPU, AC-3 recovery, Program Stream seek, audio UI and visualizer regressions.  Run strict optimized, sanitizer and analyzer checks where supported, build the native helper and confirm capabilities, then use the local GNU 10.2.1 toolchain to build and audit one exact static ARMv7 helper for a repeated early-root-menu hardware test while retaining Main `46638c7`.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 903 COMMIT Unreleased 46638c7 2026-09-02T07:07:46-07:00
 
 #### Coming From:
@@ -1257,39 +1288,6 @@ Exit MediaPlayer so its current helper stops, replace only `/media/fat/linux/Med
 - host/arm/output_reserve.c
 - host/arm/output_reserve.h
 - tools/test_dvd_overlay_output.c
-- tools/test_output_reserve.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 864 COMMIT Unreleased 5ae655a 2026-09-01T01:03:21-07:00
-
-#### Coming From:
-
-Unreleased 0318f70
-
-#### Purpose:
-
-Add a bounded helper-side output reserve so temporary physical-DVD read stalls after aggressive chapter seeking do not interrupt otherwise recoverable playback.
-
-#### Outcome:
-
-Source `5ae655a` adds a four-megabyte helper-side ring reserve between the synchronous physical-DVD producer and a dedicated output writer, preserving exact byte order while giving the producer approximately four seconds of combined-stream read-ahead through temporary optical-source stalls.  Capacity backpressure is bounded, writer errors propagate to the producer, navigation barriers and shutdown explicitly drain the reserve, and the reserve is enabled only for physical-DVD program-stream playback through the in-band output so ISO, file and split-output behavior remains unchanged.  A focused stalled-pipe regression proves that two megabytes can enqueue before a reader exists and that six megabytes spanning repeated drain and ring-wrap cycles emerge byte-identically; strict native, sanitizer, analyzer, capability, production-overlay, AC-3, random-access, subpicture and menu-hop validation also passes.  The Raspberry Pi GNU 10.2.1 toolchain builds exact source `5ae655a` into `host/build/MediaPlayer_Helper_DVDReserve_5ae655a`, a 908,660-byte static stripped ARMv7 EABI5 executable at SHA-256 `5fb737f79ad54c6754e92fe433359bf1237e6366bd21ee5b15ea827615ad23cd`; it has no dynamic section and includes the reserve and false-sync recovery diagnostics without authored-selector compensation or the solid-magenta overlay probe.  Main, RTL, the source-`1bf06db` RBF and Quartus are untouched.
-
-#### Next Steps:
-
-Exit MediaPlayer so its current helper stops, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_DVDReserve_5ae655a`, restore executable mode if needed, and verify the 908,660-byte size and recorded SHA-256.  Preserve the installed source-`2de0717` Main and source-`1bf06db` RBF.  Restart the DVD and first verify reliable menu entry, the correctly aligned movable selector and Play navigation, then repeat many fast forward and backward chapter skips before allowing chapter one to play continuously for more than sixty seconds.  The helper log must identify a 4,194,304-byte DVD output reserve; acceptance requires fluid chapter changes, intact video and selector rendering, a surviving helper, no audible gap through a comparable temporary optical stall and continued A/V synchronization.  Capture a fresh helper log, screenshot and telemetry for physical acceptance.
-
-#### Files Modified:
-
-- host/arm/Makefile
-- host/arm/media_player_helper.c
-- host/arm/output_reserve.c
-- host/arm/output_reserve.h
 - tools/test_output_reserve.c
 
 #### Status:
