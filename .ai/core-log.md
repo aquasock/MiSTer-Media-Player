@@ -1,3 +1,42 @@
+## 882 COMMIT Unreleased ??? 2026-09-01T20:31:54-07:00
+
+#### Coming From:
+
+Unreleased dfe1057
+
+#### Purpose:
+
+Add safe keyboard-driven ten-second, one-minute and five-minute relative seeking for ordinary MPEG Program Stream files without changing audio or DVD navigation.
+
+#### Outcome:
+
+The approved first seeking boundary will recognize Alt, Ctrl and Ctrl-plus-Alt with Left or Right in patched Main while leaving unmodified arrows and DVD-menu navigation unchanged.  Fixed signed seek commands will cross the existing private Main/helper control channel only for ordinary file-backed MPEG Program Streams; the helper will locate a timestamped safe restart point, discard stale demux, audio, scheduler and transport state, and reuse the proven download reset plus READY/GO barrier before resuming.  Three-second jumps, standalone audio, ISO, physical DVD, authored menus, decoder RTL and the timing-qualified source-`dfe1057` RBF remain outside this boundary.
+
+#### Next Steps:
+
+Commit and push this proposal, implement a bounded Program Stream seek index and forward scanner plus modifier-aware Main controls, add deterministic target, clamp, random-access and barrier regressions, and build strict native and ARM helper/Main artifacts.  Require ordinary MPG forward and backward jumps to restart on valid sequence and intra-picture context with synchronized audio while every existing DVD control remains byte-for-byte compatible; no RBF build is planned unless host-only playhead tracking proves inadequate.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/Makefile
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/arm/media_source.c
+- host/arm/media_source.h
+- host/arm/program_stream_seek.c
+- host/arm/program_stream_seek.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_program_stream_seek.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 881 COMMIT Unreleased dfe1057 2026-09-01T19:17:39-07:00
 
 #### Coming From:
@@ -1190,35 +1229,6 @@ The exact source-`64f5156` Main build stops before compilation because the follo
 #### Next Steps:
 
 Rebuild Main from exact source `924cb21` on build PC `10.10.0.42`, verify the resulting ARM executable and diagnostic marker, and then return to entry 842's unchanged twenty-hop physical acceptance test.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 842 COMMIT Unreleased 64f5156 2026-08-31T19:40:09-07:00
-
-#### Coming From:
-
-Unreleased 3c68242
-
-#### Purpose:
-
-Test whether residual pre-hop bytes in the FPGA input FIFO cause the intermittent root-menu B-picture presentation failure without rebuilding the RBF.
-
-#### Outcome:
-
-The user approves and source `64f5156` implements a Main-only diagnostic after one physical session completes repeated root-menu reloads before a later identical hop fails with only `0x0200`; the failing reset session accepts 18,937 bytes, recognizes a B picture at temporal reference ten while frame-rate code remains zero, and therefore reaches a picture header before parsing the new sequence header.  The helper reports the same valid sequence, intra and following-reference boundary on the successful and failing menu-to-menu hops, while static inspection proves that each `ioctl_download` rising edge resets the MPEG decoder but leaves the 32 KiB dual-clock input FIFO intact until a full core reset.  Main now timestamps every chapter or menu download release, waits until at least 500 milliseconds have elapsed before the next rising edge, and logs the measured release-to-rearm interval without changing the helper, RBF or submitted stream bytes; the complete pinned patch is structurally valid and whitespace-clean, while exact ARM compilation remains pending.
-
-#### Next Steps:
-
-Build and verify one uniquely named ARM Main from exact source `64f5156`, then preserve the installed helper and source-`f5f650f` RBF while manually replacing only Main and rebooting.  Hardware acceptance requires at least twenty consecutive `M` root-menu reloads without the schema-21 `0x0200` raster, with each log recording a download-off interval of at least 500 milliseconds; any recurrence rejects the drain hypothesis and returns to exact scheduler-source instrumentation.
 
 #### Files Modified:
 
