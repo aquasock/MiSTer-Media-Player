@@ -1,3 +1,38 @@
+## 893 COMMIT Unreleased ??? 2026-09-02T02:46:35-07:00
+
+#### Coming From:
+
+Unreleased 4063cf0
+
+#### Purpose:
+
+Replace ordinary-file clean-EOF retention with a replay-ready paused state while preserving the final valid presentation.
+
+#### Outcome:
+
+The approved Main/helper boundary will treat a clean ordinary MPG or standalone-audio EOF as a logical rewind: Main will preserve the last valid resident frame, retain the selected source and index in a replay-ready paused state, and make the next Play input launch that source from byte zero through the normal fresh-download path.  Selecting another file, explicitly stopping or leaving the core will clear the replay state, while ISO/DVD and failure teardown remain unchanged.  The helper will complete standalone audio by draining the already-open projected final UI frame from its current byte offset through exactly one COMMIT rather than issuing the nested BEGIN that physical evidence proved creates a hybrid YUV frame.  Main, helper and tests change; RTL, RBF, codecs, DVD behavior and accepted timing remain unchanged.
+
+#### Next Steps:
+
+Implement retained replay source ownership and EOF Play handling in patched Main, add lifecycle coverage for clean file EOF, replay launch, explicit stop, core change, failed EOF and non-file EOF, and require no nested audio-UI BEGIN in both partial-renderer and real-helper tests.  Verify elapsed, remaining and progress still reach exact completion, rerun strict and sanitizer suites plus real MP3, WAV, FLAC and Ogg playback, apply and compile the Main patch against pinned upstream, then build ARMv7 helper and Main artifacts locally for user transfer with the timing-qualified RBF preserved.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_ui.c
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_audio_file_seek.py
+- tools/test_audio_ui_output.c
+- tools/test_main_seek_lifecycle.cpp
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 892 COMMIT Unreleased 4063cf0 2026-09-02T02:40:18-07:00
 
 #### Coming From:
@@ -1250,34 +1285,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 853 COMMIT Unreleased 330d103 2026-08-31T21:38:36-07:00
-
-#### Coming From:
-
-Unreleased 413ace2
-
-#### Purpose:
-
-Replace the physically accepted solid-purple diagnostic selector with the correctly shaped authored DVD selector while preserving the proven userspace-only transfer compensation.
-
-#### Outcome:
-
-The user's refreshed physical capture proves source `413ace2` closes the compensated-candidate byte deficit.  The 857-byte schema-21 snapshot at SHA-256 `5b1b15f4bff4195cd7b487ff0808214475408180ca16267f5242fd4f7dd24729` passes every prefix, row, index, parity and XOR check with checksum `5d8d8a25`; it reports two configs, 44 data records, two commits, one rejected commit, one accepted commit and one plane publication.  The first candidate receives 86,379 bytes, while the second receives exactly 86,400 of its submitted 86,422 bytes and publishes successfully.  The 11,001,450-byte helper/Main log at SHA-256 `eaf58071e5a06a70ad7659fa5f65e51724217578d09c5e7594b2c7e4944a055d` confirms that the helper has already decoded the sparse authored plane at FNV-1a `c23cad52`, but the opt-in probe deliberately replaces both its pixels and palette with solid opaque magenta.  The 1,920-by-1,080 screenshot at SHA-256 `37d9b3e7cc6fa4f38a9d654bdfac9274d5278681bde2da3dfe0ede4c07c25050` contains exactly 21,780 opaque-magenta pixels in one 242-by-90 rectangle from output coordinate 566,894 through 807,983, proving the published plane, palette, compositor and authored moving rectangle.  Source `330d103` preserves the unchanged 86,400-byte authored candidate for the zero-loss case, then packetizes the compensated authored candidate as at most 4,095 source bytes followed by a duplicate of that record's final source byte.  Its 21 full 4,096-byte records and one 406-byte final record submit 86,422 bytes, so the measured one-byte loss at each of the 22 record boundaries discards only duplicates and reconstructs the exact original 86,400-byte plane.  The solid-magenta probe remains independently available, while the new authored-compensation build preserves the DVD plane and palette.  Strict native compilation and the focused subpicture, random-access and menu-hop regressions pass; a direct nonuniform-plane framing regression verifies two configs, two commits, 22 data records per candidate, 86,400 and 86,422 submitted bytes, authored style preservation and byte-identical plane recovery after removing every compensated record's final byte.  The Raspberry Pi GNU 10.2.1 ARM toolchain builds `host/build/MediaPlayer_Helper_AuthoredSelector_330d103`, a 908,660-byte stripped static ARM EABI5 executable at SHA-256 `3f81f1bce3489ad4493e88b2f09e29b068f23ba4aac7980c1adf1fc8bf897481`; it contains the authored-compensation marker, omits the solid-magenta marker and returns the complete protocol-one capability string when executed locally.  Main and the source-`f5f650f` RBF remain frozen.
-
-#### Next Steps:
-
-Exit the MediaPlayer core so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_AuthoredSelector_330d103`, restore executable mode if needed and verify the installed size and SHA-256.  Preserve the installed source-`2de0717` Main and source-`f5f650f` RBF, restart the DVD, enter the menu and move through every button; physical acceptance requires one accepted commit, one plane publication and a correctly shaped authored selector that follows every directional input.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
