@@ -1,5 +1,5 @@
 diff --git a/file_io.cpp b/file_io.cpp
-index 2c9f406..0a02ef2 100644
+index 2c9f4060cbd83be1a94a16971b25503bc43d5cdb..0a02ef2442ad6938b88241bd83d9bbf77bc75a57 100644
 --- a/file_io.cpp
 +++ b/file_io.cpp
 @@ -1789,6 +1789,15 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
@@ -19,7 +19,7 @@ index 2c9f406..0a02ef2 100644
  							for (int i = 0; i < 4; i++)
  							{
 diff --git a/fpga_io.cpp b/fpga_io.cpp
-index b64cfe5..2912a55 100644
+index b64cfe5f5e5c5df2eee53ba29e83cfd2660b3655..2912a55fadc6e6f3357177d64799a468b491811b 100644
 --- a/fpga_io.cpp
 +++ b/fpga_io.cpp
 @@ -720,6 +720,82 @@ uint16_t fpga_spi(uint16_t word)
@@ -106,7 +106,7 @@ index b64cfe5..2912a55 100644
  {
  	uint32_t gpo = (fpga_gpo_read() & ~(0xFFFF | SSPI_STROBE)) | word;
 diff --git a/fpga_io.h b/fpga_io.h
-index b912439..447b56d 100644
+index b912439441ecc6d1ffa3336a787596bb339beb65..447b56da1a9300bb2b1e357c414de96d5d81887d 100644
 --- a/fpga_io.h
 +++ b/fpga_io.h
 @@ -11,6 +11,19 @@ int fpga_io_init();
@@ -130,7 +130,7 @@ index b912439..447b56d 100644
  
  void fpga_spi_fast_block_write(const uint16_t *buf, uint32_t length);
 diff --git a/input.cpp b/input.cpp
-index 50f1991..180d511 100644
+index 50f199134a8d1f0fc0a18a5437f5e1c93426edfe..b13a2644d87a9f698dfb5f7afca1ce12b8a8663c 100644
 --- a/input.cpp
 +++ b/input.cpp
 @@ -36,6 +36,7 @@
@@ -154,11 +154,28 @@ index 50f1991..180d511 100644
  					if (mouse_emu)
  					{
  						int use_analog = (input[dev].mmap[SYS_AXIS_MX] || input[dev].mmap[SYS_AXIS_MY]);
-@@ -3790,6 +3797,21 @@ static void input_cb(struct input_event *ev, struct input_absinfo *absinfo, int
+@@ -3790,6 +3797,38 @@ static void input_cb(struct input_event *ev, struct input_absinfo *absinfo, int
  				int keyrah = (cfg.keyrah_mode && (((((uint32_t)input[dev].vid) << 16) | input[dev].pid) == cfg.keyrah_mode));
  				if (keyrah) ev->code = keyrah_trans(ev->code, ev->value);
  
-+				unsigned media_input = ev->code == KEY_SPACE ? MEDIAPLAYER_INPUT_PLAY_PAUSE :
++				uint32_t media_modifiers = get_key_mod();
++				bool media_ctrl = media_modifiers & (LCTRL | RCTRL);
++				bool media_alt = media_modifiers & (LALT | RALT);
++				bool media_shift = media_modifiers & (LSHIFT | RSHIFT);
++				unsigned media_input =
++				                       !media_shift && media_ctrl && media_alt &&
++				                           ev->code == KEY_LEFT ? MEDIAPLAYER_INPUT_SEEK_BACK_300 :
++				                       !media_shift && media_ctrl && media_alt &&
++				                           ev->code == KEY_RIGHT ? MEDIAPLAYER_INPUT_SEEK_FORWARD_300 :
++				                       !media_shift && media_ctrl &&
++				                           ev->code == KEY_LEFT ? MEDIAPLAYER_INPUT_SEEK_BACK_60 :
++				                       !media_shift && media_ctrl &&
++				                           ev->code == KEY_RIGHT ? MEDIAPLAYER_INPUT_SEEK_FORWARD_60 :
++				                       !media_shift && media_alt &&
++				                           ev->code == KEY_LEFT ? MEDIAPLAYER_INPUT_SEEK_BACK_10 :
++				                       !media_shift && media_alt &&
++				                           ev->code == KEY_RIGHT ? MEDIAPLAYER_INPUT_SEEK_FORWARD_10 :
++				                       ev->code == KEY_SPACE ? MEDIAPLAYER_INPUT_PLAY_PAUSE :
 +				                       ev->code == KEY_P ? MEDIAPLAYER_INPUT_PREVIOUS :
 +				                       ev->code == KEY_N ? MEDIAPLAYER_INPUT_NEXT :
 +				                       ev->code == KEY_UP ? MEDIAPLAYER_INPUT_MENU_UP :
@@ -177,7 +194,7 @@ index 50f1991..180d511 100644
  				if (ev->value) modifier |= ps2code;
  				else modifier &= ~ps2code;
 diff --git a/menu.cpp b/menu.cpp
-index 0c74e21..ceb3743 100644
+index 0c74e211154aa6e8faf8ba1e875548cec42edd6f..ceb3743efb2fa3bca934d3b7ef0b5b9a5afaa30a 100644
 --- a/menu.cpp
 +++ b/menu.cpp
 @@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
@@ -266,10 +283,10 @@ index 0c74e21..ceb3743 100644
  				printf("Saving config to %s\n", filename);
 diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
 new file mode 100644
-index 0000000..d828649
+index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,821 @@
+@@ -0,0 +1,877 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -309,6 +326,7 @@ index 0000000..d828649
 +static bool chapter_download_rearmed = false;
 +static bool navigation_pending = false;
 +static bool chapter_controls = false;
++static bool seek_controls = false;
 +static bool menu_controls = false;
 +static bool menu_active = false;
 +static unsigned char playback_index = 0;
@@ -324,6 +342,12 @@ index 0000000..d828649
 +	MEDIA_CONTROL_MENU_RIGHT = 0x07,
 +	MEDIA_CONTROL_MENU_ACTIVATE = 0x08,
 +	MEDIA_CONTROL_ROOT_MENU = 0x09,
++	MEDIA_CONTROL_SEEK_BACK_10 = 0x0a,
++	MEDIA_CONTROL_SEEK_FORWARD_10 = 0x0b,
++	MEDIA_CONTROL_SEEK_BACK_60 = 0x0c,
++	MEDIA_CONTROL_SEEK_FORWARD_60 = 0x0d,
++	MEDIA_CONTROL_SEEK_BACK_300 = 0x0e,
++	MEDIA_CONTROL_SEEK_FORWARD_300 = 0x0f,
 +	MEDIA_CONTROL_READY = 0x81,
 +	MEDIA_CONTROL_MENU_ENTER = 0x82,
 +	MEDIA_CONTROL_MENU_LEAVE = 0x83,
@@ -516,6 +540,7 @@ index 0000000..d828649
 +	chapter_download_rearmed = false;
 +	navigation_pending = false;
 +	chapter_controls = false;
++	seek_controls = false;
 +	menu_controls = false;
 +	menu_active = false;
 +}
@@ -671,6 +696,10 @@ index 0000000..d828649
 +	                !strncasecmp(source_spec, "isomenu:", 8);
 +	chapter_controls = menu_controls || !strncasecmp(source_spec, "dvd:", 4) ||
 +	                   !strncasecmp(source_spec, "iso:", 4);
++	const char *source_extension = strrchr(source_spec, '.');
++	seek_controls = !strncasecmp(source_spec, "file:", 5) && source_extension &&
++	                (!strcasecmp(source_extension, ".mpg") ||
++	                 !strcasecmp(source_extension, ".mpeg"));
 +	user_io_set_index(index);
 +	user_io_file_info(".M2V");
 +	user_io_set_download(1);
@@ -845,6 +874,8 @@ index 0000000..d828649
 +	    input <= MEDIAPLAYER_INPUT_MENU_ACTIVATE &&
 +	    (!menu_controls || !menu_active)) return 0;
 +	if (input == MEDIAPLAYER_INPUT_ROOT_MENU && !menu_controls) return 0;
++	if (input >= MEDIAPLAYER_INPUT_SEEK_BACK_10 &&
++	    input <= MEDIAPLAYER_INPUT_SEEK_FORWARD_300 && !seek_controls) return 0;
 +	if (!pressed) return 1;
 +
 +	if (input == MEDIAPLAYER_INPUT_PLAY_PAUSE && menu_active)
@@ -881,6 +912,48 @@ index 0000000..d828649
 +		if (!send_control(command)) stop_with_reason("menu-command-error");
 +		diagnostic_write("DVD navigation command=0x%02x submitted=%llu\n",
 +		                 command, (unsigned long long)submitted_bytes);
++		return 1;
++	}
++	if (input >= MEDIAPLAYER_INPUT_SEEK_BACK_10 &&
++	    input <= MEDIAPLAYER_INPUT_SEEK_FORWARD_300)
++	{
++		if (chapter_barrier || navigation_pending || playback_paused) return 1;
++		uint8_t command =
++			input == MEDIAPLAYER_INPUT_SEEK_BACK_10 ? MEDIA_CONTROL_SEEK_BACK_10 :
++			input == MEDIAPLAYER_INPUT_SEEK_FORWARD_10 ? MEDIA_CONTROL_SEEK_FORWARD_10 :
++			input == MEDIAPLAYER_INPUT_SEEK_BACK_60 ? MEDIA_CONTROL_SEEK_BACK_60 :
++			input == MEDIAPLAYER_INPUT_SEEK_FORWARD_60 ? MEDIA_CONTROL_SEEK_FORWARD_60 :
++			input == MEDIAPLAYER_INPUT_SEEK_BACK_300 ? MEDIA_CONTROL_SEEK_BACK_300 :
++			MEDIA_CONTROL_SEEK_FORWARD_300;
++		int seconds =
++			input == MEDIAPLAYER_INPUT_SEEK_BACK_10 ? -10 :
++			input == MEDIAPLAYER_INPUT_SEEK_FORWARD_10 ? 10 :
++			input == MEDIAPLAYER_INPUT_SEEK_BACK_60 ? -60 :
++			input == MEDIAPLAYER_INPUT_SEEK_FORWARD_60 ? 60 :
++			input == MEDIAPLAYER_INPUT_SEEK_BACK_300 ? -300 : 300;
++		if (download_active)
++		{
++			user_io_set_download(0);
++			download_active = 0;
++		}
++		pending_size = pending_offset = 0;
++		pending_eof = false;
++		burst_state = {};
++		user_io_set_index(playback_index);
++		user_io_file_info(".M2V");
++		user_io_set_download(1);
++		download_active = 1;
++		download_assert_us = monotonic_us();
++		chapter_download_rearmed = true;
++		chapter_barrier = true;
++		if (!send_control(command))
++		{
++			stop_with_reason("seek-command-error");
++			return 1;
++		}
++		diagnostic_write("seek command=%+d seconds submitted=%llu\n",
++		                 seconds, (unsigned long long)submitted_bytes);
++		printf("MediaPlayer: seek %+d seconds\n", seconds);
 +		return 1;
 +	}
 +
@@ -1093,10 +1166,10 @@ index 0000000..d828649
 +}
 diff --git a/support/mediaplayer/mediaplayer.h b/support/mediaplayer/mediaplayer.h
 new file mode 100644
-index 0000000..0a0b254
+index 0000000000000000000000000000000000000000..6c7f447a5dac27d98e8879f9290aa3d93b4bc846
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.h
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,35 @@
 +#ifndef MEDIAPLAYER_ARM_LOADER_H
 +#define MEDIAPLAYER_ARM_LOADER_H
 +
@@ -1119,7 +1192,13 @@ index 0000000..0a0b254
 +	MEDIAPLAYER_INPUT_MENU_LEFT,
 +	MEDIAPLAYER_INPUT_MENU_RIGHT,
 +	MEDIAPLAYER_INPUT_MENU_ACTIVATE,
-+	MEDIAPLAYER_INPUT_ROOT_MENU
++	MEDIAPLAYER_INPUT_ROOT_MENU,
++	MEDIAPLAYER_INPUT_SEEK_BACK_10,
++	MEDIAPLAYER_INPUT_SEEK_FORWARD_10,
++	MEDIAPLAYER_INPUT_SEEK_BACK_60,
++	MEDIAPLAYER_INPUT_SEEK_FORWARD_60,
++	MEDIAPLAYER_INPUT_SEEK_BACK_300,
++	MEDIAPLAYER_INPUT_SEEK_FORWARD_300
 +};
 +
 +int mediaplayer_input(unsigned input, int pressed, int osd_visible);
@@ -1127,7 +1206,7 @@ index 0000000..0a0b254
 +
 +#endif
 diff --git a/user_io.cpp b/user_io.cpp
-index 511c7a4..a01924e 100644
+index 511c7a477b155999ba06b6afb39bbcdac3f121d8..a01924ec70cb4c0b69a64a338844f2523110420a 100644
 --- a/user_io.cpp
 +++ b/user_io.cpp
 @@ -42,6 +42,7 @@
@@ -1373,7 +1452,7 @@ index 511c7a4..a01924e 100644
  
  			if (found)
 diff --git a/user_io.h b/user_io.h
-index 648736f..e1ff15c 100644
+index 648736f6175e3a276eda7b9aed3ad053ff4fd78e..e1ff15c56a2e32e7d2a886747e232ed3613e7c95 100644
 --- a/user_io.h
 +++ b/user_io.h
 @@ -229,6 +229,30 @@ void user_io_set_index(unsigned char index);

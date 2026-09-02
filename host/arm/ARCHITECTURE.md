@@ -25,6 +25,19 @@ owned by Main as a stdout transport hold, so no pause byte enters the FPGA
 protocol. Keyboard P/N use the same previous/next actions and Space uses the
 same pause action while the MiSTer OSD is closed.
 
+Ordinary file-backed `.mpg` and `.mpeg` Program Streams additionally accept
+Alt+Left/Right for 10-second jumps, Ctrl+Left/Right for 60-second jumps, and
+Ctrl+Alt+Left/Right for 300-second jumps. The helper records at most one
+timestamped video-PES source offset per half second while playing. A forward
+jump beyond that sparse index extends it with a packet-length-aware scan that
+emits no media; backward and already-indexed jumps use binary lookup. The
+selected timestamp is clamped at file boundaries, the file is repositioned,
+and demux/audio/scheduler queues are discarded behind the existing READY/GO
+download barrier. The normal random-access filter then withholds output until
+it has a sequence header, an I picture, and the following reference picture.
+Raw `.m2v`, standalone audio, ISO, and optical-disc routes reject these seek
+commands in this boundary.
+
 Menu-mode sources use the same channel for directional, activate and root-menu
 commands. Root calls and button activations that enter a title use the ready/go
 barrier.  An activation that remains in menu space receives a distinct
@@ -104,9 +117,10 @@ share a compilation unit:
    helper recognizes only a material backward jump, rebases the new ISO epoch
    onto the preceding maximum, and sends one continuous title clock to both
    its audio scheduler and the FPGA.  Ordinary MPEG decode-order timestamp
-   reordering and every non-ISO source remain unchanged. Chapter changes reset
-   helper demux, audio, scheduler and PTS state behind a Main download-session
-   barrier; general seeking will need the same explicit discontinuity contract.
+   reordering and every non-ISO source remain unchanged. Chapter changes and
+   ordinary Program Stream file seeks reset helper demux, audio, scheduler and
+   PTS state behind a Main download-session barrier. File seeking preserves the
+   source PTS epoch; DVD chapter changes retain their discontinuity rebasing.
 4. Audio codec: MPEG Layer II on stream ids 0xC0-0xDF, standalone MPEG-1
    Layer III, RIFF WAVE, FLAC and Ogg Vorbis files, and AC-3 on private stream 1 substreams 0x80-0x87, all
    behind codec selection rather than output-specific decode paths. MPEG audio
@@ -166,8 +180,9 @@ mono or multichannel Vorbis to signed 16-bit stereo, and emits at 44.1 or
 48 kHz. The decoder is compiled into the static helper and has no target-side
 runtime-library dependency.
 
-Previous and next chapter plus authored-menu commands use the private control
-protocol while Start pause/resume is a Main-side transport hold. General seek, title, angle,
+Previous and next chapter, fixed ordinary-Program-Stream jumps, and authored-menu
+commands use the private control protocol while Start pause/resume is a
+Main-side transport hold. Arbitrary scrubbing, audio/DVD seek, title, angle,
 audio-track and subtitle-track commands remain deferred. The ARM-only pause
 does not suppress the FPGA audio FIFO underrun after its existing reserve
 drains; that product polish requires an explicit future core pause state.

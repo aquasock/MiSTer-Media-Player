@@ -1353,6 +1353,21 @@ int media_source_seek(struct media_source *source, int64_t offset,
     return source->ops->seek_source(source->state, offset, origin);
 }
 
+int media_source_position(struct media_source *source, int64_t *position)
+{
+    struct file_source_state *state;
+    off_t offset;
+
+    if (!source || source->ops != &file_ops || !source->state || !position)
+        return -1;
+    state = source->state;
+    offset = ftello(state->stream);
+    if (offset < 0)
+        return -1;
+    *position = (int64_t)offset;
+    return 0;
+}
+
 int media_source_error(struct media_source *source)
 {
     return source && source->ops ? source->ops->has_error(source->state) : 1;

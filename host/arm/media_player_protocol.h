@@ -19,6 +19,12 @@
 #define MEDIA_PLAYER_CONTROL_MENU_RIGHT       0x07
 #define MEDIA_PLAYER_CONTROL_MENU_ACTIVATE    0x08
 #define MEDIA_PLAYER_CONTROL_ROOT_MENU        0x09
+#define MEDIA_PLAYER_CONTROL_SEEK_BACK_10      0x0a
+#define MEDIA_PLAYER_CONTROL_SEEK_FORWARD_10   0x0b
+#define MEDIA_PLAYER_CONTROL_SEEK_BACK_60      0x0c
+#define MEDIA_PLAYER_CONTROL_SEEK_FORWARD_60   0x0d
+#define MEDIA_PLAYER_CONTROL_SEEK_BACK_300     0x0e
+#define MEDIA_PLAYER_CONTROL_SEEK_FORWARD_300  0x0f
 #define MEDIA_PLAYER_CONTROL_READY            0x81
 #define MEDIA_PLAYER_CONTROL_MENU_ENTER       0x82
 #define MEDIA_PLAYER_CONTROL_MENU_LEAVE       0x83
@@ -51,6 +57,6 @@
     "flac-s16le-stereo-44100,flac-s16le-stereo-48000," \
     "ogg-vorbis-s16le-stereo-44100,ogg-vorbis-s16le-stereo-48000 " \
     "transport=inband-pcm-v1,inband-dvd-overlay-v1,inband-audio-ui-v1 " \
-    "controls=chapter-v1,pause-hold-v1,dvd-menu-v1"
+    "controls=chapter-v1,pause-hold-v1,dvd-menu-v1,mpeg-ps-seek-v1"
 
 #endif

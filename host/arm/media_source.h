@@ -73,6 +73,7 @@ int media_source_rewind(struct media_source *source);
 int media_source_prepare(struct media_source *source);
 int media_source_seek(struct media_source *source, int64_t offset,
                       enum media_source_seek_origin origin);
+int media_source_position(struct media_source *source, int64_t *position);
 int media_source_error(struct media_source *source);
 int media_source_change_chapter(struct media_source *source, int direction);
 int media_source_dvd_command(struct media_source *source,

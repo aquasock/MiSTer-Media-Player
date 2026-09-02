@@ -14,6 +14,7 @@
 #include "media_source.h"
 #include "output_reserve.h"
 #include "output_stage.h"
+#include "program_stream_seek.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -1223,7 +1224,7 @@ static int iso_filter_initial_random_access(struct output_state *output)
 
         if (chunk->offset || chunk->size < prefix) {
             fprintf(stderr,
-                    "media_player_helper: invalid DVD startup queue state\n");
+                    "media_player_helper: invalid random-access startup queue state\n");
             return -1;
         }
         video_size += chunk->size - prefix;
@@ -1231,7 +1232,7 @@ static int iso_filter_initial_random_access(struct output_state *output)
     video = malloc(video_size ? video_size : 1u);
     if (!video) {
         fprintf(stderr,
-                "media_player_helper: out of memory filtering DVD startup\n");
+                "media_player_helper: out of memory filtering random-access startup\n");
         return -1;
     }
     for (chunk = output->video_head; chunk; chunk = chunk->next) {
@@ -1259,7 +1260,7 @@ static int iso_filter_initial_random_access(struct output_state *output)
     free(video);
     output->iso_start_filter_active = 0;
     fprintf(stderr,
-            "media_player_helper: DVD random access sequence_offset=%zu "
+            "media_player_helper: random access sequence_offset=%zu "
             "intra_offset=%zu next_reference_offset=%zu discarded=%u "
             "pre-context picture(s), %u leading B picture(s)\n",
             filter_result.sequence_offset, filter_result.intra_offset,
@@ -1437,7 +1438,7 @@ static void free_video_head(struct output_state *output)
     free(chunk);
 }
 
-static void reset_audio_for_chapter(struct audio_state *audio)
+static void reset_audio_for_navigation(struct audio_state *audio)
 {
     enum audio_codec selected_codec = audio->codec;
     enum audio_output selected_output = audio->output;
@@ -1454,14 +1455,15 @@ static void reset_audio_for_chapter(struct audio_state *audio)
     audio->dts_substream = selected_dts_substream;
     mp3dec_init(&audio->decoder);
     fprintf(stderr,
-            "media_player_helper: chapter audio retained codec=%d "
+            "media_player_helper: navigation audio retained codec=%d "
             "ac3_substream=%d dts_substream=%d\n",
             (int)audio->codec, audio->a52_substream,
             audio->dts_substream);
 }
 
-static void reset_output_for_chapter(struct output_state *output,
-                                     size_t hold_limit)
+static void reset_output_for_navigation(struct output_state *output,
+                                        size_t hold_limit,
+                                        int dvd_timeline)
 {
     FILE *video = output->video;
     FILE *pcm = output->pcm;
@@ -1481,7 +1483,7 @@ static void reset_output_for_chapter(struct output_state *output,
     output->hold_active = hold_limit != 0;
     output->scheduler_started = !output->hold_active;
     output->scheduler_enabled = pcm == NULL;
-    output->iso_pts_normalization = 1;
+    output->iso_pts_normalization = dvd_timeline;
     output->iso_start_filter_active = output->scheduler_enabled;
 }
 
@@ -1496,8 +1498,8 @@ static int start_pending_menu_activation(struct dvd_menu_state *menu,
         return -1;
     if (begin_activation_stage(output) < 0)
         return -1;
-    reset_audio_for_chapter(audio);
-    reset_output_for_chapter(output, hold_limit);
+    reset_audio_for_navigation(audio);
+    reset_output_for_navigation(output, hold_limit, 1);
     menu->activation_pending = 1;
     menu->activation_payloads = 0;
     menu->activation_staged_hop = 0;
@@ -1529,7 +1531,7 @@ static int scheduler_release_silent_video(struct output_state *output)
 {
     if (output->iso_start_filter_active) {
         fprintf(stderr,
-                "media_player_helper: DVD title ended before a complete "
+                "media_player_helper: stream ended before a complete "
                 "initial random-access group\n");
         return -1;
     }
@@ -1654,7 +1656,7 @@ static int scheduler_drain(struct output_state *output, int at_eof)
     if (output->iso_start_filter_active) {
         if (at_eof)
             fprintf(stderr,
-                    "media_player_helper: DVD title ended before a complete "
+                    "media_player_helper: stream ended before a complete "
                     "initial random-access group\n");
         return at_eof ? -1 : 0;
     }
@@ -2261,6 +2263,138 @@ static int parse_pes_header(const uint8_t *packet, size_t size,
     return 0;
 }
 
+static int seek_command_seconds(int command, int *seconds)
+{
+    switch (command) {
+    case MEDIA_PLAYER_CONTROL_SEEK_BACK_10:
+        *seconds = -10;
+        return 1;
+    case MEDIA_PLAYER_CONTROL_SEEK_FORWARD_10:
+        *seconds = 10;
+        return 1;
+    case MEDIA_PLAYER_CONTROL_SEEK_BACK_60:
+        *seconds = -60;
+        return 1;
+    case MEDIA_PLAYER_CONTROL_SEEK_FORWARD_60:
+        *seconds = 60;
+        return 1;
+    case MEDIA_PLAYER_CONTROL_SEEK_BACK_300:
+        *seconds = -300;
+        return 1;
+    case MEDIA_PLAYER_CONTROL_SEEK_FORWARD_300:
+        *seconds = 300;
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+static int skip_program_stream_pack(struct media_source *input)
+{
+    uint8_t header[10];
+
+    if (read_exact(input, header, 1) < 0)
+        return -1;
+    if ((header[0] & 0xc0) == 0x40)
+        return read_exact(input, header + 1, 9) < 0 ||
+               skip_bytes(input, header[9] & 7) < 0 ? -1 : 0;
+    if ((header[0] & 0xf0) == 0x20)
+        return read_exact(input, header + 1, 7);
+    fprintf(stderr, "media_player_helper: invalid pack header\n");
+    return -1;
+}
+
+/*
+ * Extend the sparse index without emitting anything. The scan uses complete
+ * Program Stream packet lengths, so start-code-looking bytes inside compressed
+ * payloads cannot become false index entries. It leaves the source positioned
+ * at the selected entry, ready for the ordinary demux path to restart.
+ */
+static int scan_program_stream_seek(
+    struct media_source *input, struct program_stream_seek_index *index,
+    int *video_code, uint64_t target_pts,
+    struct program_stream_seek_entry *selected)
+{
+    for (;;) {
+        uint8_t code;
+        int64_t after_code;
+        int found = find_start_code(input, &code);
+
+        if (found < 0)
+            return -1;
+        if (!found || code == 0xb9)
+            break;
+        if (media_source_position(input, &after_code) < 0)
+            return -1;
+        if (code == 0xba) {
+            if (skip_program_stream_pack(input) < 0)
+                return -1;
+            continue;
+        }
+        if ((code & 0xf0) == 0xe0) {
+            uint8_t length_bytes[2];
+            uint8_t *packet;
+            size_t length;
+            size_t payload_offset;
+            uint64_t pts = 0;
+            int has_pts = 0;
+            int record_result = 0;
+
+            if (read_exact(input, length_bytes, sizeof(length_bytes)) < 0)
+                return -1;
+            length = ((size_t)length_bytes[0] << 8) | length_bytes[1];
+            if (!length) {
+                fprintf(stderr,
+                        "media_player_helper: unbounded PES packets are not supported\n");
+                return -1;
+            }
+            packet = malloc(length);
+            if (!packet) {
+                fprintf(stderr, "media_player_helper: out of memory\n");
+                return -1;
+            }
+            if (read_exact(input, packet, length) < 0) {
+                free(packet);
+                return -1;
+            }
+            if (*video_code < 0)
+                *video_code = code;
+            if (*video_code == code &&
+                parse_pes_header(packet, length, &payload_offset, &pts,
+                                 &has_pts) == 0 && has_pts)
+                record_result = program_stream_seek_record(
+                    index, pts, after_code - 4);
+            free(packet);
+            if (record_result < 0)
+                return -1;
+            if (*video_code == code && has_pts && pts >= target_pts)
+                break;
+            continue;
+        }
+        {
+            uint8_t length_bytes[2];
+            size_t length;
+
+            if (read_exact(input, length_bytes, sizeof(length_bytes)) < 0)
+                return -1;
+            length = ((size_t)length_bytes[0] << 8) | length_bytes[1];
+            if (skip_bytes(input, length) < 0)
+                return -1;
+        }
+    }
+    if (!program_stream_seek_find(index, target_pts, selected)) {
+        fprintf(stderr,
+                "media_player_helper: no timestamped video packet available for seek\n");
+        return -1;
+    }
+    if (media_source_seek(input, selected->source_offset,
+                          MEDIA_SOURCE_SEEK_START) < 0) {
+        fprintf(stderr, "media_player_helper: cannot reposition Program Stream\n");
+        return -1;
+    }
+    return 0;
+}
+
 struct h262_preflight {
     uint32_t window;
     uint8_t sequence_payload[4];
@@ -2499,7 +2633,9 @@ static int preflight_input(struct media_source *input, int is_program_stream)
 static int process_pes(struct media_source *input, uint8_t code,
                        struct audio_state *audio,
                        struct output_state *output, int *video_code,
-                       int *audio_code)
+                       int *audio_code,
+                       struct program_stream_seek_index *seek_index,
+                       int64_t pes_offset)
 {
     uint8_t length_bytes[2];
     uint8_t *packet;
@@ -2552,6 +2688,12 @@ static int process_pes(struct media_source *input, uint8_t code,
 
         if (has_pts && normalize_video_pts(output, pts, &pts) < 0)
             goto done;
+        if (has_pts && seek_index &&
+            program_stream_seek_record(seek_index, pts, pes_offset) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: cannot extend Program Stream seek index\n");
+            goto done;
+        }
         has_record = has_pts && pts_record_wanted(output);
         video_size = length - payload_offset;
 
@@ -2974,14 +3116,15 @@ static int process_program_stream(struct media_source *input,
                                   struct audio_state *audio,
                                   struct output_state *output,
                                   struct dvd_menu_state *menu,
-                                  int control_fd, int *control_command)
+                                  int control_fd, int *control_command,
+                                  struct program_stream_seek_index *seek_index,
+                                  int *video_code, int *audio_code)
 {
-    int video_code = -1;
-    int audio_code = -1;
-
     for (;;) {
         uint8_t code;
+        int64_t pes_offset = -1;
         int command = control_read_command(control_fd);
+        int seek_seconds;
         enum media_source_dvd_command menu_command;
 
         if (command < 0)
@@ -2993,6 +3136,11 @@ static int process_program_stream(struct media_source *input,
             if (cancel_pending_menu_activation(menu, output,
                                                "chapter-interrupt") < 0)
                 return -1;
+            *control_command = command;
+            return 1;
+        }
+        if (seek_command_seconds(command, &seek_seconds) &&
+            input->kind == MEDIA_SOURCE_FILE && seek_index) {
             *control_command = command;
             return 1;
         }
@@ -3059,6 +3207,13 @@ static int process_program_stream(struct media_source *input,
         }
         if (found < 0)
             return -1;
+        if (seek_index && media_source_position(input, &pes_offset) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: cannot read Program Stream position\n");
+            return -1;
+        }
+        if (pes_offset >= 0)
+            pes_offset -= 4;
         if (menu->activation_pending) {
             if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
                 return -1;
@@ -3089,25 +3244,14 @@ static int process_program_stream(struct media_source *input,
             return 0;
         }
         if (code == 0xba) {
-            uint8_t header[10];
-            if (read_exact(input, header, 1) < 0)
+            if (skip_program_stream_pack(input) < 0)
                 return -1;
-            if ((header[0] & 0xc0) == 0x40) {
-                if (read_exact(input, header + 1, 9) < 0 ||
-                    skip_bytes(input, header[9] & 7) < 0)
-                    return -1;
-            } else if ((header[0] & 0xf0) == 0x20) {
-                if (read_exact(input, header + 1, 7) < 0)
-                    return -1;
-            } else {
-                fprintf(stderr, "media_player_helper: invalid pack header\n");
-                return -1;
-            }
             continue;
         }
         if ((code & 0xf0) == 0xe0 || (code & 0xe0) == 0xc0) {
             if (process_pes(input, code, audio, output,
-                            &video_code, &audio_code) < 0)
+                            video_code, audio_code, seek_index,
+                            pes_offset) < 0)
                 return -1;
             continue;
         }
@@ -3267,6 +3411,7 @@ int main(int argc, char **argv)
     struct audio_state audio = {0};
     struct media_source input = {0};
     struct dvd_menu_state dvd_menu = {0};
+    struct program_stream_seek_index seek_index = {0};
     char source_error[512];
     uint8_t signature[4];
     int is_program_stream;
@@ -3276,6 +3421,9 @@ int main(int argc, char **argv)
     int is_ogg;
     int is_audio_file;
     int dvd_menu_mode;
+    int seekable_program_stream = 0;
+    int program_video_code = -1;
+    int program_audio_code = -1;
     int i;
     int success = 0;
 
@@ -3439,6 +3587,10 @@ int main(int argc, char **argv)
     is_audio_file = is_mp3 || is_wav || is_flac || is_ogg;
     is_program_stream = !is_audio_file &&
                         !memcmp(signature, "\x00\x00\x01\xba", 4);
+    seekable_program_stream = is_program_stream &&
+                              input.kind == MEDIA_SOURCE_FILE &&
+                              (has_suffix_case(source_specification, ".mpg") ||
+                               has_suffix_case(source_specification, ".mpeg"));
     if (is_mp3) {
         if (preflight_mp3(&input) < 0)
             goto done;
@@ -3499,12 +3651,68 @@ int main(int argc, char **argv)
             int command = 0;
             int result = process_program_stream(&input, &audio, &output,
                                                 &dvd_menu,
-                                                control_fd, &command);
+                                                control_fd, &command,
+                                                seekable_program_stream ?
+                                                    &seek_index : NULL,
+                                                &program_video_code,
+                                                &program_audio_code);
+            int seek_seconds;
 
             if (result < 0)
                 goto done;
             if (!result)
                 break;
+            if (seekable_program_stream &&
+                seek_command_seconds(command, &seek_seconds)) {
+                struct program_stream_seek_entry selected;
+                uint64_t current_pts = output.have_video_pts ?
+                    output.max_video_pts :
+                    (seek_index.count ?
+                        seek_index.entries[seek_index.count - 1u].pts_90k : 0);
+                uint64_t target_pts = program_stream_seek_target(
+                    current_pts, seek_seconds);
+
+                if (!seek_index.count ||
+                    target_pts >
+                        seek_index.entries[seek_index.count - 1u].pts_90k) {
+                    if (scan_program_stream_seek(
+                            &input, &seek_index, &program_video_code,
+                            target_pts, &selected) < 0) {
+                        (void)control_send(control_fd,
+                                           MEDIA_PLAYER_CONTROL_ERROR);
+                        goto done;
+                    }
+                } else if (!program_stream_seek_find(
+                               &seek_index, target_pts, &selected) ||
+                           media_source_seek(&input, selected.source_offset,
+                                             MEDIA_SOURCE_SEEK_START) < 0) {
+                    (void)control_send(control_fd,
+                                       MEDIA_PLAYER_CONTROL_ERROR);
+                    fprintf(stderr,
+                            "media_player_helper: Program Stream seek failed\n");
+                    goto done;
+                }
+                if (flush_output(&output, "seek barrier") < 0)
+                    goto done;
+                reset_audio_for_navigation(&audio);
+                reset_output_for_navigation(
+                    &output,
+                    (size_t)audio_delay_ms * (size_t)PCM_SAMPLE_RATE / 1000u,
+                    0);
+                if (control_send(control_fd, MEDIA_PLAYER_CONTROL_READY) < 0 ||
+                    control_wait_for_go(control_fd) < 0) {
+                    fprintf(stderr,
+                            "media_player_helper: seek barrier failed\n");
+                    goto done;
+                }
+                fprintf(stderr,
+                        "media_player_helper: seek %+d seconds target=%llu "
+                        "selected=%llu offset=%lld entries=%zu\n",
+                        seek_seconds, (unsigned long long)target_pts,
+                        (unsigned long long)selected.pts_90k,
+                        (long long)selected.source_offset, seek_index.count);
+                continue;
+            }
             if ((command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
                  command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER) &&
                 ((input.kind != MEDIA_SOURCE_ISO &&
@@ -3528,10 +3736,11 @@ int main(int argc, char **argv)
             } else if (flush_output(&output, "chapter barrier") < 0) {
                 goto done;
             }
-            reset_audio_for_chapter(&audio);
-            reset_output_for_chapter(&output,
-                                     (size_t)audio_delay_ms *
-                                     (size_t)PCM_SAMPLE_RATE / 1000u);
+            reset_audio_for_navigation(&audio);
+            reset_output_for_navigation(
+                &output,
+                (size_t)audio_delay_ms * (size_t)PCM_SAMPLE_RATE / 1000u,
+                1);
             if (control_send(control_fd, MEDIA_PLAYER_CONTROL_READY) < 0 ||
                 control_wait_for_go(control_fd) < 0) {
                 fprintf(stderr,
@@ -3595,6 +3804,7 @@ int main(int argc, char **argv)
                 "media_player_helper: DVD PTS discontinuities=%u\n",
                 output.iso_pts_discontinuities);
 done:
+    program_stream_seek_destroy(&seek_index);
     if (control_fd >= 0)
         close(control_fd);
     if (audio.a52)

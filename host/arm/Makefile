@@ -7,10 +7,11 @@ A52_DIR ?= $(DEPS_DIR)/liba52
 DVD_PREFIX ?= $(DEPS_DIR)/dvd-install-native
 OUTPUT ?= media_player_helper
 SOURCES := media_player_helper.c media_source.c dvd_random_access.c dvd_spu.c \
-	audio_ui.c \
+	audio_ui.c program_stream_seek.c \
 	output_reserve.c output_stage.c
 HEADERS := media_source.h media_player_protocol.h consumer_audio.h audio_ui.h \
-	ac3_resync.h dvd_random_access.h dvd_spu.h output_reserve.h output_stage.h \
+	ac3_resync.h dvd_random_access.h dvd_spu.h program_stream_seek.h \
+	output_reserve.h output_stage.h \
 	$(DEPS_DIR)/minimp3.h $(DEPS_DIR)/miniaudio.h \
 	$(DEPS_DIR)/stb_vorbis.c
 DVDNAV_LIBRARY := $(DVD_PREFIX)/lib/libdvdnav.a
