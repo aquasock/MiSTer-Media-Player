@@ -11,6 +11,8 @@ typedef int (*consumer_pcm_callback)(void *opaque, const int16_t *stereo,
 
 struct consumer_audio_control {
     void *opaque;
+    int (*configure_timeline)(void *opaque, uint64_t length_frames,
+                              unsigned rate_hz);
     int (*request_seek)(void *opaque, uint64_t current_frame,
                         uint64_t length_frames, unsigned rate_hz,
                         int *seconds);

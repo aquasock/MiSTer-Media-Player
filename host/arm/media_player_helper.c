@@ -3293,15 +3293,41 @@ struct audio_file_control_state {
     uint64_t length_frames;
 };
 
+static int audio_file_configure_timeline(void *opaque,
+                                         uint64_t length_frames,
+                                         unsigned rate_hz)
+{
+    struct audio_file_control_state *state = opaque;
+
+    state->length_frames = length_frames;
+    if (!state->output->audio_ui)
+        return 0;
+    if (audio_ui_set_track_length(state->output->audio_ui,
+                                  length_frames, rate_hz) < 0) {
+        fprintf(stderr,
+                "media_player_helper: cannot configure audio UI duration "
+                "frames=%llu rate=%u\n",
+                (unsigned long long)length_frames, rate_hz);
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: audio UI duration frames=%llu rate=%u\n",
+            (unsigned long long)length_frames, rate_hz);
+    return 0;
+}
+
 static int audio_file_request_seek(void *opaque, uint64_t current_frame,
                                    uint64_t length_frames, unsigned rate_hz,
                                    int *seconds)
 {
     struct audio_file_control_state *state = opaque;
-    int command = control_read_command(state->control_fd);
+    int command;
 
     (void)current_frame;
     (void)rate_hz;
+    if (state->control_fd < 0)
+        return 0;
+    command = control_read_command(state->control_fd);
     if (command < 0)
         return -1;
     if (!seek_command_seconds(command, seconds)) {
@@ -3469,12 +3495,14 @@ int main(int argc, char **argv)
     struct dvd_menu_state dvd_menu = {0};
     struct program_stream_seek_index seek_index = {0};
     struct audio_file_control_state audio_file_control_state = {
-        &output, -1, 0, 0, 0
+        .output = &output,
+        .control_fd = -1
     };
     const struct consumer_audio_control audio_file_control = {
-        &audio_file_control_state,
-        audio_file_request_seek,
-        audio_file_complete_seek
+        .opaque = &audio_file_control_state,
+        .configure_timeline = audio_file_configure_timeline,
+        .request_seek = audio_file_request_seek,
+        .complete_seek = audio_file_complete_seek
     };
     char source_error[512];
     uint8_t signature[4];
@@ -3700,20 +3728,16 @@ int main(int argc, char **argv)
                 "media_player_helper: audio UI 720x480p BT.601 frame enabled\n");
     }
     if (is_mp3) {
-        if (process_mp3_stream(&input, &output,
-                               control_fd >= 0 ? &audio_file_control : NULL) < 0)
+        if (process_mp3_stream(&input, &output, &audio_file_control) < 0)
             goto done;
     } else if (is_wav) {
-        if (process_wav_stream(&input, &output,
-                               control_fd >= 0 ? &audio_file_control : NULL) < 0)
+        if (process_wav_stream(&input, &output, &audio_file_control) < 0)
             goto done;
     } else if (is_flac) {
-        if (process_flac_stream(&input, &output,
-                                control_fd >= 0 ? &audio_file_control : NULL) < 0)
+        if (process_flac_stream(&input, &output, &audio_file_control) < 0)
             goto done;
     } else if (is_ogg) {
-        if (process_ogg_stream(&input, &output,
-                               control_fd >= 0 ? &audio_file_control : NULL) < 0)
+        if (process_ogg_stream(&input, &output, &audio_file_control) < 0)
             goto done;
     } else if (is_program_stream) {
         for (;;) {

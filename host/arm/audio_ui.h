@@ -18,6 +18,10 @@ typedef int (*audio_ui_record_writer)(void *opaque, uint8_t command,
 int audio_ui_create(struct audio_ui **ui);
 void audio_ui_destroy(struct audio_ui *ui);
 
+int audio_ui_set_track_length(struct audio_ui *ui,
+                              uint64_t length_pcm_frames,
+                              unsigned rate_hz);
+
 /*
  * Service at a PCM-record boundary. At most one bounded display record is
  * emitted per call, so image traffic can never hide an unbounded audio gap.

@@ -1,7 +1,6 @@
 #include "audio_ui.h"
 #include "media_player_protocol.h"
 
-#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -38,9 +37,11 @@ struct audio_ui {
     size_t offset;
     unsigned chunk_index;
     unsigned sequence;
-    unsigned position_seconds;
     unsigned rate_hz;
+    uint64_t position_pcm_frames;
+    uint64_t length_pcm_frames;
     uint64_t frame_start_pcm;
+    int service_started;
     enum audio_ui_state state;
 };
 
@@ -195,10 +196,56 @@ static void draw_play(struct audio_ui *ui, unsigned x, unsigned y,
     }
 }
 
+static uint64_t projected_position(const struct audio_ui *ui,
+                                   uint64_t position_pcm_frames)
+{
+    uint64_t remaining;
+
+    if (!ui->length_pcm_frames)
+        return position_pcm_frames;
+    if (position_pcm_frames >= ui->length_pcm_frames)
+        return ui->length_pcm_frames;
+    remaining = ui->length_pcm_frames - position_pcm_frames;
+    return position_pcm_frames +
+           (remaining < ui->rate_hz ? remaining : ui->rate_hz);
+}
+
+static unsigned progress_width(const struct audio_ui *ui)
+{
+    const unsigned width = 652u;
+    uint64_t quotient;
+    uint64_t remainder;
+    unsigned low = 0;
+    unsigned high = width;
+
+    if (!ui->length_pcm_frames)
+        return 0;
+    if (ui->position_pcm_frames >= ui->length_pcm_frames)
+        return width;
+
+    /*
+     * Find floor(position * width / length) without overflowing either
+     * 64-bit PCM-frame value.  ceil(length * pixel / width) is decomposed
+     * before multiplication; pixel never exceeds width.
+     */
+    quotient = ui->length_pcm_frames / width;
+    remainder = ui->length_pcm_frames % width;
+    while (low < high) {
+        unsigned pixel = (low + high + 1u) / 2u;
+        uint64_t threshold = quotient * pixel +
+            (remainder * pixel + width - 1u) / width;
+
+        if (ui->position_pcm_frames >= threshold)
+            low = pixel;
+        else
+            high = pixel - 1u;
+    }
+    return low;
+}
+
 static void render_frame(struct audio_ui *ui)
 {
-    unsigned progress_width =
-        (ui->position_seconds % 60u) * 652u / 59u;
+    unsigned filled_width = progress_width(ui);
     unsigned row;
 
     /* Full 4:3 composition, inset for consumer-CRT overscan. */
@@ -266,10 +313,10 @@ static void render_frame(struct audio_ui *ui)
               1, UI_TEXT_Y);
     draw_text(ui, 610, 412, "TRACK --:--", 1, UI_MUTED_Y);
 
-    /* The existing one-minute sample-clock motion now spans the full width. */
+    /* Absolute decoder-frame position scaled across the track duration. */
     fill_rect(ui, 32, 438, 656, 14, UI_TRACK_Y, UI_CB, UI_CR);
-    if (progress_width)
-        fill_rect(ui, 34, 441, progress_width, 8,
+    if (filled_width)
+        fill_rect(ui, 34, 441, filled_width, 8,
                   UI_PROGRESS_Y, UI_PROGRESS_CB, UI_PROGRESS_CR);
 }
 
@@ -301,6 +348,21 @@ void audio_ui_destroy(struct audio_ui *ui)
     free(ui);
 }
 
+int audio_ui_set_track_length(struct audio_ui *ui,
+                              uint64_t length_pcm_frames,
+                              unsigned rate_hz)
+{
+    if (!ui || !length_pcm_frames ||
+        (rate_hz != 44100u && rate_hz != 48000u) ||
+        (ui->rate_hz && ui->rate_hz != rate_hz))
+        return -1;
+    ui->rate_hz = rate_hz;
+    ui->length_pcm_frames = length_pcm_frames;
+    ui->position_pcm_frames = projected_position(ui, 0);
+    render_frame(ui);
+    return 0;
+}
+
 int audio_ui_service(struct audio_ui *ui, uint64_t emitted_pcm_frames,
                      unsigned rate_hz, audio_ui_record_writer writer,
                      void *opaque)
@@ -312,9 +374,12 @@ int audio_ui_service(struct audio_ui *ui, uint64_t emitted_pcm_frames,
         return -1;
     if (!ui->rate_hz) {
         ui->rate_hz = rate_hz;
-        ui->frame_start_pcm = emitted_pcm_frames;
     } else if (ui->rate_hz != rate_hz) {
         return -1;
+    }
+    if (!ui->service_started) {
+        ui->frame_start_pcm = emitted_pcm_frames;
+        ui->service_started = 1;
     }
 
     if (ui->state == AUDIO_UI_BEGIN) {
@@ -327,7 +392,8 @@ int audio_ui_service(struct audio_ui *ui, uint64_t emitted_pcm_frames,
         if (writer(opaque, MEDIA_PLAYER_AUDIO_UI_COMMIT, NULL, 0) < 0)
             return -1;
         ui->sequence++;
-        ui->position_seconds++;
+        ui->position_pcm_frames =
+            projected_position(ui, ui->position_pcm_frames);
         ui->offset = 0;
         ui->chunk_index = 0;
         ui->frame_start_pcm = emitted_pcm_frames;
@@ -357,14 +423,14 @@ int audio_ui_service(struct audio_ui *ui, uint64_t emitted_pcm_frames,
 int audio_ui_seek(struct audio_ui *ui, uint64_t emitted_pcm_frames,
                   unsigned rate_hz, uint64_t position_pcm_frames)
 {
-    uint64_t seconds;
-
     if (!ui || (rate_hz != 44100u && rate_hz != 48000u))
         return -1;
-    seconds = position_pcm_frames / rate_hz;
-    ui->position_seconds = seconds > UINT_MAX ? UINT_MAX : (unsigned)seconds;
+    if (ui->rate_hz && ui->rate_hz != rate_hz)
+        return -1;
     ui->rate_hz = rate_hz;
+    ui->position_pcm_frames = projected_position(ui, position_pcm_frames);
     ui->frame_start_pcm = emitted_pcm_frames;
+    ui->service_started = 1;
     ui->offset = 0;
     ui->chunk_index = 0;
     ui->state = AUDIO_UI_BEGIN;

@@ -23,6 +23,9 @@ SEEK_RE = re.compile(
     rb"audio seek ([+-]10) seconds current=([0-9]+) target=([0-9]+) "
     rb"length=([0-9]+) rate=([0-9]+)"
 )
+DURATION_RE = re.compile(
+    rb"audio UI duration frames=([0-9]+) rate=([0-9]+)"
+)
 
 
 def make_fixture(directory: Path, extension: str, rate: int,
@@ -126,12 +129,19 @@ def run_fixture(helper: Path, fixture: Path) -> None:
             + error_output.decode(errors="replace")
         )
     matches = SEEK_RE.findall(error_output)
+    durations = DURATION_RE.findall(error_output)
     if ready_count != 2 or len(matches) != 2:
         raise RuntimeError(
             f"{fixture.suffix}: expected two barriers/seeks, got "
             f"ready={ready_count} seeks={len(matches)}:\n"
             + error_output.decode(errors="replace")
         )
+    if len(durations) != 1:
+        raise RuntimeError(
+            f"{fixture.suffix}: expected one UI duration, got "
+            f"{len(durations)}:\n" + error_output.decode(errors="replace")
+        )
+    duration_frames, duration_rate = map(int, durations[0])
     for signed, current, target, length, rate in matches:
         seconds = int(signed)
         current_frame = int(current)
@@ -144,8 +154,14 @@ def run_fixture(helper: Path, fixture: Path) -> None:
             raise RuntimeError(
                 f"{fixture.suffix}: target {target_frame}, expected {expected}"
             )
+        if length_frames != duration_frames or rate_hz != duration_rate:
+            raise RuntimeError(
+                f"{fixture.suffix}: UI duration {duration_frames}/{duration_rate} "
+                f"does not match seek timeline {length_frames}/{rate_hz}"
+            )
     print(
         f"audio file seek {fixture.suffix}: PASS ready={ready_count} "
+        f"duration={duration_frames}/{duration_rate} "
         f"output={output_bytes} bytes"
     )
 

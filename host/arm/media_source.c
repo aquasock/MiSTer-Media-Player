@@ -120,7 +120,16 @@ static int file_seek(void *opaque, int64_t offset,
                      enum media_source_seek_origin origin)
 {
     struct file_source_state *state = opaque;
-    int whence = origin == MEDIA_SOURCE_SEEK_START ? SEEK_SET : SEEK_CUR;
+    int whence;
+
+    if (origin == MEDIA_SOURCE_SEEK_START)
+        whence = SEEK_SET;
+    else if (origin == MEDIA_SOURCE_SEEK_CURRENT)
+        whence = SEEK_CUR;
+    else if (origin == MEDIA_SOURCE_SEEK_END)
+        whence = SEEK_END;
+    else
+        return -1;
 
     return fseeko(state->stream, (off_t)offset, whence);
 }
@@ -1348,7 +1357,8 @@ int media_source_seek(struct media_source *source, int64_t offset,
 {
     if (!source || !source->ops ||
         (origin != MEDIA_SOURCE_SEEK_START &&
-         origin != MEDIA_SOURCE_SEEK_CURRENT))
+         origin != MEDIA_SOURCE_SEEK_CURRENT &&
+         origin != MEDIA_SOURCE_SEEK_END))
         return -1;
     return source->ops->seek_source(source->state, offset, origin);
 }

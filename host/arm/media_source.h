@@ -28,7 +28,8 @@ enum media_source_result {
 
 enum media_source_seek_origin {
     MEDIA_SOURCE_SEEK_START = 0,
-    MEDIA_SOURCE_SEEK_CURRENT
+    MEDIA_SOURCE_SEEK_CURRENT,
+    MEDIA_SOURCE_SEEK_END
 };
 
 enum media_source_dvd_command {

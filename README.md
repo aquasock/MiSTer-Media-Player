@@ -50,7 +50,7 @@ The supported subset is intentionally bounded while the architecture is being pr
 | Audio passthrough | AC-3 and DTS carried to S/PDIF as IEC 61937 bursts for an external decoder. DTS is passthrough only; there is no DTS decoder |
 | Audio output | A menu option selects HDMI or S/PDIF. The unused output is muted, because both are fed from one stereo stream |
 | Audio buffering | Packed signed PCM records into an 8,192-frame stereo FPGA FIFO |
-| Audio-only display | ARM-rendered planar 720x480 YCbCr 4:2:0, transferred in bounded records to an inactive DDR frame bank and published atomically at a safe frame boundary. The CRT-safe 4:3 layout reserves album art, title/artist/album metadata, playlist, transport and time fields while retaining the one-hertz progress placeholder |
+| Audio-only display | ARM-rendered planar 720x480 YCbCr 4:2:0, transferred in bounded records to an inactive DDR frame bank and published atomically at a safe frame boundary. The CRT-safe 4:3 layout reserves album art, title/artist/album metadata, playlist, transport and time fields and tracks absolute file-relative progress at one-hertz resolution |
 | Frame storage | Retained planar MiSTer DDR3 I/P banks and separate B scratch storage; native all-I overlap uses a bounded three-region ordinary frame queue |
 | Video output | Native 720x480p at 60000/1001 for supported progressive input, or native 720x480i at 30000/1001 for supported interlaced input |
 
@@ -272,10 +272,11 @@ interleaves no more than one bounded UI record after each PCM record, and
 publishes a completed frame at approximately one update per sample-clock
 second. The interface lays out a physically square album-art viewport, title,
 artist and album fields, a current-playlist panel, transport controls, time
-fields and a full-width progress bar inside 4:3 CRT-safe margins. These are
-static placeholders: embedded-art decoding, tag and playlist population, true
-duration-relative progress and arbitrary-position scrubbing are later
-boundaries.
+fields and a full-width progress bar inside 4:3 CRT-safe margins. The decoder's
+exact output-frame length scales the bar against the current absolute PCM-frame
+position, including after a fixed seek. The artwork, tag, playlist and displayed
+time fields remain static placeholders; embedded-art decoding, field population
+and arbitrary-position scrubbing are later boundaries.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`host/arm/ARCHITECTURE.md`](host/arm/ARCHITECTURE.md) for design details.
 
@@ -303,7 +304,7 @@ The build script pins minimp3, miniaudio, stb_vorbis, liba52, MiSTer Main, depen
 - Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV, FLAC and Ogg Vorbis converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III remain rejected; AAC is not enabled. Only the first Program Stream audio track is played; chapter changes retain that identity, while deliberate track switching needs a control channel that protocol one does not implement.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
-- The standalone-audio screen contains a CRT-safe 4:3 placeholder composition for album artwork, title/artist/album tags, the current playlist, transport controls, track and playlist times, and a repeating sample-clock progress bar. Populating those fields, duration-relative progress, arbitrary-position scrubbing, and FPGA-aware pause state remain later display boundaries; fixed keyboard seeking is supported.
+- The standalone-audio screen contains a CRT-safe 4:3 composition for album artwork, title/artist/album tags, the current playlist, transport controls, track and playlist times, and a duration-relative progress bar. Artwork, metadata, playlist and displayed time population, arbitrary-position scrubbing, and FPGA-aware pause state remain later display boundaries; fixed keyboard seeking and absolute progress tracking are supported.
 - Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. Current `master` also implements 720x480-at-30000/1001 interlaced frame-picture I/P/B decoding with frame or field motion, frame or field DCT, per-picture `repeat_first_field`, and mixed ordinary-interlaced/progressive-film frame pictures, but this remains simulation-qualified until a clean fit and MiSTer playback pass. Field pictures and 576i remain rejected. DVD subtitle tracks and broader systems-layer behavior remain separate limitations.
 - Comprehensive playback pixel accuracy remains unqualified. Simulation comparisons cover decoder reconstruction, and a targeted hardware-screenshot comparison found the chroma-edge difference below; that comparison is not a full playback pixel-validation suite.
 - Sharp colour transitions show one blended pixel column that an independent software decoder does not produce, consistent with horizontal chroma upsampling in the display path. It is obvious on synthetic colour bars and subtle on ordinary material, and it is not specific to any picture type.

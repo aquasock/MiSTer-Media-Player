@@ -162,9 +162,12 @@ its 224-by-200-raster-pixel artwork box is physically square at the mode's 8:9
 pixel aspect, and every album, metadata, playlist, transport, time and progress
 placeholder remains inside a 32-pixel horizontal and approximately 24-pixel
 vertical CRT-safe margin. A fixed bitmap font is part of the renderer; it does
-not parse tags, artwork or playlists. Publication remains an atomic inactive-
-bank swap, and the full-width progress placeholder retains the existing
-one-minute sample-clock motion.
+not parse tags, artwork or playlists. Once miniaudio has established the exact
+output-frame length, a one-time consumer callback configures that length in the
+renderer. The bar uses the absolute output-frame position, projects it to the
+next one-hertz publication and rescales it after every fixed seek. Publication
+remains an atomic inactive-bank swap; no duration metadata crosses the FPGA
+protocol because the helper resolves the bar entirely into pixels.
 
 Standalone `.mp3` is an audio-only use of the same output contract: miniaudio's
 bundled MP3 backend skips stream metadata, decodes MPEG-1 Layer III mono or

@@ -14,6 +14,7 @@ struct capture {
     unsigned data_records;
     unsigned commits;
     unsigned layout_checks;
+    unsigned expected_progress[3];
     int check_layout_enabled;
     int failed;
     int layout_failed;
@@ -41,6 +42,7 @@ static uint8_t frame_y(const uint8_t *frame, unsigned x, unsigned y)
 static void check_layout(struct capture *capture)
 {
     const uint8_t *frame = capture->frame;
+    unsigned progress = capture->expected_progress[capture->commits];
     int failed = 0;
 
     failed |= frame_y(frame, 0, 0) != 16u;
@@ -54,8 +56,13 @@ static void check_layout(struct capture *capture)
     failed |= frame_y(frame, 290, 40) != 220u;
     failed |= frame_y(frame, 210, 364) != 112u;
     failed |= frame_y(frame, 32, 438) != 42u;
+    failed |= progress > 652u;
     failed |= frame_y(frame, 34, 444) !=
-              (capture->commits ? 178u : 42u);
+              (progress ? 178u : 42u);
+    if (progress)
+        failed |= frame_y(frame, 33u + progress, 444) != 178u;
+    if (progress <= 652u)
+        failed |= frame_y(frame, 34u + progress, 444) != 42u;
     capture->layout_checks++;
     capture->layout_failed |= failed;
 }
@@ -121,11 +128,17 @@ static int capture_record(void *opaque, uint8_t command,
 static int run_rate(unsigned rate_hz, uint64_t frame_limit)
 {
     struct audio_ui *ui = NULL;
-    struct capture capture = {.check_layout_enabled = 1};
+    struct capture capture = {
+        .expected_progress = {163u, 326u, 489u},
+        .check_layout_enabled = 1
+    };
     uint64_t frames;
 
-    if (audio_ui_create(&ui) < 0) {
+    if (audio_ui_create(&ui) < 0 ||
+        audio_ui_set_track_length(ui, 4u * (uint64_t)rate_hz,
+                                  rate_hz) < 0) {
         fprintf(stderr, "audio UI allocation failed\n");
+        audio_ui_destroy(ui);
         return 1;
     }
     for (frames = 16; frames <= frame_limit; frames += 16) {
@@ -165,11 +178,17 @@ static int run_seek_reset(void)
 {
     struct audio_ui *ui = NULL;
     struct capture before = {0};
-    struct capture after = {0};
+    struct capture after = {
+        .expected_progress = {247u, 0u, 0u},
+        .check_layout_enabled = 1
+    };
     uint64_t emitted = 0;
 
-    if (audio_ui_create(&ui) < 0)
+    if (audio_ui_create(&ui) < 0 ||
+        audio_ui_set_track_length(ui, 100u * 48000u, 48000u) < 0) {
+        audio_ui_destroy(ui);
         return 1;
+    }
     while (!before.data_records) {
         emitted += 16;
         if (audio_ui_service(ui, emitted, 48000u,
@@ -201,7 +220,81 @@ static int run_seek_reset(void)
         audio_ui_destroy(ui);
         return 1;
     }
-    puts("audio UI seek reset PASS position=37s complete-frame restart");
+    puts("audio UI seek reset PASS position=37s progress=247/652");
+    audio_ui_destroy(ui);
+    return 0;
+}
+
+static int run_complete_progress(void)
+{
+    struct audio_ui *ui = NULL;
+    struct capture capture = {
+        .expected_progress = {652u, 0u, 0u},
+        .check_layout_enabled = 1
+    };
+    uint64_t emitted = 0;
+
+    if (audio_ui_create(&ui) < 0 ||
+        audio_ui_set_track_length(ui, 100u * 44100u, 44100u) < 0 ||
+        audio_ui_seek(ui, 0, 44100u, 99u * 44100u) < 0) {
+        audio_ui_destroy(ui);
+        return 1;
+    }
+    while (!capture.commits) {
+        emitted += 16;
+        if (audio_ui_service(ui, emitted, 44100u,
+                             capture_record, &capture) < 0) {
+            audio_ui_destroy(ui);
+            return 1;
+        }
+    }
+    if (capture.failed || capture.layout_failed ||
+        capture.layout_checks != 1u || capture.commits != 1u) {
+        fprintf(stderr,
+                "audio UI complete progress mismatch commits=%u layout=%u/%d\n",
+                capture.commits, capture.layout_checks,
+                capture.layout_failed);
+        audio_ui_destroy(ui);
+        return 1;
+    }
+    puts("audio UI complete progress PASS position=100s progress=652/652");
+    audio_ui_destroy(ui);
+    return 0;
+}
+
+static int run_large_progress(void)
+{
+    struct audio_ui *ui = NULL;
+    struct capture capture = {
+        .expected_progress = {326u, 0u, 0u},
+        .check_layout_enabled = 1
+    };
+    uint64_t emitted = 0;
+
+    if (audio_ui_create(&ui) < 0 ||
+        audio_ui_set_track_length(ui, UINT64_MAX, 48000u) < 0 ||
+        audio_ui_seek(ui, 0, 48000u, UINT64_MAX / 2u + 1u) < 0) {
+        audio_ui_destroy(ui);
+        return 1;
+    }
+    while (!capture.commits) {
+        emitted += 16;
+        if (audio_ui_service(ui, emitted, 48000u,
+                             capture_record, &capture) < 0) {
+            audio_ui_destroy(ui);
+            return 1;
+        }
+    }
+    if (capture.failed || capture.layout_failed ||
+        capture.layout_checks != 1u || capture.commits != 1u) {
+        fprintf(stderr,
+                "audio UI large progress mismatch commits=%u layout=%u/%d\n",
+                capture.commits, capture.layout_checks,
+                capture.layout_failed);
+        audio_ui_destroy(ui);
+        return 1;
+    }
+    puts("audio UI large progress PASS UINT64 timeline progress=326/652");
     audio_ui_destroy(ui);
     return 0;
 }
@@ -219,6 +312,10 @@ int main(int argc, char **argv)
     if (run_rate(44100u, 100000u) != 0)
         return 1;
     if (run_seek_reset() != 0)
+        return 1;
+    if (run_complete_progress() != 0)
+        return 1;
+    if (run_large_progress() != 0)
         return 1;
     return 0;
 }
