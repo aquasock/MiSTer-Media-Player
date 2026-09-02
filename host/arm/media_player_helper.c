@@ -9,6 +9,7 @@
 #include "mm_accel.h"
 #include "consumer_audio.h"
 #include "audio_ui.h"
+#include "audio_visualizer.h"
 #include "dvd_random_access.h"
 #include "dvd_spu.h"
 #include "media_player_protocol.h"
@@ -52,6 +53,9 @@
 #define MP3_PROBE_BYTES             (64u * 1024u)
 #define ID3V2_TAG_LIMIT             (64u * 1024u * 1024u)
 #define ISO_PTS_DISCONTINUITY_TICKS (10u * 90000u)
+#define AUDIO_VISUALIZER_PATH "/media/fat/linux/MediaPlayer_Visualizer.mmpvis"
+#define AUDIO_OVERLAY_RECORDS \
+    (2u + (AUDIO_UI_OVERLAY_BYTES + 4095u) / 4096u)
 
 /*
  * Entry 429: the FPGA gates its whole in-band byte path on the PCM sink, so a
@@ -158,6 +162,23 @@ struct video_chunk {
     uint64_t pts;
 };
 
+enum audio_overlay_upload_state {
+    AUDIO_OVERLAY_IDLE,
+    AUDIO_OVERLAY_CONFIG,
+    AUDIO_OVERLAY_DATA,
+    AUDIO_OVERLAY_COMMIT
+};
+
+struct audio_overlay_state {
+    uint8_t *plane;
+    size_t offset;
+    unsigned record_index;
+    uint64_t frame_start;
+    uint64_t next_update;
+    int visible;
+    enum audio_overlay_upload_state state;
+};
+
 struct output_state {
     FILE *video;
     FILE *pcm;
@@ -192,6 +213,10 @@ struct output_state {
     int silent_video_mode;
     int audio_only_mode;
     struct audio_ui *audio_ui;
+    struct audio_visualizer *visualizer;
+    struct audio_overlay_state audio_overlay;
+    uint64_t audio_position_base;
+    uint64_t audio_emitted_base;
     int pcm_non_audio;       /* IEC 61937 burst records, never decoded PCM */
     int scheduler_enabled;
     int scheduler_started;
@@ -804,6 +829,141 @@ static int emit_overlay_clear(struct output_state *output)
     return emit_display_record(output, MEDIA_PLAYER_OVERLAY_CLEAR, NULL, 0);
 }
 
+static void audio_overlay_descriptor(struct output_state *output,
+                                     struct dvd_spu_overlay *overlay,
+                                     int visible)
+{
+    static const uint8_t palette[4][4] = {
+        {0x00, 0x00, 0x00, 0xff},
+        {0x18, 0x1b, 0x20, 0xff},
+        {0x68, 0x7d, 0x89, 0xff},
+        {0xee, 0xf2, 0xf4, 0xff}
+    };
+
+    memset(overlay, 0, sizeof(*overlay));
+    overlay->pixels = output->audio_overlay.plane;
+    memcpy(overlay->rgba, palette, sizeof(palette));
+    memcpy(overlay->highlight_rgba, palette, sizeof(palette));
+    overlay->visible = visible;
+}
+
+static int audio_overlay_style(struct output_state *output, uint8_t command,
+                               int visible)
+{
+    struct dvd_spu_overlay overlay;
+    uint8_t payload[41];
+
+    audio_overlay_descriptor(output, &overlay, visible);
+    overlay_style_payload(&overlay, payload);
+    return emit_display_record(output, command, payload, sizeof(payload));
+}
+
+static int audio_overlay_render(struct output_state *output,
+                                uint64_t position_pcm_frames)
+{
+    if (!output->audio_overlay.plane) {
+        output->audio_overlay.plane = malloc(AUDIO_UI_OVERLAY_BYTES);
+        if (!output->audio_overlay.plane)
+            return -1;
+    }
+    return audio_ui_render_overlay(output->audio_ui, position_pcm_frames,
+                                   output->audio_overlay.plane,
+                                   AUDIO_UI_OVERLAY_BYTES);
+}
+
+static int audio_overlay_publish_full(struct output_state *output,
+                                      uint64_t position_pcm_frames)
+{
+    struct dvd_spu_overlay overlay;
+
+    if (audio_overlay_render(output, position_pcm_frames) < 0)
+        return -1;
+    audio_overlay_descriptor(output, &overlay, 1);
+    if (emit_overlay_frame(output, &overlay) < 0)
+        return -1;
+    output->audio_overlay.visible = 1;
+    output->audio_overlay.state = AUDIO_OVERLAY_IDLE;
+    output->audio_overlay.offset = 0;
+    output->audio_overlay.record_index = 0;
+    return 0;
+}
+
+static uint64_t audio_overlay_position(const struct output_state *output,
+                                       uint64_t emitted_pcm_frames)
+{
+    uint64_t elapsed = emitted_pcm_frames >= output->audio_emitted_base ?
+                       emitted_pcm_frames - output->audio_emitted_base : 0;
+
+    return elapsed > UINT64_MAX - output->audio_position_base ? UINT64_MAX :
+           output->audio_position_base + elapsed;
+}
+
+/* At most one overlay record is admitted at each PCM-record boundary. */
+static int audio_overlay_service(struct output_state *output,
+                                 uint64_t emitted_pcm_frames,
+                                 unsigned rate_hz)
+{
+    struct audio_overlay_state *state = &output->audio_overlay;
+    int action = audio_visualizer_take_overlay_action(
+        output->visualizer, emitted_pcm_frames, rate_hz);
+    uint64_t due;
+
+    if (action < 0) {
+        state->state = AUDIO_OVERLAY_IDLE;
+        state->visible = 0;
+        return emit_overlay_clear(output) < 0 ? -1 : 1;
+    }
+    if (action > 0) {
+        state->state = AUDIO_OVERLAY_IDLE;
+        state->visible = 1;
+        state->next_update = emitted_pcm_frames;
+        return audio_overlay_style(output, MEDIA_PLAYER_OVERLAY_STYLE, 1) < 0 ?
+               -1 : 1;
+    }
+    if (!state->visible)
+        return 0;
+    if (state->state == AUDIO_OVERLAY_IDLE) {
+        if (emitted_pcm_frames < state->next_update)
+            return 0;
+        if (audio_overlay_render(output,
+                audio_overlay_position(output, emitted_pcm_frames)) < 0)
+            return -1;
+        state->state = AUDIO_OVERLAY_CONFIG;
+        state->frame_start = emitted_pcm_frames;
+        state->offset = 0;
+        state->record_index = 0;
+    }
+    due = state->frame_start +
+          ((uint64_t)(state->record_index + 1u) * rate_hz) /
+          AUDIO_OVERLAY_RECORDS;
+    if (emitted_pcm_frames < due)
+        return 0;
+    if (state->state == AUDIO_OVERLAY_CONFIG) {
+        if (audio_overlay_style(output, MEDIA_PLAYER_OVERLAY_CONFIG, 1) < 0)
+            return -1;
+        state->state = AUDIO_OVERLAY_DATA;
+    } else if (state->state == AUDIO_OVERLAY_DATA) {
+        size_t count = AUDIO_UI_OVERLAY_BYTES - state->offset;
+
+        if (count > 4096u)
+            count = 4096u;
+        if (emit_display_record(output, MEDIA_PLAYER_OVERLAY_DATA,
+                                state->plane + state->offset, count) < 0)
+            return -1;
+        state->offset += count;
+        if (state->offset == AUDIO_UI_OVERLAY_BYTES)
+            state->state = AUDIO_OVERLAY_COMMIT;
+    } else {
+        if (emit_display_record(output, MEDIA_PLAYER_OVERLAY_COMMIT,
+                                NULL, 0) < 0)
+            return -1;
+        state->state = AUDIO_OVERLAY_IDLE;
+        state->next_update = emitted_pcm_frames;
+    }
+    state->record_index++;
+    return 1;
+}
+
 static enum media_source_dvd_command dvd_source_command(int command)
 {
     switch (command) {
@@ -1157,6 +1317,12 @@ static int write_video_immediate(struct output_state *output, const void *data,
     return 0;
 }
 
+static int write_visualizer_video(void *opaque, const uint8_t *data,
+                                  size_t size)
+{
+    return write_video_immediate(opaque, data, size, "audio visualizer video");
+}
+
 static int video_queue_would_overflow(const struct output_state *output,
                                       size_t size, int has_record)
 {
@@ -1312,7 +1478,25 @@ static int hold_flush(struct output_state *output, size_t keep)
             return -1;
         output->hold_head += (size_t)count * 2u;
         output->pcm_emitted_frames += count;
-        if (output->audio_ui &&
+        if (output->visualizer) {
+            int overlay = audio_overlay_service(
+                output, output->pcm_emitted_frames,
+                (unsigned)output->hold_rate_hz);
+
+            if (overlay < 0) {
+                fprintf(stderr,
+                        "media_player_helper: audio overlay output failed\n");
+                return -1;
+            }
+            if (!overlay && audio_visualizer_service(
+                    output->visualizer, output->pcm_emitted_frames,
+                    (unsigned)output->hold_rate_hz,
+                    write_visualizer_video, output) < 0) {
+                fprintf(stderr,
+                        "media_player_helper: audio visualizer output failed\n");
+                return -1;
+            }
+        } else if (output->audio_ui &&
             audio_ui_service(output->audio_ui,
                              output->pcm_emitted_frames,
                              (unsigned)output->hold_rate_hz,
@@ -1758,6 +1942,9 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
         source = stereo;
         channels = 2;
     }
+    if (output->visualizer && channels == 2)
+        audio_visualizer_analyze(output->visualizer, source,
+                                 (size_t)samples_per_channel);
     if (output->pcm) {
         size_t total = (size_t)samples_per_channel * (size_t)channels;
         if (write_all(output->pcm, source, total * sizeof(*source), "PCM") < 0)
@@ -3301,6 +3488,9 @@ static int audio_file_configure_timeline(void *opaque,
     struct audio_file_control_state *state = opaque;
 
     state->length_frames = length_frames;
+    state->output->audio_position_base = 0;
+    state->output->audio_emitted_base =
+        state->output->pcm_emitted_frames;
     if (!state->output->audio_ui)
         return 0;
     if (audio_ui_set_track_length(state->output->audio_ui,
@@ -3314,6 +3504,14 @@ static int audio_file_configure_timeline(void *opaque,
     fprintf(stderr,
             "media_player_helper: audio UI duration frames=%llu rate=%u\n",
             (unsigned long long)length_frames, rate_hz);
+    if (state->output->visualizer) {
+        if (audio_overlay_publish_full(state->output, 0) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: cannot publish initial audio overlay\n");
+            return -1;
+        }
+        state->output->audio_overlay.next_update = rate_hz;
+    }
     return 0;
 }
 
@@ -3330,6 +3528,11 @@ static int audio_file_request_seek(void *opaque, uint64_t current_frame,
     command = control_read_command(state->control_fd);
     if (command < 0)
         return -1;
+    if (command == MEDIA_PLAYER_CONTROL_USER_ACTIVITY) {
+        audio_visualizer_activity(state->output->visualizer,
+                                  state->output->pcm_emitted_frames);
+        return 0;
+    }
     if (!seek_command_seconds(command, seconds)) {
         if (command)
             fprintf(stderr,
@@ -3339,6 +3542,8 @@ static int audio_file_request_seek(void *opaque, uint64_t current_frame,
     }
     target_frame = audio_file_seek_target(current_frame, length_frames,
                                           rate_hz, *seconds);
+    audio_visualizer_activity(state->output->visualizer,
+                              state->output->pcm_emitted_frames);
     if (target_frame == current_frame) {
         fprintf(stderr,
                 "media_player_helper: ignoring audio seek %+d seconds "
@@ -3370,11 +3575,24 @@ static int audio_file_complete_seek(void *opaque, uint64_t current_frame,
         fprintf(stderr, "media_player_helper: cannot reset audio UI for seek\n");
         return -1;
     }
+    audio_visualizer_seek(state->output->visualizer,
+                          state->output->pcm_emitted_frames);
+    state->output->audio_position_base = target_frame;
+    state->output->audio_emitted_base =
+        state->output->pcm_emitted_frames;
     if (control_send(state->control_fd, MEDIA_PLAYER_CONTROL_READY) < 0 ||
         control_wait_for_go(state->control_fd) < 0) {
         fprintf(stderr, "media_player_helper: audio seek barrier failed\n");
         return -1;
     }
+    if (state->output->visualizer &&
+        audio_overlay_publish_full(state->output, target_frame) < 0) {
+        fprintf(stderr,
+                "media_player_helper: cannot republish audio overlay after seek\n");
+        return -1;
+    }
+    state->output->audio_overlay.next_update =
+        state->output->pcm_emitted_frames + rate_hz;
     fprintf(stderr,
             "media_player_helper: audio seek %+d seconds "
             "current=%llu target=%llu length=%llu rate=%u\n",
@@ -3732,13 +3950,29 @@ int main(int argc, char **argv)
         (input.kind == MEDIA_SOURCE_ISO || input.kind == MEDIA_SOURCE_DVD) &&
         output.scheduler_enabled;
     if (is_audio_file && !output.pcm) {
+        const char *visualizer_path = getenv("MMP_VISUALIZER_PATH");
+        char visualizer_error[192];
+
+        if (!visualizer_path || !*visualizer_path)
+            visualizer_path = AUDIO_VISUALIZER_PATH;
+        if (audio_visualizer_create(&output.visualizer, visualizer_path,
+                                    visualizer_error,
+                                    sizeof(visualizer_error)) == 0) {
+            fprintf(stderr,
+                    "media_player_helper: audio visualizer enabled asset=%s\n",
+                    visualizer_path);
+        } else {
+            fprintf(stderr,
+                    "media_player_helper: audio visualizer unavailable (%s); "
+                    "using framebuffer UI\n", visualizer_error);
+        }
         if (audio_ui_create(&output.audio_ui) < 0) {
             fprintf(stderr,
                     "media_player_helper: cannot allocate audio UI\n");
             goto done;
         }
-        fprintf(stderr,
-                "media_player_helper: audio UI 720x480p BT.601 frame enabled\n");
+        fprintf(stderr, "media_player_helper: audio UI 720x480p %s enabled\n",
+                output.visualizer ? "two-bit overlay" : "BT.601 frame");
     }
     if (is_mp3) {
         if (process_mp3_stream(&input, &output, &audio_file_control) < 0)
@@ -3923,7 +4157,19 @@ done:
     output.hold_active = 0;
     if (success && !output.pcm && hold_flush(&output, 0) < 0)
         success = 0;
-    if (success && output.audio_ui &&
+    if (success && output.visualizer) {
+        static const uint8_t sequence_end[4] = {0, 0, 1, 0xb7};
+
+        if (write_visualizer_video(&output, sequence_end,
+                                   sizeof(sequence_end)) < 0 ||
+            audio_overlay_publish_full(&output,
+                audio_overlay_position(&output,
+                                       output.pcm_emitted_frames)) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: final audio visualizer output failed\n");
+            success = 0;
+        }
+    } else if (success && output.audio_ui &&
         audio_ui_complete(output.audio_ui, output.pcm_emitted_frames,
                           (unsigned)output.hold_rate_hz,
                           emit_audio_ui_record, &output) < 0) {
@@ -3935,12 +4181,24 @@ done:
         emit_pcm_end(&output) < 0)
         success = 0;
     if (output.audio_ui) {
-        fprintf(stderr,
-                "media_player_helper: audio UI committed=%u frame(s)\n",
-                audio_ui_committed_frames(output.audio_ui));
+        if (!output.visualizer)
+            fprintf(stderr,
+                    "media_player_helper: audio UI committed=%u frame(s)\n",
+                    audio_ui_committed_frames(output.audio_ui));
         audio_ui_destroy(output.audio_ui);
         output.audio_ui = NULL;
     }
+    if (output.visualizer) {
+        fprintf(stderr,
+                "media_player_helper: audio visualizer gops=%llu level=%u\n",
+                (unsigned long long)audio_visualizer_gops_sent(
+                    output.visualizer),
+                audio_visualizer_level(output.visualizer));
+        audio_visualizer_destroy(output.visualizer);
+        output.visualizer = NULL;
+    }
+    free(output.audio_overlay.plane);
+    output.audio_overlay.plane = NULL;
     free(output.hold);
     output.hold = NULL;
     while (output.video_head)

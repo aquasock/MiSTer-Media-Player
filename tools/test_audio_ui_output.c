@@ -416,6 +416,40 @@ static int run_large_progress(void)
     return 0;
 }
 
+static unsigned overlay_pixel(const uint8_t *plane, unsigned x, unsigned y)
+{
+    size_t pixel = (size_t)y * AUDIO_UI_WIDTH + x;
+    return (plane[pixel >> 2] >> (6u - (pixel & 3u) * 2u)) & 3u;
+}
+
+static int run_overlay_quantization(void)
+{
+    struct audio_ui *ui = NULL;
+    uint8_t *plane = malloc(AUDIO_UI_OVERLAY_BYTES);
+    int failed;
+
+    if (!plane || audio_ui_create(&ui) < 0 ||
+        audio_ui_set_track_length(ui, 100u * 48000u, 48000u) < 0 ||
+        audio_ui_render_overlay(ui, 20u * 48000u, plane,
+                                AUDIO_UI_OVERLAY_BYTES) < 0) {
+        free(plane);
+        audio_ui_destroy(ui);
+        return 1;
+    }
+    failed = overlay_pixel(plane, 0, 0) != 0u ||
+             overlay_pixel(plane, 36, 28) != 1u ||
+             overlay_pixel(plane, 32, 24) != 2u ||
+             overlay_pixel(plane, 93, 40) != 3u;
+    free(plane);
+    audio_ui_destroy(ui);
+    if (failed) {
+        fputs("audio UI overlay quantization mismatch\n", stderr);
+        return 1;
+    }
+    puts("audio UI overlay quantization PASS palette=0,1,2,3");
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc == 3 && !strcmp(argv[1], "--dump-yuv"))
@@ -433,6 +467,8 @@ int main(int argc, char **argv)
     if (run_complete_progress() != 0)
         return 1;
     if (run_large_progress() != 0)
+        return 1;
+    if (run_overlay_quantization() != 0)
         return 1;
     return 0;
 }

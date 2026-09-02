@@ -159,9 +159,12 @@ share a compilation unit:
    record extraction. Overlay plane data is split into records no larger than
    4,096 payload bytes and becomes visible only after an explicit commit.
 
-For standalone audio, the helper renders one limited-range BT.601 planar
-720-by-480 frame per sample-clock second and interleaves at most one bounded UI
-record after each PCM record. The framebuffer is composed for a 4:3 display:
+For standalone audio without a valid visualizer pack, the helper renders one
+limited-range BT.601 planar 720-by-480 frame per sample-clock second and
+interleaves at most one bounded UI record after each PCM record. With a valid
+`/media/fat/linux/MediaPlayer_Visualizer.mmpvis` pack, it instead keeps the H.262
+decoder active from startup and renders the same interface into the existing
+packed two-bit DVD overlay plane. The framebuffer is composed for a 4:3 display:
 its 224-by-200-raster-pixel artwork box is physically square at the mode's 8:9
 pixel aspect, and every album, metadata, playlist, transport, time and progress
 placeholder remains inside a 32-pixel horizontal and approximately 24-pixel
@@ -180,6 +183,22 @@ nested frame start.
 Publication remains an atomic inactive-bank swap; no duration metadata crosses
 the FPGA protocol because the helper resolves the presentation entirely into
 pixels.
+
+The visualizer pack indexes four synchronized versions of a two-second loop as
+twenty independently decodable, three-picture closed GOPs per level. Every GOP
+starts with an H.262 sequence header and intra picture. The helper computes a
+stereo RMS envelope with immediate weighted attack and slower decay, selects
+one complete GOP at the matching loop phase, and admits at most 4 KiB of its
+ordinary elementary bytes after a PCM record. Two GOPs of lead absorb coded-size
+variation. The accepted DVD overlay initially covers this video with an opaque
+four-color quantization of the player screen; after ten seconds of emitted PCM
+without a control event, one CLEAR reveals the loop. A retained overlay STYLE
+publication restores the screen immediately after activity while a new timed
+plane upload refreshes its progress and counters. Seek resets the GOP phase and
+the inactivity epoch behind the existing READY/GO decoder barrier. Successful
+EOF writes a sequence end and synchronously republishes the completed player
+screen for the replay-ready retained presentation. The FPGA decoder, display
+record format and RBF are unchanged.
 
 Standalone `.mp3` is an audio-only use of the same output contract: miniaudio's
 bundled MP3 backend skips stream metadata, decodes MPEG-1 Layer III mono or

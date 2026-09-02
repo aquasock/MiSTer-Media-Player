@@ -102,6 +102,7 @@ static int require_patch_markers(const char *path)
 {
     static const char *const markers[] = {
         "MEDIA_CONTROL_SEEK_CONTINUE = 0x85",
+        "MEDIA_CONTROL_USER_ACTIVITY = 0x10",
         "seek_pending = true;",
         "seek continued without reset",
         "seek target ready; download reset",
@@ -111,7 +112,9 @@ static int require_patch_markers(const char *path)
         "replay_ready = arm_replay;",
         "input != MEDIAPLAYER_INPUT_PLAY_PAUSE || !replay_ready",
         "retain ? \"eof-replay-ready\" : \"eof\"",
-        "replay ready and paused; press Play to restart"
+        "replay ready and paused; press Play to restart",
+        "audio_visualizer_controls &&",
+        "activity-command-error"
     };
     std::ifstream input(path);
 

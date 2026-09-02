@@ -481,6 +481,29 @@ int audio_ui_seek(struct audio_ui *ui, uint64_t emitted_pcm_frames,
     return 0;
 }
 
+int audio_ui_render_overlay(struct audio_ui *ui,
+                            uint64_t position_pcm_frames,
+                            uint8_t *packed_pixels, size_t size)
+{
+    size_t pixel;
+
+    if (!ui || !packed_pixels || size != AUDIO_UI_OVERLAY_BYTES)
+        return -1;
+    ui->position_pcm_frames = projected_position(ui, position_pcm_frames);
+    render_frame(ui);
+    memset(packed_pixels, 0, size);
+    for (pixel = 0; pixel < AUDIO_UI_WIDTH * AUDIO_UI_HEIGHT; ++pixel) {
+        uint8_t y = ui->frame[pixel];
+        unsigned index = y == UI_BG_Y ? 0u :
+                         y <= UI_PANEL_ALT_Y ? 1u :
+                         y <= UI_MUTED_Y ? 2u : 3u;
+        unsigned shift = 6u - (unsigned)(pixel & 3u) * 2u;
+
+        packed_pixels[pixel >> 2] |= (uint8_t)(index << shift);
+    }
+    return 0;
+}
+
 int audio_ui_complete(struct audio_ui *ui, uint64_t emitted_pcm_frames,
                       unsigned rate_hz, audio_ui_record_writer writer,
                       void *opaque)

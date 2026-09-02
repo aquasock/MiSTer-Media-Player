@@ -25,6 +25,7 @@
 #define MEDIA_PLAYER_CONTROL_SEEK_FORWARD_60   0x0d
 #define MEDIA_PLAYER_CONTROL_SEEK_BACK_300     0x0e
 #define MEDIA_PLAYER_CONTROL_SEEK_FORWARD_300  0x0f
+#define MEDIA_PLAYER_CONTROL_USER_ACTIVITY     0x10
 #define MEDIA_PLAYER_CONTROL_READY            0x81
 #define MEDIA_PLAYER_CONTROL_MENU_ENTER       0x82
 #define MEDIA_PLAYER_CONTROL_MENU_LEAVE       0x83
@@ -59,6 +60,6 @@
     "ogg-vorbis-s16le-stereo-44100,ogg-vorbis-s16le-stereo-48000 " \
     "transport=inband-pcm-v1,inband-dvd-overlay-v1,inband-audio-ui-v1 " \
     "controls=chapter-v1,pause-hold-v1,dvd-menu-v1,mpeg-ps-seek-v1," \
-    "audio-file-seek-v2"
+    "audio-file-seek-v2,audio-visualizer-v1"
 
 #endif

@@ -286,7 +286,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,950 @@
+@@ -0,0 +1,965 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -328,6 +328,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +static bool seek_pending = false;
 +static bool chapter_controls = false;
 +static bool seek_controls = false;
++static bool audio_visualizer_controls = false;
 +static bool menu_controls = false;
 +static bool menu_active = false;
 +static bool retain_clean_eof = false;
@@ -352,6 +353,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	MEDIA_CONTROL_SEEK_FORWARD_60 = 0x0d,
 +	MEDIA_CONTROL_SEEK_BACK_300 = 0x0e,
 +	MEDIA_CONTROL_SEEK_FORWARD_300 = 0x0f,
++	MEDIA_CONTROL_USER_ACTIVITY = 0x10,
 +	MEDIA_CONTROL_READY = 0x81,
 +	MEDIA_CONTROL_MENU_ENTER = 0x82,
 +	MEDIA_CONTROL_MENU_LEAVE = 0x83,
@@ -552,6 +554,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	seek_pending = false;
 +	chapter_controls = false;
 +	seek_controls = false;
++	audio_visualizer_controls = false;
 +	menu_controls = false;
 +	menu_active = false;
 +	retain_clean_eof = false;
@@ -725,6 +728,12 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	                 !strcasecmp(source_extension, ".wav") ||
 +	                 !strcasecmp(source_extension, ".flac") ||
 +	                 !strcasecmp(source_extension, ".ogg"));
++	audio_visualizer_controls = !strncasecmp(requested_source.c_str(), "file:", 5) &&
++	                            source_extension &&
++	                            (!strcasecmp(source_extension, ".mp3") ||
++	                             !strcasecmp(source_extension, ".wav") ||
++	                             !strcasecmp(source_extension, ".flac") ||
++	                             !strcasecmp(source_extension, ".ogg"));
 +	retain_clean_eof = seek_controls;
 +	playback_source_spec = requested_source;
 +	user_io_set_index(index);
@@ -960,6 +969,12 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	if (input == MEDIAPLAYER_INPUT_PLAY_PAUSE)
 +	{
 +		if (chapter_barrier || navigation_pending || seek_pending) return 1;
++		if (audio_visualizer_controls &&
++		    !send_control(MEDIA_CONTROL_USER_ACTIVITY))
++		{
++			stop_with_reason("activity-command-error");
++			return 1;
++		}
 +		playback_paused = !playback_paused;
 +		diagnostic_write("playback %s submitted=%llu\n",
 +		                 playback_paused ? "paused" : "resumed",

@@ -9,6 +9,7 @@
 #define AUDIO_UI_FRAME_BYTES \
     (AUDIO_UI_WIDTH * AUDIO_UI_HEIGHT * 3u / 2u)
 #define AUDIO_UI_DATA_BYTES 4096u
+#define AUDIO_UI_OVERLAY_BYTES ((AUDIO_UI_WIDTH * AUDIO_UI_HEIGHT) / 4u)
 
 struct audio_ui;
 
@@ -32,6 +33,11 @@ int audio_ui_service(struct audio_ui *ui, uint64_t emitted_pcm_frames,
 
 int audio_ui_seek(struct audio_ui *ui, uint64_t emitted_pcm_frames,
                   unsigned rate_hz, uint64_t position_pcm_frames);
+
+/* Render the projected position and quantize the accepted UI into 2-bit pixels. */
+int audio_ui_render_overlay(struct audio_ui *ui,
+                            uint64_t position_pcm_frames,
+                            uint8_t *packed_pixels, size_t size);
 
 /* Drain the projected final-duration frame without restarting an open upload. */
 int audio_ui_complete(struct audio_ui *ui, uint64_t emitted_pcm_frames,

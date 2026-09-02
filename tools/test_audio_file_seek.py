@@ -39,6 +39,10 @@ AUDIO_UI_BEGIN = 0x10
 AUDIO_UI_DATA = 0x11
 AUDIO_UI_COMMIT = 0x12
 AUDIO_UI_FRAME_BYTES = 720 * 480 * 3 // 2
+OVERLAY_CLEAR = 0x00
+OVERLAY_CONFIG = 0x01
+OVERLAY_DATA = 0x02
+OVERLAY_COMMIT = 0x03
 
 
 TIME_GLYPHS = {
@@ -174,13 +178,59 @@ def centered_time_x(region_x: int, region_width: int,
             + (len(label) + 1) * 6)
 
 
-def run_fixture(helper: Path, fixture: Path) -> None:
+def visualizer_stream_summary(stream: bytes) -> tuple[int, dict[int, int]]:
+    offset = 0
+    video = bytearray()
+    commands: dict[int, int] = {}
+
+    while offset < len(stream):
+        if stream[offset:offset + 3] != b"\x00\x00\x01":
+            video.append(stream[offset])
+            offset += 1
+            continue
+        code = stream[offset + 3]
+        if code == PCM_MARKER:
+            frames = (stream[offset + 4] >> 2) & 0x1F
+            offset += 5 + frames * 4
+        elif code == PCM_END_MARKER:
+            offset += 4
+        elif code == DISPLAY_MARKER:
+            size = int.from_bytes(stream[offset + 4:offset + 6], "big")
+            end = offset + 6 + size
+            if size < 1 or end > len(stream):
+                raise RuntimeError("truncated visualizer display record")
+            command = stream[offset + 6]
+            commands[command] = commands.get(command, 0) + 1
+            offset = end
+        else:
+            video.extend(stream[offset:offset + 4])
+            offset += 4
+    decode = subprocess.run(
+        ["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
+         "-f", "mpegvideo", "-i", "pipe:0", "-f", "null", "-"],
+        input=video, capture_output=True,
+    )
+    if decode.returncode:
+        raise RuntimeError(
+            "selected visualizer H.262 failed to decode:\n"
+            + decode.stderr.decode(errors="replace")
+        )
+    pictures = video.count(b"\x00\x00\x01\x00")
+    return pictures, commands
+
+
+def run_fixture(helper: Path, fixture: Path,
+                visualizer: Path | None = None) -> None:
     parent, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+    environment = os.environ.copy()
+    if visualizer is not None:
+        environment["MMP_VISUALIZER_PATH"] = str(visualizer)
     process = subprocess.Popen(
         [str(helper), "--protocol", "1", "--source", f"file:{fixture}",
          "--control-fd", str(child.fileno())],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         pass_fds=(child.fileno(),),
+        env=environment,
     )
     child.close()
     assert process.stdout is not None
@@ -310,6 +360,21 @@ def run_fixture(helper: Path, fixture: Path) -> None:
         raise RuntimeError(
             f"{fixture.suffix}: playback did not continue after end no-op"
         )
+    if visualizer is not None:
+        pictures, commands = visualizer_stream_summary(stream_output)
+        if (pictures < 30 or commands.get(OVERLAY_CLEAR, 0) < 1 or
+                commands.get(OVERLAY_CONFIG, 0) < 2 or
+                commands.get(OVERLAY_DATA, 0) < 44 or
+                commands.get(OVERLAY_COMMIT, 0) < 2):
+            raise RuntimeError(
+                f"{fixture.suffix}: incomplete visualizer transport "
+                f"pictures={pictures} commands={commands}"
+            )
+        print(
+            f"audio visualizer {fixture.suffix}: PASS pictures={pictures} "
+            f"clear={commands.get(OVERLAY_CLEAR, 0)}"
+        )
+        return
     final_frame = final_audio_ui_frame(stream_output, reset_offsets)
     elapsed_seconds = duration_frames // duration_rate
     total_seconds = (duration_frames + duration_rate - 1) // duration_rate
@@ -347,12 +412,16 @@ def run_fixture(helper: Path, fixture: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("helper", type=Path)
+    parser.add_argument("--visualizer", type=Path)
     args = parser.parse_args()
     helper = args.helper.resolve()
     if not helper.is_file():
         parser.error(f"helper does not exist: {helper}")
     if shutil.which("ffmpeg") is None:
         parser.error("ffmpeg is required")
+    visualizer = args.visualizer.resolve() if args.visualizer else None
+    if visualizer is not None and not visualizer.is_file():
+        parser.error(f"visualizer does not exist: {visualizer}")
 
     formats = (
         ("mp3", 44100, ["-c:a", "libmp3lame", "-b:a", "128k"]),
@@ -363,7 +432,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="mmp-audio-seek-") as temporary:
         directory = Path(temporary)
         for extension, rate, codec in formats:
-            run_fixture(helper, make_fixture(directory, extension, rate, codec))
+            run_fixture(helper, make_fixture(directory, extension, rate, codec),
+                        visualizer)
     return 0
 
 
