@@ -1,4 +1,4 @@
-## 880 COMMIT Unreleased ??? 2026-09-01T18:30:20-07:00
+## 880 COMMIT Unreleased dfe1057 2026-09-01T18:30:20-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Remove the nine residual HDMI setup violations by shortening the three remaining
 
 #### Outcome:
 
-The first structural fit removes both targeted cross-device zero-logic path families and reduces global setup failure from negative 0.978 to negative 0.138 nanoseconds, leaving nine marginal paths in three unrelated but explicit `ascal` clusters.  The residual paths are the normal line-address addition from the registered stride product, the cascaded RGB maximum used for vertical adaptive-polyphase luminance, and the vertical-priority term feeding the horizontal adaptive coefficient mux.  The second correction will register the normal line-plus-burst address during the already existing request-preparation cycle, split the vertical RGB maximum across its already existing pixel and coefficient stages, and precompute the horizontal adaptive enable with the same vertical-over-horizontal priority; all three preserve the current sampled values, state-machine request edge and scaler pipeline alignment.
+Source `dfe1057` registers the normal line-plus-burst address during its existing request-preparation cycle, splits the vertical RGB maximum across the existing pixel and coefficient stages, and precomputes the horizontal adaptive enable while preserving vertical-over-horizontal priority, sampled values, Avalon request timing and scaler alignment.  All ten exact-source telemetry, progressive cadence, framebuffer geometry, output timing, audio-interface, DDR-arbiter, DVD-overlay metadata, engine, integrated delivery and snapshot regressions pass.  Quartus Prime 17.0.2 seed 24 completes synthesis in 2 minutes 25 seconds, fitting in 12 minutes 23 seconds and assembly with zero errors; global setup, hold, recovery, removal and minimum-pulse-width margins are positive at 0.180, 0.190, 3.758, 0.644 and 0.925 nanoseconds, with zero violated paths, while dedicated 60 MHz decoder and 54 MHz video setup are positive at 1.220 and 2.215 nanoseconds.  The fit uses 34,859 ALMs, 54,492 registers, 4,187,219 block-memory bits in 536 RAM blocks and 70 DSP blocks.  The byte-identical local and build-PC artifact `output_files/MediaPlayer_20260901_dfe1057.rbf` is 4,480,236 bytes at SHA-256 `6389fa57b2d642b5b4e85980c6ccf8746ea8d20869cbe480f80b0ea172bcdb4b`; the matched 1,178,588-byte telemetry-aware patched Main is collected as `host/build/MiSTer_TelemetryOff_dfe1057` at SHA-256 `74b354977d3ce56c0ad27c90089936d303258a869fa75fa73c80ef6a2edbfd29`, and the accepted 916,852-byte helper remains unchanged at SHA-256 `5de3178711e7893d23ad75e22f1ef19a7905454bf48fc71c9bf98a95db6977a4`.
 
 #### Next Steps:
 
-Commit and push this proposal, implement the three targeted `ascal` transformations, rerun all ten exact-source RTL regressions, and perform one clean seed-24 Quartus build.  Require positive global setup, hold, recovery, removal and minimum-pulse-width margins plus violation-free 60 MHz decoder and 54 MHz video reports before collecting an RBF; if timing still fails, inspect the permanent global report and stop rather than reseeding.
+Preserve the accepted source-`5f00e35` rollback, install `output_files/MediaPlayer_20260901_dfe1057.rbf` and `host/build/MiSTer_TelemetryOff_dfe1057`, retain the unchanged accepted helper, and reboot because Main changes.  Physical validation should confirm normal MPG, DVD and standalone-audio playback with Telemetry Off producing neither the diagnostic raster nor `/tmp/MediaPlayer_ARM.log`, then enable Telemetry before a fresh playback and confirm the diagnostic raster and combined Main/helper log remain available; do not mark this entry Passed until that MiSTer test succeeds.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Commit and push this proposal, implement the three targeted `ascal` transformati
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
