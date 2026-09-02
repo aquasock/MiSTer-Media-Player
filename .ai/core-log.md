@@ -1,3 +1,35 @@
+## 886 COMMIT Unreleased ??? 2026-09-01T22:56:38-07:00
+
+#### Coming From:
+
+Unreleased 72bdccc
+
+#### Purpose:
+
+Replace the initial standalone-audio diagnostic composition with the approved full-screen 4:3 CRT-safe album, metadata, playlist and transport layout without changing playback behavior.
+
+#### Outcome:
+
+The user reports that source `72bdccc` fixed audio seeking works great in hardware and elects to defer its visible full-screen reset flash; the six captured READY/GO seek barriers complete successfully, and static tracing establishes that the flash is the shared new-download reset clearing audio-interface `mode_active` until the next full frame commits rather than a seeking failure.  The approved next boundary will use the supplied one-page `Presentation1.pdf` only as a visual reference and will redraw the ARM-generated 720-by-480 interface as a full-screen 4:3 composition inside CRT-safe overscan margins: a square album-art placeholder and title, artist and album placeholders on the left; a current-playlist placeholder on the right; previous, play/pause and next controls below; track and playlist time placeholders; and a full-width bottom progress bar.  A small fixed bitmap font and deterministic shapes will remain entirely inside the helper's existing YCbCr frame generation, while actual tag parsing, album-art decoding, playlist management, time calculation, control behavior and scrubbing remain deferred.  The one-hertz update cadence, sample-clock-driven progress motion, atomic inactive-bank publication, audio priority, seeking, codecs, Main, RTL, RBF and video/DVD paths will remain unchanged.
+
+#### Next Steps:
+
+Commit and push this proposal after the authorized ring-buffer rotation, implement the CRT-safe 4:3 coordinates and placeholder text in `audio_ui.c`, update the user and architecture descriptions, and strengthen the renderer regression with stable layout-region and frame-change checks.  Produce and inspect a deterministic 720-by-480 preview, run strict native and sanitizer UI tests plus the retained audio-seek regression, then build and verify a uniquely named static ARMv7 helper with the local GNU 10.2 toolchain.  Deliver only the helper for MiSTer testing and preserve the installed Main and timing-qualified RBF.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_ui.c
+- tools/test_audio_ui_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 885 COMMIT Unreleased 72bdccc 2026-09-01T21:54:05-07:00
 
 #### Coming From:
@@ -1219,35 +1251,6 @@ Exit the MediaPlayer core so the running helper stops, manually replace only `/m
 #### Files Modified:
 
 - host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 846 COMMIT Unreleased 924cb21 2026-08-31T20:19:36-07:00
-
-#### Coming From:
-
-Unreleased ad0d5ec
-
-#### Purpose:
-
-Restore the proven moving solid-purple DVD menu selector entirely in the ARM helper while freezing the accepted RBF and reliable Main menu-load behavior.
-
-#### Outcome:
-
-The user defines the current source-`f5f650f` RBF as complete for the required product scope because playback, chapter and menu stream hops, software-directed DVD navigation and overlay rendering have all been physically demonstrated, with the residual intermittent overlay-plane shortfall treated as a software compatibility constraint rather than an FPGA release blocker.  The existing opt-in `MMP_DVD_OVERLAY_PROBE` implementation already provides the required behavior by sending an all-index-one plane with a transparent normal palette, opaque magenta highlight palette and the authored moving button rectangle, so no source, RBF or Main change is needed.  On the Raspberry Pi, the user's installed GNU 10.2.1 ARM toolchain builds the current helper locally with that definition into `host/build/MediaPlayer_Helper` and the byte-identical uniquely named `host/build/MediaPlayer_Helper_PurpleSelector_924cb21`; both are 908,660-byte stripped static 32-bit ARM EABI5 executables at SHA-256 `fd5d46f116ec41224ff9dd4c13fb62453a009ec462de9ab9b1bdfa794ff2b26c`, contain the required `probe=solid-index1-magenta` marker and return the complete protocol-one capability string when executed.  A strict native equivalent build and the focused fragmented-SPU, selected-histogram, scheduled-stop, random-access and menu-hop regressions pass; the prior ordinary helper is preserved locally as `host/build/MediaPlayer_Helper_Authored_f5f650f`.
-
-#### Next Steps:
-
-Exit the MediaPlayer core so the running helper stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with local `host/build/MediaPlayer_Helper_PurpleSelector_924cb21`, restore executable mode if needed and verify the installed size and SHA-256.  Preserve the installed Main and RBF, restart the DVD, press `M` and move through every menu button; acceptance requires the menu to continue loading reliably and one solid purple selector rectangle to follow the arrow keys.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
