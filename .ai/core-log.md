@@ -1,3 +1,34 @@
+## 900 COMMIT Unreleased ??? 2026-09-02T06:26:43-07:00
+
+#### Coming From:
+
+Unreleased 5327358
+
+#### Purpose:
+
+Make physical-DVD navigation discard interrupt an output record blocked on Main without changing continuation output or decoder behavior.
+
+#### Outcome:
+
+Approved plan: keep the helper output descriptor nonblocking inside the physical-DVD reserve worker, retry ordinary backpressure without changing byte order, priority or record boundaries, and let an explicit navigation discard cancel the unfinished portion of the current record together with the queued reserve only after libdvdnav has definitively classified a stream hop.  Main's existing barrier will discard any already-written prefix before `GO`, while a root or activation request that resolves as `MENU_CONTINUE` will never request reserve discard and will therefore retain its complete output byte-for-byte.  This is a helper-only transport correction; Main, libdvdnav policy, H.262 decoding, RTL, RBF and the visualizer remain unchanged.
+
+#### Next Steps:
+
+Implement the interruptible nonblocking reserve worker and deterministic regression coverage for a completely filled pipe with an active multi-write record, requiring discard to finish without a reader and fresh post-barrier bytes to remain exact.  Retain the existing stalled-reader, priority, complete-record and ordinary discard tests, run strict native, sanitizer and analyzer validation, build a static stripped ARMv7 helper with the local GNU 10.2 toolchain, audit its identity and capabilities, and provide only that helper for an early and late `M`, menu activation and chapter-hop hardware test on the golden DVD.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/output_reserve.c
+- tools/test_output_reserve.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 899 COMMIT Unreleased 5327358 2026-09-02T06:23:24-07:00
 
 #### Coming From:
@@ -1272,37 +1303,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 860 COMMIT Unreleased bb3110d 2026-08-31T22:52:26-07:00
-
-#### Coming From:
-
-Unreleased 79da6c3
-
-#### Purpose:
-
-Defer pending DVD activation classification beyond an ambiguous finite-still skip until libdvdnav exposes the actual post-still boundary.
-
-#### Outcome:
-
-Source `79da6c3` changes a title-zero result immediately after `dvdnav_still_skip` from a completed menu continuation to `MEDIA_SOURCE_DVD_MENU_PENDING`, leaves the source boundary and Main request intact, and makes the helper resume event consumption without sending `MENU_CONTINUE`; an immediate nonzero title still enters the existing hop, while a later observed menu leave uses the saved-start-code path to enter the ready/go barrier before title payload processing.  Source `bb3110d` completes the validation boundary by making the real-image harness recognize that helper-side post-still hop and require the pending-payload marker, post-still-pending marker, no continuation acknowledgment, menu leave, second ready event, post-hop random access and title bytes.  The strict authored-compensation native helper builds with `-Werror` after demoting only the pinned DVD headers' ignored-attribute warning, its complete capability smoke test passes, and the focused delayed-transition, random-access and fragmented-subpicture regressions pass.  The Raspberry Pi GNU 10.2.1 ARM toolchain builds exact source `bb3110d` into `host/build/MediaPlayer_Helper_PostStillPending_bb3110d`, a 908,660-byte static stripped ARMv7 EABI5 executable at SHA-256 `f1f40c7e9a36b5182016038bcbbcaa03a3db91ac020e53a544f54020418f67ad`; it has no dynamic section, contains the new post-still-pending and authored-compensation markers, omits the solid-magenta probe marker and returns the complete protocol-one capability string.  Main and the source-`f5f650f` RBF are unchanged.
-
-#### Next Steps:
-
-The user should exit MediaPlayer so its helper process stops, manually replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_PostStillPending_bb3110d`, restore executable mode if needed and verify the 908,660-byte size and recorded SHA-256.  Preserve the installed source-`2de0717` Main and source-`f5f650f` RBF, restart the disc, enter the root menu, leave Play selected and press Space once, then wait through the authored ten-second still.  Physical acceptance requires `pending reached still`, `remains pending after finite still`, menu leave, `stream hop before payload`, one clean ready/go barrier, a new random-access group and continuously moving title video; returning to the menu must retain the authored selector.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- host/arm/media_source.c
-- tools/test_dvd_menu_hop.c
-- tools/test_dvd_menu_navigation.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
