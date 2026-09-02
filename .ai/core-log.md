@@ -1,4 +1,4 @@
-## 906 COMMIT Unreleased ??? 2026-09-02T07:56:41-07:00
+## 906 COMMIT Unreleased 8c90e2d 2026-09-02T07:56:41-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Preserve an already-active DVD root menu and keep unsupported private audio from
 
 #### Outcome:
 
-The approved helper-only boundary combines the source-`fddab62` Blazing Saddles finding with an independent forum-user failure.  Blazing Saddles enters its four-button root menu autonomously before `M`, after which the redundant root call resets Main and reaches an indefinite still without replacement MPEG background; the helper will query libdvdnav's current menu identity and acknowledge `M` without a VM jump or decoder barrier only when the root menu is already active, while title-to-root and submenu-to-root calls retain the existing hop.  The forum capture reaches a DVD menu at 10.178249 seconds after decoding AC-3 normally, then encounters private-stream substream `0xa0`, reports it unsupported and exits 1; Main drains the reserve until 11.532917 seconds and leaves the last Rhino frame under telemetry.  Substream `0xa0` is DVD LPCM, which remains outside the current decoder scope, so unsupported private audio in `0x90` through `0xaf` will be skipped with a bounded diagnostic instead of aborting the video and navigation session.  This intentionally permits a silent LPCM menu while preserving the established AC-3 selection for subsequent title playback.  The 207,073-byte forum log and 197,440-byte screenshot have SHA-256 `c80483d19004127c21de329b3c6c307ecd7a035d30db8592e45e8bcfc8b56d75` and `f59f45385e958b90fbf0314ffbbdebe4070a828a4e9a4e263ff69a238ddaaf96`.
+The helper now queries libdvdnav's current title and menu identity before a root-menu command; an already-active root menu returns continuation status `already-root` without a VM jump, output discard or decoder barrier, while title-to-root and submenu-to-root navigation retain the existing hop.  DVD private audio substreams `0x90` through `0xaf` are now skipped with one bounded diagnostic per substream instead of terminating video and navigation; the forum capture's `0xa0` DVD LPCM menu can therefore remain silent while the established AC-3 selection is preserved for subsequent title playback.  Deterministic regressions reproduced the prior fatal `0xa0` behavior and then proved complete H.262 output with no fabricated PCM, 100 root-menu identity and reserve repetitions, 20 LPCM and overlay repetitions, all four real audio seek/timer formats, the complete native helper suite, and ASAN/UBSAN coverage.  The exact static ARMv7 artifact `host/build/MediaPlayer_Helper_MenuCompat_8c90e2d` is 961,956 bytes with SHA-256 `1cad3ba0a5beefb4090126e99f2cfd35fd83a5d8fe44c36c0764033f38338f3b`; Main, RTL, the visualizer, the transport capability string and RBF are unchanged.
 
 #### Next Steps:
 
-Add root-menu identity coverage for an active root, a non-root submenu and title playback, then add a deterministic ffmpeg-generated VOB regression whose private stream carries DVD LPCM `0xa0` and prove the current helper fails while the new helper keeps and completes its H.262 video with no fabricated PCM.  Run strict native, sanitizer and full helper regressions, build an exact static ARMv7 helper locally with the Raspberry Pi toolchain, verify its markers, architecture and hash, and leave Main, RTL, the visualizer and RBF unchanged.  Physical acceptance requires Blazing Saddles to retain its loaded background when `M` is pressed from its root menu, the forum disc to proceed through its LPCM menu without helper exit, and Coming to America plus The Big Lebowski to preserve normal menu entry, selector and title playback.
+Install only the exact helper as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main and RBF.  For Blazing Saddles, allow the automatic root menu to appear and press `M`; the background and selector must remain active and telemetry should report `status=already-root` without a navigation reserve discard or READY/GO barrier.  For the forum disc, telemetry should report that unsupported DVD LPCM substream `0xa0` is skipped, the helper must remain alive through the menu even if that menu is silent, and activating the title must restore its supported AC-3 playback.  Recheck ordinary root-menu entry, selection and title playback with Coming to America and The Big Lebowski before accepting this commit on hardware.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Add root-menu identity coverage for an active root, a non-root submenu and title
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
