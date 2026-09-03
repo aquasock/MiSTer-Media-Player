@@ -1,3 +1,32 @@
+## 944 COMMIT Unreleased cea2add 2026-09-03T06:15:39-07:00
+
+#### Coming From:
+
+Unreleased cea2add
+
+#### Purpose:
+
+Use the physical Futurama result to distinguish the automatic-menu scheduler correction from an earlier terminal-still decoder-session freeze.
+
+#### Outcome:
+
+The physical `FUTURAMA_S1D1` run rejects source `cea2add` visually but proves the helper did not freeze.  The first authored ten-second still is finalized from 224,665 bytes of sequence-plus-I video, receives sequence end and transport drain, and is the only payload the schema-21 FPGA snapshot accepts: 224,780 bytes, one I picture, one reference and one displayed picture, sequence-end seen and presentation complete, with zero decoder error flags, transport blocks or audio underruns.  Three finite-still expirations then resume the same completed download session without a READY/GO decoder reset.  The helper continues, classifies later first-play video silent, enters the menu at 40.449462 seconds, rearms source `cea2add`, selects AC-3 substream `0x80`, publishes seven complete overlay planes and accepts an Up command at 63.111029 seconds that changes the authored button from one to four; it remains alive beyond 71 seconds.  Main submits through overlay offset 9,035,621, but telemetry retains zero overlay records, zero PCM samples and the first still's 224,780 accepted bytes, proving every later video, audio and overlay record remains outside the terminal FPGA session.  The black 1,600-by-1,200 screenshot contains valid telemetry but no decoded menu background.  The 1,477,359-byte log, 2,788-byte screenshot and 441-byte sidecar have SHA-256 `19bf6160b410268650e34db63b7507c1d7f5b21396a4d9314da5ebe3fc9d7518`, `bba7649ac2ac61c546f485a5f52d6f9bd09a7b9e4b17552b7ee0aed2ea380a1d` and `abe2bbe935177401657cdb1090b2e3b8b63d3c17368ccd20e4d5a990bf57318c`.  The helper-only menu rearm is therefore insufficient because it cannot reopen an FPGA session already closed by the first finite still.
+
+#### Next Steps:
+
+After user approval, replace the helper-only assumption with an explicit autonomous DVD stream-boundary handshake shared by Main and the helper while retaining the decoder and RTL.  Associate buffered libdvdnav transition metadata with its consumed payload position rather than exposing producer-ahead menu state; when a finite authored still expires or a synchronized automatic menu domain begins after a terminal or silent epoch, finish the intentional old transport, notify Main without requiring a user navigation command, drain rather than discard the completed boundary, deassert and reassert download exactly once, then send GO so the helper resets demux, audio, PTS, random-access and bounded scheduling before consuming the new epoch.  Remove the unsynchronized `cea2add` post-`find_start_code` rearm.  Add regressions for multiple finite first-play stills followed by a silent segment and an automatic video-plus-AC-3 menu, verifying one decoder reset per terminal boundary, consumer-position menu notification, accepted background video, PCM and overlay records, while retaining directional continuations, explicit navigation hops, staged menus, silent Program Streams, late-audio rejection, reserve ownership, seek, audio and sanitizer coverage.  Build Main and the static ARM helper locally; no RTL simulation is required unless implementation evidence unexpectedly reaches the transport decoder.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 943 COMMIT Unreleased cea2add 2026-09-03T05:54:12-07:00
 
 #### Coming From:
@@ -1180,39 +1209,6 @@ Preserve Main, the RBF, reserve discard, media-only ownership and normal authore
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 904 COMMIT Unreleased fddab62 2026-09-02T07:11:06-07:00
-
-#### Coming From:
-
-Unreleased 46638c7
-
-#### Purpose:
-
-Keep reserve-backed physical-DVD output independent from the nonblocking descriptor's unused stdio stream at navigation barriers and shutdown.
-
-#### Outcome:
-
-Source `fddab62` makes helper output ownership exclusive and fixes the hardware root cause rather than masking its symptom.  Libdvdnav's default informational logger was buffering diagnostics on media stdout; the helper now uses the supported `dvdnav_open2` and `dvdnav_open_stream2` logger callback to route every diagnostic level to stderr before playback, while reserve-backed barriers select reserve drain or discard without also flushing that nonblocking descriptor's unused stdio stream and shutdown remembers reserve ownership.  The focused production regression fills the nonblocking pipe while retaining a buffered stdio sentinel: source `2bd8447` reproduces `flushing ownership navigation barrier failed: Resource temporarily unavailable`, while `fddab62` cancels 262,144 reserve bytes, leaves stdio untouched through shutdown and preserves the sentinel for an independent later flush.  One hundred strict repetitions of that path reconstruct the exact 86,400-byte overlay plane, and one hundred logger/menu-hop repetitions prove diagnostics never reach stdout and preserve immediate and delayed transition classifications.  One hundred stalled-sink reserve runs, output staging, random-access, fragmented-SPU, AC-3 recovery, Program Stream and audio-file seek, audio UI and visualizer regressions pass; reserve, staging, logger/menu-hop and production ownership paths also pass AddressSanitizer and UndefinedBehaviorSanitizer, and the reserve passes GCC analyzer.  The strict native helper builds and all four audio formats pass real READY/GO visualizer integration.  Local GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_MediaOnly_fddab62` at SHA-256 `f191264565c89e1e1115eae9a3debe186b9bf4b35556350e59bc53f88460a8e0`; it has no dynamic section and contains the media-only logger, reserve-discard and complete protocol-one capability markers.  Main source `46638c7`, the output-reserve worker, libdvdnav navigation policy, decoder, visualizer, RTL and RBF are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer so the old helper stops, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_MediaOnly_fddab62`, preserve executable mode, and retain Main `MiSTer_NavDrain_46638c7`, the current visualizer asset and RBF.  Reboot, start the golden physical DVD with telemetry, and press `M` once early enough to reproduce the rejected run; acceptance requires libdvdnav diagnostics in the helper log, a navigation-reserve discard, `READY`, exactly one Main reset and `GO`, a surviving helper and a displayed root menu without `Resource temporarily unavailable`.  Then move and activate the authored selector, return to playback, press `M` again after sustained playback, exercise `N` and `P` once each, and return fresh results for physical acceptance.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- host/arm/media_source.c
-- tools/test_dvd_menu_hop.c
-- tools/test_dvd_overlay_output.c
 
 #### Status:
 
