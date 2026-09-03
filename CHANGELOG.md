@@ -6,9 +6,24 @@ This project is still in active pre-release development. Published milestone rel
 
 ## Unreleased
 
-Target milestone: **v0.9.0**. The changes below are implemented in the current
-release candidate; final regression, clean-build and packaging qualification
-are still in progress.
+No changes yet.
+
+## [0.9.0] - 2026-09-03 — DVD navigation, native video and consumer-audio milestone
+
+Encrypted ISO and direct USB-disc DVD-Video playback with authored menus,
+expanded native 480i decoding, native 480p, file/audio seeking, standalone
+consumer audio, the MPEG-2 visualizer and production telemetry.
+
+- Release package: `MiSTer_Media_Player_v0.9.0.zip`, 6,580,818 compressed
+  bytes, SHA-256
+  `e8bc8e0c25291df85d6d53ad2688995d30ce156c547b7315b08058052863e1f9`.
+  Its 16 files total 10,476,902 uncompressed bytes; all 15 manifest entries and
+  ZIP integrity pass, and Main/helper retain executable mode.
+- The project owner accepted the exact runtime set through functional and
+  regression testing and directed that it be packaged without rebuilding.
+  The source-`dfe1057` RBF was already a clean, reproducible, timing-qualified
+  Quartus build; package assembly preserves every accepted artifact byte for
+  byte.
 
 ### Added
 

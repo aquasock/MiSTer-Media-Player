@@ -6,10 +6,10 @@ ISO and direct optical-disc playback with authored menus, expands interlaced
 I/P/B decoding, replaces the progressive diagnostic raster with native 480p,
 and adds a complete standalone-audio experience.
 
-This document currently describes the **v0.9.0 release candidate**. The user is
-performing final functional and regression testing. The annotated tag, public
-package identity and final clean-build reproduction data will be added only
-after qualification; v0.9.0 has not yet been published.
+The project owner accepted the complete runtime set through functional and
+regression testing. The release package is ready for the owner to attach to the
+annotated `v0.9.0` GitHub pre-release; no tag or release was created during
+package preparation.
 
 ## Highlights since v0.8.0
 
@@ -69,7 +69,7 @@ uses `games/MediaPlayer/USB DVD Drive.dvd`. The RBF, Main and helper must remain
 a matched set; standalone audio falls back to its ordinary interface when the
 visualizer is omitted.
 
-The current tested candidate combines:
+The v0.9.0 runtime set combines:
 
 - timing-qualified RBF source `dfe1057`, built as
   `MediaPlayer_20260901.rbf`;
@@ -78,9 +78,9 @@ The current tested candidate combines:
   pack introduced at `366a227`;
 - final helper compatibility source `0f1165c`.
 
-The exact artifacts used for the current candidate testing are:
+The exact packaged runtime artifacts are:
 
-| Candidate file | Size | SHA-256 |
+| Release file | Size | SHA-256 |
 | --- | ---: | --- |
 | `MediaPlayer_20260901.rbf` | 4,480,236 | `6389fa57b2d642b5b4e85980c6ccf8746ea8d20869cbe480f80b0ea172bcdb4b` |
 | `MiSTer` | 1,182,692 | `1b3387170083be269831bf4c3a828f1cce6bcb3b93c519d8cde32cb9768bedf9` |
@@ -88,12 +88,12 @@ The exact artifacts used for the current candidate testing are:
 | `linux/MediaPlayer_Visualizer.mmpvis` | 3,740,562 | `448407cdd7e6c79fbe13cbb435241116127f726aca5af9f99d75b32fc2519f47` |
 | `games/MediaPlayer/USB DVD Drive.dvd` | 111 | `4757d49e9d1b94d88f554b3bd3157ed5d2064caaa65a6cf0f856e8ab6fbe2d2e` |
 
-These hashes identify the tested candidate and are not yet release-package
-provenance. Final package filenames and SHA-256 values will be recorded after
-the clean release build; the published package's `SHA256SUMS` will then be
-authoritative.
+The project owner directed that these accepted artifacts not be rebuilt during
+packaging. Their bytes match the previously tested files exactly. The
+source-`dfe1057` RBF was already produced by a clean, reproducible Quartus
+build; the package's `SHA256SUMS` is authoritative for every member.
 
-## Candidate FPGA qualification
+## FPGA qualification
 
 The unchanged source-`dfe1057` RBF was built with Quartus Prime Lite 17.0.2 and
 fitter seed 24. It completed with zero errors and positive timing in every
@@ -105,8 +105,8 @@ bits in 536 RAM blocks, 70 DSP blocks and 3 PLLs.
 
 That RBF is 4,480,236 bytes with SHA-256
 `6389fa57b2d642b5b4e85980c6ccf8746ea8d20869cbe480f80b0ea172bcdb4b`.
-This identifies the current hardware-tested candidate and does not replace the
-required final clean/from-scratch release reproduction.
+This is the existing clean, reproducible and hardware-tested RBF retained for
+the release without another build.
 
 ## Validation scope
 
@@ -118,11 +118,31 @@ subpicture rendering, menu navigation, still termination, staged transitions,
 reserve cancellation, unsupported LPCM handling and the malformed-chroma
 compatibility boundary.
 
-Physical development testing has covered `.mpg` playback, standalone MP3/WAV/
+Physical release testing covered `.mpg` playback, standalone MP3/WAV/
 FLAC/Ogg playback, the ten-second visualizer transition, encrypted direct-disc
 startup, root menus, scene selection, scene-page changes, chapter navigation,
 pause/resume and repeated title/menu transitions across multiple commercial
-DVDs. The final release regression is still underway.
+DVDs. The project owner reports that the complete functional and regression
+matrix looks good and accepts this exact runtime set for v0.9.0.
+
+## Packaging
+
+`MiSTer_Media_Player_v0.9.0.zip` contains the RBF, patched Main, executable
+helper, visualizer pack, USB DVD launcher, installation/source provenance,
+project licence and all seven bundled dependency licences.
+
+- ZIP size: **6,580,818 bytes**.
+- ZIP SHA-256:
+  `e8bc8e0c25291df85d6d53ad2688995d30ce156c547b7315b08058052863e1f9`.
+- Uncompressed member total: **10,476,902 bytes** across 16 files.
+- All 15 `SHA256SUMS` entries pass and ZIP integrity reports no errors.
+- Fresh extraction preserves mode 755 on `MiSTer` and
+  `linux/MediaPlayer_Helper`; all other files use mode 644.
+- A fresh extraction is byte-identical to the bounded staging directory.
+
+Package assembly performed no compile or rebuild at the project owner's
+direction. The RBF qualification above records its earlier clean build; the
+other component source commits and exact payload hashes are listed above.
 
 ## Known limitations
 

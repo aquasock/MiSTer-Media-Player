@@ -122,14 +122,20 @@ Quartus-generated directories and reports are ignored by `.gitignore`, including
 
 For release qualification or suspicious incremental behavior, use a fresh checkout or export of the exact tracked source with no reused Quartus database or prior output binaries. Preserve the previous qualified artifacts. Compare new hashes only after all required commands exit successfully.
 
-The v0.9.0 candidate's existing timing-qualified RBF provenance, source
-composition and open release gates are recorded in the
-[v0.9.0 release notes](RELEASE_NOTES_v0.9.0.md). Release qualification requires
-a clean tracked-source export, wiped generated/dependency directories, a fresh
-Quartus build, fresh ARM/Main/visualizer artifacts, checksum comparison and a
-final hardware pass. Reproducing a binary does not itself constitute a new
-hardware run.
+The v0.9.0 runtime composition and timing-qualified RBF provenance are recorded
+in the [v0.9.0 release notes](RELEASE_NOTES_v0.9.0.md). Its RBF came from the
+recorded clean, reproducible source-`dfe1057` Quartus build. After the project
+owner accepted the complete runtime set, release packaging preserved those
+exact artifacts without rebuilding them at the owner's direction. Future
+release candidates should normally use a clean tracked-source export, wiped
+generated/dependency directories, fresh FPGA/ARM/Main/visualizer artifacts,
+checksum comparison and a final hardware pass. Reproducing a binary does not
+itself constitute a new hardware run.
 
 ## Known presentation limitation
 
-A hardware-screenshot comparison found a blended pixel column at sharp colour transitions that the independent decoder did not produce. Chroma upsampling is a hypothesis, not a proven cause. Comprehensive playback pixel qualification remains open; distinguish this recorded observation from new corruption introduced by a candidate.
+A hardware-screenshot comparison found a blended pixel column at sharp colour
+transitions that the independent decoder did not produce. Chroma upsampling is
+a hypothesis, not a proven cause. Comprehensive playback pixel qualification
+remains open; distinguish this recorded observation from new corruption
+introduced by a future candidate.

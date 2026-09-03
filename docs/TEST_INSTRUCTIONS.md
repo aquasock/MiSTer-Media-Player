@@ -84,5 +84,6 @@ duration. Also retain the decoded telemetry sidecar when the screenshot helper
 produces one.
 
 Record the exact source commit and installed SHA-256 values with every result.
-The candidate is ready for release only when the complete clean-built runtime
-set passes the MPEG, audio, ISO and direct-disc matrix without a new regression.
+The project owner completed this matrix on the accepted v0.9.0 runtime set.
+Future changes to any runtime component require another relevant pass before a
+new release package is accepted.

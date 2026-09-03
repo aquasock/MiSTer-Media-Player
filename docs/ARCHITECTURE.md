@@ -57,7 +57,7 @@ The older `rtl/mpeg2fpga/` implementation is retained only as a frozen reference
 
 ## Current supported implementation path
 
-The v0.9.0 candidate covers continuous progressive 4:2:0 I/P/B frame pictures
+v0.9.0 covers continuous progressive 4:2:0 I/P/B frame pictures
 through 720x480. Its interlaced path accepts 720x480 at `30000/1001`, 4:2:0
 frame pictures with I, P and B coding, frame or field motion, frame or field
 DCT, per-picture field order, repeat-first-field scheduling and mixed ordinary
@@ -160,17 +160,17 @@ Picture PTS may delay presentation but cannot bypass the encoded cadence floor. 
 
 ## Resource and qualification limits
 
-The current source-`dfe1057` candidate uses 536 RAM blocks, 34,859 ALMs,
+The v0.9.0 source-`dfe1057` RBF uses 536 RAM blocks, 34,859 ALMs,
 54,492 registers and 70 DSP blocks. Its seed-24 Quartus 17.0.2 build has
 +0.180 ns worst global setup with zero reported total negative slack; decoder
-and video setup are positive at +1.220 ns and +2.215 ns. A clean/from-scratch
-release reproduction is still required before v0.9.0 publication.
+and video setup are positive at +1.220 ns and +2.215 ns. That RBF was produced
+by the recorded clean, reproducible build and retained unchanged for release.
 
 Large coded pictures can exhaust the available input lead and repeat one or two
 display slots at a scene cut. Increasing buffering was deferred to preserve
 memory headroom. These are measured implementation limitations, not
 input-format limits. See the [v0.9.0 release notes](RELEASE_NOTES_v0.9.0.md) for
-candidate provenance, qualification scope and remaining release gates.
+package provenance and qualification scope.
 
 ## Standards boundary
 

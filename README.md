@@ -2,16 +2,15 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-1.0. **v0.9.0 is the upcoming milestone**,
+> **Development status:** active, pre-1.0. **v0.9.0 is the current milestone**,
 > adding encrypted DVD ISO and direct USB-disc playback, authored menus and
 > navigation, expanded native interlaced decoding, file/audio seeking, a
-> standalone-audio interface and an optional MPEG-2 visualizer. Final release
-> regression and packaging are still in progress.
+> standalone-audio interface and an optional MPEG-2 visualizer.
 
 ## Current status
 
 The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`.
-The v0.9.0 release candidate provides:
+v0.9.0 provides:
 
 - raw MPEG-2 Video elementary-stream playback, a bounded H.222.0 MPEG-2
   Program Stream path for `.mpg`, `.mpeg` and `.vob` files, and audio-only
@@ -66,23 +65,26 @@ The frozen `rtl/mpeg2fpga/` tree remains historical reference material and is no
 
 ## Installation
 
-Until v0.9.0 is published, the latest public package is the
-[v0.8.0 pre-release](https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.8.0).
-The v0.9.0 package will contain a matching RBF, patched Main and helper plus the
-optional visualizer and optical-drive launcher. Back up the existing files,
-extract the ZIP at the root of `/media/fat`, preserve executable permissions
-and verify its `SHA256SUMS`. Do not combine runtime files from different
-releases.
+[Download the v0.9.0 pre-release](https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.9.0).
+Its package contains a matching RBF, patched Main and helper plus the optional
+visualizer and optical-drive launcher. Back up the existing files, extract the
+ZIP at the root of `/media/fat`, preserve executable permissions and verify its
+`SHA256SUMS`. Do not combine runtime files from different releases.
 
 | Release file | MiSTer destination | SHA-256 |
 | --- | --- | --- |
-| `MediaPlayer_20260827.rbf` | `/media/fat/MediaPlayer_20260827.rbf` | `61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce` |
-| `MiSTer` | `/media/fat/MiSTer` | `01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9` |
-| `linux/MediaPlayer_Helper` | `/media/fat/linux/MediaPlayer_Helper` | `f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8` |
+| `MediaPlayer_20260901.rbf` | `/media/fat/MediaPlayer_20260901.rbf` | `6389fa57b2d642b5b4e85980c6ccf8746ea8d20869cbe480f80b0ea172bcdb4b` |
+| `MiSTer` | `/media/fat/MiSTer` | `1b3387170083be269831bf4c3a828f1cce6bcb3b93c519d8cde32cb9768bedf9` |
+| `linux/MediaPlayer_Helper` | `/media/fat/linux/MediaPlayer_Helper` | `613d35de5ace0622584ae14b4540423c2c56b1f923c02c599f47b55722e21e56` |
+| `linux/MediaPlayer_Visualizer.mmpvis` | `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` | `448407cdd7e6c79fbe13cbb435241116127f726aca5af9f99d75b32fc2519f47` |
+| `games/MediaPlayer/USB DVD Drive.dvd` | `/media/fat/games/MediaPlayer/USB DVD Drive.dvd` | `4757d49e9d1b94d88f554b3bd3157ed5d2064caaa65a6cf0f856e8ab6fbe2d2e` |
 
-`MiSTer` is a patched Main and is not optional: it passes the core's `Audio output` selection to the helper and yields during backpressured media transfers to keep the menu responsive. An older Main may display the core's option without passing its selection to the helper. The helper must be executable. Reboot after installing Main. Mixing v0.8.0 components with a different Main, helper, or RBF is unsupported.
+`MiSTer` is a patched Main and is not optional: it passes the core's controls
+and `Audio output` selection to the helper while keeping the menu responsive.
+The helper must be executable. Reboot after installing Main. Mixing v0.9.0
+components with a different Main, helper or RBF is unsupported.
 
-The v0.9.0 package adds these paths:
+The visualizer and optical-drive launcher have these roles:
 
 | Release file | MiSTer destination | Required for |
 | --- | --- | --- |
@@ -154,36 +156,37 @@ pause state to the core.
 
 ## v0.9.0 release qualification
 
-The current candidate uses the timing-qualified source-`dfe1057` RBF, source
-`3689cca` patched Main, the source-`932dc22` interface/visualizer behavior and
-source-`0f1165c` helper. The user is running the final functional and regression
-matrix; the required clean release reproduction and final package hashes remain
-open. See the [v0.9.0 release notes](docs/RELEASE_NOTES_v0.9.0.md) for current
-source provenance, timing/resource figures, validation scope and limitations.
+The accepted runtime set uses the clean, reproducible and timing-qualified
+source-`dfe1057` RBF, source-`3689cca` patched Main, source-`932dc22`
+interface/visualizer behavior and source-`0f1165c` helper. The project owner
+completed the functional and regression matrix and directed that these exact
+accepted artifacts be packaged without rebuilding.
+
+`MiSTer_Media_Player_v0.9.0.zip` is 6,580,818 bytes with SHA-256
+`e8bc8e0c25291df85d6d53ad2688995d30ce156c547b7315b08058052863e1f9`.
+All 15 entries in its internal manifest pass, ZIP integrity is clean, and Main
+and the helper retain mode 755. See the
+[v0.9.0 release notes](docs/RELEASE_NOTES_v0.9.0.md) for source provenance,
+timing/resources, validation scope and limitations.
 
 ## Releases
 
 Milestone releases use semantic-version tags on GitHub. RBF assets retain the normal MiSTer date-coded naming convention.
 
-Upcoming milestone:
+Current milestone:
 
-- **v0.9.0** — DVD ISO/direct-disc playback, authored menus, expanded native
-  interlaced decoding, seeking, consumer audio, visualizer and production
-  telemetry. Release qualification is in progress.
-
-Current published milestone:
-
-- **[v0.8.0](https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.8.0)** — bounded native 480i all-I playback, AC-3 decode, AC-3/DTS passthrough, and responsive Main media transfers; binary `MediaPlayer_20260827.rbf`.
+- **[v0.9.0](https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.9.0)** — DVD ISO/direct-disc playback, authored menus, expanded native interlaced decoding, seeking, consumer audio, visualizer and production telemetry; binary `MediaPlayer_20260901.rbf`.
 
 Previous milestones:
 
+- **[v0.8.0](https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.8.0)** — bounded native 480i all-I playback, AC-3 decode, AC-3/DTS passthrough, and responsive Main media transfers; binary `MediaPlayer_20260827.rbf`.
 - **v0.7.0** — bounded Program Stream input, real picture PTS, MPEG Layer II audio, and full-length audio-video playback; binary `MediaPlayer_20260824.rbf`.
 - **v0.6.0** — sustained progressive 720x480 real-stream I/P/B playback with native 23.976/24/25-fps cadence; binary `MediaPlayer_20260822.rbf`.
 
-See the [v0.9.0 release-candidate notes](docs/RELEASE_NOTES_v0.9.0.md) for the
-new milestone and [v0.8.0 release notes](docs/RELEASE_NOTES_v0.8.0.md) for the
-current public package. Historical qualification remains in each version's
-notes and the [changelog](CHANGELOG.md).
+See the [v0.9.0 release notes](docs/RELEASE_NOTES_v0.9.0.md) for the current
+package and [v0.8.0 release notes](docs/RELEASE_NOTES_v0.8.0.md) for the prior
+milestone. Historical qualification remains in each version's notes and the
+[changelog](CHANGELOG.md).
 
 ## Converting media with FFmpeg
 
@@ -329,7 +332,7 @@ for the current workflow.
 - The standalone-audio screen contains a CRT-safe 4:3 composition for album artwork, title/artist/album tags, the current playlist, transport controls, centered elapsed/total/remaining time and a duration-relative progress bar. Track timing, fixed keyboard seeking and absolute progress tracking are active; artwork, metadata, playlist entries, playlist summary fields, arbitrary-position scrubbing and FPGA-aware pause state remain later display boundaries.
 - The optional `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` asset is generated with `python3 tools/generate-audio-visualizer.py host/build/MediaPlayer_Visualizer.mmpvis`. It contains eight aligned, interlaced top-field-first, three-picture closed-GOP MPEG-2 variants, not malformed decoder input. The helper rejects progressive or otherwise incompatible packs so the native-480i player overlay cannot be bypassed. It sends one selected GOP at each source phase, limits every change to one adjacent grade per GOP, applies hysteresis to its fixed RMS thresholds, and limits each video admission to 4 KiB between PCM records. The two-bit player overlay uses a transparent background, a translucent dark panel and opaque text and borders; while it is present, the loop is capped at grade three. The helper clears that overlay after ten playback seconds without input, restores the full zero-through-seven brightness range without changing the GOP cadence, and restores the capped overlay on pause/resume or seek activity. The fixed thresholds do not provide per-track automatic gain.
 - Progressive 4:2:0 video is supported through 720x480 and decodes I, P and B
-  pictures. The v0.9.0 candidate also supports 720x480-at-30000/1001
+  pictures. v0.9.0 also supports 720x480-at-30000/1001
   interlaced frame-picture I/P/B decoding with frame or field motion, frame or
   field DCT, per-picture `repeat_first_field`, and mixed ordinary-interlaced/
   progressive-film frames. Field pictures and 576i remain rejected. DVD
