@@ -1,3 +1,37 @@
+## 931 COMMIT Unreleased ??? 2026-09-02T23:23:00-07:00
+
+#### Coming From:
+
+Unreleased 366a227
+
+#### Purpose:
+
+Minimize the striped standalone-audio interface artifact with helper-only overlay transparency and a covered-visualizer brightness limit while preserving the accepted animation cadence.
+
+#### Outcome:
+
+Implementation approved.  The planned helper descriptor will make palette index zero fully transparent so unserved or dark full-width background runs expose the continuously decoded visualizer instead of appearing as black bars, retain opaque border and text colors, and make only the dark panel color partially translucent for the accepted blended presentation.  While the ten-second player interface is selected, the visualizer grade will be limited to level 3 of 7; after the existing overlay clear it will regain the full 0-through-7 loudness range, and any user activity will restore the translucent interface and the same temporary cap.  The visualizer asset, GOP selection deadline, upload/service cadence, playback and pause behavior, decoder, Main and RBF remain unchanged.
+
+#### Next Steps:
+
+Implement the palette alpha changes and covered-state grade cap, add focused assertions for exact palette opacity, the level-3 covered ceiling, full-range recovery after the existing ten-second clear and renewed capping after activity and seek, and run strict native, sanitizer, analyzer and real-audio helper validation.  Build one static ARMv7 helper with the local Raspberry Pi toolchain, preserve the installed visualizer pack and fixed animation rate, then test that the first ten seconds and activity-restored interface read as an even translucent scanline HUD without disruptive dark bars while the revealed visualizer retains its accepted brightness response and constant motion during both playback and pause.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_visualizer.c
+- host/arm/media_player_helper.c
+- tools/test_audio_visualizer.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 930 COMMIT Unreleased 366a227 2026-09-02T23:10:33-07:00
 
 #### Coming From:
@@ -1191,44 +1225,6 @@ Obtain approval for a helper-only correction that makes final UI completion drai
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 891 COMMIT Unreleased 4063cf0 2026-09-02T01:51:36-07:00
-
-#### Coming From:
-
-Unreleased e05ede0
-
-#### Purpose:
-
-Make valid and boundary standalone-file seeks transactional, preserve the resident presentation at clean EOF, and replace standalone-audio time placeholders with real elapsed and remaining counters.
-
-#### Outcome:
-
-Source `4063cf0` adds the `audio-file-seek-v2` continuation event and makes Main defer every file-seek reset until the helper returns READY, so exact-end and past-end standalone-audio requests now complete with zero resets while valid standalone-audio and Program Stream targets retain one reset and GO barrier.  Main distinguishes a clean ordinary `file:` helper exit from errors and leaves download asserted for the final MPG frame or completed audio interface; ISO/DVD EOF, nonzero or signaled exits, transport failures, explicit stop and core changes retain teardown.  The audio renderer now derives elapsed floor-seconds and remaining ceiling-seconds from its absolute PCM timeline, republishes both after seeks and synchronously commits an exact full-progress, zero-remaining frame before clean audio EOF.  Strict focused tests pass for seek arithmetic, Program Stream indexing, AC-3 resynchronization, DVD random access, menu hops, SPU, output reserve/staging, UI rendering and modeled Main lifecycle; the renderer and real helper also pass AddressSanitizer/UndefinedBehaviorSanitizer coverage, and native plus final ARM real-file runs pass MP3, WAV, FLAC and Ogg with two valid READY/GO seeks, one continuation no-op and exact final timers.  The patched Main applies to pinned upstream and compiles as ARMv7.  GNU 10.2 produced the 957,860-byte static ARMv7 helper `host/build/MediaPlayer_Helper_SeekEOFTime_4063cf0` with SHA-256 `3263c64789add0cbcba67410f08dee2b65441331c82e2b36978b3fa956a3d485` and the 1,178,588-byte ARMv7 Main `host/build/MiSTer_SeekEOFTime_4063cf0` with SHA-256 `a513ca83b806c61593283c215384d2a397a44d791a0c9841d7f2f288b1d20fef`; RTL, RBF, codecs and accepted timing are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer and install `host/build/MediaPlayer_Helper_SeekEOFTime_4063cf0` as `/media/fat/linux/MediaPlayer_Helper` with executable mode and `host/build/MiSTer_SeekEOFTime_4063cf0` as `/media/fat/MiSTer`, preserving the current timing-qualified RBF.  Validate one valid forward and backward seek plus an oversized forward no-op in standalone audio, confirm elapsed, remaining and progress move together and reach exact completion without black, then play an ordinary MPG through natural EOF and require its final frame to remain instead of black.  Report hardware acceptance or place fresh Main/helper logs and a screenshot in `.ai/current_results` for any discrepancy; DVD behavior needs only a smoke check because its lifecycle and RBF are unchanged.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/audio_ui.c
-- host/arm/audio_ui.h
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_audio_file_seek.py
-- tools/test_audio_ui_output.c
-- tools/test_main_seek_lifecycle.cpp
 
 #### Status:
 
