@@ -1,7 +1,10 @@
-# v0.9.0 hardware playback test
+# Hardware playback test
 
-Use a matched RBF, patched Main, ARM helper and visualizer pack. Reboot after
-replacing `MiSTer`; make the helper executable. For direct optical testing,
+Use a matched RBF, core-specific patched Main, ARM helper and visualizer pack.
+Keep the official `/media/fat/MiSTer`, install the patched executable as
+`/media/fat/MiSTer_MediaPlayer`, and merge the `[MediaPlayer]` section from
+`assets/MiSTer_MediaPlayer.ini.fragment` at the end of `/media/fat/MiSTer.ini`.
+Make both custom executables executable and reboot. For direct optical testing,
 install `USB DVD Drive.dvd` at
 `/media/fat/games/MediaPlayer/USB DVD Drive.dvd` and confirm the drive is
 present as readable `/dev/sr0`. The disc does not need to be mounted.

@@ -4,6 +4,7 @@ set -euo pipefail
 root_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 deps_dir="$root_dir/host/arm/.deps"
 build_dir="$root_dir/host/build"
+main_output="$build_dir/MiSTer_MediaPlayer"
 minimp3_commit=ea99364f61c14656440e8d77e9c233ccf3124633
 minimp3_sha=57e437c5c1f0e8b243885d3929c8973b5e6c778451e0100ab4251d19915cb3ad
 license_sha=6a1ee543e5282cd9061881edf462e6fdab181f328da71fc2c9a6950a80e94d01
@@ -222,7 +223,7 @@ build_main() {
         done
         PATH="$(dirname -- "$(command -v "$arm_cc")"):$PATH" \
             make -C "$temporary/Main_MiSTer" -j"$(nproc)"
-        cp "$temporary/Main_MiSTer/bin/MiSTer" "$build_dir/MiSTer"
+        cp "$temporary/Main_MiSTer/bin/MiSTer" "$main_output"
         rm -r "$temporary"
         trap - EXIT
 }

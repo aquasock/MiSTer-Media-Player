@@ -84,6 +84,28 @@ and `Audio output` selection to the helper while keeping the menu responsive.
 The helper must be executable. Reboot after installing Main. Mixing v0.9.0
 components with a different Main, helper or RBF is unsupported.
 
+### Isolated Main for development builds
+
+Development builds after v0.9.0 keep the official `/media/fat/MiSTer`
+executable in place. Install the matching patched Main as
+`/media/fat/MiSTer_MediaPlayer`, make it executable, and merge the tracked
+[`MiSTer_MediaPlayer.ini.fragment`](assets/MiSTer_MediaPlayer.ini.fragment) at
+the end of `/media/fat/MiSTer.ini`:
+
+```ini
+[MediaPlayer]
+main=MiSTer_MediaPlayer
+```
+
+The section name is the core-reported `MediaPlayer`, not the filename of the
+RBF or an informal DVD-player name. Main's upstream core-specific executable
+handoff starts `MiSTer_MediaPlayer` when this core loads and returns to the
+official `MiSTer` executable when the Menu core loads. The patched Main remains
+a required matched runtime component, but it no longer replaces the system-wide
+binary or affects other cores. The installed official Main must include the
+core-specific `main=` option introduced upstream in March 2024. Do not place
+this setting in the global `[MiSTer]` section.
+
 The visualizer and optical-drive launcher have these roles:
 
 | Release file | MiSTer destination | Required for |
@@ -317,7 +339,9 @@ ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host arm
 ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host main
 ```
 
-The build script pins minimp3, miniaudio, stb_vorbis, liba52, libdvdcss,
+The outputs are `host/build/MediaPlayer_Helper` and
+`host/build/MiSTer_MediaPlayer`. The build script pins minimp3, miniaudio,
+stb_vorbis, liba52, libdvdcss,
 libdvdread, libdvdnav, MiSTer Main, dependency hashes and the Main patch. Release
 candidates require reproducible FPGA, helper, Main and visualizer artifacts plus
 host and MiSTer regression evidence. See [building and testing](docs/BUILDING.md)

@@ -1,0 +1,4 @@
+; Merge this section at the end of /media/fat/MiSTer.ini.
+; Do not replace the complete MiSTer.ini file with this fragment.
+[MediaPlayer]
+main=MiSTer_MediaPlayer

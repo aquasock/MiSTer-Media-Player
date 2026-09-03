@@ -44,7 +44,10 @@ chapters, pause/resume, telemetry and repeated navigation. Real commercial DVD
 testing complements the deterministic host and simulation suite because disc
 authoring and optical-drive behavior cannot be represented by one fixture.
 
-Install the matched RBF, helper and patched Main as described in the [README](../README.md#installation). Record installed hashes and playback observations; collect the helper log before another playback overwrites it, followed by a fresh scaled screenshot.
+Install the matched RBF, helper and core-specific patched Main as described in
+the [README](../README.md#isolated-main-for-development-builds). Record
+installed hashes and playback observations; collect the helper log before
+another playback overwrites it, followed by a fresh scaled screenshot.
 
 ## Helper and Main builds
 
@@ -57,7 +60,11 @@ ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host main
 ```
 
 The outputs are `host/build/media_player_helper.native`,
-`host/build/MediaPlayer_Helper`, and `host/build/MiSTer`. The script pins
+`host/build/MediaPlayer_Helper`, and `host/build/MiSTer_MediaPlayer`. The
+official `/media/fat/MiSTer` remains in place; install the custom Main at
+`/media/fat/MiSTer_MediaPlayer` and merge
+`assets/MiSTer_MediaPlayer.ini.fragment` into the end of the target's
+`MiSTer.ini`. The script pins
 minimp3, miniaudio, stb_vorbis, liba52, libdvdcss, libdvdread, libdvdnav and
 upstream Main and verifies fetched dependencies. The DVD libraries are linked
 statically into the helper; encrypted ISO or disc support does not use a
