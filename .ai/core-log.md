@@ -1,4 +1,4 @@
-## 937 COMMIT Unreleased ??? 2026-09-03T00:41:17-07:00
+## 937 COMMIT Unreleased 490dc02 2026-09-03T00:41:17-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Normalize The Big Lebowski's nonconforming 4:2:0 progressive-frame chroma flag a
 
 #### Outcome:
 
-Compatibility implementation approved from entry 936's byte-exact physical evidence.  The helper will retain the decoder, RBF, Main, random-access structure, transport length, every byte of conforming streams and all unrelated malformed fields, while changing only `chroma_420_type` from zero to one when a validated restart sequence extension specifies 4:2:0 and its initial complete-frame I-picture coding extension specifies `progressive_frame=1`; the exact offset and before/after byte will be logged.
+Implemented the helper-only compatibility normalization approved from entry 936's byte-exact physical evidence.  Immediately after successful random-access filtering, the helper now changes only `chroma_420_type` from zero to one when the buffered restart has a valid 4:2:0 sequence extension and a valid initial complete-frame progressive I-picture coding extension; conforming streams and out-of-scope malformed streams remain byte-identical, stream length and every offset remain unchanged, and the exact offset plus before/after byte are logged.  The captured 191-byte Big Lebowski prefix changes only byte 185 from `0xc0` to `0xc1` and is idempotent.  Its original form raises RTL syntax source 21, while the corrected form reaches the first slice with no syntax error and is accepted as a supported phase-1/native-film picture.  Strict focused C, ASan/UBSan, GCC analyzer, DVD random-access/menu-hop/overlay/SPU/staging/reserve/program-stream, audio seek/UI/visualizer, native static-helper capability and private audio/LPCM tests passed.  The exact ARM release artifact also passed its capability probe and real MP3/WAV/FLAC/Ogg visualizer integration (378/381 pictures and one clear record per file).  No Main, RBF or visualizer change was made.  Built `host/build/MediaPlayer_Helper_ChromaFix_490dc02`, 966052 bytes, SHA-256 `0d99ce70d703eb9486052f8673474aed0b85446e321b73d0d640573f79d3d2c0`.
 
 #### Next Steps:
 
-Add the narrowly gated in-place normalization immediately after successful random-access filtering and before diagnostic publication, extend the production C regression with the captured 191-byte prefix plus conforming and out-of-scope controls proving only offset 185 changes from `0xc0` to `0xc1`, and add an Icarus frontend regression proving the captured original raises syntax source 21 while the normalized prefix reaches its first slice with no syntax error.  Run strict native, sanitizer, analyzer, DVD random-access, navigation, staging, overlay, SPU, LPCM and audio suites, build one static ARMv7 helper locally without changing Main, RBF or visualizer, then retest Big Lebowski startup and Root Menu plus accepted Blazing Saddles and Coming to America menu paths.
+Exit MediaPlayer on the fresh MiSTer, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_ChromaFix_490dc02`, preserve executable mode, enable telemetry, and test The Big Lebowski.  Startup should show the authored still without the syntax error; then press `m` and confirm the Root Menu background appears and remains responsive.  The helper log should contain two `H262 restart normalized chroma_420_type offset=185 before=c0 after=c1` events and the following diagnostic should show picture extension `8ffff3c180`; telemetry should show no H.262 error and should report completed/displayed pictures.  Spot-check the accepted Blazing Saddles and Coming to America menu paths for regression.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Add the narrowly gated in-place normalization immediately after successful rando
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
