@@ -1,3 +1,32 @@
+## 919 COMMIT Unreleased 7186fb4 2026-09-02T20:16:16-07:00
+
+#### Coming From:
+
+Unreleased 7186fb4
+
+#### Purpose:
+
+Diagnose the second-visit Coming to America Scene Selection stall when a directional auto-action advances to the next page.
+
+#### Outcome:
+
+The user's source-`7186fb4` run proves the directional target and helper-side auto-action fix work: on the second Scene Selection visit, Right from button 4 selects authored button 15, recognizes `auto_action_mode`, explicitly activates it and stages a complete 311,502-byte one-picture indefinite menu replacement.  The apparent decoder stall is a deterministic Main/helper control-protocol deadlock immediately afterward.  Because Main marks only Enter and Root Menu as pending navigation commands, it handles a directional command as highlight-only; the helper returns READY (`0x81`) for the auto-action stream hop, Main logs it as an unexpected event instead of resetting the download and sending GO, and the helper thereafter logs Down and Left controls as ignored while waiting for GO.  The screenshot retains a correctly decoded Scene Selection page, and its checksum-valid schema-21 telemetry reports 224,829 accepted bytes, one completed reference and displayed picture, a recognized sequence end, completed presentation and no decoder, presentation, PCM or overlay protocol errors.  The helper remains alive and polling, which distinguishes this from the prior helper exit.  The 3,389,750-byte log, 729,406-byte screenshot and 597-byte telemetry report have SHA-256 `a3c73e8e20e60a1d77f4c352a8dd2f0a46a34997400b369f16f78ae8bc204630`, `cb4301d6bb2c687c5fadfcd4c1f45908fd2c91014f2091665f6c222a55c6e165` and `055501f2a8bac9a1565e2d4e6df6e71368101da27067629c49a8432dfc471eb6`.
+
+#### Next Steps:
+
+After user approval, make every accepted DVD menu direction a pending navigation transaction in Main and have the helper explicitly return MENU_CONTINUE for ordinary no-hop directional moves, while retaining READY for directional auto-action hops.  Main should preserve the resident stream on MENU_CONTINUE and execute the existing reset, drain and GO barrier on READY.  Add focused protocol coverage for both replies, rebuild Main and the static ARM helper, run strict native, sanitizer, analyzer, menu-hop, staging, random-access, overlay, audio and seek regressions, then exercise the exact resume-to-menu-to-next-page route on hardware and retain the existing disc regressions.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 918 COMMIT Unreleased 7186fb4 2026-09-02T20:06:39-07:00
 
 #### Coming From:
@@ -1230,36 +1259,6 @@ Preserve the accepted source-`5f00e35` rollback, install `output_files/MediaPlay
 #### Files Modified:
 
 - sys/ascal.vhd
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 879 COMMIT Unreleased 40dd64d 2026-09-01T18:08:06-07:00
-
-#### Coming From:
-
-Unreleased 326382a
-
-#### Purpose:
-
-Close the telemetry build's HDMI-domain setup timing structurally without changing decoder, presentation or telemetry behavior.
-
-#### Outcome:
-
-Source `40dd64d` gives cycle-eight its own same-edge outer-pixel register, supplies the vertical red, green and blue DSP groups from independent value-identical coefficient registers protected from merging, and permanently adds a routed one-hundred-path global setup report to the existing TimeQuest extractor.  All ten exact-source telemetry, progressive cadence, framebuffer geometry, output timing, audio-interface, DDR-arbiter, DVD-overlay metadata, engine, integrated delivery and snapshot regressions pass.  Quartus Prime 17.0.2 seed 24 completes synthesis in 2 minutes 24 seconds, fitting in 12 minutes 23 seconds and assembly with zero errors; the targeted negative 0.978-nanosecond outer-pixel route and nineteen negative 0.581-nanosecond shared-coefficient routes disappear, while global setup improves to negative 0.138 nanoseconds with only nine residual `ascal` violations.  Global hold, recovery, removal and minimum-pulse-width margins remain positive at 0.248, 3.710, 0.477 and 0.925 nanoseconds, and the dedicated 60 MHz decoder and 54 MHz video setup checks are clean at positive 0.717 and 1.573 nanoseconds.  The fit uses 34,681 ALMs, 54,549 registers, 4,187,203 block-memory bits in 535 RAM blocks and 70 DSP blocks; its RBF remains rejected on the build PC.
-
-#### Next Steps:
-
-Proceed through entry 880's separately recorded second structural correction for the nine measured residual paths, retaining seed 24 and every accepted source-`5f00e35` artifact.  Do not collect or distribute the source-`40dd64d` RBF.
-
-#### Files Modified:
-
-- sys/ascal.vhd
-- tools/phase1p_timing.tcl
 
 #### Status:
 
