@@ -31,7 +31,7 @@ always @(posedge clk) begin
         stream_seen[stream_count]=stream_data;
         stream_count=stream_count+1;
         stream_window={stream_window[23:0],stream_data};
-        if({stream_window[23:0],stream_data}==32'h000001b7)
+        if(stream_window==32'h000001b7)
             sequence_end_seen=1;
     end
     if(overlay_stalled)begin
