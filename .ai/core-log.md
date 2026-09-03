@@ -1,3 +1,34 @@
+## 928 COMMIT Unreleased 9c00a20 2026-09-02T22:31:00-07:00
+
+#### Coming From:
+
+Unreleased 6b63c91
+
+#### Purpose:
+
+Complete picture-bearing motion-menu transitions before their activation stage fills and publish terminal one-picture DVD menus after every navigation route.
+
+#### Outcome:
+
+Source `9c00a20` preserves the 4 MiB classification boundary but expands the bounded activation stage to 8 MiB, statically reserving at least one complete 2 MiB video-queue drain beyond that decision; a pending picture-qualified motion menu still in the menu domain now requests the existing staged READY/GO hop at the watermark and publishes its bytes atomically after the decoder reset instead of failing at capacity.  DVD still waiting now applies the existing byte-exact terminal random-access finalizer whenever an initial filter retains queued video, independent of deferred activation state, so direct Root Menu transitions such as the reproduced long-running Blazing Saddles route receive the H.262 sequence end and five transport-drain bytes while staged destinations retain their prior publication policy.  New production-path regressions verify the exact unstaged terminal tail, the accepted 3,797,120-byte finite-still classification below the watermark and an exact 4 MiB motion-menu commit; strict native DVD, staging, reserve, random-access, overlay, audio, visualizer, LPCM-skip and seek suites pass locally and on the build PC, including 20 focused and 50 staging/menu-hop local repetitions plus focused ASAN and UBSAN on both hosts.  GCC analyzer finds no change-related fault after demoting its pre-existing audio-overlay allocation warning.  ARM GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_MenuTransitions_9c00a20` with SHA-256 `cbd5359271c10c2788b66b83d21fc21f82631e7b77c49e2697b715bfc805f143`; Main, RTL, the RBF and libdvdnav policy are unchanged.
+
+#### Next Steps:
+
+Exit MediaPlayer and install only `host/build/MediaPlayer_Helper_MenuTransitions_9c00a20` as `/media/fat/linux/MediaPlayer_Helper` with executable mode while preserving the installed Main, visualizer asset and timing-qualified RBF.  On The Big Lebowski, enter Scene Selection, change pages, play a scene, return to the menu, resume the saved title position, re-enter Scene Selection and change pages again; acceptance requires a logged `DVD picture-bearing motion menu requires staged stream hop` at or beyond 4 MiB, READY/GO completion and continued navigation without `No space left on device`.  On Blazing Saddles, play for several minutes and press Root Menu; acceptance requires a logged terminal random-access group and authored-still drain followed by a visible responsive menu.  Retain shorter Coming to America Scene Selection, ordinary chapter, forum-disc LPCM-menu and title-audio checks before marking this source hardware-passed.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 927 COMMIT Unreleased 6b63c91 2026-09-02T22:16:01-07:00
 
 #### Coming From:
@@ -1199,45 +1230,6 @@ Exit MediaPlayer and install `host/build/MediaPlayer_Helper_AudioSeekEOF_e05ede0
 - host/arm/media_player_helper.c
 - tools/test_audio_file_seek.c
 - tools/test_audio_file_seek.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 888 COMMIT Unreleased e580270 2026-09-01T23:49:02-07:00
-
-#### Coming From:
-
-Unreleased 9397fa7
-
-#### Purpose:
-
-Make the standalone-audio progress bar represent the current absolute track position instead of repeating once per minute.
-
-#### Outcome:
-
-Source `e580270` replaces the accepted layout's repeating one-minute activity ruler with true track-relative progress for standalone MP3, WAV, FLAC and Ogg Vorbis playback.  Once the decoder establishes its output-frame length, a one-time consumer callback configures the UI; the renderer retains the absolute PCM-frame position, projects it to the next one-hertz publication, rescales after every fixed seek and clamps at the exact end.  An overflow-safe binary search maps even a `UINT64_MAX` timeline across the existing 652-pixel interior without wide-integer target support.  MP3, WAV and FLAC use miniaudio's reported length; callback-mode Ogg Vorbis returns a successful zero length, so file media sources now support end-relative seeking and the consumer reads at most the final 65,307-byte Ogg page, requiring a version-zero end-of-stream page ending exactly at EOF and using its authoritative granule position without scanning or decoding the whole file.  Strict and AddressSanitizer/UndefinedBehaviorSanitizer renderer tests pass at 44.1 and 48 kHz with exact one-quarter, one-half, 37-second seek, complete and maximum-64-bit progress checks; their first two frame hashes are `ea64e99d` and `eb334e45`.  Clean and fully instrumented real-helper regressions pass forward and backward seeking for all four formats while matching the UI duration to the decoder timeline; each twelve-second fixture reports 529,200/44,100 or 576,000/48,000 frames as appropriate.  The inspected deterministic YCbCr preview has SHA-256 `9fc41135e21762c078b570b553defe05b3fb9db8cbaabdb25cc480fc94157ad7`, and its PNG conversion has SHA-256 `242ea03862c9f20a48f329e0cd6f5144654057b781e0840940af3f1cc2ecfb5e`.  The GNU 10.2 build produces the 953,764-byte static ARMv7 helper `host/build/MediaPlayer_Helper_AudioProgress_e580270` with SHA-256 `e18854df1f64c6dd61b50c6f7b3463f2e88f5f1ad5f89f9213369a9e7c9295b4`; the accepted layout, displayed time placeholders, one-hertz cadence, bounded interleaving, atomic publication, codecs, audio priority, controls, Main, RTL, RBF, video and DVD paths remain unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer, install `host/build/MediaPlayer_Helper_AudioProgress_e580270` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, and preserve the installed source-`72bdccc` Main and timing-qualified RBF.  Re-enter the core and play a track with a known duration long enough to distinguish file-relative motion from the former one-minute repeat; acceptance requires the bar to begin near zero, advance monotonically in proportion to the full track, jump to the correct fraction after ten-second, one-minute and five-minute seeks in either direction, and approach the right edge at the end while audio remains clean.  Spot-check MP3, WAV, FLAC and Ogg Vorbis where practical, then report hardware acceptance or enable telemetry before playback and collect a fresh screenshot and helper/Main log for any discrepancy.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/audio_ui.c
-- host/arm/audio_ui.h
-- host/arm/consumer_audio.c
-- host/arm/consumer_audio.h
-- host/arm/media_player_helper.c
-- host/arm/media_source.c
-- host/arm/media_source.h
-- tools/test_audio_file_seek.py
-- tools/test_audio_ui_output.c
 
 #### Status:
 
