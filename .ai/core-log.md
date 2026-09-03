@@ -1,3 +1,36 @@
+## 929 COMMIT Unreleased ??? 2026-09-02T22:47:52-07:00
+
+#### Coming From:
+
+Unreleased 9c00a20
+
+#### Purpose:
+
+Keep the standalone-audio player interface visible for its intended first ten seconds by making the optional visualizer stream compatible with the existing native-480i overlay path.
+
+#### Outcome:
+
+Fresh hardware evidence accepts audio playback, the radial animation and its loudness response, while the Main trace proves that the helper commits the opaque player overlay near startup and does not clear it until approximately 10.15 seconds.  The current generated visualizer is progressive, however, and the unchanged DVD overlay compositor is intentionally active only for native interlaced video, so the committed interface plane is not composited and the underlying animation is visible immediately.  The approved boundary will correct the visualizer asset and reject incompatible packs without changing the H.262 decoder, Main, RTL, RBF, audio transport, inactivity timer or accepted animation.
+
+#### Next Steps:
+
+Encode the deterministic visualizer as DVD-compatible interlaced H.262, strengthen generator and helper validation to require the corresponding sequence and picture-coding declarations, and extend focused tests with accepted interlaced and rejected progressive packs.  Regenerate and decode-audit the asset, run strict native and sanitizer visualizer tests plus real-helper MP3, WAV, FLAC and Ogg regressions, build the static ARM helper locally, and provide both helper and asset for a hardware test requiring the normal interface for ten seconds, visualizer reveal afterward, activity restoration and another full delay.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_visualizer.c
+- tools/generate-audio-visualizer.py
+- tools/test_audio_visualizer.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 928 COMMIT Unreleased 9c00a20 2026-09-02T22:31:00-07:00
 
 #### Coming From:
@@ -1196,40 +1229,6 @@ Preserve the current timing-qualified RBF and treat two corrections as separate 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 889 COMMIT Unreleased e05ede0 2026-09-02T00:31:57-07:00
-
-#### Coming From:
-
-Unreleased e580270
-
-#### Purpose:
-
-Prevent oversized forward jumps in standalone audio files from terminating playback at the exact end and appearing to freeze the core.
-
-#### Outcome:
-
-The fresh hardware log localizes the reported Ogg incident to the shared audio seek boundary rather than the Ogg parser, decoder or FPGA: a sixty-second jump from frame 1,526,440 in a 3,309,167-frame 44.1-kHz file clamped to exact EOF, after which the helper exited normally with status zero and Main left a black display following its reset.  Source `e05ede0` makes any standalone-audio forward target that would reach or pass exact EOF resolve to the current frame, and the helper consumes that command before marking a seek pending, touching the decoder or entering the READY/GO reset barrier.  Focused strict and AddressSanitizer/UndefinedBehaviorSanitizer arithmetic tests cover exact-end, past-end and overflow cases; real-helper regressions against native and final ARM builds prove valid forward and backward seeks still use exactly two barriers while an oversized sixty-second jump uses no third barrier and playback continues for MP3, WAV, FLAC and Ogg Vorbis.  The GNU 10.2 build produces the 953,764-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_AudioSeekEOF_e05ede0` with SHA-256 `cdc9cb350c7f4e87aac2cd33a991d8bc32ff2ccd52d492fca41374abde0cbc4a`; Main, RTL, RBF, ordinary MPG seeking, DVD navigation and valid standalone-audio seeks are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer and install `host/build/MediaPlayer_Helper_AudioSeekEOF_e05ede0` as `/media/fat/linux/MediaPlayer_Helper` with executable mode while preserving the installed source-`72bdccc` Main and timing-qualified RBF.  Reopen the short Ogg file and repeatedly issue one-minute and five-minute forward jumps that exceed its remaining duration; acceptance requires uninterrupted playback and an unchanged audio interface with no black-screen reset, then spot-check one valid backward and forward jump and another standalone format before reporting hardware acceptance or collecting fresh telemetry-enabled evidence for any discrepancy.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/audio_file_seek.c
-- host/arm/media_player_helper.c
-- tools/test_audio_file_seek.c
-- tools/test_audio_file_seek.py
 
 #### Status:
 
