@@ -123,9 +123,14 @@ present. Contextless pictures before that sequence and open-GOP B pictures
 between the I and following reference have their start codes neutralized while
 all byte positions and timestamp records remain stable; the complete sequence
 context and every later authored picture remain unchanged. Each successful
-initial filter writes a diagnostic-only, 256-byte-bounded post-filter prefix
-and parsed sequence, picture and coding-extension fields to stderr; this does
-not alter, delay or duplicate any media byte. This delegates CSS
+initial filter checks its first I-picture extension against the parsed sequence
+extension. For a 4:2:0 complete frame with `progressive_frame=1`, the helper
+normalizes only the nonconforming `chroma_420_type=0` bit to one before copying
+the already-buffered group to its original queue positions; conforming streams,
+group size and every byte offset remain unchanged. It logs an applied byte
+offset and before/after value, then writes a 256-byte-bounded post-filter prefix
+and parsed sequence, picture and coding-extension fields to stderr. This
+delegates CSS
 access to libdvdcss and is not a claim of CSS conformance.
 
 The direct optical backend retains one authenticated libdvdnav session across

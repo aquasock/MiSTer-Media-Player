@@ -1393,6 +1393,8 @@ struct h262_restart_diagnostic {
     int sequence_extension_valid;
     size_t sequence_extension_offset;
     uint8_t sequence_extension[6];
+    unsigned progressive_sequence;
+    unsigned chroma_format;
     int picture_header_valid;
     unsigned temporal_reference;
     unsigned picture_coding_type;
@@ -1453,6 +1455,10 @@ static void collect_h262_restart_diagnostic(
             diagnostic->sequence_extension_offset = offset;
             memcpy(diagnostic->sequence_extension, data + offset + 4u,
                    sizeof(diagnostic->sequence_extension));
+            diagnostic->progressive_sequence =
+                (diagnostic->sequence_extension[1] >> 3) & 1u;
+            diagnostic->chroma_format =
+                (diagnostic->sequence_extension[1] >> 1) & 3u;
             break;
         }
     }
@@ -1469,6 +1475,41 @@ static void collect_h262_restart_diagnostic(
             break;
         }
     }
+}
+
+struct h262_restart_normalization {
+    size_t byte_offset;
+    uint8_t before;
+    uint8_t after;
+};
+
+static int normalize_h262_restart_chroma_420(
+    uint8_t *data, size_t size,
+    const struct dvd_random_access_result *restart,
+    struct h262_restart_normalization *normalization)
+{
+    struct h262_restart_diagnostic diagnostic;
+    const uint8_t *picture;
+
+    memset(normalization, 0, sizeof(*normalization));
+    normalization->byte_offset = SIZE_MAX;
+    collect_h262_restart_diagnostic(data, size, restart, &diagnostic);
+    picture = diagnostic.picture_extension;
+    if (!diagnostic.sequence_header_valid ||
+        !diagnostic.sequence_extension_valid ||
+        diagnostic.chroma_format != 1u ||
+        !diagnostic.picture_header_valid ||
+        diagnostic.picture_coding_type != 1u ||
+        !diagnostic.picture_extension_valid ||
+        (picture[2] & 3u) != 3u ||
+        !(picture[4] & 0x80u) || (picture[3] & 1u))
+        return 0;
+
+    normalization->byte_offset = diagnostic.picture_extension_offset + 7u;
+    normalization->before = data[normalization->byte_offset];
+    data[normalization->byte_offset] |= 1u;
+    normalization->after = data[normalization->byte_offset];
+    return 1;
 }
 
 static void log_h262_restart_diagnostic(
@@ -1503,6 +1544,7 @@ static void log_h262_restart_diagnostic(
             "size=%ux%u aspect=%u rate=%u marker=%u "
             "sequence_ext_valid=%d sequence_ext_offset=%zu "
             "sequence_ext=%02x%02x%02x%02x%02x%02x "
+            "sequence_progressive=%u chroma_format=%u "
             "picture_valid=%d temporal=%u type=%u "
             "picture_ext_valid=%d picture_ext_offset=%zu "
             "picture_ext=%02x%02x%02x%02x%02x "
@@ -1517,6 +1559,7 @@ static void log_h262_restart_diagnostic(
             diagnostic.sequence_extension[0], diagnostic.sequence_extension[1],
             diagnostic.sequence_extension[2], diagnostic.sequence_extension[3],
             diagnostic.sequence_extension[4], diagnostic.sequence_extension[5],
+            diagnostic.progressive_sequence, diagnostic.chroma_format,
             diagnostic.picture_header_valid,
             diagnostic.temporal_reference, diagnostic.picture_coding_type,
             diagnostic.picture_extension_valid,
@@ -1537,6 +1580,7 @@ static int iso_filter_initial_random_access(struct output_state *output,
     struct video_chunk *chunk;
     struct dvd_random_access_result filter_result;
     uint8_t *video;
+    struct h262_restart_normalization normalization;
     size_t video_size = 0;
     size_t copied = 0;
     int filtered;
@@ -1575,6 +1619,14 @@ static int iso_filter_initial_random_access(struct output_state *output,
         return filtered;
     }
 
+    if (normalize_h262_restart_chroma_420(
+            video, video_size, &filter_result, &normalization)) {
+        fprintf(stderr,
+                "media_player_helper: H262 restart normalized "
+                "chroma_420_type offset=%zu before=%02x after=%02x\n",
+                normalization.byte_offset, normalization.before,
+                normalization.after);
+    }
     log_h262_restart_diagnostic(video, video_size, terminal, &filter_result);
 
     copied = 0;

@@ -96,6 +96,108 @@ static int test_h262_restart_diagnostic_fields(void)
     return failed;
 }
 
+static int hex_nibble(char digit)
+{
+    if (digit >= '0' && digit <= '9')
+        return digit - '0';
+    if (digit >= 'a' && digit <= 'f')
+        return digit - 'a' + 10;
+    return -1;
+}
+
+static int test_h262_restart_chroma_normalization(void)
+{
+    static const char captured_prefix[] =
+        "000001b32d01e024138823821010101010101010101010101010101010101010"
+        "1010101010101010101010101010101010101010101010101010101010101010"
+        "1010101010101010101010110808080808080808080808080808080808080808"
+        "0808080808080808080808080808080808080808080808080808080808080808"
+        "080808080808080808080808000001b5148200010000000001b5250606060872"
+        "0f00000001b88008004000000100000a23e0000001b58ffff3c08000000101";
+    enum { PREFIX_BYTES = 191 };
+    struct dvd_random_access_result restart = {
+        .sequence_offset = 0,
+        .intra_offset = 170,
+        .next_reference_offset = PREFIX_BYTES
+    };
+    struct h262_restart_normalization normalization;
+    struct h262_restart_diagnostic diagnostic;
+    uint8_t malformed[PREFIX_BYTES];
+    uint8_t corrected[PREFIX_BYTES];
+    uint8_t control[PREFIX_BYTES];
+    size_t offset;
+    int failed = 0;
+
+    failed |= require(sizeof(captured_prefix) - 1u == PREFIX_BYTES * 2u,
+                      "captured H262 prefix length changed");
+    for (offset = 0; offset < PREFIX_BYTES; offset++) {
+        int high = hex_nibble(captured_prefix[offset * 2u]);
+        int low = hex_nibble(captured_prefix[offset * 2u + 1u]);
+
+        failed |= require(high >= 0 && low >= 0,
+                          "captured H262 prefix is not hexadecimal");
+        malformed[offset] = (uint8_t)((high << 4) | low);
+    }
+    if (failed)
+        return failed;
+
+    memcpy(corrected, malformed, sizeof(corrected));
+    failed |= require(normalize_h262_restart_chroma_420(
+                          corrected, sizeof(corrected), &restart,
+                          &normalization) == 1,
+                      "captured H262 mismatch was not normalized");
+    failed |= require(normalization.byte_offset == 185 &&
+                          normalization.before == 0xc0 &&
+                          normalization.after == 0xc1 &&
+                          corrected[185] == 0xc1,
+                      "captured H262 normalization changed the wrong field");
+    for (offset = 0; offset < sizeof(corrected); offset++) {
+        failed |= require(corrected[offset] ==
+                              (offset == 185 ? 0xc1 : malformed[offset]),
+                          "captured H262 normalization changed another byte");
+    }
+    collect_h262_restart_diagnostic(corrected, sizeof(corrected), &restart,
+                                    &diagnostic);
+    failed |= require(diagnostic.progressive_sequence == 0 &&
+                          diagnostic.chroma_format == 1 &&
+                          diagnostic.picture_coding_type == 1 &&
+                          (diagnostic.picture_extension[2] & 3u) == 3u &&
+                          (diagnostic.picture_extension[3] & 1u) == 1u &&
+                          (diagnostic.picture_extension[4] >> 7) == 1u,
+                      "normalized H262 fields do not describe a 4:2:0 "
+                      "progressive frame");
+    failed |= require(normalize_h262_restart_chroma_420(
+                          corrected, sizeof(corrected), &restart,
+                          &normalization) == 0,
+                      "conforming H262 restart was not idempotent");
+
+    memcpy(control, malformed, sizeof(control));
+    control[145] = 0x84;
+    failed |= require(normalize_h262_restart_chroma_420(
+                          control, sizeof(control), &restart,
+                          &normalization) == 0 && control[185] == 0xc0,
+                      "non-4:2:0 sequence was normalized");
+    memcpy(control, malformed, sizeof(control));
+    control[175] = 0x12;
+    failed |= require(normalize_h262_restart_chroma_420(
+                          control, sizeof(control), &restart,
+                          &normalization) == 0 && control[185] == 0xc0,
+                      "non-I picture was normalized");
+    memcpy(control, malformed, sizeof(control));
+    control[184] = 0xf1;
+    failed |= require(normalize_h262_restart_chroma_420(
+                          control, sizeof(control), &restart,
+                          &normalization) == 0 && control[185] == 0xc0,
+                      "field picture was normalized");
+    memcpy(control, malformed, sizeof(control));
+    control[186] = 0x00;
+    failed |= require(normalize_h262_restart_chroma_420(
+                          control, sizeof(control), &restart,
+                          &normalization) == 0 && control[185] == 0xc0,
+                      "non-progressive frame was normalized");
+    return failed;
+}
+
 static int read_pipe_bytes(int fd, uint8_t *data, size_t size)
 {
     size_t offset = 0;
@@ -459,6 +561,7 @@ int main(void)
     int failed = 0;
 
     failed |= test_h262_restart_diagnostic_fields();
+    failed |= test_h262_restart_chroma_normalization();
     audio_overlay_descriptor(&output, &overlay, 1);
     failed |= require(overlay.visible && overlay.rgba[0][3] == 0x00 &&
                       overlay.rgba[1][3] == 0xa0 &&
