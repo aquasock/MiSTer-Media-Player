@@ -1,4 +1,4 @@
-## 929 COMMIT Unreleased ??? 2026-09-02T22:47:52-07:00
+## 929 COMMIT Unreleased 366a227 2026-09-02T22:47:52-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Keep the standalone-audio player interface visible for its intended first ten se
 
 #### Outcome:
 
-Fresh hardware evidence accepts audio playback, the radial animation and its loudness response, while the Main trace proves that the helper commits the opaque player overlay near startup and does not clear it until approximately 10.15 seconds.  The current generated visualizer is progressive, however, and the unchanged DVD overlay compositor is intentionally active only for native interlaced video, so the committed interface plane is not composited and the underlying animation is visible immediately.  The approved boundary will correct the visualizer asset and reject incompatible packs without changing the H.262 decoder, Main, RTL, RBF, audio transport, inactivity timer or accepted animation.
+Fresh hardware evidence accepts audio playback, the radial animation and its loudness response, while the Main trace proves that the helper commits the opaque player overlay near startup and does not clear it until approximately 10.15 seconds.  Source `366a227` makes every generated visualizer GOP declare an interlaced sequence and three top-field-first interlaced frame pictures so the unchanged native-480i compositor displays that initial plane, and the helper now rejects packs that omit those declarations or signal progressive sequence or picture content.  Strict focused, AddressSanitizer and UndefinedBehaviorSanitizer tests accept the interlaced fixture and reject both progressive flag classes; GCC analyzer passes.  The 3,740,562-byte generated pack contains 160 indexed GOPs, and a deliberately level-switched sample decodes as 60 top-field-first interlaced 720-by-480 pictures at 30000/1001 without FFmpeg errors.  Native and final ARMv7 real-helper runs pass MP3, WAV, FLAC and Ogg with 378 through 381 decoded selected pictures and exactly one ten-second overlay clear, while the final ARM helper rejects the former progressive pack and all four formats retain the full-frame interface fallback.  GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_Visualizer480i_366a227` at SHA-256 `ea2004223d160dd2377144b85e311c9e594e541fca2ab856e83ce3f99b1291e2`; `host/build/MediaPlayer_Visualizer_366a227.mmpvis` has SHA-256 `448407cdd7e6c79fbe13cbb435241116127f726aca5af9f99d75b32fc2519f47`.  Main, RTL, RBF, decoder, audio transport, timer and accepted animation are unchanged.
 
 #### Next Steps:
 
-Encode the deterministic visualizer as DVD-compatible interlaced H.262, strengthen generator and helper validation to require the corresponding sequence and picture-coding declarations, and extend focused tests with accepted interlaced and rejected progressive packs.  Regenerate and decode-audit the asset, run strict native and sanitizer visualizer tests plus real-helper MP3, WAV, FLAC and Ogg regressions, build the static ARM helper locally, and provide both helper and asset for a hardware test requiring the normal interface for ten seconds, visualizer reveal afterward, activity restoration and another full delay.
+Exit MediaPlayer, replace `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_Visualizer480i_366a227` using executable mode and replace `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` with `host/build/MediaPlayer_Visualizer_366a227.mmpvis`, while preserving the installed Main and timing-qualified RBF.  Play standalone audio and require the normal interface to remain visible for the first ten playback seconds before the visualizer appears; then pause or seek, require immediate interface restoration, resume and require another complete ten-second delay before the visualizer returns.  Confirm clean audio and the accepted animation and loudness response, then return fresh telemetry-enabled results for hardware acceptance.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Encode the deterministic visualizer as DVD-compatible interlaced H.262, strength
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
