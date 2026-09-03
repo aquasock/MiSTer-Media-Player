@@ -1,3 +1,32 @@
+## 947 COMMIT Unreleased ae533a1 2026-09-03T16:48:14-07:00
+
+#### Coming From:
+
+Unreleased ae533a1
+
+#### Purpose:
+
+Qualify the isolated-Main stream-boundary build on Futurama disc one and isolate its first finite-still freeze.
+
+#### Outcome:
+
+The physical source-`ae533a1` run confirms that the per-core Main selection works, but rejects the stream-boundary handshake as implemented.  Main starts the `MediaPlayer` core through its alternate executable and the helper completes the first authored ten-second FBI still, sends the autonomous boundary event and waits for GO.  Main receives that event at 20.234007 seconds after submitting 224,682 bytes, but retains one buffered byte and never records `DVD stream boundary released after drain`; more than four million later would-block polls submit no additional data through the 227-second capture endpoint.  The visible FBI frame and checksum-valid schema-21 snapshot show that this is a host-handshake deadlock rather than a decoder failure: the FPGA accepted 224,669 decoder bytes, exactly the 224,665-byte authored video plus the four-byte sequence end, completed and displayed its one I picture, reports sequence end, presentation complete and session quiet, and has zero decoder errors, transport blocks, PCM samples or audio underruns.  The five following zero bytes are implementation-only transport drain; four crossed Main before the terminal decoder stopped returning input credit and the fifth remains in Main's pipe buffer, so the current requirement that every boundary byte receive FPGA credit can never become true.  The 5,630,162-byte log, 685,317-byte screenshot and 441-byte telemetry sidecar have SHA-256 `24ff68036d13b73d674dca1bf349a5fb2041d4de4343ef3f0bbe8ac041732d45`, `afcb6905c04398c9bcf6f2aef795d55bbcc85c990000d90908b6bc88f6c84f3e` and `dfb936ef46bc9eb7324357e82d356be24c3f7646d4bc6183ba5e07e7880bfa52`.
+
+#### Next Steps:
+
+After user approval, distinguish a finite terminal boundary from an automatic silent-menu boundary on the control channel and give only the terminal form an explicit five-byte discardable-tail contract.  Main must continue submitting all meaningful queued media, then after pipe quiescence accept at most the declared number of remaining zero tail bytes, record their exact count, reset download once and send GO; a nonzero byte, an oversized remainder or any residue on the automatic boundary must fail rather than be hidden.  Extend the Main regression with the observed one-byte no-credit remainder plus zero-, partial- and malformed-tail cases, retain the helper production-path and sanitizer suites, rebuild the patched per-core Main and static ARM helper locally, and retest Futurama through every finite intro still into its moving menu without changing the RBF or RTL.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 946 COMMIT Unreleased ae533a1 2026-09-03T16:22:52-07:00
 
 #### Coming From:
@@ -1181,35 +1210,6 @@ The user's physical Coming to America run rejects source `8c90e2d` as a complete
 #### Next Steps:
 
 Preserve the source-`8c90e2d` redundant-root and unsupported-LPCM fixes, Main, the RBF and the overlay protocol.  After user approval, classify pending indefinite menu activation from actual validated H.262 picture output rather than generic start-code count: an overlay-only destination must commit its staged overlay to the live resident presentation and acknowledge menu continuation without reserve discard, READY/GO or decoder reset, while a genuine video-bearing destination retains the existing staged stream-hop barrier and empty or finite still paths remain unchanged.  Add exact overlay-only coverage matching the observed 26 records and 86,664 bytes, retain true-video, empty and finite-stage regressions, rerun the complete helper and sanitizer suites, and build only a new ARM helper for Coming to America, Blazing Saddles, The Big Lebowski and forum-disc testing.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 907 COMMIT Unreleased 8c90e2d 2026-09-02T08:26:19-07:00
-
-#### Coming From:
-
-Unreleased 8c90e2d
-
-#### Purpose:
-
-Bundle the source-`8c90e2d` DVD menu compatibility helper with its matched runtime set and physical-drive launcher for hardware testing.
-
-#### Outcome:
-
-`host/build/MiSTer_Media_Player_8c90e2d.zip` contains the exact static ARMv7 helper from source `8c90e2d`, source-`46638c7` Main, source-`5327358` visualizer pack, timing-qualified source-`dfe1057` `MediaPlayer_20260901.rbf`, `games/MediaPlayer/USB DVD Drive.dvd`, installation and source-provenance notes, the project licence and all seven bundled dependency licences.  A fresh extraction contains sixteen files, all fifteen manifest entries pass SHA-256 verification, both executables retain mode 755, the helper and launcher are byte-identical to their verified source artifacts, and ZIP integrity reports no errors.  The 6,481,417-byte archive has SHA-256 `02ce7dae21297423c1ac1fc0afe45744d8a8ab431e3bfcc9dec9347f85216a0d`.
-
-#### Next Steps:
-
-Extract the archive to the MiSTer paths documented in `INSTALL.txt`, preserve the installed rollback files, reboot because the matched Main is included, and run the source-`8c90e2d` Blazing Saddles redundant-root test, the forum disc's LPCM-menu survival and AC-3 title test, and ordinary Coming to America plus The Big Lebowski menu regressions before accepting the helper on hardware.
 
 #### Files Modified:
 
