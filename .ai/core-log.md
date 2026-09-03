@@ -1,3 +1,32 @@
+## 927 COMMIT Unreleased 6b63c91 2026-09-02T22:16:01-07:00
+
+#### Coming From:
+
+Unreleased 6b63c91
+
+#### Purpose:
+
+Diagnose Blazing Saddles' reproducible black decoder state after returning from long-running title playback to its root menu.
+
+#### Outcome:
+
+The fresh telemetry-enabled trace disproves a helper crash: after approximately 619.78 seconds of healthy playback, Root Menu succeeds, enters the menu domain, discards the old reserve and completes READY/GO in about 29 milliseconds; Main then receives and publishes a complete 86,400-byte selector overlay, while the helper remains alive and continues polling through the 679.72-second capture endpoint.  The new root destination reaches an authored indefinite still, but produces no `random access`, scheduler-progress or terminal-finalizer diagnostic after the barrier even though its overlay changes repeatedly.  This uniquely matches a single-picture menu stream retained by the helper's initial random-access filter: `wait_dvd_still()` calls `iso_finalize_terminal_random_access()` only when `activation_pending` is true, whereas Root Menu is classified immediately as `MEDIA_SOURCE_DVD_STREAM_HOP`, clears that flag and resets the decoder before reaching the still.  Consequently the queued picture receives neither the valid H.262 sequence end nor its five transport-drain bytes, no menu video crosses to Main and the screen remains black with the independently valid selector state unable to make a visible composite.  The 15,514,884-byte log, 559-byte all-black screenshot and 2,818-byte no-matrix sidecar have SHA-256 `2e25ec68e38676f4d221b37ca24c9365a5aa2ed4b25bb1ae51c28c3063ac595e`, `1fa718e5c800529417461bd164f5afadd65ec82288dd97ce9c34c334f65a91b1` and `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004`.  No runtime source was changed.
+
+#### Next Steps:
+
+After user approval, make one helper-only commit containing both diagnosed boundaries.  Generalize terminal DVD-still finalization so any active initial random-access filter with queued video, including a direct Root Menu hop, receives the existing sequence-end and transport-drain tail before waiting; retain activation staging only as the destination publication policy.  Separately give picture-bearing deferred motion-menu staging bounded headroom beyond the existing 4 MiB decision watermark and promote such a destination through the existing staged READY/GO stream-hop path before `ENOSPC`.  Add exact production-path regressions for an unstaged Root Menu one-picture indefinite still, the existing staged terminal still, an over-watermark motion menu with byte-exact post-barrier commit, the accepted 3,797,120-byte finite-still route below the watermark and overlay-only continuation, then run strict native, sanitizer, analyzer, DVD navigation, staging, random-access, overlay, LPCM, audio and seek suites locally and on the build PC before producing one static ARM helper for the specified Big Lebowski and Blazing Saddles hardware routes.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 926 COMMIT Unreleased 6b63c91 2026-09-02T22:10:56-07:00
 
 #### Coming From:
@@ -1214,34 +1243,5 @@ Exit MediaPlayer, install `host/build/MediaPlayer_Helper_AudioProgress_e580270` 
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 887 COMMIT Unreleased 9397fa7 2026-09-01T23:40:06-07:00
-
-#### Coming From:
-
-Unreleased 9397fa7
-
-#### Purpose:
-
-Record physical acceptance of the full-screen 4:3 CRT-safe standalone-audio interface layout.
-
-#### Outcome:
-
-The user reports that everything looked great on MiSTer, physically accepting source `9397fa7` and its helper-only audio-interface layout with playback behavior unchanged.  The fresh 8,308-byte 1,920-by-1,080 screenshot at SHA-256 `511b79f7badd1b9a3c660ba547d735a0dcc865fdfd62a50a45488c398b5c18bc` visibly contains the complete album-art and metadata column, six-row playlist, transport controls, time placeholders and active full-width progress bar without a clipped panel or label.  The matching 4,575,874-byte helper/Main log at SHA-256 `02dbd13e504e7816eae2ee25a790d291b503bdc31a2648aa04dd5860b2cd2345` covers approximately 74.7 seconds of 44.1-kHz FLAC playback, identifies the 720-by-480 BT.601 audio UI, records 74 complete UI commits at a 1.005-second average interval and includes four successful ten-second seek commands without a fatal helper or transport event.  Its 76 begin, 9,725 data and 74 commit records include expected partial-frame restarts around seeking and the live capture endpoint.  Main's overlay-only trace formatter calls audio-UI commands `0x10`, `0x11` and `0x12` `overlay_submit unknown` and increments its local `order_errors` diagnostic because that formatter predates the audio-UI protocol; the successfully rendered frames prove these labels are not FPGA publication failures.  The 2,818-byte `telemetry.txt` at SHA-256 `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004` correctly reports that no supported telemetry matrix can be extracted from the clean audio-interface screenshot, so it supplies no decoder-word snapshot and does not contradict the visual and transport acceptance.
-
-#### Next Steps:
-
-Preserve source `9397fa7`, `host/build/MediaPlayer_Helper_AudioLayout_9397fa7`, the installed source-`72bdccc` Main and the timing-qualified RBF as the accepted standalone-audio layout baseline.  Continue ordinary audio, MPEG Program Stream and DVD testing without enabling telemetry unless diagnostic evidence is needed; a later approved boundary may populate artwork, tags, playlist entries and true duration-relative time fields while retaining this accepted 4:3 geometry and playback behavior.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
