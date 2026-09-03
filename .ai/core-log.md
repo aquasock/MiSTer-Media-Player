@@ -1,4 +1,4 @@
-## 940 COMMIT Unreleased ??? 2026-09-03T03:51:20-07:00
+## 940 COMMIT Unreleased 177886b 2026-09-03T03:51:20-07:00
 
 #### Coming From:
 
@@ -10,22 +10,25 @@ Qualify, document and package the accepted v0.9.0 runtime set for the user's Git
 
 #### Outcome:
 
-The user reports that the complete v0.9.0 functional and regression testing looks good and approves repository finalization plus release-package generation, while retaining responsibility for the annotated tag and GitHub Release.  The user explicitly directs that the accepted runtime artifacts must not be rebuilt.  The candidate documentation at source `7759f87` already identifies their composition and hashes; this release-preparation boundary will preserve those exact FPGA, ARM helper, patched Main and visualizer binaries, assemble the date-coded RBF, helper, Main, visualizer, USB optical launcher, installation/source notes, checksums and all bundled licences into `MiSTer_Media_Player_v0.9.0.zip`, and finalize public documentation from candidate to release-ready state without creating a tag or publishing an external release.
+The user reports that the complete v0.9.0 functional and regression matrix looks good and accepts the exact runtime set for release.  At the user's explicit direction, packaging invoked no build: it retained the already clean, reproducible, timing-qualified source-`dfe1057` RBF and byte-identical accepted source-`3689cca` Main, source-`0f1165c` helper and source-`366a227` visualizer pack with source-`932dc22` behavior.  The helper's protocol-one capability probe passes.  `host/build/MiSTer_Media_Player_v0.9.0.zip` contains the five runtime/launcher payloads, installation and source notes, the project licence, seven dependency licences and a 15-entry SHA-256 manifest.  A fresh extraction is byte-identical to its bounded staging directory, every manifest entry passes, ZIP integrity is clean, and Main/helper retain mode 755 while all other files use mode 644.  The 6,580,818-byte archive has SHA-256 `e8bc8e0c25291df85d6d53ad2688995d30ce156c547b7315b08058052863e1f9`; its 16 files total 10,476,902 uncompressed bytes.  Source `177886b` moves the changelog into the dated v0.9.0 milestone, starts a clean Unreleased section and finalizes the README, release notes, architecture, build and test guidance with the exact package identity, accepted validation and no-rebuild provenance.  Documentation link, fence, whitespace, package-identity and staged-diff audits pass.  No tag or GitHub Release was created.
 
 #### Next Steps:
 
-Commit and push this approved release proposal, independently inspect the already accepted artifact formats and hashes, assemble the package in a new bounded staging directory without invoking any build, and verify member identity, modes, internal SHA-256 manifest and ZIP integrity.  Update the README, changelog and v0.9.0 notes with exact final provenance and an explicit record that no clean rebuild was performed at the user's direction, commit and push the release-ready documentation, resolve this entry to that commit, and provide the verified ZIP path and checksum to the user for tagging and publication.
+The repository and package are ready for the project owner to create annotated tag `v0.9.0` on the final metadata commit following source `177886b`, create a GitHub pre-release titled `MiSTer Media Player v0.9.0`, attach `host/build/MiSTer_Media_Player_v0.9.0.zip`, and use `docs/RELEASE_NOTES_v0.9.0.md` as the release description.  After publication, record the tag resolution, GitHub release time and downloaded-asset verification in a VERSION entry without changing the accepted runtime payloads.
 
 #### Files Modified:
 
 - CHANGELOG.md
 - README.md
+- docs/ARCHITECTURE.md
+- docs/BUILDING.md
 - docs/RELEASE_NOTES_v0.9.0.md
+- docs/TEST_INSTRUCTIONS.md
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 
