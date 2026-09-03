@@ -1,4 +1,4 @@
-## 941 COMMIT Unreleased ??? 2026-09-03T04:56:54-07:00
+## 941 COMMIT Unreleased 401148e 2026-09-03T04:56:54-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Instrument and reproduce Futurama's late-menu-audio rejection so the permanent s
 
 #### Outcome:
 
-The fresh `FUTURAMA_S1D1` physical-disc capture reaches its authored menu, publishes one valid still and selector overlay, and then leaves that frame resident after the helper exits normally with status one.  The checksum-valid schema-21 snapshot reports one completed and displayed I picture, sequence-end and presentation completion, zero decoder error flags, zero transport blocks and zero audio underruns.  The helper log identifies the software boundary: before any audio PES appears, the bounded 2 MiB video queue fills and `scheduler_release_silent_video()` irreversibly disables scheduling; the later valid AC-3 private substream `0x80` reaches the deliberate `AC-3 audio begins beyond the bounded video lookahead` rejection, after which Main drains the already-reserved bytes and observes helper EOF.  This is an implementation classification failure rather than an H.262, overlay, CSS, optical-transport or FPGA failure.  The approved diagnostic commit will preserve output behavior while recording the silent-release video PTS horizon and the late audio packet's PTS, and will add a deterministic focused regression for the exact video-before-audio state transition.
+The fresh `FUTURAMA_S1D1` physical-disc capture reaches its authored menu, publishes one valid still and selector overlay, and then leaves that frame resident after the helper exits normally with status one.  The checksum-valid schema-21 snapshot reports one completed and displayed I picture, sequence-end and presentation completion, zero decoder error flags, zero transport blocks and zero audio underruns.  The helper log identifies the software boundary: before any audio PES appears, the bounded 2 MiB video queue fills and `scheduler_release_silent_video()` irreversibly disables scheduling; the later valid AC-3 private substream `0x80` reaches the deliberate late-audio rejection, after which Main drains the already-reserved bytes and observes helper EOF.  Source `401148e` preserves that fail-fast behavior and every media byte while logging the exact silent-release queue, released and total-video counts, picture count and final video PTS horizon, followed by the late MPEG Layer II, AC-3 or DTS packet's PTS validity, value, horizon relation and absolute 90 kHz delta.  The focused production-translation-unit regression forces the 2 MiB boundary, proves its queued video remains byte-identical and verifies ahead, behind and untimestamped late-audio diagnostics.  Strict optimized compilation, focused GCC analyzer, AddressSanitizer, UndefinedBehaviorSanitizer, DVD random-access, SPU, overlay, reserve, output-stage, menu-hop, private-LPCM-skip, AC-3 recovery, Program Stream seek, audio UI, visualizer and audio-seek tests pass.  Real MP3, WAV, FLAC and Ogg integrations pass against both native and final ARM helpers with 378 or 381 pictures and one clear record per file.  Local GNU 10.2.1 produced the 966,052-byte static stripped ARMv7 EABI5 helper `host/build/MediaPlayer_Helper_LateAudioDiag_401148e` with SHA-256 `19020ff3e785718854fe399f23462720428012129082335f9c3c61414fa371c7`; its protocol-one capability probe passes and it has no dynamic section.  Main, decoder, RBF, visualizer and RTL are unchanged.
 
 #### Next Steps:
 
-Add bounded diagnostics at the silent-video release and late MPEG, AC-3 and DTS rejection paths, including queue, byte, picture and PTS state without changing media output or error policy.  Extend the focused production-translation-unit regression to force the 2 MiB queue boundary and verify the one-way late-audio rejection plus preserved queued video, then run strict native compilation, AddressSanitizer, UndefinedBehaviorSanitizer, GCC analyzer and retained DVD random-access, overlay, staging, menu, private-audio, AC-3 and consumer-audio tests.  Build a static ARMv7 helper locally and use one Futurama menu rerun to establish whether its first AC-3 PTS is ahead of or behind the already-released video horizon before proposing the synchronization correction.
+Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_LateAudioDiag_401148e`, preserving executable mode and the installed Main, RBF and visualizer.  Enable telemetry, launch Futurama disc one, wait until the menu and selector appear and allow the helper to reach its expected clean rejection without needing to press a direction.  Return the fresh helper log; its `video lookahead classified silent` and expanded `AC-3 audio begins beyond` records will establish whether the first audio PTS is ahead of, equal to or behind the already-released video horizon.  Do not suppress the rejection or increase the queue from this diagnostic evidence alone; use the measured temporal relationship to propose the bounded state transition that retains genuinely silent Program Streams and synchronized late-starting DVD audio.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Add bounded diagnostics at the silent-video release and late MPEG, AC-3 and DTS 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
