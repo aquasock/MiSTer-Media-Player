@@ -46,6 +46,7 @@ int main(void)
     size_t intra;
     size_t leading_b;
     size_t next_p;
+    size_t terminal_b;
     size_t size;
     int filtered;
     int failed = 0;
@@ -96,9 +97,45 @@ int main(void)
     filtered = dvd_random_access_filter(video, size, &result);
     failed |= require(filtered == 0,
                       "incomplete I-only group was released without a following reference");
+    filtered = dvd_random_access_filter_terminal(video, size, &result);
+    failed |= require(filtered == 1 && result.sequence_offset == 0 &&
+                      result.intra_offset == 6 &&
+                      result.next_reference_offset == size,
+                      "terminal I-only group was not released at its end boundary");
+    failed |= require(is_start(video, 0, 0xb3) &&
+                      is_start(video, 6, 0x00),
+                      "terminal sequence/I context changed");
+
+    memset(video, 0x55, sizeof(video));
+    sequence = 4;
+    size = put_start(video, sequence, 0xb3, 0x11);
+    intra = size;
+    size = put_start(video, size, 0x00, MPEG_PICTURE_I << 3);
+    size = put_start(video, size, 0x01, 0xaa);
+    terminal_b = size;
+    size = put_start(video, size, 0x00, MPEG_PICTURE_B << 3);
+    size = put_start(video, size, 0xb5, 0x44);
+    size = put_start(video, size, 0x01, 0xbb);
+    filtered = dvd_random_access_filter_terminal(video, size, &result);
+    failed |= require(filtered == 1 &&
+                      result.sequence_offset == sequence &&
+                      result.intra_offset == intra &&
+                      result.next_reference_offset == size &&
+                      result.leading_b_pictures == 1,
+                      "terminal boundary did not classify its trailing B picture");
+    failed |= require(is_start(video, sequence, 0xb3) &&
+                      is_start(video, intra, 0x00) &&
+                      is_start(video, terminal_b, 0xb2),
+                      "terminal trailing B picture remained visible");
+
+    memset(video, 0, sizeof(video));
+    size = put_start(video, 0, 0xb3, 0x11);
+    filtered = dvd_random_access_filter_terminal(video, size, &result);
+    failed |= require(filtered == 0,
+                      "terminal sequence without an I picture was released");
 
     if (failed)
         return 1;
-    puts("dvd random access: sequence context, intra restart and leading-B filtering pass");
+    puts("dvd random access: open and terminal sequence/I filtering pass");
     return 0;
 }

@@ -53,7 +53,11 @@ while the helper advances the overlay. A nonempty indefinite activation stage
 requires that barrier only after the H.262 output path has emitted a picture;
 an overlay-only stage commits through the live session before its continuation
 acknowledgment, so generic Program Stream headers cannot blank a resident menu
-frame. Highlight-only moves likewise do not reset the video stream. Main maps player-one
+frame. If an authored still terminates a sequence-plus-I startup group before a
+later reference picture arrives, the helper uses that explicit end boundary to
+release the independently decodable still picture; the resulting picture mark
+selects the normal staged decoder barrier. Highlight-only moves likewise do not
+reset the video stream. Main maps player-one
 D-pad/A/Start/Select and keyboard arrows/Enter/M while an authored menu is
 active.
 

@@ -1374,7 +1374,8 @@ static int queue_video(struct output_state *output, const uint8_t *data,
     return 0;
 }
 
-static int iso_filter_initial_random_access(struct output_state *output)
+static int iso_filter_initial_random_access(struct output_state *output,
+                                            int terminal)
 {
     struct video_chunk *chunk;
     struct dvd_random_access_result filter_result;
@@ -1409,7 +1410,9 @@ static int iso_filter_initial_random_access(struct output_state *output)
         copied += count;
     }
 
-    filtered = dvd_random_access_filter(video, video_size, &filter_result);
+    filtered = terminal ?
+        dvd_random_access_filter_terminal(video, video_size, &filter_result) :
+        dvd_random_access_filter(video, video_size, &filter_result);
     if (filtered <= 0) {
         free(video);
         return filtered;
@@ -1426,9 +1429,10 @@ static int iso_filter_initial_random_access(struct output_state *output)
     free(video);
     output->iso_start_filter_active = 0;
     fprintf(stderr,
-            "media_player_helper: random access sequence_offset=%zu "
+            "media_player_helper: random access %ssequence_offset=%zu "
             "intra_offset=%zu next_reference_offset=%zu discarded=%u "
             "pre-context picture(s), %u leading B picture(s)\n",
+            terminal ? "terminal " : "",
             filter_result.sequence_offset, filter_result.intra_offset,
             filter_result.next_reference_offset,
             filter_result.pre_context_pictures,
@@ -2899,7 +2903,7 @@ static int process_pes(struct media_source *input, uint8_t code,
                             video_size, has_pts, has_record, pts) < 0)
                 goto done;
             if (output->iso_start_filter_active &&
-                iso_filter_initial_random_access(output) < 0)
+                iso_filter_initial_random_access(output, 0) < 0)
                 goto done;
             if (scheduler_drain(output, 0) < 0)
                 goto done;
@@ -3192,6 +3196,19 @@ static int wait_dvd_still(struct media_source *input,
         deadline = monotonic_us() + (uint64_t)seconds * 1000000u;
     fprintf(stderr, "media_player_helper: DVD still wait %s%u seconds\n",
             seconds == 0xffu ? "indefinite/" : "", seconds);
+    if (menu->activation_pending && output->iso_start_filter_active &&
+        output->video_head) {
+        int filtered = iso_filter_initial_random_access(output, 1);
+
+        if (filtered < 0 ||
+            (filtered > 0 && scheduler_drain(output, 0) < 0))
+            return -1;
+        if (!filtered)
+            fprintf(stderr,
+                    "media_player_helper: DVD authored still did not "
+                    "complete a sequence/I startup group queued_video=%zu\n",
+                    output->video_queued_bytes);
+    }
     if (menu->activation_pending && menu->activation_payloads)
         fprintf(stderr,
                 "media_player_helper: DVD menu activation pending reached "

@@ -168,6 +168,74 @@ done:
     return failed ? -1 : 0;
 }
 
+static int test_terminal_still_stage(void)
+{
+    static const uint8_t still_video[] = {
+        0x00, 0x00, 0x01, 0xb3, 0x11, 0x22,
+        0x00, 0x00, 0x01, 0x00, 0x00, 1u << 3,
+        0x00, 0x00, 0x01, 0x01, 0xaa, 0xbb
+    };
+    struct output_state output = {0};
+    uint8_t received[sizeof(still_video)];
+    size_t committed_bytes = 0;
+    size_t committed_records = 0;
+    int filtered;
+    int failed = 0;
+
+    output.video = tmpfile();
+    failed |= require(output.video != NULL,
+                      "could not create terminal-still output stream");
+    failed |= require(output_stage_create(&output.activation_stage,
+                                          sizeof(still_video)) == 0 &&
+                      output_stage_begin(output.activation_stage) == 0,
+                      "could not start terminal-still activation stage");
+    if (failed)
+        goto done;
+    output.scheduler_enabled = 1;
+    output.iso_start_filter_active = 1;
+    output.hold_active = 1;
+    output.hold_limit = PCM_SAMPLE_RATE;
+    failed |= require(queue_video(&output, still_video, sizeof(still_video),
+                                  0, 0, 0) == 0 &&
+                      output.picture_marks == 0 &&
+                      output_stage_records(output.activation_stage) == 0,
+                      "terminal still escaped before its authored boundary");
+    if (failed)
+        goto done;
+    filtered = iso_filter_initial_random_access(&output, 1);
+    failed |= require(filtered == 1 &&
+                      !output.iso_start_filter_active &&
+                      scheduler_drain(&output, 0) == 0 &&
+                      output.picture_marks == 1 &&
+                      output_stage_records(output.activation_stage) == 1 &&
+                      output_stage_size(output.activation_stage) ==
+                          sizeof(still_video) &&
+                      output_stage_classify_still(
+                          output.activation_stage, output.picture_marks,
+                          0xffu) == OUTPUT_STAGE_STILL_HOP,
+                      "terminal still did not become a staged picture hop");
+    failed |= require(output_stage_commit(
+                          output.activation_stage,
+                          write_output_stage_callback, &output,
+                          &committed_bytes, &committed_records) == 0 &&
+                      committed_bytes == sizeof(still_video) &&
+                      committed_records == 1 &&
+                      fflush(output.video) == 0 &&
+                      fseek(output.video, 0, SEEK_SET) == 0 &&
+                      fread(received, 1, sizeof(received), output.video) ==
+                          sizeof(received) &&
+                      !memcmp(received, still_video, sizeof(received)),
+                      "terminal still stage changed its qualified picture");
+
+done:
+    while (output.video_head)
+        free_video_head(&output);
+    output_stage_destroy(output.activation_stage);
+    if (output.video)
+        fclose(output.video);
+    return failed;
+}
+
 int main(void)
 {
     struct dvd_spu_overlay overlay = {0};
@@ -266,6 +334,8 @@ int main(void)
     if (failed)
         return 1;
     if (test_reserve_stdio_ownership() < 0)
+        return 1;
+    if (test_terminal_still_stage())
         return 1;
     puts("DVD overlay output: exact plane and reserve ownership pass");
     return 0;

@@ -37,8 +37,9 @@ static void neutralize_start_codes(uint8_t *data, size_t begin, size_t end)
     }
 }
 
-int dvd_random_access_filter(uint8_t *data, size_t size,
-                             struct dvd_random_access_result *result)
+static int filter_group(uint8_t *data, size_t size,
+                        struct dvd_random_access_result *result,
+                        int terminal)
 {
     size_t sequence_offset = SIZE_MAX;
     size_t intra_offset = SIZE_MAX;
@@ -86,8 +87,11 @@ int dvd_random_access_filter(uint8_t *data, size_t size,
             break;
         }
     }
-    if (next_reference_offset == SIZE_MAX)
+    if (intra_offset == SIZE_MAX ||
+        (next_reference_offset == SIZE_MAX && !terminal))
         return 0;
+    if (next_reference_offset == SIZE_MAX)
+        next_reference_offset = size;
 
     for (i = 0; i < sequence_offset && i + 5u < size; ++i) {
         if (start_code_at(data, size, i) &&
@@ -142,4 +146,16 @@ int dvd_random_access_filter(uint8_t *data, size_t size,
     result->pre_context_pictures = pre_context_pictures;
     result->leading_b_pictures = leading_b_pictures;
     return 1;
+}
+
+int dvd_random_access_filter(uint8_t *data, size_t size,
+                             struct dvd_random_access_result *result)
+{
+    return filter_group(data, size, result, 0);
+}
+
+int dvd_random_access_filter_terminal(
+    uint8_t *data, size_t size, struct dvd_random_access_result *result)
+{
+    return filter_group(data, size, result, 1);
 }

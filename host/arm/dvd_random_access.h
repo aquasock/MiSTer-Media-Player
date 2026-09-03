@@ -20,4 +20,13 @@ struct dvd_random_access_result {
 int dvd_random_access_filter(uint8_t *data, size_t size,
                              struct dvd_random_access_result *result);
 
+/*
+ * At an authored end boundary, a sequence plus one complete I picture is an
+ * independently decodable terminal group even when no later I/P reference
+ * exists. The returned next_reference_offset is size for that case. This must
+ * not be used while further bytes can still arrive.
+ */
+int dvd_random_access_filter_terminal(
+    uint8_t *data, size_t size, struct dvd_random_access_result *result);
+
 #endif
