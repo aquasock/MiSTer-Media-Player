@@ -1,3 +1,35 @@
+## 937 COMMIT Unreleased ??? 2026-09-03T00:41:17-07:00
+
+#### Coming From:
+
+Unreleased ac13724
+
+#### Purpose:
+
+Normalize The Big Lebowski's nonconforming 4:2:0 progressive-frame chroma flag at the helper's buffered initial I-picture boundary.
+
+#### Outcome:
+
+Compatibility implementation approved from entry 936's byte-exact physical evidence.  The helper will retain the decoder, RBF, Main, random-access structure, transport length, every byte of conforming streams and all unrelated malformed fields, while changing only `chroma_420_type` from zero to one when a validated restart sequence extension specifies 4:2:0 and its initial complete-frame I-picture coding extension specifies `progressive_frame=1`; the exact offset and before/after byte will be logged.
+
+#### Next Steps:
+
+Add the narrowly gated in-place normalization immediately after successful random-access filtering and before diagnostic publication, extend the production C regression with the captured 191-byte prefix plus conforming and out-of-scope controls proving only offset 185 changes from `0xc0` to `0xc1`, and add an Icarus frontend regression proving the captured original raises syntax source 21 while the normalized prefix reaches its first slice with no syntax error.  Run strict native, sanitizer, analyzer, DVD random-access, navigation, staging, overlay, SPU, LPCM and audio suites, build one static ARMv7 helper locally without changing Main, RBF or visualizer, then retest Big Lebowski startup and Root Menu plus accepted Blazing Saddles and Coming to America menu paths.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+- tools/test_h262_restart_normalization.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 936 COMMIT Unreleased ac13724 2026-09-03T00:38:42-07:00
 
 #### Coming From:
@@ -1168,40 +1200,6 @@ Preserve the accepted radial animation, eight endpoint/intermediate grades, loud
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 897 COMMIT Unreleased 5327358 2026-09-02T05:57:42-07:00
-
-#### Coming From:
-
-Unreleased 532bd8e
-
-#### Purpose:
-
-Smooth the accepted audio visualizer's loudness response without changing its underlying animation, transport or decoder path.
-
-#### Outcome:
-
-Source `5327358` preserves the exact two-second radial animation and its accepted darkest and brightest grades while expanding the synchronized pack from four to eight linearly interpolated grades.  The helper now separates the RMS target from the emitted grade, applies a one-eighth deadband around seven fixed thresholds and moves by at most one adjacent grade when each independent three-picture GOP begins, so near-threshold audio cannot chatter and a large loudness change becomes a bounded ramp of roughly one grade per 100 milliseconds.  Strict focused, AddressSanitizer and UndefinedBehaviorSanitizer tests prove fast attack, slow decay, hysteresis and the one-step maximum; GCC analyzer passes, and the audited 3,560,506-byte pack contains 160 valid indexed GOPs with payloads from 15,918 through 27,389 bytes and a deliberately switched stream that FFmpeg decodes without error.  Native and exact GNU 10.2 ARMv7 real-helper runs pass MP3, WAV, FLAC and Ogg Vorbis with two seek barriers, one boundary continuation, overlay inactivity clear and 378 through 381 decodable selected pictures; the unchanged no-pack fallback also passes all four formats.  The final 961,956-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_VisualizerSmooth_5327358` has SHA-256 `a7fb85e60882ba40ee5363cd467bb8daa3cfe97cd419b46fae253e8d6500a04d`, and `host/build/MediaPlayer_Visualizer_5327358.mmpvis` has SHA-256 `d4625fadb089ba84f3d9e64b1ff104db3e8ebc65a96b35e14b3727f165ec31d3`; Main, the protocol, RTL and the timing-qualified RBF are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer so its helper stops, replace `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_VisualizerSmooth_5327358`, restore executable mode if needed, and replace `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` with `host/build/MediaPlayer_Visualizer_5327358.mmpvis`, verifying both recorded sizes and hashes while preserving the installed source-`532bd8e` Main and current timing-qualified RBF.  Replay the same dynamic FLAC passage through quiet, moderate, loud and peak sections; acceptance requires the unchanged gently blending radial animation and dark-to-bright correlation, but each loudness response must now appear as a smooth short pulse or ramp without the prior abrupt grade cuts or near-threshold flicker.  Confirm user activity still restores the interface and another ten seconds reveals the visualizer, then capture a fresh screenshot and telemetry-enabled log for acceptance or any remaining response issue.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/audio_visualizer.c
-- host/arm/audio_visualizer.h
-- tools/generate-audio-visualizer.py
-- tools/test_audio_visualizer.c
 
 #### Status:
 
