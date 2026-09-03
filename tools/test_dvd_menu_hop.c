@@ -1,5 +1,10 @@
 #define _POSIX_C_SOURCE 200809L
 
+#define dvdnav_current_title_info test_dvdnav_current_title_info
+#define dvdnav_err_to_string test_dvdnav_err_to_string
+#define dvdnav_next_pg_search test_dvdnav_next_pg_search
+#define dvdnav_prev_pg_search test_dvdnav_prev_pg_search
+
 /*
  * Include the production translation unit so this focused native test can
  * exercise the private DVD block-boundary transition without adding a test
@@ -7,8 +12,58 @@
  */
 #include "../host/arm/media_source.c"
 
+#undef dvdnav_current_title_info
+#undef dvdnav_err_to_string
+#undef dvdnav_next_pg_search
+#undef dvdnav_prev_pg_search
+
 #include <stdarg.h>
 #include <unistd.h>
+
+static dvdnav_status_t chapter_info_status = DVDNAV_STATUS_OK;
+static dvdnav_status_t chapter_search_status = DVDNAV_STATUS_OK;
+static int32_t chapter_title;
+static int32_t chapter_part;
+static unsigned chapter_info_calls;
+static unsigned chapter_next_calls;
+static unsigned chapter_previous_calls;
+static unsigned chapter_error_calls;
+
+dvdnav_status_t test_dvdnav_current_title_info(dvdnav_t *navigation,
+                                                int32_t *title,
+                                                int32_t *part)
+{
+    (void)navigation;
+    chapter_info_calls++;
+    *title = chapter_title;
+    *part = chapter_part;
+    return chapter_info_status;
+}
+
+dvdnav_status_t test_dvdnav_next_pg_search(dvdnav_t *navigation)
+{
+    (void)navigation;
+    chapter_next_calls++;
+    if (chapter_search_status == DVDNAV_STATUS_OK)
+        chapter_part++;
+    return chapter_search_status;
+}
+
+dvdnav_status_t test_dvdnav_prev_pg_search(dvdnav_t *navigation)
+{
+    (void)navigation;
+    chapter_previous_calls++;
+    if (chapter_search_status == DVDNAV_STATUS_OK)
+        chapter_part--;
+    return chapter_search_status;
+}
+
+const char *test_dvdnav_err_to_string(dvdnav_t *navigation)
+{
+    (void)navigation;
+    chapter_error_calls++;
+    return "simulated navigation failure";
+}
 
 static int require(int condition, const char *message)
 {
@@ -72,11 +127,106 @@ done:
     return failed;
 }
 
+static void reset_chapter_navigation(int32_t title, int32_t part)
+{
+    chapter_info_status = DVDNAV_STATUS_OK;
+    chapter_search_status = DVDNAV_STATUS_OK;
+    chapter_title = title;
+    chapter_part = part;
+    chapter_info_calls = 0;
+    chapter_next_calls = 0;
+    chapter_previous_calls = 0;
+    chapter_error_calls = 0;
+}
+
+static int test_chapter_navigation(void)
+{
+    struct iso_source_state state;
+    int failed = 0;
+
+    memset(&state, 0, sizeof(state));
+    state.navigation = (dvdnav_t *)&state;
+    state.title = 1;
+    state.title_active = 1;
+    state.title_part = 4;
+    state.block_offset = 128;
+    state.block_size = DVD_VIDEO_LB_LEN;
+    state.end_of_stream = 1;
+    state.error = 1;
+    state.still_active = 1;
+    state.still_seconds = 7;
+    state.menu_pci_valid = 1;
+    reset_chapter_navigation(1, 4);
+    failed |= require(iso_change_chapter(&state, -1) == 3,
+                      "previous program did not resolve on the main title");
+    failed |= require(chapter_previous_calls == 1 &&
+                          chapter_next_calls == 0 && chapter_info_calls == 2,
+                      "previous program used the wrong libdvdnav operation");
+    failed |= require(state.title == 1 && !state.title_active &&
+                          state.title_part == 0,
+                      "chapter hop changed selected-title metadata");
+    failed |= require(state.block_offset == 0 && state.block_size == 0 &&
+                          !state.end_of_stream && !state.error &&
+                          !state.still_active && state.still_seconds == 0 &&
+                          !state.menu_pci_valid,
+                      "successful previous program retained stale state");
+
+    memset(&state, 0, sizeof(state));
+    state.navigation = (dvdnav_t *)&state;
+    state.title = 1;
+    state.title_active = 1;
+    state.title_part = 8;
+    reset_chapter_navigation(7, 2);
+    failed |= require(iso_change_chapter(&state, 1) == 3,
+                      "next program rejected a menu-launched alternate title");
+    failed |= require(chapter_next_calls == 1 &&
+                          chapter_previous_calls == 0 &&
+                          chapter_title == 7 && chapter_part == 3,
+                      "alternate-title hop did not remain on the active VM path");
+    failed |= require(state.title == 1 && !state.error,
+                      "alternate-title hop replaced the inventoried main title");
+
+    memset(&state, 0, sizeof(state));
+    state.navigation = (dvdnav_t *)&state;
+    state.title = 1;
+    state.block_offset = 64;
+    state.block_size = DVD_VIDEO_LB_LEN;
+    state.menu_pci_valid = 1;
+    reset_chapter_navigation(7, 9);
+    chapter_search_status = DVDNAV_STATUS_ERR;
+    failed |= require(iso_change_chapter(&state, 1) < 0,
+                      "rejected next-program boundary was accepted");
+    failed |= require(chapter_next_calls == 1 && chapter_error_calls == 1 &&
+                          state.error && state.block_offset == 64 &&
+                          state.block_size == DVD_VIDEO_LB_LEN,
+                      "rejected chapter hop changed the source boundary");
+
+    memset(&state, 0, sizeof(state));
+    state.navigation = (dvdnav_t *)&state;
+    state.title = 1;
+    reset_chapter_navigation(0, 0);
+    failed |= require(iso_change_chapter(&state, -1) < 0,
+                      "menu-domain chapter request was accepted");
+    failed |= require(!chapter_previous_calls && !chapter_next_calls &&
+                          chapter_error_calls == 1 && state.error,
+                      "menu-domain rejection called a program search");
+
+    reset_chapter_navigation(1, 1);
+    failed |= require(iso_change_chapter(&state, 0) < 0 &&
+                          chapter_info_calls == 0 &&
+                          chapter_previous_calls == 0 &&
+                          chapter_next_calls == 0,
+                      "invalid chapter direction reached libdvdnav");
+    return failed;
+}
+
 int main(void)
 {
     struct iso_source_state state;
     size_t discarded;
     int failed = test_navigation_logger();
+
+    failed |= test_chapter_navigation();
 
     failed |= require(iso_menu_identity_is_root(0, DVD_MENU_Root),
                       "active root menu was not recognized");
@@ -211,6 +361,6 @@ int main(void)
 
     if (failed)
         return 1;
-    puts("dvd menu hop: immediate and delayed transition boundaries pass");
+    puts("dvd menu hop: chapter and menu transition boundaries pass");
     return 0;
 }

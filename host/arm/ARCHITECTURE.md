@@ -25,6 +25,14 @@ owned by Main as a stdout transport hold, so no pause byte enters the FPGA
 protocol. Keyboard P/N use the same previous/next actions and Space uses the
 same pause action while the MiSTer OSD is closed.
 
+DVD chapter commands use libdvdnav's relative previous- and next-program
+operations against the currently playing VM path. This is intentionally not an
+absolute replay of the longest title selected during inventory: an authored
+menu can launch another valid title, and its chapter controls must remain on
+that active title/program chain. A successful hop discards the direct-device
+prefetch and old output reserve before the existing READY/GO reset; a rejected
+hop is reported with the current title, part and libdvdnav diagnostic.
+
 Ordinary file-backed `.mpg` and `.mpeg` Program Streams additionally accept
 Alt+Left/Right for 10-second jumps, Ctrl+Left/Right for 60-second jumps, and
 Ctrl+Alt+Left/Right for 300-second jumps. The helper records at most one

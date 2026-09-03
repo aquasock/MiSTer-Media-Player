@@ -833,11 +833,14 @@ init_failed:
 
 static int iso_change_chapter(struct iso_source_state *state, int direction)
 {
-    int32_t title = 0;
-    int32_t part = 0;
-    int32_t target;
+    int32_t current_title = 0;
+    int32_t current_part = 0;
+    int32_t resolved_title = 0;
+    int32_t resolved_part = 0;
+    dvdnav_status_t status;
     int restart_buffer = state->buffer_thread_started;
     size_t discarded = 0;
+    const char *detail;
 
     if (direction != -1 && direction != 1)
         return -1;
@@ -848,23 +851,36 @@ static int iso_change_chapter(struct iso_source_state *state, int direction)
         discarded = state->buffer_fill;
         pthread_mutex_unlock(&state->buffer_lock);
     }
-    if (dvdnav_current_title_info(state->navigation, &title, &part) !=
-            DVDNAV_STATUS_OK || title != state->title) {
+    status = dvdnav_current_title_info(state->navigation, &current_title,
+                                       &current_part);
+    if (status != DVDNAV_STATUS_OK || current_title < 1) {
+        detail = dvdnav_err_to_string(state->navigation);
+        fprintf(stderr,
+                "media_source: %s chapter control direction=%s "
+                "current_title=%d current_part=%d status=error detail=%s "
+                "discarded_buffer=%zu\n",
+                state->direct_device ? "DVD" : "ISO",
+                direction < 0 ? "previous" : "next", (int)current_title,
+                (int)current_part, detail ? detail : "unknown", discarded);
         state->error = 1;
         return -1;
     }
-    if (part < 1)
-        part = state->title_part > 0 ? state->title_part : 1;
-    target = part + direction;
-    if (target < 1)
-        target = 1;
-    if ((uint32_t)target > state->chapters)
-        target = (int32_t)state->chapters;
-    if (dvdnav_part_play(state->navigation, state->title, target) !=
-            DVDNAV_STATUS_OK) {
+    status = direction < 0 ? dvdnav_prev_pg_search(state->navigation) :
+                             dvdnav_next_pg_search(state->navigation);
+    if (status != DVDNAV_STATUS_OK) {
+        detail = dvdnav_err_to_string(state->navigation);
+        fprintf(stderr,
+                "media_source: %s chapter control direction=%s "
+                "current_title=%d current_part=%d status=error detail=%s "
+                "discarded_buffer=%zu\n",
+                state->direct_device ? "DVD" : "ISO",
+                direction < 0 ? "previous" : "next", (int)current_title,
+                (int)current_part, detail ? detail : "unknown", discarded);
         state->error = 1;
         return -1;
     }
+    (void)dvdnav_current_title_info(state->navigation, &resolved_title,
+                                    &resolved_part);
     state->block_offset = 0;
     state->block_size = 0;
     state->title_active = 0;
@@ -877,15 +893,18 @@ static int iso_change_chapter(struct iso_source_state *state, int direction)
     state->still_seconds = 0;
     iso_reset_buffer(state, 0);
     fprintf(stderr,
-            "media_source: %s chapter control current=%d target=%d of %u "
-            "discarded_buffer=%zu\n",
-            state->direct_device ? "DVD" : "ISO", (int)part, (int)target,
-            state->chapters, discarded);
+            "media_source: %s chapter control direction=%s "
+            "current_title=%d current_part=%d resolved_title=%d "
+            "resolved_part=%d selected_title=%d discarded_buffer=%zu\n",
+            state->direct_device ? "DVD" : "ISO",
+            direction < 0 ? "previous" : "next", (int)current_title,
+            (int)current_part, (int)resolved_title, (int)resolved_part,
+            (int)state->title, discarded);
     if (restart_buffer && iso_start_buffer(state) < 0) {
         state->error = 1;
         return -1;
     }
-    return target;
+    return resolved_part > 0 ? resolved_part : current_part;
 }
 
 /*
