@@ -1,3 +1,38 @@
+## 939 COMMIT Unreleased ??? 2026-09-03T03:19:43-07:00
+
+#### Coming From:
+
+Unreleased 0f1165c
+
+#### Purpose:
+
+Prepare the repository documentation and release-candidate notes for the v0.9.0 capability set accumulated since v0.8.0.
+
+#### Outcome:
+
+The user reports that the source-`0f1165c` candidate now looks good and is conducting the final functional and regression pass independently.  Documentation remains fragmented between v0.8.0 release facts and later development notes, so this approved documentation boundary will describe the current video, Program Stream, consumer-audio, visualizer, DVD ISO, encrypted-disc, direct-optical, authored-menu, navigation, seeking, EOF and telemetry behavior without representing the untagged candidate as already published.  It will also make the supplied 720-by-480 exact-24-fps MPEG-2 Program Stream FFmpeg command the project's recommended file-conversion recipe and reserve final runtime hashes, clean-build figures and publication provenance for release qualification.
+
+#### Next Steps:
+
+Update the README, changelog, architecture, building and hardware-test guidance; add focused media-conversion guidance and v0.9.0 release-candidate notes; cross-check controls, install paths, bundled dependencies and known limitations against the current source; then run documentation structure, link and whitespace checks.  Commit and push the documentation without tagging or publishing v0.9.0 while the user's regression testing and the required clean release build remain open.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/ARCHITECTURE.md
+- docs/BUILDING.md
+- docs/MEDIA_CONVERSION.md
+- docs/RELEASE_NOTES_v0.9.0.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 938 COMMIT Unreleased 0f1165c 2026-09-03T02:28:26-07:00
 
 #### Coming From:
@@ -1174,35 +1209,6 @@ Exit MediaPlayer so the existing helper stops, replace only `/media/fat/linux/Me
 - host/arm/ARCHITECTURE.md
 - host/arm/output_reserve.c
 - tools/test_output_reserve.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 899 COMMIT Unreleased 5327358 2026-09-02T06:23:24-07:00
-
-#### Coming From:
-
-Unreleased 5327358
-
-#### Purpose:
-
-Record the physical root-menu freeze and localize it to a circular wait at the DVD navigation output-reserve boundary.
-
-#### Outcome:
-
-The user's golden physical-DVD run starts successfully from `/dev/sr0`, inventories title one with 24 chapters, authenticates the disc, enters menu mode and submits 4,160,412 media bytes before Main sends root-menu command `0x09` at 4.024721 seconds.  Libdvdnav accepts the command, reports status `ok`, classifies a root stream hop at logical block 3395 and discards a 2,034-byte source-block tail, after which the helper log ends without the expected reserve-discard completion, navigation `READY`, Main download reset or `GO`; the 370,504-byte screenshot at SHA-256 `541ca0729e1eb2d4efe82823dc431540ca3d3177ac1821e48354d9f54c6da70f` consequently shows the last valid resident DVD frame rather than decoder corruption, and the matching 136,144-byte log has SHA-256 `7503f2162194a8547033ef1c1455077db0dd6a2bf2199cd337b017a78d4a0d2a`.  The 675-byte schema-21 telemetry sidecar at SHA-256 `1aac888676af9d1e6aa73af44e5ded3ab3737cb027c6cfdffc3a0b2c64b518c8` is checksum-valid.  Static localization identifies a timing-dependent circular wait inherited from the accepted DVD path: once `navigation_pending` is set, Main returns before draining helper stdout until it receives `READY`, while `output_reserve_discard` cannot let the helper send `READY` until its writer finishes the active record, and that writer can remain blocked on the undrained stdout pipe; pressing `M` early while the four-megabyte reserve is active exposes the race, independently of the audio-visualizer changes.
-
-#### Next Steps:
-
-Preserve libdvdnav behavior, the decoder, RTL, RBF, menu-continuation semantics and the accepted visualizer work.  After user approval, make one bounded navigation-transport correction that prevents the reserve writer from blocking discard completion while Main is waiting for `READY`, without discarding valid output when root or activation resolves as `MENU_CONTINUE`; add a deterministic filled-pipe regression that issues a root hop during an active multi-write record and requires bounded discard completion, exactly one `READY` and clean `GO`, retain the existing continuation case byte-for-byte, rebuild the helper and any required Main component locally, then repeat an early `M`, later `M`, activation and chapter-hop sequence on the golden disc.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
