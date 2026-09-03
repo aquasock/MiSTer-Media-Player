@@ -1,3 +1,34 @@
+## 940 COMMIT Unreleased ??? 2026-09-03T03:51:20-07:00
+
+#### Coming From:
+
+Unreleased 7759f87
+
+#### Purpose:
+
+Qualify, document and package the accepted v0.9.0 runtime set for the user's GitHub release publication.
+
+#### Outcome:
+
+The user reports that the complete v0.9.0 functional and regression testing looks good and approves repository finalization plus release-package generation, while retaining responsibility for the annotated tag and GitHub Release.  The user explicitly directs that the accepted runtime artifacts must not be rebuilt.  The candidate documentation at source `7759f87` already identifies their composition and hashes; this release-preparation boundary will preserve those exact FPGA, ARM helper, patched Main and visualizer binaries, assemble the date-coded RBF, helper, Main, visualizer, USB optical launcher, installation/source notes, checksums and all bundled licences into `MiSTer_Media_Player_v0.9.0.zip`, and finalize public documentation from candidate to release-ready state without creating a tag or publishing an external release.
+
+#### Next Steps:
+
+Commit and push this approved release proposal, independently inspect the already accepted artifact formats and hashes, assemble the package in a new bounded staging directory without invoking any build, and verify member identity, modes, internal SHA-256 manifest and ZIP integrity.  Update the README, changelog and v0.9.0 notes with exact final provenance and an explicit record that no clean rebuild was performed at the user's direction, commit and push the release-ready documentation, resolve this entry to that commit, and provide the verified ZIP path and checksum to the user for tagging and publication.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/RELEASE_NOTES_v0.9.0.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 939 COMMIT Unreleased 7759f87 2026-09-03T03:19:43-07:00
 
 #### Coming From:
@@ -1178,37 +1209,6 @@ Preserve the source-`78646bd` helper, libdvdnav behavior, decoder, RTL, RBF and 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 900 COMMIT Unreleased 78646bd 2026-09-02T06:26:43-07:00
-
-#### Coming From:
-
-Unreleased 5327358
-
-#### Purpose:
-
-Make physical-DVD navigation discard interrupt an output record blocked on Main without changing continuation output or decoder behavior.
-
-#### Outcome:
-
-Source `78646bd` makes the physical-DVD reserve writer own its output descriptor in nonblocking mode, poll ordinary backpressure in bounded ten-millisecond intervals and restore the original descriptor flags at teardown.  Once libdvdnav definitively requests a stream-hop discard, the worker now cancels the unwritten suffix of an active record together with both queued lanes instead of waiting forever for Main to drain that record; Main's existing barrier still discards the already-written pipe prefix before `GO`, while a request resolved as `MENU_CONTINUE` never invokes discard and retains complete byte-exact delivery.  One hundred strict focused runs reproduce a full pipe with no reader, require discard in under 500 milliseconds, account for every pipe and canceled byte, reject stale bytes after the barrier and preserve ordinary records, priority order and descriptor flags; the same boundary passes AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer checks, and output staging passes one hundred retained runs.  Production overlay output passes twenty exact 86,400-byte reconstructions, and DVD menu-hop, random-access, fragmented-SPU, AC-3 recovery and Program Stream seek regressions pass.  The native helper builds and reports the complete protocol-one capability set.  GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_NavDiscard_78646bd` at SHA-256 `aea920527750897528e06700ddf15eb0ce3429f56878af1cb016f6385e0da59b`; it has no dynamic section, and Main, libdvdnav policy, H.262 decoding, RTL, RBF and the source-`5327358` visualizer asset are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer so the existing helper stops, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_NavDiscard_78646bd`, restore executable mode if needed, and verify the recorded size and SHA-256 while preserving the installed Main, visualizer asset and timing-qualified RBF.  On the golden physical DVD, press `M` once within approximately four seconds as in the rejected run and again after sustained playback; each stream hop must log reserve discard, navigation `READY`, Main reset and `GO` without freezing.  Then activate the authored menu choice, exercise previous and next chapter once each, and confirm a menu-space continuation retains its resident frame and selector without losing output; return fresh telemetry-enabled results for physical acceptance.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/output_reserve.c
-- tools/test_output_reserve.c
 
 #### Status:
 
