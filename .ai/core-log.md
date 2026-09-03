@@ -1,4 +1,4 @@
-## 935 COMMIT Unreleased ??? 2026-09-03T00:16:48-07:00
+## 935 COMMIT Unreleased ac13724 2026-09-03T00:16:48-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Bundle the source-`ac13724` H.262 restart diagnostic helper with its matched run
 
 #### Outcome:
 
-Forum package assembly approved.  The archive will combine the exact source-`ac13724` static ARMv7 diagnostic helper, accepted source-`3689cca` Main, current source-`366a227` interlaced visualizer pack, timing-qualified source-`dfe1057` RBF, USB DVD Drive launcher, installation and provenance notes, project licence and all bundled dependency licences without rebuilding or changing any runtime component.
+`host/build/MiSTer_Media_Player_H262Diag_ac13724.zip` contains the exact source-`ac13724` static ARMv7 diagnostic helper, accepted source-`3689cca` Main, current source-`366a227` interlaced visualizer pack, timing-qualified source-`dfe1057` `MediaPlayer_20260901.rbf`, `games/MediaPlayer/USB DVD Drive.dvd`, diagnostic installation and source-provenance notes, the project licence and all seven bundled dependency licences.  It is explicitly identified as an unreleased diagnostic community test rather than a tagged or fixed release.  A fresh extraction contains sixteen files, all fifteen manifest entries pass SHA-256 verification, both executables retain mode 755, and the helper, Main, visualizer, RBF and launcher are byte-identical to their qualified inputs; ZIP integrity reports no errors.  The 6,578,930-byte archive has SHA-256 `ceb791f59ccc8db2d9702fb6631b9705a793d645fa8b2532560d5eeab26777ef`.
 
 #### Next Steps:
 
-Assemble `host/build/MiSTer_Media_Player_H262Diag_ac13724.zip` in the established root-relative MiSTer layout, identify it clearly as an unreleased diagnostic community test, generate an internal SHA-256 manifest, verify a fresh extraction byte-for-byte against the qualified inputs, executable modes and launcher placement, run ZIP integrity validation, and record the resulting archive size and digest for the forum upload.
+Upload `host/build/MiSTer_Media_Player_H262Diag_ac13724.zip` to the forum and have the tester follow `INSTALL.txt`: enable telemetry, start The Big Lebowski, leave the failed startup visible briefly, press Root Menu once and leave that failed screen visible briefly, then return the helper log, telemetry screenshot and decoded sidecar.  Keep this package labeled diagnostic until those two bounded H.262 prefixes identify the compatibility correction and subsequent hardware testing qualifies a fixed build.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ None.
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
