@@ -1,4 +1,4 @@
-## 911 COMMIT Unreleased ??? 2026-09-02T18:46:53-07:00
+## 911 COMMIT Unreleased efe2a76 2026-09-02T18:46:53-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Release an independently decodable single-picture DVD menu background when its a
 
 #### Outcome:
 
-The approved helper-only boundary will add an explicit terminal mode to DVD random-access filtering so an authored still can bound a complete sequence-plus-I group without inventing the later I/P reference required during open-ended streaming.  Terminal filtering will retain the sequence and I picture, neutralize contextless pictures before it and unsafe B pictures after it, and leave an incomplete or pictureless destination pending; the helper will invoke it only for a pending DVD menu activation at an actual still event, drain any qualified queued video into the existing activation stage, and then reuse the established picture-bearing READY/GO barrier.  Source `338c4d5` overlay-only continuation, ordinary multi-picture filtering and menu hops, Main, decoder, visualizer, protocol, RTL and RBF remain unchanged.
+Source `efe2a76` adds an explicit terminal mode to DVD random-access filtering so an authored still bounds a complete sequence-plus-I group without inventing the later I/P reference required during open-ended streaming.  Terminal filtering retains the sequence and I picture, neutralizes contextless pictures before it and unsafe trailing B pictures, and leaves a sequence without an I picture pending; the helper invokes it only for a pending DVD menu activation at an actual still event, drains a qualified picture into the existing activation stage, and reuses the established picture-bearing READY/GO barrier.  Ordinary open-ended filtering still refuses the same I-only group, and source `338c4d5` overlay-only continuation remains selected when no video is queued or no sequence/I group qualifies.  Strict native and GNU 10.2.1 ARM builds pass along with the random-access analyzer and sanitizer checks, production-path terminal-still staging, output-stage and reserve sanitizers, AC-3 recovery, DVD SPU, menu-hop, Program Stream seek, audio UI/timer/visualizer units, all four real standalone-audio seek integrations, 100 random-access repetitions, 20 overlay/still repetitions, 100 stage repetitions, 100 menu-hop repetitions and 20 unsupported-LPCM repetitions.  The resulting 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_SceneStill_efe2a76` has SHA-256 `c0dd48b3926a58b9425e708acd7fb02f964e4936f2acb71f1aa05dc8e1706731`; Main, decoder, visualizer, protocol, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Extend the random-access API and implementation with explicit terminal-group qualification, call it before activation-stage classification at an authored DVD still, and add exact regressions proving an I-only stream remains blocked while open but releases at the terminal boundary, trailing B pictures are neutralized, ordinary I/P groups remain unchanged, and pictureless overlay-only destinations still continue without reset.  Run strict native, sanitizer, analyzer, staging, reserve, menu-hop, overlay, random-access, audio, seek and visualizer regressions with repeated high-risk cases, then build and verify only an exact static ARMv7 helper for physical Coming to America retest.
+Install only `host/build/MediaPlayer_Helper_SceneStill_efe2a76` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  On Coming to America, enter Scene Selection and require its authored background to replace the root-menu frame while its selector remains responsive; activate a scene, return to the root menu and repeat entry to exercise both picture-bearing and overlay-only transitions.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback, and the forum disc's silent LPCM menu followed by supported AC-3 title playback; for any failure collect a fresh helper/Main log, screenshot and schema-21 telemetry without reusing prior captures.
 
 #### Files Modified:
 
@@ -22,11 +22,12 @@ Extend the random-access API and implementation with explicit terminal-group qua
 - host/arm/dvd_random_access.c
 - host/arm/dvd_random_access.h
 - host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
 - tools/test_dvd_random_access.c
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
