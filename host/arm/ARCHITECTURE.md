@@ -236,12 +236,14 @@ pixels.
 
 The visualizer pack indexes eight synchronized versions of a two-second loop as
 twenty independently decodable, three-picture closed GOPs per level. Every GOP
-starts with an H.262 sequence header and intra picture. The helper computes a
-stereo RMS envelope with immediate weighted attack and slower decay, applies
+starts with an H.262 interlaced-sequence header and an intra, top-field-first
+frame picture; the helper rejects progressive or otherwise incompatible packs
+so their video cannot bypass the native-480i player overlay. The helper computes
+a stereo RMS envelope with immediate weighted attack and slower decay, applies
 hysteresis to its fixed grade thresholds, slews by at most one adjacent grade
 per GOP, selects one complete GOP at the matching loop phase, and admits at
 most 4 KiB of its ordinary elementary bytes after a PCM record. Two GOPs of
-lead absorb coded-size variation. The accepted DVD overlay initially covers
+lead absorb coded-size variation. The native-480i DVD overlay initially covers
 this video with an opaque four-color quantization of the player screen; after
 ten seconds of emitted PCM
 without a control event, one CLEAR reveals the loop. A retained overlay STYLE

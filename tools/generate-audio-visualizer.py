@@ -57,21 +57,43 @@ def split_gops(data: bytes) -> list[bytes]:
     for index, chunk in enumerate(chunks):
         pictures = start_codes(chunk, 0x00)
         groups = start_codes(chunk, 0xB8)
+        extensions = start_codes(chunk, 0xB5)
+        sequence_extensions = [offset for offset in extensions
+                               if offset + 6 <= len(chunk) and
+                               chunk[offset + 4] >> 4 == 1]
+        picture_extensions = [offset for offset in extensions
+                              if offset + 9 <= len(chunk) and
+                              chunk[offset + 4] >> 4 == 8]
         if len(pictures) != FRAMES_PER_GOP or len(groups) != 1:
             raise RuntimeError(f"GOP {index} is not an independent three-picture group")
         group = groups[0]
         if group + 8 > len(chunk) or not (chunk[group + 7] & 0x40):
             raise RuntimeError(f"GOP {index} is not marked closed")
+        if (len(sequence_extensions) != 1 or
+                chunk[sequence_extensions[0] + 5] & 0x08):
+            raise RuntimeError(f"GOP {index} is not an interlaced sequence")
+        if len(picture_extensions) != FRAMES_PER_GOP:
+            raise RuntimeError(f"GOP {index} lacks picture coding extensions")
+        for extension in picture_extensions:
+            if ((chunk[extension + 6] & 0x03) != 0x03 or
+                    not (chunk[extension + 7] & 0x80) or
+                    chunk[extension + 7] & 0x03 or
+                    chunk[extension + 8] & 0x80):
+                raise RuntimeError(
+                    f"GOP {index} is not an interlaced top-field-first frame group"
+                )
     return chunks
 
 
 def encode(ffmpeg: str, grade: str, destination: pathlib.Path) -> bytes:
     command = [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "lavfi",
-        "-i", SOURCE, "-vf", grade, "-frames:v", str(GOPS * FRAMES_PER_GOP),
+        "-i", SOURCE, "-vf", f"{grade},setfield=tff",
+        "-frames:v", str(GOPS * FRAMES_PER_GOP),
         "-pix_fmt", "yuv420p", "-c:v", "mpeg2video", "-profile:v", "main",
         "-level:v", "main", "-g", str(FRAMES_PER_GOP), "-bf", "0",
-        "-sc_threshold", "1000000000", "-flags", "+cgop", "-q:v", "8",
+        "-sc_threshold", "1000000000", "-flags", "+cgop+ilme+ildct",
+        "-top", "1", "-q:v", "8",
         "-f", "mpeg2video", str(destination),
     ]
     subprocess.run(command, check=True)

@@ -60,12 +60,14 @@ static int validate_gop(const uint8_t *data, size_t size,
                         unsigned frames_per_gop)
 {
     unsigned sequences = 0;
+    unsigned sequence_extensions = 0;
     unsigned groups = 0;
     unsigned pictures = 0;
+    unsigned picture_coding_extensions = 0;
     int first_intra = 0;
     size_t offset;
 
-    for (offset = 0; offset + 8u <= size; ++offset) {
+    for (offset = 0; offset + 4u <= size; ++offset) {
         uint8_t code;
 
         if (memcmp(data + offset, "\0\0\1", 3u))
@@ -76,17 +78,41 @@ static int validate_gop(const uint8_t *data, size_t size,
                 return -1;
             sequences++;
         } else if (code == 0xb8u) {
+            if (offset + 8u > size)
+                return -1;
             groups++;
             if (!(data[offset + 7u] & 0x40u))
                 return -1;
         } else if (code == 0x00u) {
+            if (offset + 6u > size)
+                return -1;
             if (!pictures)
                 first_intra = ((data[offset + 5u] >> 3) & 7u) == 1u;
             pictures++;
+        } else if (code == 0xb5u) {
+            unsigned extension_id;
+
+            if (offset + 5u > size)
+                return -1;
+            extension_id = data[offset + 4u] >> 4;
+            if (extension_id == 1u) {
+                if (offset + 6u > size || (data[offset + 5u] & 0x08u))
+                    return -1;
+                sequence_extensions++;
+            } else if (extension_id == 8u) {
+                if (offset + 9u > size ||
+                    (data[offset + 6u] & 0x03u) != 0x03u ||
+                    !(data[offset + 7u] & 0x80u) ||
+                    (data[offset + 7u] & 0x03u) ||
+                    (data[offset + 8u] & 0x80u))
+                    return -1;
+                picture_coding_extensions++;
+            }
         }
     }
-    return sequences == 1u && groups == 1u && first_intra &&
-           pictures == frames_per_gop ? 0 : -1;
+    return sequences == 1u && sequence_extensions == 1u && groups == 1u &&
+           first_intra && pictures == frames_per_gop &&
+           picture_coding_extensions == frames_per_gop ? 0 : -1;
 }
 
 int audio_visualizer_create(struct audio_visualizer **result,

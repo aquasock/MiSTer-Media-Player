@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 #define TEST_GOPS 2u
-#define TEST_GOP_BYTES 24u
+#define TEST_GOP_BYTES 48u
 #define TEST_ENTRIES (AUDIO_VISUALIZER_LEVELS * TEST_GOPS)
 #define TEST_FILE_BYTES (32u + TEST_ENTRIES * 8u + \
                          TEST_ENTRIES * TEST_GOP_BYTES)
@@ -104,10 +104,13 @@ int main(void)
         put32(file + 36 + index * 8, TEST_GOP_BYTES);
         memcpy(file + offset, "\0\0\1\xb3", 4);
         file[offset + 4] = (uint8_t)(index / TEST_GOPS);
-        memcpy(file + offset + 8, "\0\0\1\xb8", 4);
-        file[offset + 15] = 0x40;
-        memcpy(file + offset + 16, "\0\0\1\x00", 4);
-        file[offset + 21] = 0x08;
+        memcpy(file + offset + 8, "\0\0\1\xb5\x14\x82", 6);
+        memcpy(file + offset + 16, "\0\0\1\xb8", 4);
+        file[offset + 23] = 0x40;
+        memcpy(file + offset + 24, "\0\0\1\x00", 4);
+        file[offset + 29] = 0x08;
+        memcpy(file + offset + 32,
+               "\0\0\1\xb5\x80\x00\x03\x80\x00", 9);
         offset += TEST_GOP_BYTES;
     }
     stream = fdopen(fd, "wb");
@@ -167,6 +170,20 @@ int main(void)
         capture.levels[1] != 2)
         return 1;
     audio_visualizer_destroy(visualizer);
+
+    file[32u + TEST_ENTRIES * 8u + 13u] |= 0x08u;
+    stream = fopen(path, "wb");
+    if (!stream || fwrite(file, 1, sizeof(file), stream) != sizeof(file) ||
+        fclose(stream) != 0 ||
+        audio_visualizer_create(&visualizer, path, error, sizeof(error)) == 0)
+        return 1;
+    file[32u + TEST_ENTRIES * 8u + 13u] &= (uint8_t)~0x08u;
+    file[32u + TEST_ENTRIES * 8u + 40u] |= 0x80u;
+    stream = fopen(path, "wb");
+    if (!stream || fwrite(file, 1, sizeof(file), stream) != sizeof(file) ||
+        fclose(stream) != 0 ||
+        audio_visualizer_create(&visualizer, path, error, sizeof(error)) == 0)
+        return 1;
     unlink(path);
     puts("audio visualizer: pass");
     return 0;
