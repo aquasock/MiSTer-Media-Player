@@ -1,3 +1,34 @@
+## 922 COMMIT Unreleased ??? 2026-09-02T20:55:28-07:00
+
+#### Coming From:
+
+Unreleased 3689cca
+
+#### Purpose:
+
+Make DVD chapter controls follow the currently playing authored program chain so menu-launched alternate titles cannot terminate playback.
+
+#### Outcome:
+
+The approved helper-only boundary will replace the absolute `dvdnav_part_play()` call and initial-longest-title equality guard in `iso_change_chapter()` with libdvdnav's relative previous- and next-program navigation operations.  The existing producer stop, unread-buffer discard, demux reset, audio reset and READY/GO decoder barrier will remain intact, but source state will be reset and the direct-device producer restarted only after libdvdnav accepts the hop.  Diagnostics will record the current title and part, requested direction, resolved post-hop title and part, buffered bytes discarded and libdvdnav's error string on failure.  Focused native coverage will model original-title and menu-launched alternate-title success in both directions plus rejected boundary behavior without adding an ARM helper ABI, and the architecture note will document why chapter controls are relative to the active DVD VM path rather than the initially inventoried main feature.
+
+#### Next Steps:
+
+Implement the recorded boundary, compile the focused test strictly and under AddressSanitizer and UndefinedBehaviorSanitizer, run GCC analyzer plus the retained menu-hop, random-access, SPU, reserve, staging, AC-3, LPCM-skip, Program Stream seek, audio UI, timer and visualizer regressions, and commit the exact passing source.  Pull that commit into an isolated build-PC checkout, repeat the relevant native and simulator tests, build and strip the static ARMv7 helper with GNU 10.2.1, then record its size and SHA-256 for a Big Lebowski hardware rerun; Main, decoder RTL, visualizer assets and the timing-qualified RBF are outside this change.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_source.c
+- tools/test_dvd_menu_hop.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 921 COMMIT Unreleased 3689cca 2026-09-02T20:51:04-07:00
 
 #### Coming From:
@@ -1230,44 +1261,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 882 COMMIT Unreleased 68f8f26 2026-09-01T20:31:54-07:00
-
-#### Coming From:
-
-Unreleased dfe1057
-
-#### Purpose:
-
-Add safe keyboard-driven ten-second, one-minute and five-minute relative seeking for ordinary MPEG Program Stream files without changing audio or DVD navigation.
-
-#### Outcome:
-
-Source `68f8f26` implements the approved first seeking boundary for ordinary file-backed `.mpg` and `.mpeg` Program Streams.  Patched Main maps Alt, Ctrl and Ctrl-plus-Alt with Left or Right to signed ten-second, sixty-second and three-hundred-second control messages while leaving Shift combinations, unmodified arrows and DVD-menu navigation unchanged.  The helper records at most one timestamped video-PES source offset per half second, uses binary lookup for indexed targets, extends the index with a packet-length-aware no-output scan for later targets, clamps at file ends, flushes stale pipe bytes, resets demux, audio and scheduling state, and reuses the proven download-reset plus READY/GO barrier and sequence/I/following-reference random-access gate.  The focused index test passes strict compilation, AddressSanitizer and UndefinedBehaviorSanitizer, the retained random-access, AC-3 recovery, output-reserve and output-stage tests pass, a complete native decode of the user's 492-megabyte `01.mpg` reaches all 60,270 audio frames and 450,552,801 video bytes, and an end-to-end control smoke test completes forward and backward ten-, sixty- and three-hundred-second barriers on that file.  Both Main patches apply cleanly to pinned upstream `0a8fb44`, and the full Main build plus strict native and GNU 10.2 ARM helper builds succeed.  The final 920,948-byte static ARMv7 helper `host/build/MediaPlayer_Helper_ProgramSeek_68f8f26` has SHA-256 `ed0356a8cc941c75d3aac0f53db675da99d7ddaf606f82e42241f4cda89d5fae`; the final 1,174,492-byte dynamic ARMv7 Main `host/build/MiSTer_ProgramSeek_68f8f26` has SHA-256 `0d78e26c84575d825f5701cd9937cbb4cbc0c3cdf971c753b34fd9a4385e3f17`.  Three-second jumps, standalone audio, ISO, physical DVD, authored menus, decoder RTL and the timing-qualified source-`dfe1057` RBF remain unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer, install `host/build/MediaPlayer_Helper_ProgramSeek_68f8f26` as `/media/fat/linux/MediaPlayer_Helper` and `host/build/MiSTer_ProgramSeek_68f8f26` as `/media/fat/MiSTer`, preserve executable mode and the accepted source-`dfe1057` RBF, then reboot because Main changed.  During ordinary `.mpg` playback, verify Alt+Left/Right, Ctrl+Left/Right and Ctrl+Alt+Left/Right repeatedly in both directions, including clamping near the beginning and end; acceptance requires prompt clean-picture restart, synchronized uninterrupted audio after every jump and normal playback afterward.  Retest unmodified arrows in a DVD menu, P/N chapter changes, Space pause/resume, one audio-only file and one physical DVD to prove the excluded paths remain unchanged, then report hardware acceptance or collect telemetry-enabled helper/Main diagnostics for any failure.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/Makefile
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/arm/media_source.c
-- host/arm/media_source.h
-- host/arm/program_stream_seek.c
-- host/arm/program_stream_seek.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_program_stream_seek.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
