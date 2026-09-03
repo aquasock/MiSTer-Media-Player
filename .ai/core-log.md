@@ -1,3 +1,32 @@
+## 933 COMMIT Unreleased 932dc22 2026-09-02T23:59:04-07:00
+
+#### Coming From:
+
+Unreleased 932dc22
+
+#### Purpose:
+
+Determine whether Root Menu recovers The Big Lebowski's failed startup or independently reproduces its decoder rejection.
+
+#### Outcome:
+
+Root Menu performs a genuine second navigation attempt rather than merely redisplaying the first latched telemetry state.  At 113.253892 seconds Main sends command `0x09`; libdvdnav reports a successful root hop, the helper enters the menu, discards 4,180,090 reserved bytes, returns READY at 113.302508 seconds and releases the reset/GO barrier at 113.313835 seconds.  The destination then reaches its authored 15-second menu still and terminal-finalizes a new group with sequence offset 0, I-picture offset 170 and next reference offset 128,368.  The new checksum-valid schema-21 snapshot nevertheless records the same H.262 syntax flag `0x0001`, only 188 accepted bytes, and zero completed, displayed or reference pictures and swaps; the preceding independent startup snapshot failed at 187 bytes with the same sequence and I-picture offsets.  The helper remains alive, continues publishing menu highlights and has supplied 870,570,274 bytes by the 370.83-second capture endpoint, proving that the reset succeeds but both authored stills share an early H.262 construct rejected by the decoder.  Therefore entry 932's proposed non-menu-only gating could avoid the first failure but cannot make this root menu work and must not be shipped as the complete correction.  The 6,131,013-byte log, 1,451-byte barcode screenshot and 376-byte sidecar have SHA-256 `0334960b4723a0f4559d11ed89d3d660f916d109f574f8a3160896a7b17081e7`, `cd46075c074321026dd213f5514271b5502899e3325397b9f9e37bd0cc6f71a0` and `a720e6a6355b778971f8138b56e9940e55045d21babde553343919f9cb1d6c46`.  No runtime source was changed.
+
+#### Next Steps:
+
+Do not implement the entry-932 gating alone.  After user approval, make one diagnostic helper build that logs a bounded byte-exact prefix and parsed sequence, picture and extension fields for each initial random-access group before publication, without changing the bytes, decoder, Main, RBF, visualizer or timing.  Reproduce Big Lebowski startup and Root Menu once with that helper, identify the exact common construct at the 187/188-byte boundary against the frontend's 22 syntax-source checks, and then propose the narrowest helper-side compatibility normalization that preserves ordinary DVD streams and all accepted Blazing Saddles and Coming to America menu behavior.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 932 COMMIT Unreleased 932dc22 2026-09-02T23:55:22-07:00
 
 #### Coming From:
@@ -1189,42 +1218,6 @@ Exit MediaPlayer so the running helper stops, install `host/build/MediaPlayer_He
 - host/arm/audio_ui.c
 - tools/test_audio_file_seek.py
 - tools/test_audio_ui_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 893 COMMIT Unreleased 09b1d28 2026-09-02T02:46:35-07:00
-
-#### Coming From:
-
-Unreleased 4063cf0
-
-#### Purpose:
-
-Replace ordinary-file clean-EOF retention with a replay-ready paused state while preserving the final valid presentation.
-
-#### Outcome:
-
-Source `09b1d28` makes a clean ordinary MPG or standalone-audio EOF replay-ready and paused while preserving the final valid resident frame; the next Play input relaunches the retained source and index through the normal fresh-download path from byte zero, while selecting another file, explicitly stopping, leaving the core, a failed helper exit and ISO/DVD completion clear or bypass replay state as appropriate.  Standalone audio now completes by draining the already-open projected final UI frame from its current byte offset through exactly one COMMIT, eliminating the nested BEGIN and hybrid YUV frame demonstrated by entry 892 while preserving exact full progress, final elapsed time and zero remaining time.  Strict focused seek, Program Stream, AC-3, DVD, staging, renderer and modeled Main lifecycle tests pass, sanitizer coverage passes, the patch applies to pinned upstream and the exact-source ARMv7 Main compiles, and the final ARM helper passes real MP3, WAV, FLAC and Ogg runs with valid transaction boundaries and exact final UI state.  GNU 10.2 produced the 957,860-byte static ARMv7 helper `host/build/MediaPlayer_Helper_ReplayReady_09b1d28` with SHA-256 `380ca98301de0a0b2ae84cede46523a5254fbf8046bd9868f76c2a02653f46c3` and the 1,182,692-byte ARMv7 Main `host/build/MiSTer_ReplayReady_09b1d28` with SHA-256 `6c6ace67a1114d609ca339e0aa11cb71756a149257896169c8d72f7cab75c784`; RTL, RBF, codecs, DVD behavior and accepted timing are unchanged.
-
-#### Next Steps:
-
-Install both `host/build/MediaPlayer_Helper_ReplayReady_09b1d28` as `/media/fat/linux/MediaPlayer_Helper` with executable mode and `host/build/MiSTer_ReplayReady_09b1d28` as `/media/fat/MiSTer`, preserving the current timing-qualified RBF.  On hardware, let a standalone audio file reach natural EOF and confirm that the final undistorted UI remains visible with full progress, correct elapsed time and zero remaining time, then press Play and require the same file to restart from the beginning; repeat natural EOF and Play restart with an ordinary MPG, and confirm that an oversized standalone-audio seek remains a no-op without interrupting playback.  Report acceptance or place fresh Main/helper logs and a screenshot in `.ai/current_results` for any discrepancy.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/audio_ui.c
-- host/arm/audio_ui.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_audio_file_seek.py
-- tools/test_audio_ui_output.c
-- tools/test_main_seek_lifecycle.cpp
 
 #### Status:
 
