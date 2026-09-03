@@ -170,6 +170,31 @@ struct video_chunk {
     uint64_t pts;
 };
 
+/*
+ * A picture coding extension carries chroma_420_type in the byte immediately
+ * before progressive_frame.  Holding one elementary-stream byte is therefore
+ * sufficient to validate the latter before releasing the former, including
+ * when a DVD video PES boundary falls between them.
+ */
+struct h262_chroma_stream_state {
+    uint32_t window;
+    uint64_t input_bytes;
+    unsigned payload_index;
+    unsigned sequence_chroma_format;
+    unsigned picture_coding_type;
+    unsigned picture_structure;
+    unsigned corrections;
+    uint8_t start_code;
+    uint8_t extension_id;
+    uint8_t pending_byte;
+    int sequence_pending;
+    int sequence_extension_valid;
+    int picture_started_since_sequence;
+    int picture_header_valid;
+    int picture_structure_valid;
+    int have_pending;
+};
+
 enum audio_overlay_upload_state {
     AUDIO_OVERLAY_IDLE,
     AUDIO_OVERLAY_CONFIG,
@@ -230,6 +255,11 @@ struct output_state {
     int scheduler_started;
     int iso_start_filter_active;
     int iso_pts_normalization;
+    int h262_chroma_normalization;
+    struct h262_chroma_stream_state h262_chroma;
+    int h262_pending_has_pts;
+    int h262_pending_has_record;
+    uint64_t h262_pending_pts;
     int have_iso_video_pts;
     uint64_t iso_pts_epoch_offset;
     uint64_t iso_pts_raw_max;
@@ -1383,6 +1413,169 @@ static int queue_video(struct output_state *output, const uint8_t *data,
     return 0;
 }
 
+static void h262_chroma_stream_consume(
+    struct h262_chroma_stream_state *state, uint8_t current,
+    uint8_t *previous, int log_correction)
+{
+    uint32_t window = (state->window << 8) | current;
+
+    if ((window & UINT32_C(0xffffff00)) == UINT32_C(0x00000100)) {
+        state->start_code = current;
+        state->payload_index = 0;
+        state->extension_id = 0xffu;
+        if (current == 0xb3u) {
+            state->sequence_pending = 1;
+            state->sequence_extension_valid = 0;
+            state->sequence_chroma_format = 0;
+            state->picture_started_since_sequence = 0;
+            state->picture_header_valid = 0;
+            state->picture_structure_valid = 0;
+        } else if (current == 0x00u) {
+            if (state->picture_started_since_sequence)
+                state->sequence_pending = 0;
+            state->picture_started_since_sequence = 1;
+            state->picture_header_valid = 0;
+            state->picture_coding_type = 0;
+            state->picture_structure_valid = 0;
+            state->picture_structure = 0;
+        }
+        state->window = window;
+        state->input_bytes++;
+        return;
+    }
+
+    if (state->start_code == 0xb5u) {
+        if (state->payload_index == 0u) {
+            state->extension_id = current >> 4;
+        } else if (state->extension_id == 1u &&
+                   state->payload_index == 1u) {
+            state->sequence_chroma_format = (current >> 1) & 3u;
+            state->sequence_extension_valid = 1;
+        } else if (state->extension_id == 8u &&
+                   state->payload_index == 2u) {
+            state->picture_structure = current & 3u;
+            state->picture_structure_valid = 1;
+        } else if (state->extension_id == 8u &&
+                   state->payload_index == 4u) {
+            if (previous && state->sequence_pending &&
+                state->sequence_extension_valid &&
+                state->sequence_chroma_format == 1u &&
+                state->picture_header_valid &&
+                state->picture_coding_type == 1u &&
+                state->picture_structure_valid &&
+                state->picture_structure == 3u &&
+                (current & 0x80u) && !(*previous & 1u)) {
+                uint8_t before = *previous;
+
+                *previous |= 1u;
+                state->corrections++;
+                if (log_correction)
+                    fprintf(stderr,
+                            "media_player_helper: H262 stream normalized "
+                            "chroma_420_type offset=%llu before=%02x "
+                            "after=%02x correction=%u\n",
+                            (unsigned long long)(state->input_bytes - 1u),
+                            before, *previous, state->corrections);
+            }
+            state->sequence_pending = 0;
+        }
+    } else if (state->start_code == 0x00u &&
+               state->payload_index == 1u) {
+        state->picture_coding_type = (current >> 3) & 7u;
+        state->picture_header_valid = 1;
+    }
+
+    state->payload_index++;
+    state->window = window;
+    state->input_bytes++;
+}
+
+/*
+ * Filter one elementary-video payload in place.  The returned prefix is the
+ * final byte of the preceding payload, now safe to emit; data[0..return-1]
+ * are the safe bytes of this payload.  Its final byte remains in state until
+ * the next payload or an explicit stream-boundary flush.
+ */
+static size_t h262_chroma_stream_filter(
+    struct h262_chroma_stream_state *state, uint8_t *data, size_t size,
+    uint8_t *prefix, int *prefix_valid, int log_correction)
+{
+    size_t offset;
+
+    *prefix_valid = 0;
+    for (offset = 0; offset < size; offset++) {
+        uint8_t current = data[offset];
+
+        h262_chroma_stream_consume(
+            state, current, state->have_pending ? &state->pending_byte : NULL,
+            log_correction);
+        if (state->have_pending) {
+            if (!offset) {
+                *prefix = state->pending_byte;
+                *prefix_valid = 1;
+            } else {
+                data[offset - 1u] = state->pending_byte;
+            }
+        }
+        state->pending_byte = current;
+        state->have_pending = 1;
+    }
+    return size ? size - 1u : 0u;
+}
+
+static int queue_h262_video(struct output_state *output, uint8_t *data,
+                            size_t size, int has_pts, int has_record,
+                            uint64_t pts)
+{
+    int pending_has_pts = output->h262_pending_has_pts;
+    int pending_has_record = output->h262_pending_has_record;
+    uint64_t pending_pts = output->h262_pending_pts;
+    uint8_t prefix = 0;
+    int prefix_valid = 0;
+    size_t safe_size;
+
+    if (!output->h262_chroma_normalization || !size)
+        return queue_video(output, data, size, has_pts, has_record, pts);
+    safe_size = h262_chroma_stream_filter(
+        &output->h262_chroma, data, size, &prefix, &prefix_valid, 1);
+    if (prefix_valid &&
+        queue_video(output, &prefix, 1u, pending_has_pts,
+                    pending_has_record, pending_pts) < 0)
+        return -1;
+    if (safe_size &&
+        queue_video(output, data, safe_size, has_pts, has_record, pts) < 0)
+        return -1;
+    if (safe_size) {
+        output->h262_pending_has_pts = 0;
+        output->h262_pending_has_record = 0;
+        output->h262_pending_pts = 0;
+    } else {
+        output->h262_pending_has_pts = has_pts;
+        output->h262_pending_has_record = has_record;
+        output->h262_pending_pts = pts;
+    }
+    return 0;
+}
+
+static int flush_h262_video(struct output_state *output)
+{
+    struct h262_chroma_stream_state *state = &output->h262_chroma;
+    uint8_t byte;
+
+    if (!output->h262_chroma_normalization || !state->have_pending)
+        return 0;
+    byte = state->pending_byte;
+    state->have_pending = 0;
+    if (queue_video(output, &byte, 1u, output->h262_pending_has_pts,
+                    output->h262_pending_has_record,
+                    output->h262_pending_pts) < 0)
+        return -1;
+    output->h262_pending_has_pts = 0;
+    output->h262_pending_has_record = 0;
+    output->h262_pending_pts = 0;
+    return 0;
+}
+
 struct h262_restart_diagnostic {
     int sequence_header_valid;
     unsigned horizontal_size;
@@ -1888,6 +2081,8 @@ static void reset_output_for_navigation(struct output_state *output,
     output->scheduler_enabled = pcm == NULL;
     output->iso_pts_normalization = dvd_timeline;
     output->iso_start_filter_active = output->scheduler_enabled;
+    output->h262_chroma_normalization =
+        dvd_timeline && output->scheduler_enabled;
 }
 
 static int start_pending_menu_activation(struct dvd_menu_state *menu,
@@ -2178,8 +2373,12 @@ static int finalize_dvd_still_random_access(struct output_state *output)
 {
     int filtered;
 
-    if (!output->iso_start_filter_active || !output->video_head)
+    if (flush_h262_video(output) < 0)
+        return -1;
+    if (!output->video_head)
         return 0;
+    if (!output->iso_start_filter_active)
+        return scheduler_drain(output, 0);
     filtered = iso_finalize_terminal_random_access(output);
     if (filtered < 0)
         return -1;
@@ -3156,8 +3355,8 @@ static int process_pes(struct media_source *input, uint8_t code,
             goto done;
 
         if (output->scheduler_enabled) {
-            if (queue_video(output, packet + payload_offset,
-                            video_size, has_pts, has_record, pts) < 0)
+            if (queue_h262_video(output, packet + payload_offset,
+                                 video_size, has_pts, has_record, pts) < 0)
                 goto done;
             if (output->iso_start_filter_active &&
                 iso_filter_initial_random_access(output, 0) < 0)
@@ -4265,6 +4464,8 @@ int main(int argc, char **argv)
     output.iso_start_filter_active =
         (input.kind == MEDIA_SOURCE_ISO || input.kind == MEDIA_SOURCE_DVD) &&
         output.scheduler_enabled;
+    output.h262_chroma_normalization =
+        output.iso_pts_normalization && output.scheduler_enabled;
     if (is_audio_file && !output.pcm) {
         const char *visualizer_path = getenv("MMP_VISUALIZER_PATH");
         char visualizer_error[192];
@@ -4421,6 +4622,8 @@ int main(int argc, char **argv)
             fprintf(stderr,
                     "media_player_helper: navigation barrier released\n");
         }
+        if (flush_h262_video(&output) < 0)
+            goto done;
         if (!output.audio_pes_seen) {
             if (output.scheduler_enabled &&
                 scheduler_release_silent_video(&output) < 0)

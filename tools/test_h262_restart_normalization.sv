@@ -62,6 +62,23 @@ begin
 end
 endtask
 
+task feed_sequence_end;
+    integer index;
+    reg [31:0] bytes;
+begin
+    bytes = 32'h000001b7;
+    for (index = 0; index < 4; index = index + 1) begin
+        @(negedge clk);
+        stream_data = bytes[(4-index)*8-1 -: 8];
+        stream_valid = 1'b1;
+    end
+    @(negedge clk);
+    stream_valid = 1'b0;
+    stream_data = 8'd0;
+    repeat (3) @(posedge clk);
+end
+endtask
+
 task feed_prefix;
     input integer normalize;
     integer index;
@@ -107,7 +124,16 @@ initial begin
         !progressive_frame || !chroma_420_type)
         $fatal(1, "normalized prefix fields are not the expected film frame");
 
-    $display("H262 restart normalization: source 21 clears and first slice is admitted");
+    feed_sequence_end();
+    feed_prefix(1);
+    if (syntax_error)
+        $fatal(1, "second normalized still raised syntax source %0d",
+               syntax_error_source);
+    if (!slice_seen || !frontend_ready || !phase1_supported ||
+        !native_film_supported || !chroma_420_type)
+        $fatal(1, "second normalized still was not admitted");
+
+    $display("H262 restart normalization: source 21 clears and two stills are admitted");
     $finish;
 end
 

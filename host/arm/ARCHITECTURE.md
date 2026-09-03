@@ -122,15 +122,20 @@ sequence header, an I reference and the following I/P reference are all
 present. Contextless pictures before that sequence and open-GOP B pictures
 between the I and following reference have their start codes neutralized while
 all byte positions and timestamp records remain stable; the complete sequence
-context and every later authored picture remain unchanged. Each successful
-initial filter checks its first I-picture extension against the parsed sequence
-extension. For a 4:2:0 complete frame with `progressive_frame=1`, the helper
-normalizes only the nonconforming `chroma_420_type=0` bit to one before copying
-the already-buffered group to its original queue positions; conforming streams,
-group size and every byte offset remain unchanged. It logs an applied byte
-offset and before/after value, then writes a 256-byte-bounded post-filter prefix
-and parsed sequence, picture and coding-extension fields to stderr. This
-delegates CSS
+context and every later authored picture remain unchanged. DVD and ISO video
+payloads also cross a one-byte-lookahead H.262 compatibility filter before that
+queue. It carries syntax state across PES boundaries and, for the first valid I
+picture after each sequence header, changes only a zero `chroma_420_type` to one
+when the sequence extension specifies 4:2:0 and the complete-frame picture
+coding extension specifies `progressive_frame=1`. The one-byte hold lets those
+adjacent fields straddle PES payloads without guessing; it is flushed at an
+authored still or ordinary stream end and discarded with the old stream at a
+navigation-reset barrier. Conforming, interlaced, field, non-I and non-4:2:0
+pictures remain byte-identical, as do stream length, offsets and timestamp
+record order. Every correction logs its elementary-stream byte offset and
+before/after value. The initial random-access filter retains its independent
+post-filter 256-byte prefix and parsed sequence, picture and coding-extension
+diagnostic. This delegates CSS
 access to libdvdcss and is not a claim of CSS conformance.
 
 The direct optical backend retains one authenticated libdvdnav session across

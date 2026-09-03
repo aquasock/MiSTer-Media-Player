@@ -198,6 +198,138 @@ static int test_h262_restart_chroma_normalization(void)
     return failed;
 }
 
+static int run_h262_stream_filter(const uint8_t *input, size_t size,
+                                  size_t first_chunk, uint8_t *output,
+                                  unsigned *corrections)
+{
+    struct h262_chroma_stream_state state = {0};
+    size_t input_offset = 0;
+    size_t output_offset = 0;
+    unsigned chunks = 0;
+
+    while (input_offset < size) {
+        uint8_t buffer[512];
+        uint8_t prefix = 0;
+        int prefix_valid = 0;
+        size_t count;
+        size_t safe;
+
+        if (first_chunk == SIZE_MAX)
+            count = 1u;
+        else if (!chunks)
+            count = first_chunk;
+        else
+            count = size - input_offset;
+        if (count > size - input_offset)
+            count = size - input_offset;
+        if (!count || count > sizeof(buffer))
+            return -1;
+        memcpy(buffer, input + input_offset, count);
+        safe = h262_chroma_stream_filter(&state, buffer, count, &prefix,
+                                         &prefix_valid, 0);
+        if (prefix_valid)
+            output[output_offset++] = prefix;
+        memcpy(output + output_offset, buffer, safe);
+        output_offset += safe;
+        input_offset += count;
+        chunks++;
+    }
+    if (state.have_pending)
+        output[output_offset++] = state.pending_byte;
+    *corrections = state.corrections;
+    return output_offset == size ? 0 : -1;
+}
+
+static int test_h262_stream_chroma_normalization(void)
+{
+    static const char captured_prefix[] =
+        "000001b32d01e024138823821010101010101010101010101010101010101010"
+        "1010101010101010101010101010101010101010101010101010101010101010"
+        "1010101010101010101010110808080808080808080808080808080808080808"
+        "0808080808080808080808080808080808080808080808080808080808080808"
+        "080808080808080808080808000001b5148200010000000001b5250606060872"
+        "0f00000001b88008004000000100000a23e0000001b58ffff3c08000000101";
+    static const uint8_t sequence_end[] = {0x00, 0x00, 0x01, 0xb7};
+    enum { PREFIX_BYTES = 191, STREAM_BYTES = PREFIX_BYTES * 2 + 4 };
+    uint8_t prefix[PREFIX_BYTES];
+    uint8_t malformed[STREAM_BYTES];
+    uint8_t expected[STREAM_BYTES];
+    uint8_t actual[STREAM_BYTES];
+    uint8_t control[PREFIX_BYTES];
+    size_t offset;
+    unsigned corrections = 0;
+    int failed = 0;
+
+    for (offset = 0; offset < PREFIX_BYTES; offset++) {
+        int high = hex_nibble(captured_prefix[offset * 2u]);
+        int low = hex_nibble(captured_prefix[offset * 2u + 1u]);
+
+        failed |= require(high >= 0 && low >= 0,
+                          "stream fixture is not hexadecimal");
+        prefix[offset] = (uint8_t)((high << 4) | low);
+    }
+    if (failed)
+        return failed;
+    memcpy(malformed, prefix, PREFIX_BYTES);
+    memcpy(malformed + PREFIX_BYTES, sequence_end, sizeof(sequence_end));
+    memcpy(malformed + PREFIX_BYTES + sizeof(sequence_end), prefix,
+           PREFIX_BYTES);
+    memcpy(expected, malformed, sizeof(expected));
+    expected[185] = 0xc1;
+    expected[PREFIX_BYTES + sizeof(sequence_end) + 185u] = 0xc1;
+
+    for (offset = 1; offset < sizeof(malformed); offset++) {
+        failed |= require(run_h262_stream_filter(
+                              malformed, sizeof(malformed), offset, actual,
+                              &corrections) == 0 && corrections == 2u &&
+                              !memcmp(actual, expected, sizeof(expected)),
+                          "PES split changed bytes or missed a captured "
+                          "sequence correction");
+    }
+    failed |= require(run_h262_stream_filter(
+                          malformed, sizeof(malformed), SIZE_MAX, actual,
+                          &corrections) == 0 && corrections == 2u &&
+                          !memcmp(actual, expected, sizeof(expected)),
+                      "one-byte PES fragmentation changed normalized output");
+
+    memcpy(control, prefix, sizeof(control));
+    control[185] = 0xc1;
+    failed |= require(run_h262_stream_filter(
+                          control, sizeof(control), 186u, actual,
+                          &corrections) == 0 && corrections == 0u &&
+                          !memcmp(actual, control, sizeof(control)),
+                      "conforming streaming picture changed");
+    memcpy(control, prefix, sizeof(control));
+    control[145] = 0x84;
+    failed |= require(run_h262_stream_filter(
+                          control, sizeof(control), 145u, actual,
+                          &corrections) == 0 && corrections == 0u &&
+                          !memcmp(actual, control, sizeof(control)),
+                      "streaming non-4:2:0 picture changed");
+    memcpy(control, prefix, sizeof(control));
+    control[175] = 0x12;
+    failed |= require(run_h262_stream_filter(
+                          control, sizeof(control), 176u, actual,
+                          &corrections) == 0 && corrections == 0u &&
+                          !memcmp(actual, control, sizeof(control)),
+                      "streaming non-I picture changed");
+    memcpy(control, prefix, sizeof(control));
+    control[184] = 0xf1;
+    failed |= require(run_h262_stream_filter(
+                          control, sizeof(control), 185u, actual,
+                          &corrections) == 0 && corrections == 0u &&
+                          !memcmp(actual, control, sizeof(control)),
+                      "streaming field picture changed");
+    memcpy(control, prefix, sizeof(control));
+    control[186] = 0x00;
+    failed |= require(run_h262_stream_filter(
+                          control, sizeof(control), 186u, actual,
+                          &corrections) == 0 && corrections == 0u &&
+                          !memcmp(actual, control, sizeof(control)),
+                      "streaming interlaced-frame picture changed");
+    return failed;
+}
+
 static int read_pipe_bytes(int fd, uint8_t *data, size_t size)
 {
     size_t offset = 0;
@@ -562,6 +694,7 @@ int main(void)
 
     failed |= test_h262_restart_diagnostic_fields();
     failed |= test_h262_restart_chroma_normalization();
+    failed |= test_h262_stream_chroma_normalization();
     audio_overlay_descriptor(&output, &overlay, 1);
     failed |= require(overlay.visible && overlay.rgba[0][3] == 0x00 &&
                       overlay.rgba[1][3] == 0xa0 &&
