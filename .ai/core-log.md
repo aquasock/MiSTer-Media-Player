@@ -1,3 +1,34 @@
+## 913 COMMIT Unreleased ??? 2026-09-02T19:06:18-07:00
+
+#### Coming From:
+
+Unreleased efe2a76
+
+#### Purpose:
+
+Terminate a qualified single-picture DVD menu stream so the existing decoder completes and publishes its authored still background.
+
+#### Outcome:
+
+The approved helper-only boundary will append the standard four-byte H.262 `sequence_end_code` after terminal random-access filtering qualifies and drains an authored sequence-plus-I group into the pending DVD activation stage.  The terminator will remain inside the same bounded transaction before its established READY/GO barrier, provide the non-slice delimiter required to close the final `picture_data()` region, and assert the decoder's existing one-picture end-of-sequence publication path.  It will not fabricate a picture, modify authored picture bytes, weaken ordinary random-access qualification, or change overlay-only continuation, Main, protocol, decoder logic, visualizer, RTL or RBF.
+
+#### Next Steps:
+
+Add the terminal delimiter only after successful terminal still qualification, document the authored-still contract, and extend the production-path stage regression to require unchanged source video followed by exactly one sequence-end code while preserving picture count and hop classification.  Run strict native, analyzer, sanitizer, random-access, overlay, staging, reserve, menu-hop, DVD SPU, AC-3, LPCM-skip, audio UI, visualizer and real audio-seek regressions with repeated high-risk cases, then build and verify one static ARMv7 helper for physical Coming to America Scene Selection testing plus retained Blazing Saddles, The Big Lebowski and forum-disc coverage.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 912 COMMIT Unreleased efe2a76 2026-09-02T19:04:18-07:00
 
 #### Coming From:
@@ -1233,51 +1264,6 @@ Exit MediaPlayer so the running helper releases its executable, transfer `host/b
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 873 COMMIT Unreleased f0fba4d 2026-09-01T05:51:42-07:00
-
-#### Coming From:
-
-Unreleased add7d00
-
-#### Purpose:
-
-Add the first audio-only ARM-rendered user-interface boundary with reserved album-art space and atomic one-hertz progress presentation.
-
-#### Outcome:
-
-Source `f0fba4d` implements the first standalone-audio presentation boundary: the ARM helper renders a deterministic limited-range BT.601 720-by-480 4:2:0 interface with a reserved 280-by-280 album-art viewport, static transport panel, reserved metadata strip and sample-clock-driven activity ruler.  Bounded in-band begin, data and commit records upload one complete frame into the inactive existing DDR framebuffer bank without passing through H.262 syntax; PCM records retain transport priority, publication is atomic at a safe frame boundary and DVD overlay commands retain their existing route and arbitration order.  Strict native and Raspberry Pi GNU 10.2 ARM builds pass, the 916,852-byte static stripped ARMv7 helper has SHA-256 `5de3178711e7893d23ad75e22f1ef19a7905454bf48fc71c9bf98a95db6977a4`, 48 kHz and 44.1 kHz renderer tests pass, sanitizer coverage passes, and a 3.2-second WAV integration emits 9,600 PCM records plus three complete UI commits with every UI record following PCM service.  The exact-source FPGA UI regression reconstructs all 64,800 64-bit writes and one safe commit, while the retained DDR-arbiter regression passes.  Seed 23 completed synthesis, fitting and assembly but was rejected at negative 7.142-nanosecond global setup slack because the new first-frame loading level directly crossed from the 60 MHz decoder domain into 54 MHz video blanking; `f0fba4d` corrects that structural defect with an explicit three-stage video-domain synchronizer and a first-stage-only timing exception.  The one permitted seed-24 attempt passed the focused regressions and synthesis, but the user cancelled it after approximately 30 minutes in fitting because routing was progressing abnormally slowly.  No timing-qualified RBF was produced or collected.
-
-#### Next Steps:
-
-Pause at source `f0fba4d` as requested and preserve the physically accepted source-`add7d00` RBF and installed helper on MiSTer.  Do not install the new audio-UI helper by itself because its display records require the matching FPGA implementation.  Resume only with explicit user approval; first inspect the cancelled seed-24 fitter reports and constrain any next attempt to a separately approved build boundary, then require a timing-clean RBF before transferring both the new helper and RBF for physical standalone MP3, WAV, FLAC and Ogg Vorbis validation plus retained MPG and DVD regression testing.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-- MediaPlayer.qsf
-- MediaPlayer.sdc
-- README.md
-- docs/ARCHITECTURE.md
-- files.qip
-- host/arm/Makefile
-- host/arm/audio_ui.c
-- host/arm/audio_ui.h
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- rtl/mpeg2_new/mpeg2_h262_audio_ui.sv
-- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
-- rtl/mpeg2_new/mpeg2_h262_display_record_router.sv
-- tools/test_audio_ui_output.c
-- tools/test_dvd_overlay_arbiter.sv
-- tools/test_mpeg2_audio_ui.sv
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
