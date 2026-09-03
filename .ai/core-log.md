@@ -1,3 +1,32 @@
+## 924 COMMIT Unreleased 6b63c91 2026-09-02T21:28:47-07:00
+
+#### Coming From:
+
+Unreleased 6b63c91
+
+#### Purpose:
+
+Qualify the corrected source-`6b63c91` installation on The Big Lebowski and diagnose its Scene Selection failure.
+
+#### Outcome:
+
+The user confirms that the checksum-correct helper restores The Big Lebowski startup, root-menu operation and chapter skipping during movie playback, accepting the active-program chapter correction and disproving a source regression in the prior immediate crash.  The fresh trace then enters the root menu, preserves responsive highlights, selects button one and successfully begins a deferred Scene Selection activation at 102.416959 seconds.  Post-activation output contains a qualified H.262 sequence and reference group, but this authored motion-menu destination produces neither a menu-domain exit nor a DVD still before the 4,194,304-byte atomic activation stage fills; at 107.881250 seconds the helper deliberately exits with `staging scheduled video failed: No space left on device`, after which Main reports a normal exit-code-one helper error.  The message describes the in-memory bounded stage, not filesystem storage.  The screenshot correctly retains the last root-menu picture because no partial destination was published, while its checksum-valid schema-21 snapshot shows a completed overlay plane, no overlay protocol error and the last stable decoder state; the later single audio-underrun flag accompanies the terminated stream rather than identifying the cause.  The 3,054,475-byte log, 564,283-byte screenshot and 844-byte sidecar have SHA-256 `af8f741463cd36f3400e96e186cb4d6e46d7a4bf91b8327af526a7eb4db6003c`, `74a5447d25dbc3fea1bb6d21959be684129b420b9b907ed03878674f65b6a522` and `7fa1f1f937f6a629cd748d9a896815e128aff1b78d39b16770bfeaa72a4ea8f3`.  No runtime source was changed.
+
+#### Next Steps:
+
+After user approval, preserve the accepted chapter, menu, finite-still and overlay-only behavior while adding a bounded capacity-pressure decision for picture-bearing motion-menu activations: retain 4 MiB as the decision threshold, give the stage sufficient bounded headroom for one deepest scheduler drain, and when a pending menu destination remains in the menu domain with a qualified picture group at that threshold, promote it through the existing staged READY/GO stream-hop path instead of reaching `ENOSPC`.  Add production-path coverage for an over-threshold motion menu with byte-exact post-barrier commit, retain the accepted 3,797,120-byte finite-still case below the threshold and all overlay-only classifications, then run strict native, sanitizer, analyzer, DVD navigation, staging, random-access, overlay, LPCM, audio and seek regressions locally and on the build PC before producing a new static ARM helper for Big Lebowski Scene Selection plus the retained Coming to America, Blazing Saddles and forum-disc routes.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 923 COMMIT Unreleased 6b63c91 2026-09-02T21:16:43-07:00
 
 #### Coming From:
@@ -1231,35 +1260,5 @@ Exit MediaPlayer, install `host/build/MediaPlayer_Helper_AudioSeek_72bdccc` as `
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 884 COMMIT Unreleased eb11247 2026-09-01T21:16:29-07:00
-
-#### Coming From:
-
-Unreleased 68f8f26
-
-#### Purpose:
-
-Add semantic schema-21 overlay telemetry decoding and deterministic regression coverage without rebuilding or changing any MiSTer runtime component.
-
-#### Outcome:
-
-Source `eb11247` teaches `tools/decode-hardware-telemetry.py` that schema 21 retains the common cadence, terminal and schema-20 audio words but replaces words 37 through 54 with overlay-pipeline evidence.  The decoder now reports record, byte, publication, rectangle, ABGR palette, video-sample and capture-trigger semantics without reinterpreting `OVL1` as native deadline counters, validates overlay magic and both protocol-error observations, and clearly marks the unavailable full-width cadence rate.  The new deterministic regression covers the exact checksum-valid 64-word accepted source-`68f8f26` screenshot, a synthetic active authored-menu transfer, protocol-error validation and unchanged schema-20 deadline/audio interpretation.  Python syntax, all four unit tests, JSON decoding, human-readable decoding and raw word-dump decoding passed against the accepted screenshot; it reported bounded no-commit fallback during ordinary video, ready engine state, zero protocol errors, zero transport blocks and zero recurring audio underruns.  RTL, RBF, ARM helper, patched Main and target files were untouched.
-
-#### Next Steps:
-
-Use the schema-21 semantic decoder on a future authored DVD-menu capture to read the nonzero overlay counters directly.  No ARM compiler, Quartus build, MiSTer transfer, reboot or hardware rerun is required for this completed host-tool-only boundary.
-
-#### Files Modified:
-
-- tools/decode-hardware-telemetry.py
-- tools/test_hardware_telemetry.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
