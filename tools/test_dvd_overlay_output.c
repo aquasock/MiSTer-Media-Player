@@ -751,6 +751,139 @@ done:
     return failed;
 }
 
+static void encode_pes_pts(uint8_t encoded[5], uint64_t pts)
+{
+    encoded[0] = (uint8_t)(0x21u | ((pts >> 29) & 0x0eu));
+    encoded[1] = (uint8_t)(pts >> 22);
+    encoded[2] = (uint8_t)(0x01u | ((pts >> 14) & 0xfeu));
+    encoded[3] = (uint8_t)(pts >> 7);
+    encoded[4] = (uint8_t)(0x01u | ((pts << 1) & 0xfeu));
+}
+
+static int test_automatic_menu_scheduling_epoch(void)
+{
+    static const uint8_t menu_video[] = {
+        0x00, 0x00, 0x01, 0xb3, 0x11, 0x22,
+        0x00, 0x00, 0x01, 0x00, 0x00, 1u << 3,
+        0x00, 0x00, 0x01, 0x01, 0xaa, 0xbb,
+        0x00, 0x00, 0x01, 0x00, 0x00, 2u << 3,
+        0x00, 0x00, 0x01, 0x01, 0xcc, 0xdd
+    };
+    uint8_t private_pes[] = {
+        0x00, 0x12,
+        0x80, 0x80, 0x05, 0, 0, 0, 0, 0,
+        0x80, 0x00, 0x00, 0x01,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    struct output_state output = {0};
+    struct audio_state audio = {0};
+    struct media_source input = {0};
+    uint8_t *first_play = NULL;
+    char input_path[] = "/tmp/mmp-menu-epoch-XXXXXX";
+    char source_error[128];
+    size_t first_play_size = VIDEO_QUEUE_LIMIT - 8u;
+    int input_fd = -1;
+    int input_open = 0;
+    int failed = 0;
+
+    first_play = malloc(first_play_size);
+    output.video = tmpfile();
+    failed |= require(first_play != NULL && output.video != NULL,
+                      "could not allocate automatic-menu epoch fixture");
+    if (failed)
+        goto done;
+    memset(first_play, 0x5a, first_play_size);
+    output.scheduler_enabled = 1;
+    output.hold_active = 1;
+    output.hold_limit = PCM_SAMPLE_RATE;
+    output.iso_pts_normalization = 1;
+    output.h262_chroma_normalization = 1;
+    failed |= require(queue_video(&output, first_play, first_play_size,
+                                  1, 0, 151777u) == 0 &&
+                          video_queue_would_overflow(&output, 16u, 0) &&
+                          scheduler_release_silent_video(&output) == 0 &&
+                          reject_late_audio(&output, "AC-3", 1, 45045u) < 0,
+                      "first-play fixture did not reproduce late menu audio");
+    if (failed)
+        goto done;
+
+    rearm_output_for_automatic_menu_epoch(&output);
+    failed |= require(output.scheduler_enabled &&
+                          !output.scheduler_started &&
+                          output.iso_start_filter_active &&
+                          output.iso_pts_normalization &&
+                          output.h262_chroma_normalization &&
+                          output.hold_active && !output.silent_video_mode &&
+                          !output.audio_pes_seen &&
+                          !output.have_audio_pts && !output.have_video_pts &&
+                          output.video_bytes == 0 &&
+                          output.picture_marks == 0,
+                      "automatic menu did not receive a fresh scheduler epoch");
+    failed |= require(queue_video(&output, menu_video, sizeof(menu_video),
+                                  1, 0, 45045u) == 0 &&
+                          iso_filter_initial_random_access(&output, 0) == 1 &&
+                          scheduler_drain(&output, 0) == 0 &&
+                          !output.iso_start_filter_active &&
+                          output.have_video_pts &&
+                          output.max_video_pts == 45045u,
+                      "menu video did not establish its own PTS horizon");
+    if (failed)
+        goto done;
+
+    encode_pes_pts(private_pes + 5, 45045u);
+    input_fd = mkstemp(input_path);
+    failed |= require(input_fd >= 0,
+                      "could not create automatic-menu AC-3 fixture");
+    if (failed)
+        goto done;
+    failed |= require(write(input_fd, private_pes, sizeof(private_pes)) ==
+                          (ssize_t)sizeof(private_pes) &&
+                          close(input_fd) == 0,
+                      "could not write automatic-menu AC-3 fixture");
+    input_fd = -1;
+    if (failed)
+        goto done;
+    failed |= require(media_source_open(&input, input_path, source_error,
+                                        sizeof(source_error)) ==
+                          MEDIA_SOURCE_OK,
+                      "could not open automatic-menu AC-3 fixture");
+    if (failed)
+        goto done;
+    input_open = 1;
+    unlink(input_path);
+    input_path[0] = '\0';
+    audio.output = AUDIO_OUT_SPDIF;
+    audio.a52_substream = -1;
+    audio.dts_substream = -1;
+    failed |= require(process_private_pes(&input, &audio, &output, NULL) == 0 &&
+                          audio.codec == AUDIO_CODEC_AC3 &&
+                          audio.a52_substream == 0x80 &&
+                          audio.size == 6u &&
+                          output.audio_pes_seen && output.have_audio_pts &&
+                          output.first_audio_pts == 45045u &&
+                          output.scheduler_enabled &&
+                          !output.silent_video_mode,
+                      "fresh menu epoch did not accept synchronized AC-3");
+
+done:
+    if (input_fd >= 0)
+        close(input_fd);
+    if (input_path[0])
+        unlink(input_path);
+    if (input_open)
+        media_source_close(&input);
+    while (output.video_head)
+        free_video_head(&output);
+    free(output.hold);
+    free(audio.data);
+    if (audio.a52)
+        a52_free(audio.a52);
+    if (output.video)
+        fclose(output.video);
+    free(first_play);
+    return failed ? -1 : 0;
+}
+
 int main(void)
 {
     struct dvd_spu_overlay overlay = {0};
@@ -869,6 +1002,8 @@ int main(void)
     if (test_motion_menu_stage_pressure())
         return 1;
     if (test_late_audio_after_silent_release())
+        return 1;
+    if (test_automatic_menu_scheduling_epoch())
         return 1;
     puts("DVD overlay output: exact plane and reserve ownership pass");
     return 0;

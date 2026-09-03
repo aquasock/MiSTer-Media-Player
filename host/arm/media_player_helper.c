@@ -1043,10 +1043,12 @@ static int refresh_dvd_menu_state(struct media_source *input,
                                   int control_fd)
 {
     struct media_source_dvd_state state;
+    int menu_entered = 0;
 
     if (!menu->enabled || !media_source_dvd_state(input, &state))
         return 0;
     if (state.menu_changed || state.menu_active != menu->menu_active) {
+        menu_entered = state.menu_active && !menu->menu_active;
         menu->menu_active = state.menu_active;
         if (control_fd >= 0 &&
             control_send(control_fd, state.menu_active ?
@@ -1088,7 +1090,7 @@ static int refresh_dvd_menu_state(struct media_source *input,
             return -1;
         menu->overlay_emitted = 0;
     }
-    return 0;
+    return menu_entered;
 }
 
 static int read_exact(struct media_source *source, void *data, size_t size)
@@ -2083,6 +2085,30 @@ static void reset_output_for_navigation(struct output_state *output,
     output->iso_start_filter_active = output->scheduler_enabled;
     output->h262_chroma_normalization =
         dvd_timeline && output->scheduler_enabled;
+}
+
+/*
+ * First-play material and its automatically selected menu are separate DVD
+ * scheduling epochs even though libdvdnav presents them through one source.
+ * A silent first-play decision has already drained its bounded queue, so no
+ * media is discarded here.  Reuse the navigation reset without emitting a
+ * decoder barrier or overlay clear: the completed first-play frame remains
+ * resident while the menu reacquires random-access video and its own audio
+ * timeline.
+ */
+static void rearm_output_for_automatic_menu_epoch(
+    struct output_state *output)
+{
+    size_t hold_limit = output->hold_limit;
+    uint64_t prior_video_bytes = output->video_bytes;
+    uint64_t prior_video_pts = output->max_video_pts;
+
+    reset_output_for_navigation(output, hold_limit, 1);
+    fprintf(stderr,
+            "media_player_helper: DVD automatic menu scheduling epoch "
+            "rearmed prior_video=%llu prior_video_pts=%llu\n",
+            (unsigned long long)prior_video_bytes,
+            (unsigned long long)prior_video_pts);
 }
 
 static int start_pending_menu_activation(struct dvd_menu_state *menu,
@@ -3942,6 +3968,15 @@ static int process_program_stream(struct media_source *input,
         }
         if (found < 0)
             return -1;
+        {
+            int menu_refresh = refresh_dvd_menu_state(
+                input, menu, output, control_fd);
+
+            if (menu_refresh < 0)
+                return -1;
+            if (menu_refresh > 0 && output->silent_video_mode)
+                rearm_output_for_automatic_menu_epoch(output);
+        }
         if (seek_index && media_source_position(input, &pes_offset) < 0) {
             fprintf(stderr,
                     "media_player_helper: cannot read Program Stream position\n");
