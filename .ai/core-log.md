@@ -1,3 +1,32 @@
+## 908 COMMIT Unreleased 8c90e2d 2026-09-02T17:50:47-07:00
+
+#### Coming From:
+
+Unreleased 8c90e2d
+
+#### Purpose:
+
+Qualify the source-`8c90e2d` helper on Coming to America's authored Scene Selections submenu and isolate its black freeze.
+
+#### Outcome:
+
+The user's physical Coming to America run rejects source `8c90e2d` as a complete DVD-menu compatibility boundary.  Root-menu navigation remains active for approximately 89 seconds, three Right commands select button four, and activation command `0x08` succeeds at 97.841139 seconds, starts the bounded destination stage and reaches an authored indefinite still after 249 generic Program Stream start codes.  The helper incorrectly treats that raw count as proof of a replacement video stream, discards 3,917,940 bytes from the old reserve, sends READY, resets Main and commits 26 staged records totaling 86,664 bytes; that total is exhausted exactly by one overlay style record, one clear, one configuration, twenty-two plane-data records and one commit, with no H.262 picture or PCM record.  Main therefore receives the new selector plane after blanking the resident video but has no replacement picture to display, matching the completely black 559-byte screenshot, while the helper remains alive in the indefinite still through the 254.403587-second capture endpoint without a fatal error.  The 6,152,722-byte log and screenshot have SHA-256 `10ceecceead32b51aff4d22fed0ab816c95e2c50cee070d7ad9b972258a07e27` and `1799af730e4ee79b5cdfe65960df9323dfc4c9d01f44b29fa2fbd549718fea49`; the unchanged 2,818-byte telemetry decode failure at SHA-256 `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004` contains no hardware snapshot and adds no FPGA fault evidence.
+
+#### Next Steps:
+
+Preserve the source-`8c90e2d` redundant-root and unsupported-LPCM fixes, Main, the RBF and the overlay protocol.  After user approval, classify pending indefinite menu activation from actual validated H.262 picture output rather than generic start-code count: an overlay-only destination must commit its staged overlay to the live resident presentation and acknowledge menu continuation without reserve discard, READY/GO or decoder reset, while a genuine video-bearing destination retains the existing staged stream-hop barrier and empty or finite still paths remain unchanged.  Add exact overlay-only coverage matching the observed 26 records and 86,664 bytes, retain true-video, empty and finite-stage regressions, rerun the complete helper and sanitizer suites, and build only a new ARM helper for Coming to America, Blazing Saddles, The Big Lebowski and forum-disc testing.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 907 COMMIT Unreleased 8c90e2d 2026-09-02T08:26:19-07:00
 
 #### Coming From:
@@ -1254,35 +1283,6 @@ The user explicitly accepts the remaining visible chapter scramble as a closed k
 #### Next Steps:
 
 After user approval, preserve Main and the RBF and add a bounded helper-side activation transaction that separates all post-activation output from the pre-activation reserve while libdvdnav exposes the destination.  An indefinite still reached after destination payload must discard only stale pre-activation reserve data, enter the existing ready/go stream-hop barrier and release the staged clean destination menu after rearm; a no-payload indefinite still must retain the resident-frame continuation, while finite-still Play must release its staged transition normally and keep the pending activation alive for the later title hop.  Add focused reserve and menu-navigation regressions for all three paths, rerun AC-3, random-access, subpicture and overlay-priority validation, then build only a new helper locally for physical Scene Selection, Play and root-return testing.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 868 COMMIT Unreleased 22e780a 2026-09-01T02:27:02-07:00
-
-#### Coming From:
-
-Unreleased 22e780a
-
-#### Purpose:
-
-Qualify the source-`22e780a` navigation-discard and chapter-blank changes on physical hardware and localize the remaining visible chapter scramble.
-
-#### Outcome:
-
-The user's physical source-`22e780a` run accepts the helper reserve discard and every tested control path: all buttons operate correctly, chapter transitions are visibly faster, and 51 consecutive chapter requests comprising 25 next and 26 previous commands complete without a fatal helper or transport event.  Main records `chapter startup blank rearmed` for every request, the helper discards between 528,161 and 4,188,934 obsolete reserved bytes at complete record boundaries, and rearm-to-barrier latency is 2,206 microseconds minimum, 25,936 microseconds median, 22,584 microseconds mean and 95,160 microseconds maximum; two root requests reach stream-hop ready in 23,249 and 49,993 microseconds.  The requested black masking is rejected because the user still sees the transition scramble.  The 6,371,107-byte log at SHA-256 `cb7b5d9059fbfb734cfa4950826d27fb051e92d5f033377bc366a7753d1befc5` proves that the first post-barrier payload is a seven-byte overlay-clear record before each clean random-access video group, while the installed source-`1bf06db` RBF makes any `dvd_overlay_record_valid` event sticky-bypass the existing startup blank; the host correctly rearms the session, but the core releases black on that overlay clear approximately 0.2 to 0.3 seconds before the first clean chapter video reaches Main.  The matching screenshot and checksum-valid schema-21 telemetry have SHA-256 `73e81bba6248cf8408cd235e6b5551a3e417596f9b6007430f2116d497d5ce95` and `19c6fbca57ec69db661347a684b04e93ddfe8c9da3330f603c3f6d3036b0256d`; the snapshot reports no decoder error flags but is not timed to observe the transient blank state.
-
-#### Next Steps:
-
-Preserve source `22e780a` Main and helper because their speed and controls pass.  After user approval, make a narrowly scoped RBF correction that latches black on each download rearm independently of metadata, PCM and DVD overlay traffic and releases it only when the new decoder session has a clean presentable video frame, without delaying helper output, chapter barriers, audio or video decode; retain the existing native-startup swap policy separately, add focused simulation for overlay clear and audio records arriving before the first random-access picture, then perform a timing-clean Quartus build for physical chapter-transition validation.
 
 #### Files Modified:
 
