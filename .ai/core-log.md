@@ -1,3 +1,32 @@
+## 942 COMMIT Unreleased 401148e 2026-09-03T05:40:29-07:00
+
+#### Coming From:
+
+Unreleased 401148e
+
+#### Purpose:
+
+Use the source-`401148e` Futurama diagnostic to distinguish a safely future late-audio packet from stale silent-video state crossing an automatic DVD menu transition.
+
+#### Outcome:
+
+The fresh `FUTURAMA_S1D1` run reproduces the expected helper exit and supplies both bounded diagnostic records.  Before libdvdnav reports entry into the authored menu, the helper classifies the active DVD session as silent at the 2 MiB queue boundary, releasing 2,096,723 queued bytes at 2,321,525 total video bytes with two picture marks and a maximum video PTS of 151,777.  It then remains in permanent silent mode across the automatic menu-domain transition and emits 8,636,808 total video bytes before encountering the menu's valid AC-3 substream `0x80`.  That first audio packet has PTS 45,045, which is 106,732 90 kHz ticks, approximately 1.186 seconds, behind the retained video horizon; accepting it at the existing rejection point would therefore start audio late rather than restore synchronization.  The checksum-valid schema-21 snapshot again reports one completed and displayed I picture, sequence-end and presentation completion, zero decoder errors, zero transport blocks and zero audio underruns.  Main observes the expected exit-code-one helper EOF only after draining reserved output.  The 1,078,836-byte log, 637,394-byte screenshot and 441-byte sidecar have SHA-256 `5ee82e04ed9e510db88dffcafd2a70f28b3f68f341925048a3039f7e9a707ba3`, `a6a8c0694187aa92fde5509c54b4785a498276d33d785dccccb8e40cbeffe205` and `3c852112765d9bf2b432454813449353e9c66b02cf828fa31aef1acd92f408bf`.  The diagnostic succeeds and local source remains unchanged.
+
+#### Next Steps:
+
+After user approval, preserve the 2 MiB bound and the late-audio fail-fast guard while treating an automatic DVD transition from first-play/title space into menu space during silent-video mode as a new scheduling epoch.  Refresh the DVD menu state immediately after source reads expose the transition and before processing that payload, then rearm bounded video lookahead, the initial random-access filter, PTS state and PCM startup hold without clearing the resident frame, resetting Main or changing libdvdnav navigation.  Add a production-path regression that begins with more than 2 MiB of silent first-play video, enters a menu, and then supplies synchronized video plus AC-3, proving that the old source-`401148e` path rejects it while the corrected epoch accepts and schedules it; retain genuinely silent Program Stream completion, out-of-epoch late-audio rejection, automatic menu exit, authored still, overlay, staging, navigation, audio and sanitizer coverage.  Build only a new static ARM helper locally for Futurama menu, selector, title launch and return-to-menu testing while retaining the accepted v0.9.0 Main, RBF and visualizer.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 941 COMMIT Unreleased 401148e 2026-09-03T04:56:54-07:00
 
 #### Coming From:
@@ -1183,36 +1212,6 @@ Preserve Main source `46638c7`, libdvdnav behavior, decoder, visualizer, RTL and
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 902 COMMIT Unreleased 46638c7 2026-09-02T06:50:22-07:00
-
-#### Coming From:
-
-Unreleased 78646bd
-
-#### Purpose:
-
-Keep Main draining ordinary DVD output until an unresolved navigation command is classified as continuation or stream hop.
-
-#### Outcome:
-
-Source `46638c7` removes only `navigation_pending` from Main's post-control barrier return condition so unresolved DVD navigation follows the existing seek-decision behavior.  Main polls the private control channel first on every media poll and continues submitting old-session bytes while no decision is available; `MENU_CONTINUE` clears the pending state without a download reset, while `READY` atomically changes the state to `chapter_barrier`, lowers download and returns before any further transfer so the established pipe discard and `GO` sequence remains unchanged.  The modeled lifecycle proves that unresolved navigation continues submitting, menu continuation performs no reset, discard or `GO`, and stream-hop `READY` performs exactly one reset and `GO`; the strict test passes both optimized and AddressSanitizer/UndefinedBehaviorSanitizer builds.  Both Main patches apply in order to pinned upstream `0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f`, and local GNU 10.2.1 produced the 1,182,692-byte stripped ARMv7 hard-float executable `host/build/MiSTer_NavDrain_46638c7` at SHA-256 `e387a2283bd55e1d44d263c110ac6b068df7ef6554b810451cad9aca8321c827`.  The source-`78646bd` helper remains byte-identical at SHA-256 `aea920527750897528e06700ddf15eb0ce3429f56878af1cb016f6385e0da59b`; the decoder, helper protocol, libdvdnav policy, visualizer, RTL and RBF are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer, replace only `/media/fat/MiSTer` with `host/build/MiSTer_NavDrain_46638c7`, preserve executable mode, retain the source-`78646bd` helper and existing visualizer asset/RBF, then reboot.  On the golden physical DVD, press `M` once early enough to reproduce the rejected pre-classification freeze and once after sustained playback; each classified hop must complete reserve discard, navigation `READY`, one Main reset and one `GO` without freezing.  Then activate the authored menu choice, exercise previous and next chapter once each, and return fresh telemetry-enabled results for physical acceptance.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_main_seek_lifecycle.cpp
 
 #### Status:
 
