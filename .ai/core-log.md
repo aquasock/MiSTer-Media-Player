@@ -1,3 +1,34 @@
+## 918 COMMIT Unreleased 7186fb4 2026-09-02T20:06:39-07:00
+
+#### Coming From:
+
+Unreleased 101aa4a
+
+#### Purpose:
+
+Handle authored directional DVD auto-actions as real navigation transitions without allowing a rejected arrow input to terminate playback.
+
+#### Outcome:
+
+Source `7186fb4` replaces libdvdnav's opaque directional convenience calls with the equivalent public target-selection operation against the helper's already-derived authored link.  A valid target carrying `auto_action_mode` is then explicitly activated and routed through the same existing menu-pending or stream-hop classification used by Enter, ensuring the old NAV packet is invalidated and the destination is consumed before another command; normal targets remain highlight-only, invalid links are ignored, and a library-rejected arrow now logs `ignored-error` and returns a no-hop result instead of killing the helper.  Enter activation reuses the factored classification without changing its behavior.  The focused regression covers valid and invalid target bounds plus auto-action classification, and passes under optimization, AddressSanitizer and UndefinedBehaviorSanitizer; the changed source passes GCC analyzer and a strict native helper build.  Twenty terminal-overlay, one hundred random-access, one hundred staging, one hundred local menu-hop, twenty unsupported-LPCM and real MP3, WAV, FLAC and Ogg seek integrations pass alongside the focused AC-3, audio-seek, audio-UI, visualizer, DVD SPU, reserve and Program Stream seek checks.  An isolated exact-source build-PC checkout completes another one hundred menu-hop repetitions and the retained live sequence-end/overlay Icarus regression.  The 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_MenuAuto_7186fb4` has SHA-256 `8a7d511846c160c0d4b4c0727fb420e76d147abcad8049384fc79b0d5e619411`; the proven terminal still drain, Main, protocol, decoder, RTL, visualizer and RBF are unchanged.
+
+#### Next Steps:
+
+Install only `host/build/MediaPlayer_Helper_MenuAuto_7186fb4` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  Reproduce the Coming to America Scene Selection route, navigate repeatedly across its scene pages, specifically exercise the prior Left auto-action from the first scene button followed by another direction, and require every authored background and highlight to update without helper exit; activate a scene, return to the root menu and repeat.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback and the forum disc's silent LPCM menu followed by supported AC-3 title playback, then provide a fresh log, screenshot and telemetry snapshot for qualification.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_source.c
+- tools/test_dvd_menu_hop.c
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 917 COMMIT Unreleased 101aa4a 2026-09-02T19:58:11-07:00
 
 #### Coming From:
@@ -1229,35 +1260,6 @@ Proceed through entry 880's separately recorded second structural correction for
 
 - sys/ascal.vhd
 - tools/phase1p_timing.tcl
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 878 COMMIT Unreleased 326382a 2026-09-01T18:02:25-07:00
-
-#### Coming From:
-
-Unreleased 326382a
-
-#### Purpose:
-
-Record the final permitted seed-24 telemetry build result and stop without distributing a timing-rejected RBF.
-
-#### Outcome:
-
-Exact source `326382a` passes all ten focused and retained Icarus regressions covering default-hidden and live telemetry visibility, progressive cadence and geometry, 480p and 480i output timing, the complete 64,800-word audio-interface upload, DDR arbitration, DVD-overlay extraction, engine, integrated stalled-DDR delivery and schema-21 snapshot triggering.  The strict native helper, static ARMv7 helper and patched ARMv7 Main builds also succeed, with both generated Main patches applying cleanly to pinned upstream `0a8fb44`.  Quartus Prime 17.0.2 seed 24 completes synthesis in 2 minutes 25 seconds, fitting in 12 minutes 24 seconds and assembly with zero errors, but is rejected at negative 0.978-nanosecond global setup slack while global hold, recovery, removal and minimum-pulse-width slacks remain positive at 0.254, 3.432, 0.395 and 0.925 nanoseconds.  Dedicated 60 MHz decoder and 54 MHz video setup are violation-free at positive 0.555 and 1.128 nanoseconds.  The fit uses 34,587 ALMs, 53,873 registers, 4,187,203 block-memory bits in 535 RAM blocks and 70 DSP blocks.  The 4,465,712-byte generated RBF is rejected and remains only on the build PC; no new RBF or Main is collected locally, and the accepted source-`5f00e35` RBF/helper pair remains untouched.
-
-#### Next Steps:
-
-Pause at source `326382a` under the one-reseed limit.  Resume only with explicit user approval for a timing-correction cycle; first inspect the global HDMI-domain failing paths from both rejected placements, then choose a structural or constraint correction rather than another blind seed and require all ten simulations plus a fully positive timing gate before collecting the telemetry RBF and Main for physical validation.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
