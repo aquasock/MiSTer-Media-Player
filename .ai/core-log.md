@@ -1,3 +1,35 @@
+## 915 COMMIT Unreleased a0cdd43 2026-09-02T19:41:21-07:00
+
+#### Coming From:
+
+Unreleased d75327e
+
+#### Purpose:
+
+Drain the complete terminal DVD still sequence-end marker through the live transport lookahead so the decoder can publish the authored menu background.
+
+#### Outcome:
+
+Source `a0cdd43` replaces the terminal still's isolated four-byte sequence-end write with one exact nine-byte tail containing the unchanged standard `00 00 01 b7` marker followed by five zero-valued implementation drain bytes.  The drain applies only after terminal random-access filtering qualifies and stages an authored sequence-plus-I still; ordinary random access, overlay-only continuation, decoder interpretation, Main, protocol, visualizer, RTL and RBF remain unchanged.  The production-path regression requires byte-identical authored video, the exact nine-byte tail, two staged records, one emitted picture mark and picture-bearing hop classification, while the metadata regression requires the complete sequence end to emerge before `input_end` during a live session.  Strict native and GNU 10.2.1 ARM builds pass, as do AddressSanitizer and UndefinedBehaviorSanitizer coverage, the helper analyzer apart from its suppressed pre-existing audio-overlay allocation false positive, focused AC-3, audio-seek, audio-UI, visualizer, DVD random-access, SPU, reserve, stage, menu-hop and Program Stream seek tests, twenty terminal-overlay repetitions, one hundred random-access, staging and menu-hop repetitions, twenty unsupported-LPCM integrations, and real MP3, WAV, FLAC and Ogg seek integrations.  The Raspberry Pi has no installed RTL simulator, so the new metadata regression is source-reviewed but was not executed locally.  The 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_SceneDrain_a0cdd43` has SHA-256 `9cde18ced068f6b39865a24f79ade13a3c07810324c185d1df6cf3d54a422d33`.
+
+#### Next Steps:
+
+Install only `host/build/MediaPlayer_Helper_SceneDrain_a0cdd43` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  On Coming to America, enter Scene Selection and require its authored background plus selector to appear, remain responsive and launch a selected scene; return to the root menu and repeat the transition.  With telemetry enabled, a captured failure or success should now show at least 224,828 decoder-accepted bytes for this still, sequence-end recognition, one completed reference picture and one displayed picture.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback and the forum disc's silent LPCM menu followed by supported AC-3 title playback; a simulation-capable run should execute the added metadata regression before any future RBF boundary.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_metadata.sv
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 914 COMMIT Unreleased d75327e 2026-09-02T19:23:06-07:00
 
 #### Coming From:
@@ -1237,34 +1269,5 @@ Push exact source `60d7c75`, run the focused visibility test and retained media,
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 875 COMMIT Unreleased 5f00e35 2026-09-01T07:34:29-07:00
-
-#### Coming From:
-
-Unreleased 5f00e35
-
-#### Purpose:
-
-Record physical acceptance of the timing-qualified ARM-rendered standalone-audio interface and its moving progress presentation.
-
-#### Outcome:
-
-The user reports that source `5f00e35` looks great on MiSTer and explicitly confirms that the progress bar moves correctly during standalone FLAC playback.  The 9,154-byte 1,920-by-1,080 screenshot at SHA-256 `674f4dab0fdfa1636f195b75af90f89425dda637ddff0e92cb216cdd19de0dd5` shows a clean stable native presentation with the reserved square album-art viewport, transport panel, progress bar and activity ruler plus reserved metadata strip.  The 6,000,885-byte Main/helper log at SHA-256 `0aff68b888e6c58f4d3733c4de0e915a9dbb62efd8f04c8ae0a750ca969a831f` starts `Symphony No.6 (1st movement).flac`, selects decoded stereo HDMI PCM and enables the 720-by-480p BT.601 audio interface; across approximately one hundred seconds it carries 99 frame begins, 12,559 data chunks and 98 commits.  Every completed frame contains exactly 127 chunks comprising 126 full 4,096-byte payloads and one 2,304-byte tail, with zero framing or ordering failures, while the final begun frame is merely partial at capture time.  Main's repeated `overlay_submit unknown` and `order_errors` labels are stale diagnostic classification of the newly valid commands `0x10`, `0x11` and `0x12`, not FPGA or transport faults; the log contains no fatal, decoder, protocol, unsupported-stream or transport error.  The 2,818-byte file at SHA-256 `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004` records only that the legacy screenshot telemetry decoder finds no stripe in the audio-interface image, as expected, and is not a failed hardware snapshot.  The timing-qualified RBF/helper pair is physically accepted for this first audio-interface boundary.
-
-#### Next Steps:
-
-Preserve `output_files/MediaPlayer_20260901_5f00e35.rbf` and `host/build/MediaPlayer_Helper_AudioUI_5f00e35` together as the accepted standalone-audio interface baseline while retaining source `add7d00` as the prior video-only rollback.  In the next approved feature cycle, teach the ARM renderer to populate the reserved viewport and metadata strip from bounded album-art and tag decoding without increasing the one-hertz FPGA publication rate or weakening PCM priority; also update Main's passive record profiler to recognize commands `0x10` through `0x12` so future logs do not mislabel valid UI records as DVD-overlay order errors.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
