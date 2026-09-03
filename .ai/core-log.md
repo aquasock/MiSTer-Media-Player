@@ -1,3 +1,37 @@
+## 948 COMMIT Unreleased ??? 2026-09-03T16:51:15-07:00
+
+#### Coming From:
+
+Unreleased ae533a1
+
+#### Purpose:
+
+Release a completed finite DVD still boundary without treating its implementation-only drain suffix as undecoded media.
+
+#### Outcome:
+
+The approved change will split the autonomous boundary protocol into a strict ordinary form and a terminal-still form carrying the existing five-zero-byte drain-tail contract.  The helper will select the terminal form only after finite still finalization has appended that exact suffix; Main will continue normal verified submission while credit exists, establish that the old pipe is quiescent, and permit only an all-zero remainder no larger than the declared tail before resetting download and sending GO.  Unexpected residue, nonzero bytes, excess bytes and any residue at an ordinary automatic-menu boundary will stop playback with an explicit diagnostic instead of being discarded silently.  Decoder logic, RBF, overlay state and libdvdnav policy remain unchanged.
+
+#### Next Steps:
+
+Implement the helper/Main protocol distinction and strict quiescent-tail validator, extend the production helper and Main lifecycle regressions with the physical one-byte no-credit case plus complete, partial, oversized, nonzero and ordinary-boundary residue cases, and rerun strict native, sanitizer, analyzer, navigation, reserve, stage, audio and seek coverage.  Apply the Main patch to its pinned upstream source, build the patched per-core Main and static ARM helper locally, package the matched pair with the existing merge-only INI fragment, then retest Futurama through every finite first-play still into its visible moving menu with synchronized AC-3 and responsive activation.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_dvd_overlay_output.c
+- tools/test_main_seek_lifecycle.cpp
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 947 COMMIT Unreleased ae533a1 2026-09-03T16:48:14-07:00
 
 #### Coming From:
@@ -1185,35 +1219,6 @@ Install only `host/build/MediaPlayer_Helper_SceneContinue_338c4d5` as `/media/fa
 - host/arm/output_stage.c
 - host/arm/output_stage.h
 - tools/test_output_stage.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 908 COMMIT Unreleased 8c90e2d 2026-09-02T17:50:47-07:00
-
-#### Coming From:
-
-Unreleased 8c90e2d
-
-#### Purpose:
-
-Qualify the source-`8c90e2d` helper on Coming to America's authored Scene Selections submenu and isolate its black freeze.
-
-#### Outcome:
-
-The user's physical Coming to America run rejects source `8c90e2d` as a complete DVD-menu compatibility boundary.  Root-menu navigation remains active for approximately 89 seconds, three Right commands select button four, and activation command `0x08` succeeds at 97.841139 seconds, starts the bounded destination stage and reaches an authored indefinite still after 249 generic Program Stream start codes.  The helper incorrectly treats that raw count as proof of a replacement video stream, discards 3,917,940 bytes from the old reserve, sends READY, resets Main and commits 26 staged records totaling 86,664 bytes; that total is exhausted exactly by one overlay style record, one clear, one configuration, twenty-two plane-data records and one commit, with no H.262 picture or PCM record.  Main therefore receives the new selector plane after blanking the resident video but has no replacement picture to display, matching the completely black 559-byte screenshot, while the helper remains alive in the indefinite still through the 254.403587-second capture endpoint without a fatal error.  The 6,152,722-byte log and screenshot have SHA-256 `10ceecceead32b51aff4d22fed0ab816c95e2c50cee070d7ad9b972258a07e27` and `1799af730e4ee79b5cdfe65960df9323dfc4c9d01f44b29fa2fbd549718fea49`; the unchanged 2,818-byte telemetry decode failure at SHA-256 `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004` contains no hardware snapshot and adds no FPGA fault evidence.
-
-#### Next Steps:
-
-Preserve the source-`8c90e2d` redundant-root and unsupported-LPCM fixes, Main, the RBF and the overlay protocol.  After user approval, classify pending indefinite menu activation from actual validated H.262 picture output rather than generic start-code count: an overlay-only destination must commit its staged overlay to the live resident presentation and acknowledge menu continuation without reserve discard, READY/GO or decoder reset, while a genuine video-bearing destination retains the existing staged stream-hop barrier and empty or finite still paths remain unchanged.  Add exact overlay-only coverage matching the observed 26 records and 86,664 bytes, retain true-video, empty and finite-stage regressions, rerun the complete helper and sanitizer suites, and build only a new ARM helper for Coming to America, Blazing Saddles, The Big Lebowski and forum-disc testing.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
