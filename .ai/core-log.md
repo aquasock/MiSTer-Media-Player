@@ -1,4 +1,4 @@
-## 931 COMMIT Unreleased ??? 2026-09-02T23:23:00-07:00
+## 931 COMMIT Unreleased 932dc22 2026-09-02T23:23:00-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Minimize the striped standalone-audio interface artifact with helper-only overla
 
 #### Outcome:
 
-Implementation approved.  The planned helper descriptor will make palette index zero fully transparent so unserved or dark full-width background runs expose the continuously decoded visualizer instead of appearing as black bars, retain opaque border and text colors, and make only the dark panel color partially translucent for the accepted blended presentation.  While the ten-second player interface is selected, the visualizer grade will be limited to level 3 of 7; after the existing overlay clear it will regain the full 0-through-7 loudness range, and any user activity will restore the translucent interface and the same temporary cap.  The visualizer asset, GOP selection deadline, upload/service cadence, playback and pause behavior, decoder, Main and RBF remain unchanged.
+Source `932dc22` makes standalone-audio overlay palette index zero fully transparent, the dark panel color alpha `0xa0`, and both border/text colors opaque, so missed or background-only rows expose the continuously decoded visualizer while retained UI detail reads as a translucent scanline-style HUD.  While that overlay is visible, the already-scheduled GOP selector limits the displayed grade to level 3 of 7; the existing ten-second CLEAR restores the full zero-through-seven loudness range, and activity or seek reapplies the cap without changing `due_gops`, GOP phase, source frame rate, slice size or service cadence.  Focused strict and ASAN/UBSAN tests prove exact palette alpha, covered attack `1,2,3,3...`, revealed recovery `4,5,6,7`, and renewed capping after activity and seek; GCC analyzer passes both changed translation units.  Native real-helper tests pass MP3, WAV, FLAC and Ogg with 378 through 381 decoded pictures and one CLEAR each, and the final ARMv7 helper passes the same four formats with 372 through 381 pictures and one CLEAR each.  GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_Scanline_932dc22` at SHA-256 `a87a6a81e21996735abc0d218d9d301ad8e349f96b0eeb8d891a172b86c70b09`.  The visualizer asset, decoder, Main and RBF are unchanged.
 
 #### Next Steps:
 
-Implement the palette alpha changes and covered-state grade cap, add focused assertions for exact palette opacity, the level-3 covered ceiling, full-range recovery after the existing ten-second clear and renewed capping after activity and seek, and run strict native, sanitizer, analyzer and real-audio helper validation.  Build one static ARMv7 helper with the local Raspberry Pi toolchain, preserve the installed visualizer pack and fixed animation rate, then test that the first ten seconds and activity-restored interface read as an even translucent scanline HUD without disruptive dark bars while the revealed visualizer retains its accepted brightness response and constant motion during both playback and pause.
+Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_Scanline_932dc22` using executable mode, preserving the installed visualizer pack, Main and timing-qualified RBF.  Play standalone audio and require the first ten seconds to show a readable translucent scanline-style interface with the disruptive full-width dark bars removed or materially minimized; after the existing CLEAR, require the normal full-brightness visualizer.  Press Space during playback and pause, require the interface to return immediately over the animation with its quieter brightness ceiling, and confirm that the visualizer motion rate remains constant in both states and returns to full range after another ten seconds without input.
 
 #### Files Modified:
 
@@ -27,7 +27,7 @@ Implement the palette alpha changes and covered-state grade cap, add focused ass
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
