@@ -1,3 +1,36 @@
+## 911 COMMIT Unreleased ??? 2026-09-02T18:46:53-07:00
+
+#### Coming From:
+
+Unreleased 338c4d5
+
+#### Purpose:
+
+Release an independently decodable single-picture DVD menu background when its authored still boundary completes the startup group.
+
+#### Outcome:
+
+The approved helper-only boundary will add an explicit terminal mode to DVD random-access filtering so an authored still can bound a complete sequence-plus-I group without inventing the later I/P reference required during open-ended streaming.  Terminal filtering will retain the sequence and I picture, neutralize contextless pictures before it and unsafe B pictures after it, and leave an incomplete or pictureless destination pending; the helper will invoke it only for a pending DVD menu activation at an actual still event, drain any qualified queued video into the existing activation stage, and then reuse the established picture-bearing READY/GO barrier.  Source `338c4d5` overlay-only continuation, ordinary multi-picture filtering and menu hops, Main, decoder, visualizer, protocol, RTL and RBF remain unchanged.
+
+#### Next Steps:
+
+Extend the random-access API and implementation with explicit terminal-group qualification, call it before activation-stage classification at an authored DVD still, and add exact regressions proving an I-only stream remains blocked while open but releases at the terminal boundary, trailing B pictures are neutralized, ordinary I/P groups remain unchanged, and pictureless overlay-only destinations still continue without reset.  Run strict native, sanitizer, analyzer, staging, reserve, menu-hop, overlay, random-access, audio, seek and visualizer regressions with repeated high-risk cases, then build and verify only an exact static ARMv7 helper for physical Coming to America retest.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/dvd_random_access.c
+- host/arm/dvd_random_access.h
+- host/arm/media_player_helper.c
+- tools/test_dvd_random_access.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 910 COMMIT Unreleased 338c4d5 2026-09-02T18:42:42-07:00
 
 #### Coming From:
@@ -1245,52 +1278,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 871 COMMIT Unreleased add7d00 2026-09-01T03:23:04-07:00
-
-#### Coming From:
-
-Unreleased 59f6312
-
-#### Purpose:
-
-Replace the development-era 800-by-600 fallback with native 720-by-480 progressive presentation while preserving the physically accepted 480i decoder path.
-
-#### Outcome:
-
-Source `add7d00` removes the standalone and embedded 800-by-600 timing paths, makes exact 720-by-480 progressive at 60000/1001 the reset presentation, retains the existing 720-by-480i field path for supported interlaced and film-in-interlaced sequences, and admits progressive 4:2:0 frame-picture I, P and B sequences through 720 by 480 at H.262 rate codes one through five.  Progressive framebuffer geometry is now centered inside the permanent 720-by-480 raster, the extracted cadence accumulator implements exact source-to-output ratios including two presentations per five output frames for 24000/1001, and presentation mode changes complete only on safe frame or field boundaries.  The obsolete generator is absent from the active QIP and the legacy inactive wrapper, while historical changelog text and the excluded frozen `rtl/mpeg2fpga` reference remain intact.  All nine focused and retained SystemVerilog regressions pass on exact source, and deterministic fixtures probe as 720-by-480 progressive 24000/1001 and top-field-first interlaced 30000/1001.  Clean Quartus Prime 17.0.2 seeds 20, 21 and 22 were rejected for unrelated global setup slacks of negative 0.010, 0.409 and 0.130 nanoseconds; seed 23 completes synthesis, fitting, assembly and the project timing gate with positive setup, hold, recovery, removal and minimum-pulse-width slacks of 0.224, 0.244, 3.333, 0.625 and 0.925 nanoseconds, plus dedicated 60 MHz decoder and 54 MHz video setup slacks of 0.872 and 2.685 nanoseconds with no violations.  The fit uses 35,092 ALMs, 54,790 registers, 4,187,011 block-memory bits in 535 RAM blocks and 70 DSP blocks.  The byte-identical local and build-PC artifact `output_files/MediaPlayer_20260901_add7d00.rbf` is 4,478,208 bytes at SHA-256 `33ecb87988427d44a97993dc7dda53930c60b0397d0a0202a6e928bb36aa048f`; Main, the helper, DVD navigation, audio and record formats are unchanged.
-
-#### Next Steps:
-
-Upload only `output_files/MediaPlayer_20260901_add7d00.rbf` to the MiSTer while preserving the installed Main and helper, then test the generated-style 720-by-480 progressive 24000/1001 MPEG-2 Program Stream and an ordinary progressive code-four or code-five stream for stable native video, correct centering, smooth exact cadence and no vertical-line artifact.  Retest the known-good 720-by-480 top-field-first 30000/1001 interlaced reference for unchanged field order, motion and DVD overlay behavior, then report the installed RBF hash and capture a fresh screenshot, helper/Main log and telemetry if either presentation family fails; hardware acceptance is required before marking this entry Passed.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-- MediaPlayer.sdc
-- MediaPlayer.sv
-- README.md
-- files.qip
-- rtl/mpeg2_decoder.sv
-- rtl/mpeg2_luma_framebuffer.sv
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_new/mpeg2_h262_native_startup.sv
-- rtl/mpeg2_new/mpeg2_h262_output_cadence.sv
-- rtl/mpeg2_progressive_geometry.sv
-- rtl/mpeg2_video_output_timing.sv
-- rtl/mpeg2_video_svga_800x600.sv
-- tools/generate-progressive-regression.sh
-- tools/test_mpeg2_output_timing.sv
-- tools/test_mpeg2_progressive_cadence.sv
-- tools/test_mpeg2_progressive_framebuffer.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
