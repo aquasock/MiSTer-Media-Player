@@ -1,4 +1,4 @@
-## 938 COMMIT Unreleased ??? 2026-09-03T02:28:26-07:00
+## 938 COMMIT Unreleased 0f1165c 2026-09-03T02:28:26-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Normalize each qualifying malformed DVD H.262 sequence boundary across PES fragm
 
 #### Outcome:
 
-Implementation approved from entry 937's physical proof that source `490dc02` corrects and displays The Big Lebowski's first authored still but leaves the immediately following seven-second still unchanged, where the decoder repeats the same source-21 failure after exactly 188 new accepted bytes.  The change will remain helper-only and preserve the decoder, Main, RBF, stream length, offsets and every conforming or out-of-scope picture while carrying bounded elementary-stream syntax state across DVD video PES payloads and delaying only the byte needed to validate `progressive_frame` before conditionally setting its preceding `chroma_420_type` bit.
+Source `0f1165c` replaces the startup-only correction boundary with a DVD/ISO elementary-video compatibility filter that carries sequence, picture and extension syntax state across PES payloads and delays exactly one byte.  That lookahead validates `progressive_frame` before conditionally setting the preceding zero `chroma_420_type` bit on only the first valid complete-frame I picture after a 4:2:0 sequence header; stream length, byte order, offsets and timestamp-record order remain exact, navigation reset discards the old held suffix, and authored-still or ordinary stream completion flushes it.  Every correction logs its cumulative elementary-stream offset and before/after byte.  The focused C regression joins two captured malformed Big Lebowski prefixes and proves exactly offsets 185 and 380 change from `0xc0` to `0xc1` under every possible single split and one-byte fragmentation, while conforming, non-4:2:0, non-I, field and interlaced controls remain byte-identical.  Icarus reproduces source 21 on the original prefix and admits two consecutive corrected stills with supported film fields and no syntax error.  Strict native and ARM helper builds, ASan/UBSan, focused GCC analyzer, one hundred random-access, menu-hop, reserve and staging repetitions, twenty overlay and SPU repetitions, Program Stream seek, audio seek/UI/visualizer and unsupported-LPCM tests pass.  The exact ARM helper passes its capability probe and real MP3/WAV/FLAC/Ogg integration with 378 or 381 pictures and one clear record per file.  The static stripped ARMv7 EABI5 artifact `host/build/MediaPlayer_Helper_H262Stream_0f1165c` is 966052 bytes with SHA-256 `613d35de5ace0622584ae14b4540423c2c56b1f923c02c599f47b55722e21e56`; Main, RBF and visualizer are unchanged.
 
 #### Next Steps:
 
-Implement a DVD/ISO video-payload normalizer that recognizes valid 4:2:0 sequence extensions, initial I pictures and complete-frame picture coding extensions across arbitrary PES splits, emits all bytes in original order with bounded one-byte lookahead, flushes or discards that held byte at the existing terminal and navigation boundaries, and logs every correction.  Extend the focused production regression with two consecutive captured malformed still prefixes split at every critical header boundary plus conforming, interlaced, non-I and non-4:2:0 controls; extend the Icarus regression to admit both normalized stills without source 21; run strict, sanitizer, analyzer, DVD navigation/output and audio integration suites; then build one static ARM helper for physical Big Lebowski startup, title, Root Menu and repeated-menu testing with Blazing Saddles and Coming to America regression checks.
+Exit MediaPlayer, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_H262Stream_0f1165c`, preserve executable mode and retain the installed Main, visualizer and timing-qualified RBF.  With telemetry enabled, start The Big Lebowski and require correction one at elementary offset 185, a second correction when the following seven-second still begins, accepted bytes advancing beyond the former 5,670-byte failure boundary, error flags remaining zero and normal title playback beginning.  Press `m`, exercise the Root Menu and Scene Selection repeatedly, return to the title and reopen both paths, then verify each new malformed authored sequence is corrected without a helper exit or decoder latch.  Spot-check Blazing Saddles and Coming to America title, menu and chapter navigation before returning the fresh log, screenshot and telemetry sidecar.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Implement a DVD/ISO video-payload normalizer that recognizes valid 4:2:0 sequenc
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
