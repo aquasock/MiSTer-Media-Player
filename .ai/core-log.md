@@ -1,3 +1,34 @@
+## 934 COMMIT Unreleased ??? 2026-09-03T00:01:33-07:00
+
+#### Coming From:
+
+Unreleased 932dc22
+
+#### Purpose:
+
+Capture the exact common H.262 header construct rejected near byte 188 in The Big Lebowski's startup and Root Menu stills without changing playback behavior.
+
+#### Outcome:
+
+Diagnostic implementation approved.  The helper will retain every filtered byte and existing publication decision while logging at most the first 256 post-filter bytes plus bounded parsed sequence-header, sequence-extension, picture-header and picture-coding-extension fields for each initial random-access group.  This is sufficient to map the physical disc's repeatable 187/188-byte syntax failure to one of the decoder frontend's explicit checks without changing the decoder, Main, RBF, visualizer, audio transport, menu policy or timing.
+
+#### Next Steps:
+
+Add a side-effect-free bounded restart-field collector and stderr diagnostic at the existing successful initial-filter boundary, cover its field extraction and retained byte identity in the production overlay regression, and run strict native, sanitizer, analyzer, DVD random-access, navigation, staging, overlay, LPCM and audio suites.  Build one static ARMv7 diagnostic helper locally, then reproduce Big Lebowski startup and press Root Menu once; the returned log must contain both bounded prefixes and parsed extension fields so the exact helper-side compatibility correction can be proposed from evidence.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 933 COMMIT Unreleased 932dc22 2026-09-02T23:59:04-07:00
 
 #### Coming From:
@@ -1185,39 +1216,6 @@ Exit MediaPlayer, install `host/build/MediaPlayer_Helper_Visualizer_532bd8e` as 
 - tools/test_audio_ui_output.c
 - tools/test_audio_visualizer.c
 - tools/test_main_seek_lifecycle.cpp
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 894 COMMIT Unreleased 7e152d5 2026-09-02T03:50:37-07:00
-
-#### Coming From:
-
-Unreleased 09b1d28
-
-#### Purpose:
-
-Center the standalone-audio elapsed and remaining displays and replace the disabled track-time placeholder with the decoded track duration.
-
-#### Outcome:
-
-Source `7e152d5` replaces the combined left-aligned timing string and disabled track placeholder with three independently centered fields spanning the progress-bar width: `ELAPSED`, `TRACK` and `REMAIN`, all rendered with the same font scale on vertical baseline 412.  The fixed track duration derives from decoded PCM-frame length and sample rate and rounds partial final seconds up like remaining time, while elapsed retains completed-second truncation.  Pixel-level regressions verify all three values at their computed horizontal centers during 44.1 and 48 kHz playback, after seeking and at a fractional-second clean completion where elapsed is 100 seconds, total is 101 seconds and remaining is zero; the renderer and full helper pass AddressSanitizer/UndefinedBehaviorSanitizer coverage, and native plus final ARM real-helper runs pass MP3, WAV, FLAC and Ogg with exact final values and valid transaction boundaries.  GNU 10.2 produced the 957,860-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_TrackTime_7e152d5` with SHA-256 `495606437ef2d855546d8a1906b8a375b8666984f10a9e267f7d563ee9f75859`; the source-`09b1d28` Main, replay behavior, protocol, RTL and timing-qualified RBF are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer so the running helper stops, install `host/build/MediaPlayer_Helper_TrackTime_7e152d5` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, and preserve `host/build/MiSTer_ReplayReady_09b1d28` as `/media/fat/MiSTer` plus the current timing-qualified RBF.  Play a standalone audio file and confirm that elapsed, total track and remaining time are horizontally centered in three balanced regions and vertically aligned on one baseline, that total remains fixed while elapsed and remaining update and seek correctly, and that clean EOF still shows full progress with zero remaining before Play restarts the file.  Report hardware acceptance or place a fresh screenshot and Main/helper log in `.ai/current_results` for any discrepancy.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/audio_ui.c
-- tools/test_audio_file_seek.py
-- tools/test_audio_ui_output.c
 
 #### Status:
 
