@@ -1,3 +1,32 @@
+## 925 COMMIT Unreleased 6b63c91 2026-09-02T21:56:19-07:00
+
+#### Coming From:
+
+Unreleased 6b63c91
+
+#### Purpose:
+
+Record Blazing Saddles' successful first source-`6b63c91` run and determine whether the supplied second-run evidence can diagnose its root-menu hang.
+
+#### Outcome:
+
+The user reports that Blazing Saddles initially booted, entered its menu, played and accepted chapter skips, further qualifying the corrected helper installation and active-program chapter path, but that a subsequent core reload produced a black hang after Root Menu.  Only `mister-screenshot.png` is fresh at 21:53; it is an all-black 1,920-by-1,080 image with no telemetry matrix, 559 bytes and SHA-256 `d964cb7603836826beb6afaa57ff6343531871568ec91a4fcc0cd55365f6ee73`.  `MediaPlayer_ARM.log` and `telemetry.txt` retain their 21:24 timestamps and exact hashes from the preceding Big Lebowski Scene Selection run, so their staging-capacity failure and schema-21 snapshot cannot be attributed to Blazing Saddles.  The collection script saves the screenshot before retrieving `/tmp/MediaPlayer_ARM.log` and exits under `set -e` if that retrieval fails, leaving the prior local log and sidecar untouched; the observed file combination therefore indicates that no fresh helper log was available to the collection, consistent with telemetry not being active for this attempt.  The current evidence cannot distinguish a helper failure, a Main/helper synchronization wait or an authored first-play delay, and no runtime source was changed.
+
+#### Next Steps:
+
+Hold the approved combined-build boundary until a fresh trace identifies the second correction.  Enable telemetry before loading Blazing Saddles, launch the disc, reproduce Root Menu from the black state, capture while it remains hung and verify that `.ai/current_results/MediaPlayer_ARM.log` receives the new run's timestamp rather than retaining the Big Lebowski file; if collection again stops after the screenshot, first confirm that `/tmp/MediaPlayer_ARM.log` exists on MiSTer.  Once fresh evidence is present, classify the exact navigation boundary and combine its narrow helper-side correction with the already-proposed bounded Big Lebowski motion-menu staging promotion, then run both discs plus Coming to America and the forum disc through the full regression and ARM build boundary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 924 COMMIT Unreleased 6b63c91 2026-09-02T21:28:47-07:00
 
 #### Coming From:
@@ -1211,49 +1240,6 @@ Exit MediaPlayer, install `host/build/MediaPlayer_Helper_AudioLayout_9397fa7` as
 - README.md
 - host/arm/ARCHITECTURE.md
 - host/arm/audio_ui.c
-- tools/test_audio_ui_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 885 COMMIT Unreleased 72bdccc 2026-09-01T21:54:05-07:00
-
-#### Coming From:
-
-Unreleased eb11247
-
-#### Purpose:
-
-Add responsive fixed ten-second, one-minute and five-minute seeking to every supported standalone audio-file format without changing FPGA logic or established video and DVD controls.
-
-#### Outcome:
-
-Source `512b5eb` implements the approved helper/Main-only boundary and source `72bdccc` corrects the generated Main patch's new-file hunk length after the first exact build exposed truncation, making `72bdccc` the final build source.  File-backed `.mp3`, `.wav`, `.flac` and `.ogg` playback now accepts the source-`68f8f26` Alt, Ctrl and Ctrl-plus-Alt fixed jumps through bounded control polling, saturated sample-frame target arithmetic, codec-native random access and the existing READY/GO download reset; the helper flushes pre-jump output and restarts any partial audio-interface update at the absolute target before new PCM is emitted.  WAV, FLAC and Ogg Vorbis retain their miniaudio decoders, while standalone MP3 uses miniaudio's bundled seek-aware backend with sixty-four seek points and preserves the existing MPEG-1 Layer III mono/stereo and 44.1/48 kHz restrictions.  Strict target and UI-reset tests, AddressSanitizer and UndefinedBehaviorSanitizer checks, deterministic real-helper forward/backward seek regressions for all four formats, retained Program Stream random-access, AC-3 recovery, DVD random-access, DVD subpicture, output-reserve and output-stage tests all pass; both Main patches apply to pinned upstream `0a8fb44`, and the full GNU 10.2 ARM helper and Main builds succeed.  The 953,764-byte static ARMv7 helper `host/build/MediaPlayer_Helper_AudioSeek_72bdccc` has SHA-256 `bcd3cbae9d30115784d0f3de5aef9e38b84f58d7ced0a45378ae67101ce94b22`, and the 1,178,588-byte dynamic ARMv7 Main `host/build/MiSTer_AudioSeek_72bdccc` has SHA-256 `b0e5d1f941559139daf82dfe1f03db6fcc3d41d36b48cae527d7c787c99aac05`.  Ordinary arrows, pause, MPG seeking, DVD chapters, authored menus, RTL, RBF and Quartus remain unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer, install `host/build/MediaPlayer_Helper_AudioSeek_72bdccc` as `/media/fat/linux/MediaPlayer_Helper` and `host/build/MiSTer_AudioSeek_72bdccc` as `/media/fat/MiSTer`, preserve executable modes and the current timing-qualified RBF, then reboot because Main changed.  During each supported standalone audio format, verify Alt+Left/Right, Ctrl+Left/Right and Ctrl+Alt+Left/Right repeatedly in both directions, including clamping near the beginning and end; acceptance requires a prompt clean restart at the expected position, uninterrupted synchronized audio, a correctly restarted progress display and normal playback afterward.  Retest one ordinary MPG seek, pause, one DVD chapter change and authored-menu arrows to prove the unchanged paths, then report hardware acceptance or enable telemetry before playback and collect fresh helper/Main diagnostics for any failure.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/Makefile
-- host/arm/audio_file_seek.c
-- host/arm/audio_file_seek.h
-- host/arm/audio_ui.c
-- host/arm/audio_ui.h
-- host/arm/consumer_audio.c
-- host/arm/consumer_audio.h
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_audio_file_seek.c
-- tools/test_audio_file_seek.py
 - tools/test_audio_ui_output.c
 
 #### Status:
