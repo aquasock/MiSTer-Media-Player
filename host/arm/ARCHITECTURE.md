@@ -138,14 +138,16 @@ post-filter 256-byte prefix and parsed sequence, picture and coding-extension
 diagnostic. This delegates CSS
 access to libdvdcss and is not a claim of CSS conformance.
 
-The direct optical backend retains one authenticated libdvdnav session across
-signature and stream preflight rewinds. Only after preflight, a producer thread
-fills an 8 MiB HPS-RAM byte ring and playback starts with at least 4 MiB queued
-unless the title is shorter. Consumer order is exact; end-of-stream and read
-errors cross the same synchronized boundary. Waits of at least 100 ms and final
-producer/consumer totals are diagnostic output. ISO and ordinary file sources
-remain synchronous and byte-identical, and none of this buffer consumes FPGA
-memory.
+The non-menu direct optical backend retains one authenticated libdvdnav session
+across signature and stream preflight rewinds. Only after preflight, a producer
+thread fills an 8 MiB HPS-RAM byte ring and playback starts with at least 4 MiB
+queued unless the title is shorter. Menu-mode optical and ISO routes remain
+synchronous so libdvdnav state changes describe the payload currently consumed
+by the demultiplexer rather than producer-ahead data. Consumer order is exact;
+end-of-stream and read errors cross the same synchronized boundary. Waits of at
+least 100 ms and final producer/consumer totals are diagnostic output. Ordinary
+file sources also remain synchronous and byte-identical, and none of this buffer
+consumes FPGA memory.
 
 Physical-DVD program output also crosses a record-aware 4 MiB reserve before
 Main's pipe. Its writer owns the output descriptor in nonblocking mode, retains
@@ -168,9 +170,16 @@ decoded into a packed 720x480 two-bit plane; normal/highlight palettes and the
 inclusive button rectangle travel separately so highlight motion does not
 reload the plane. A displayed libdvdnav button forces menu compositing even
 when the packet also carries a later scheduled stop that the clockless helper
-has already parsed. Future work may add optical-device discovery beyond the
-explicit `/dev/sr0` launcher. Angles, track selection and general seeking
-remain separate work.
+has already parsed. A finite authored still closes its decoder epoch. The
+helper drains that epoch to Main, sends an autonomous stream-boundary event and
+waits; Main submits through pipe-empty, toggles download exactly once and sends
+GO before the helper resets demux, audio, PTS, random-access and bounded
+scheduling state. Automatic entry into a menu from an already-silent epoch uses
+the same handshake and saves the consumed Program Stream start code for the new
+epoch. Unlike an explicit navigation hop, this boundary discards no old media
+and does not clear the menu overlay. Future work may add optical-device
+discovery beyond the explicit `/dev/sr0` launcher. Angles, track selection and
+general seeking remain separate work.
 
 ## Pipeline boundaries
 

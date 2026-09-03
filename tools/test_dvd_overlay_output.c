@@ -784,6 +784,8 @@ static int test_automatic_menu_scheduling_epoch(void)
     size_t first_play_size = VIDEO_QUEUE_LIMIT - 8u;
     int input_fd = -1;
     int input_open = 0;
+    struct dvd_menu_state menu = {0};
+    int boundary_command = 0;
     int failed = 0;
 
     first_play = malloc(first_play_size);
@@ -807,7 +809,12 @@ static int test_automatic_menu_scheduling_epoch(void)
     if (failed)
         goto done;
 
-    rearm_output_for_automatic_menu_epoch(&output);
+    request_stream_boundary_before_code(&menu, &boundary_command, 0xe0);
+    failed |= require(
+        boundary_command == MEDIA_PLAYER_CONTROL_STREAM_BOUNDARY &&
+            menu.resume_code_valid && menu.resume_code == 0xe0,
+        "automatic menu boundary did not preserve the consumed start code");
+    reset_for_stream_boundary(&audio, &output);
     failed |= require(output.scheduler_enabled &&
                           !output.scheduler_started &&
                           output.iso_start_filter_active &&

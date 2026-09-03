@@ -2087,28 +2087,13 @@ static void reset_output_for_navigation(struct output_state *output,
         dvd_timeline && output->scheduler_enabled;
 }
 
-/*
- * First-play material and its automatically selected menu are separate DVD
- * scheduling epochs even though libdvdnav presents them through one source.
- * A silent first-play decision has already drained its bounded queue, so no
- * media is discarded here.  Reuse the navigation reset without emitting a
- * decoder barrier or overlay clear: the completed first-play frame remains
- * resident while the menu reacquires random-access video and its own audio
- * timeline.
- */
-static void rearm_output_for_automatic_menu_epoch(
-    struct output_state *output)
+static void reset_for_stream_boundary(struct audio_state *audio,
+                                      struct output_state *output)
 {
     size_t hold_limit = output->hold_limit;
-    uint64_t prior_video_bytes = output->video_bytes;
-    uint64_t prior_video_pts = output->max_video_pts;
 
+    reset_audio_for_navigation(audio);
     reset_output_for_navigation(output, hold_limit, 1);
-    fprintf(stderr,
-            "media_player_helper: DVD automatic menu scheduling epoch "
-            "rearmed prior_video=%llu prior_video_pts=%llu\n",
-            (unsigned long long)prior_video_bytes,
-            (unsigned long long)prior_video_pts);
 }
 
 static int start_pending_menu_activation(struct dvd_menu_state *menu,
@@ -3836,7 +3821,11 @@ static int wait_dvd_still(struct media_source *input,
                         menu, control_fd, "finite-still-menu") < 0)
                     return -1;
             }
-            return 1;
+            *control_command = MEDIA_PLAYER_CONTROL_STREAM_BOUNDARY;
+            fprintf(stderr,
+                    "media_player_helper: DVD finite still requests "
+                    "decoder stream boundary\n");
+            return 2;
         }
         while (nanosleep(&delay, &delay) < 0 && errno == EINTR)
             ;
@@ -3869,6 +3858,14 @@ static int activation_stage_motion_hop(struct dvd_menu_state *menu,
             OUTPUT_ACTIVATION_STAGE_DECISION_BYTES,
             OUTPUT_ACTIVATION_STAGE_BYTES);
     return 1;
+}
+
+static void request_stream_boundary_before_code(
+    struct dvd_menu_state *menu, int *control_command, uint8_t code)
+{
+    menu->resume_code = code;
+    menu->resume_code_valid = 1;
+    *control_command = MEDIA_PLAYER_CONTROL_STREAM_BOUNDARY;
 }
 
 static int process_program_stream(struct media_source *input,
@@ -3974,8 +3971,15 @@ static int process_program_stream(struct media_source *input,
 
             if (menu_refresh < 0)
                 return -1;
-            if (menu_refresh > 0 && output->silent_video_mode)
-                rearm_output_for_automatic_menu_epoch(output);
+            if (menu_refresh > 0 && output->silent_video_mode) {
+                request_stream_boundary_before_code(
+                    menu, control_command, code);
+                fprintf(stderr,
+                        "media_player_helper: DVD automatic menu requests "
+                        "decoder stream boundary before code=0x%02x\n",
+                        code);
+                return 1;
+            }
         }
         if (seek_index && media_source_position(input, &pes_offset) < 0) {
             fprintf(stderr,
@@ -4588,6 +4592,23 @@ int main(int argc, char **argv)
                 goto done;
             if (!result)
                 break;
+            if (command == MEDIA_PLAYER_CONTROL_STREAM_BOUNDARY) {
+                if (flush_output(&output, "DVD stream boundary") < 0)
+                    goto done;
+                reset_for_stream_boundary(&audio, &output);
+                if (control_send(
+                        control_fd,
+                        MEDIA_PLAYER_CONTROL_STREAM_BOUNDARY) < 0 ||
+                    control_wait_for_go(control_fd) < 0) {
+                    fprintf(stderr,
+                            "media_player_helper: DVD stream boundary "
+                            "handshake failed\n");
+                    goto done;
+                }
+                fprintf(stderr,
+                        "media_player_helper: DVD stream boundary released\n");
+                continue;
+            }
             if (seekable_program_stream &&
                 seek_command_seconds(command, &seek_seconds)) {
                 struct program_stream_seek_entry selected;

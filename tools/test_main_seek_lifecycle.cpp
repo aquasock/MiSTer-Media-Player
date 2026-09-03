@@ -19,6 +19,7 @@ struct MainLifecycle {
     bool seek_pending = false;
     bool navigation_pending = false;
     bool chapter_barrier = false;
+    bool stream_boundary_pending = false;
     bool playback_paused = false;
     bool replay_ready = false;
     std::uint64_t submitted = 0;
@@ -82,6 +83,24 @@ struct MainLifecycle {
         chapter_barrier = false;
     }
 
+    void stream_boundary()
+    {
+        if (stream_boundary_pending)
+            throw "duplicate stream boundary";
+        stream_boundary_pending = true;
+    }
+
+    void stream_boundary_drained()
+    {
+        if (!stream_boundary_pending)
+            throw "drain without stream boundary";
+        download_active = false;
+        ++resets;
+        download_active = true;
+        ++go_commands;
+        stream_boundary_pending = false;
+    }
+
     void helper_eof(bool clean, bool file_source)
     {
         if (clean && file_source) {
@@ -130,6 +149,7 @@ static int require_patch_markers(const char *path)
 {
     static const char *const markers[] = {
         "MEDIA_CONTROL_SEEK_CONTINUE = 0x85",
+        "MEDIA_CONTROL_STREAM_BOUNDARY = 0x86",
         "MEDIA_CONTROL_USER_ACTIVITY = 0x10",
         "seek_pending = true;",
         "seek continued without reset",
@@ -144,7 +164,11 @@ static int require_patch_markers(const char *path)
         "audio_visualizer_controls &&",
         "activity-command-error",
         "if (helper_fd < 0 || chapter_barrier) return;",
-        "navigation_pending = true;\n+\t\tif (!send_control(command))"
+        "navigation_pending = true;\n+\t\tif (!send_control(command))",
+        "stream_boundary_pending &&\n+\t\t\t\t    pending_size == pending_offset",
+        "DVD stream boundary released after drain",
+        "if (playback_paused && !stream_boundary_pending) return;",
+        "if (!pending_eof && !stream_boundary_pending) available &= ~1u;"
     };
     std::ifstream input(path);
 
@@ -236,6 +260,24 @@ int main(int argc, char **argv)
                           navigation_hop_boundary.submitted == 28672,
                       "navigation decision phase lost submitted output");
 
+    MainLifecycle automatic_boundary;
+    automatic_boundary.submit(224665);
+    automatic_boundary.stream_boundary();
+    automatic_boundary.submit(115);
+    failed |= require(automatic_boundary.stream_boundary_pending &&
+                          automatic_boundary.resets == 0 &&
+                          automatic_boundary.go_commands == 0,
+                      "automatic boundary reset before the old stream drained");
+    automatic_boundary.stream_boundary_drained();
+    automatic_boundary.submit(9035621);
+    failed |= require(automatic_boundary.download_active &&
+                          !automatic_boundary.stream_boundary_pending &&
+                          automatic_boundary.resets == 1 &&
+                          automatic_boundary.go_commands == 1 &&
+                          automatic_boundary.discards == 0 &&
+                          automatic_boundary.submitted == 9260401,
+                      "automatic boundary did not drain, reset once, and resume");
+
     boundary.helper_eof(true, true);
     failed |= require(boundary.download_active && boundary.replay_ready &&
                           boundary.playback_paused,
@@ -277,6 +319,7 @@ int main(int argc, char **argv)
         return 1;
     std::cout << "main seek lifecycle PASS no-op_resets=0 valid_resets=1 "
                  "directional_navigation=continue-or-ready "
+                 "automatic_boundary=drain-reset-go "
                  "clean_eof=replay-ready play=relaunch "
                  "failed_eof=released\n";
     return 0;
