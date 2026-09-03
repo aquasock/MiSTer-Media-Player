@@ -1,3 +1,32 @@
+## 926 COMMIT Unreleased 6b63c91 2026-09-02T22:10:56-07:00
+
+#### Coming From:
+
+Unreleased 6b63c91
+
+#### Purpose:
+
+Qualify a fresh live Blazing Saddles run and decide whether its preceding unlogged black attempt warrants a bundled source correction.
+
+#### Outcome:
+
+The new telemetry-enabled run is healthy through the live capture endpoint: Blazing Saddles starts `dvdmenu:/dev/sr0`, automatically enters its authored root menu, publishes a complete overlay and responds to a later Root Menu request with `already-root` plus `MENU_CONTINUE`, preserving the resident frame.  Activation leaves the menu, completes the existing READY/GO navigation barrier and begins movie playback; Next Chapter then succeeds from current title 2 part 1 to resolved title 2 part 2 and releases its barrier normally.  At 67.288 seconds Main remains actively reading and transferring helper output, with approximately 56.2 MB submitted and no helper EOF, child exit, control error, staging failure or transport failure.  The checksum-valid schema-21 snapshot measures 200 pictures and 199 swaps over 29.940731 seconds, a completed presentation with no decoder error, zero audio underruns, zero transport blocks and no overlay protocol error.  The visible 1,920-by-1,080 movie screenshot, 2,224,070-byte log and 766-byte sidecar have SHA-256 `98815a3c19614ae4bab11aa350524bf51d519b0de2de5d5b6a069f4a01d2edad`, `615eb08ed3c7eace5cb8809384357af3e3d9d2a1399652adb65be4df3e7fed22` and `f1c4dab826a2e841ae0840776c39e42da3165d40a1cb3777b075de459e1261c6`.  Because a telemetry-active helper crash would ordinarily leave Main's child-wait and exit diagnostics, the earlier attempt's missing log cannot establish a helper crash; the same build and disc now complete the route, so no reproducible Blazing Saddles defect or defensible second code change exists.
+
+#### Next Steps:
+
+Do not bundle a speculative Blazing Saddles change.  Preserve this run as acceptance of its startup, root-menu continuation, title launch and active-program chapter hop, and make the next approved helper boundary only the already-diagnosed Big Lebowski picture-bearing motion-menu staging promotion from entry 924.  Retest Big Lebowski Scene Selection as the primary acceptance route while retaining this exact Blazing Saddles route, Coming to America's finite and indefinite Scene Selection paths, ordinary movie chapters and the forum disc's LPCM-menu behavior; if the black Blazing Saddles attempt recurs with a fresh log, diagnose that trace as a separate reproducible boundary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 925 COMMIT Unreleased 6b63c91 2026-09-02T21:56:19-07:00
 
 #### Coming From:
@@ -1214,37 +1243,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 886 COMMIT Unreleased 9397fa7 2026-09-01T22:56:38-07:00
-
-#### Coming From:
-
-Unreleased 72bdccc
-
-#### Purpose:
-
-Replace the initial standalone-audio diagnostic composition with the approved full-screen 4:3 CRT-safe album, metadata, playlist and transport layout without changing playback behavior.
-
-#### Outcome:
-
-Source `9397fa7` replaces the standalone-audio diagnostic composition with the approved full-screen 720-by-480 interface authored for 4:3 CRT display.  A 224-by-200 raster-pixel album-art placeholder, physically square at the mode's 8:9 pixel aspect, and title, artist and album placeholders occupy the left column; a six-row current-playlist placeholder occupies the right; previous, play/pause and next controls, track and playlist time placeholders, and a full-width progress bar complete the lower area inside 32-pixel horizontal and approximately 24-pixel vertical safe margins.  A deterministic built-in 5-by-7 font supplies the static labels, while the existing one-minute sample-clock progress motion, one-hertz update cadence, bounded interleaving and atomic inactive-bank publication are retained.  Actual tag parsing, album-art decoding, playlist management, duration calculation, control behavior and scrubbing remain deferred.  Exact layout-region checks and frame hashes pass at 48 and 44.1 kHz under strict native compilation and AddressSanitizer/UndefinedBehaviorSanitizer; UI seek-reset and real-helper `.mp3`, `.wav`, `.flac` and `.ogg` forward/backward seek regressions also pass.  The inspected deterministic YCbCr preview has SHA-256 `cdee861ec163331526bf1f6749eca81975e86373c529d0d946ef7f0b20f087f5` and its PNG conversion has SHA-256 `22b364cd5cad02e78bd03e1679be3cefe49fcc066d732ec3a6c2fcf9a2f23d8a`.  The GNU 10.2 build produces the 953,764-byte static ARMv7 helper `host/build/MediaPlayer_Helper_AudioLayout_9397fa7` with SHA-256 `517543f9f47b3ca7b42a4646c542347902d2fa2de5feb2ae628ae4a53df7dc7c`; Main, RTL, RBF, codecs, seeking, video and DVD behavior are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer, install `host/build/MediaPlayer_Helper_AudioLayout_9397fa7` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, and preserve the installed `MiSTer_AudioSeek_72bdccc` Main and timing-qualified RBF.  Re-enter the core and test at least one standalone audio file on the intended 4:3 CRT: verify that all panel borders and labels remain visible outside overscan, the album-art placeholder appears physically square, the progress bar advances once per second, and audio plus fixed seeking remain clean.  Also spot-check one 16:9 display mode for acceptable pillarbox/stretch behavior, then report hardware acceptance or capture a screenshot and fresh telemetry if any presentation or playback regression appears.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/audio_ui.c
-- tools/test_audio_ui_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
