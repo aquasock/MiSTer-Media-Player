@@ -58,9 +58,12 @@ later reference picture arrives, the helper uses that explicit end boundary to
 release the independently decodable still picture and appends one H.262
 sequence-end code after its unchanged bytes. That standard non-slice delimiter
 closes the final picture-data region and selects the decoder's existing
-one-picture end-of-sequence publication path; the resulting picture mark selects
-the normal staged decoder barrier. Highlight-only moves likewise do not reset
-the video stream. Main maps player-one
+one-picture end-of-sequence publication path. Because a live indefinite menu
+does not assert the transport's end-of-input signal, five zero-valued
+implementation drain bytes follow the sequence end so the complete delimiter
+crosses the in-band extractor and downstream delivery lookahead. The resulting
+picture mark selects the normal staged decoder barrier. Highlight-only moves
+likewise do not reset the video stream. Main maps player-one
 D-pad/A/Start/Select and keyboard arrows/Enter/M while an authored menu is
 active.
 

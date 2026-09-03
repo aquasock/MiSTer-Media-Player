@@ -175,9 +175,11 @@ static int test_terminal_still_stage(void)
         0x00, 0x00, 0x01, 0x00, 0x00, 1u << 3,
         0x00, 0x00, 0x01, 0x01, 0xaa, 0xbb
     };
-    static const uint8_t sequence_end[] = {0x00, 0x00, 0x01, 0xb7};
+    static const uint8_t terminal_tail[] = {
+        0x00, 0x00, 0x01, 0xb7, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
     struct output_state output = {0};
-    uint8_t received[sizeof(still_video) + sizeof(sequence_end)];
+    uint8_t received[sizeof(still_video) + sizeof(terminal_tail)];
     size_t committed_bytes = 0;
     size_t committed_records = 0;
     int filtered;
@@ -225,10 +227,10 @@ static int test_terminal_still_stage(void)
                       fread(received, 1, sizeof(received), output.video) ==
                           sizeof(received) &&
                       !memcmp(received, still_video, sizeof(still_video)) &&
-                      !memcmp(received + sizeof(still_video), sequence_end,
-                              sizeof(sequence_end)),
+                      !memcmp(received + sizeof(still_video), terminal_tail,
+                              sizeof(terminal_tail)),
                       "terminal still stage did not preserve its picture "
-                      "and append one sequence end");
+                      "and append its exact sequence-end drain tail");
 
 done:
     while (output.video_head)

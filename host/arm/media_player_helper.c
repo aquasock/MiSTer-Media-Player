@@ -1936,17 +1936,25 @@ static int scheduler_drain(struct output_state *output, int at_eof)
 
 static int iso_finalize_terminal_random_access(struct output_state *output)
 {
-    static const uint8_t sequence_end[4] = {0, 0, 1, 0xb7};
+    /*
+     * The live DVD session cannot assert the transport's input_end signal.
+     * Five implementation-level drain bytes move the complete sequence-end
+     * code through the in-band extractor and downstream delivery lookahead.
+     */
+    static const uint8_t terminal_tail[9] = {
+        0x00, 0x00, 0x01, 0xb7, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
     int filtered = iso_filter_initial_random_access(output, 1);
 
     if (filtered <= 0)
         return filtered;
     if (scheduler_drain(output, 0) < 0 ||
-        write_video_immediate(output, sequence_end, sizeof(sequence_end),
-                              "DVD terminal sequence end") < 0)
+        write_video_immediate(output, terminal_tail, sizeof(terminal_tail),
+                              "DVD terminal sequence end and drain") < 0)
         return -1;
     fprintf(stderr,
-            "media_player_helper: DVD authored still appended sequence end\n");
+            "media_player_helper: DVD authored still appended sequence end "
+            "and transport drain\n");
     return 1;
 }
 

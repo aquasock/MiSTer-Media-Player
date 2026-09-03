@@ -15,17 +15,25 @@ wire [15:0] pcm_left,pcm_right;
 wire pcm_stereo,pcm_rate_48k,pcm_non_audio,pcm_valid,pcm_end;
 wire [13:0] pcm_sample_count;
 wire pcm_error,overlay_error;
-reg [7:0] stream_seen [0:7];
+reg [7:0] stream_seen [0:31];
 reg [7:0] overlay_seen [0:7];
 integer stream_count=0,overlay_count=0,cycles=0;
 reg overlay_stalled=0;
 reg [9:0] overlay_stalled_value=0;
+reg sequence_end_seen=0;
+reg [31:0] stream_window=0;
 
 always #5 clk=~clk;
 always @(posedge clk) begin
     cycles<=cycles+1;
     overlay_ready<=cycles[0];
-    if(stream_valid)begin stream_seen[stream_count]=stream_data;stream_count=stream_count+1;end
+    if(stream_valid)begin
+        stream_seen[stream_count]=stream_data;
+        stream_count=stream_count+1;
+        stream_window={stream_window[23:0],stream_data};
+        if({stream_window[23:0],stream_data}==32'h000001b7)
+            sequence_end_seen=1;
+    end
     if(overlay_stalled)begin
         if(!overlay_valid)$fatal(1,"overlay valid dropped during stall");
         if({overlay_start,overlay_last,overlay_data}!==overlay_stalled_value)
@@ -81,6 +89,14 @@ initial begin
     send_byte(8'h00);send_byte(8'h03);
     send_byte(8'h02);send_byte(8'hde);send_byte(8'had);
     send_byte(8'hbb);send_byte(8'hcc);
+    send_byte(8'h00);send_byte(8'h00);send_byte(8'h01);send_byte(8'hb7);
+    // A live indefinite DVD menu cannot assert input_end.  The helper's five
+    // transport drain bytes must expose the complete sequence end first.
+    send_byte(8'h00);send_byte(8'h00);send_byte(8'h00);
+    send_byte(8'h00);send_byte(8'h00);
+    repeat(10)@(posedge clk);
+    if(input_end||!sequence_end_seen)
+        $fatal(1,"sequence end did not leave lookahead during live session");
     input_end=1;
     repeat(20)@(posedge clk);
     if(overlay_error||pcm_error)$fatal(1,"unexpected protocol error");
@@ -90,10 +106,12 @@ initial begin
     if(overlay_count!=3||overlay_seen[0]!=8'h02||
        overlay_seen[1]!=8'hde||overlay_seen[2]!=8'had)
         $fatal(1,"overlay payload mismatch");
-    if(stream_count!=4||stream_seen[0]!=8'haa||stream_seen[1]!=8'h00||
-       stream_seen[2]!=8'hbb||stream_seen[3]!=8'hcc)
+    if(stream_count!=13||stream_seen[0]!=8'haa||stream_seen[1]!=8'h00||
+       stream_seen[2]!=8'hbb||stream_seen[3]!=8'hcc||
+       stream_seen[4]!=8'h00||stream_seen[5]!=8'h00||
+       stream_seen[6]!=8'h01||stream_seen[7]!=8'hb7)
         $fatal(1,"clean stream mismatch count=%0d",stream_count);
-    $display("dvd overlay metadata: bounded extraction and backpressure pass");
+    $display("dvd overlay metadata: bounded extraction, live sequence end and backpressure pass");
     $finish;
 end
 endmodule
