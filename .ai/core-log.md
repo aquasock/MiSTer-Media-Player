@@ -1,3 +1,32 @@
+## 923 COMMIT Unreleased 6b63c91 2026-09-02T21:16:43-07:00
+
+#### Coming From:
+
+Unreleased 6b63c91
+
+#### Purpose:
+
+Diagnose The Big Lebowski's immediate startup failure after installing the source-`6b63c91` chapter-navigation helper.
+
+#### Outcome:
+
+The fresh physical-disc run starts `dvdmenu:/dev/sr0`, forks helper PID 784 and asserts download, but helper stdout reaches EOF at 13.002 seconds and Main reaps the helper with signal 11 at 13.076 seconds after zero reads and zero submitted media bytes.  No libdvdnav title, CSS or chapter diagnostic appears, proving that the new chapter-control path is never reached.  A read-only FTP retrieval of `/media/fat/linux/MediaPlayer_Helper` finds the expected 961,956-byte length but SHA-256 `7d1ab3b073e9b120cdc285110a94c5ed47c78779cf61a21d60d17f0d8773346e`, rather than the released artifact's `556b706c8c8b4fc60a4e11c21adb62ebb40daec4201d3f4c0052d8275b59fabb`.  Bytes 1 through 458,752 exactly match the good artifact, with prefix SHA-256 `abd7f0665e7bdc22dbf3fd395e849efffdffe725a876289ebf2afb68c7fc0007`; the first difference is byte 458,753 and 428,092 bytes differ through byte 961,454.  The installed image also retains the old absolute chapter-control diagnostic and lacks the new active-VM diagnostic.  This is deterministic evidence of an interrupted in-place upload that left a hybrid new-prefix/old-tail ELF, fully explaining the immediate segmentation fault without indicating a source regression.  The supplied 1,940-byte log, 559-byte all-black screenshot and 2,818-byte no-telemetry sidecar have SHA-256 `99c947fd325de9d1f77bd95a0f6fbbfc4e9c596ba150f749cb75227669410f9c`, `d203038ddaadf5db6adf11901b670ba6930afc8dce176332662184b49780d50a` and `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004`.  A fresh exact copy of the good build-PC artifact has been restored locally as `host/build/MediaPlayer_Helper_ChapterVM_6b63c91`.
+
+#### Next Steps:
+
+Exit the core and ensure no MediaPlayer helper process is running, then copy `host/build/MediaPlayer_Helper_ChapterVM_6b63c91` to `/media/fat/linux/MediaPlayer_Helper`, set mode 755 and read the installed file back before launching the core.  Require the read-back SHA-256 to equal `556b706c8c8b4fc60a4e11c21adb62ebb40daec4201d3f4c0052d8275b59fabb`; if it does not, repeat the transfer rather than testing a mixed executable.  Once verified, rerun The Big Lebowski startup and its failing menu-launched chapter route, then provide fresh telemetry-enabled results to qualify source `6b63c91`.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 922 COMMIT Unreleased 6b63c91 2026-09-02T20:55:28-07:00
 
 #### Coming From:
@@ -1227,35 +1256,6 @@ Use the schema-21 semantic decoder on a future authored DVD-menu capture to read
 
 - tools/decode-hardware-telemetry.py
 - tools/test_hardware_telemetry.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 883 COMMIT Unreleased 68f8f26 2026-09-01T21:11:53-07:00
-
-#### Coming From:
-
-Unreleased 68f8f26
-
-#### Purpose:
-
-Record physical acceptance of ordinary MPEG Program Stream seeking and distinguish the fresh schema-21 screenshot from stale diagnostic sidecar files.
-
-#### Outcome:
-
-The user reports that source `68f8f26` seeking works perfectly on MiSTer, accepting the fixed ten-second, one-minute and five-minute ordinary `.mpg` jump boundary in hardware.  The fresh 329,184-byte 1,920-by-1,080 screenshot at SHA-256 `31f8765a08fc40e9c63191c3209d36460041d199518468e7e608f809011276e8` shows stable progressive video with the visible telemetry matrix after seeking.  Direct extraction from that image produces a complete 64-word schema-21 snapshot: every prefix, row index and parity bit passes and calculated XOR `7ea59e0a` matches word 63; hardware error flags, the recurring audio-underrun count and transport-block count are zero, while word 54 reports the expected thirty-second no-overlay fallback capture for ordinary video.  The uncertainty is a host reporting limitation rather than a malformed FPGA snapshot: `tools/decode-hardware-telemetry.py` can extract schema-21 words with `--word-dump` but its semantic parser deliberately rejects every schema above 20.  The supplied `telemetry.txt` and `MediaPlayer_ARM.log` retain morning timestamps, hashes `b8361d71fc79fb54a2459ee068ebb0e5397b15416b52e392a71d83ac6a975561` and `49ed6cf08da17fd05625ad2e4be516af2c155021cb2990ffa70fee6a74245303`, and pre-seek contents, so neither is attributed to this fresh hardware run.
-
-#### Next Steps:
-
-Preserve source `68f8f26`, `host/build/MediaPlayer_Helper_ProgramSeek_68f8f26`, `host/build/MiSTer_ProgramSeek_68f8f26` and the timing-qualified source-`dfe1057` RBF as the accepted ordinary-Program-Stream seeking baseline.  Treat semantic schema-21 decoding as a separate host-tool compatibility correction: if approved, extend the decoder for the overlay word layout without changing RTL or playback, add a known-image regression for checksum `7ea59e0a`, and make the screenshot collection script save a fresh semantic report while continuing to preserve raw word-dump evidence.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
