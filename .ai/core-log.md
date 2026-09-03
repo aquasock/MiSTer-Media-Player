@@ -1,4 +1,4 @@
-## 909 COMMIT Unreleased ??? 2026-09-02T17:54:21-07:00
+## 909 COMMIT Unreleased 338c4d5 2026-09-02T17:54:21-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Preserve the resident DVD picture when an authored indefinite submenu activation
 
 #### Outcome:
 
-The approved helper-only boundary will replace the ambiguous raw Program Stream start-code count with destination evidence from the bounded output stage and the helper's emitted H.262 picture scanner.  An active finite-still stage will retain its existing commit-and-delay behavior, an empty indefinite stage will retain cancellation and continuation, a stage containing an emitted H.262 picture will retain stale-reserve discard plus the READY/GO decoder barrier, and a nonempty indefinite stage containing only overlay or audio records will gain an explicit commit-and-continuation result that preserves Main's resident picture.  The source-`8c90e2d` redundant-root and unsupported-LPCM behavior, genuine video-bearing activation path, Main, visualizer, transport protocol, RTL and RBF remain unchanged.
+Source `338c4d5` replaces the ambiguous raw Program Stream start-code count with destination evidence from the bounded output stage and the helper's emitted H.262 picture scanner.  A nonempty indefinite activation containing no emitted picture now commits its staged overlay through the live session and acknowledges `MENU_CONTINUE` without stale-reserve discard, READY/GO or decoder reset; finite, empty and genuine picture-bearing destinations retain their prior commit, cancel and staged-hop behavior.  The focused regression reconstructs the Coming to America transaction as exactly 26 priority records and 86,664 bytes and proves byte-exact continuation, while 100 staging repetitions, 100 menu-hop repetitions, 20 overlay reconstructions, 20 unsupported-LPCM runs, strict native builds, GCC analyzer, AddressSanitizer and UndefinedBehaviorSanitizer checks, DVD random-access and SPU tests, AC-3 recovery, Program Stream seek, audio UI, timer, visualizer and all four real standalone-audio integrations pass.  GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_SceneContinue_338c4d5` at SHA-256 `6af407d0d0b8abfba1d9302ca6eb8f51ab7319bd729ff9fa98f300e7dc817a25`; the source-`8c90e2d` redundant-root and unsupported-LPCM behavior, Main, RBF, decoder, visualizer and protocol remain unchanged.
 
 #### Next Steps:
 
-Extend the output-stage classifier with the explicit overlay-only continuation result, drive it from actual emitted picture marks, and make that result commit the staged records before acknowledging `MENU_CONTINUE` without reserve discard or decoder reset.  Add a focused 26-record, 86,664-byte overlay-only transaction matching the Coming to America evidence plus retained empty, finite and picture-bearing cases; run strict native, sanitizer, analyzer, reserve, staging, menu-hop, overlay, random-access, audio, seek and visualizer regressions, then build and verify an exact static ARMv7 helper for physical retest.
+Install only `host/build/MediaPlayer_Helper_SceneContinue_338c4d5` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  On Coming to America, enter Scene Selections and require the existing background plus replacement selector to remain visible and responsive without a navigation reset; then activate a scene to prove a genuine video-bearing destination still uses the decoder barrier.  Retest Blazing Saddles at its already-active root menu, The Big Lebowski menu and title playback, and the forum disc's silent LPCM menu followed by supported AC-3 title playback before accepting the helper on hardware.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Extend the output-stage classifier with the explicit overlay-only continuation r
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
