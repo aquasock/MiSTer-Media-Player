@@ -1,3 +1,36 @@
+## 946 COMMIT Unreleased ae533a1 2026-09-03T16:22:52-07:00
+
+#### Coming From:
+
+Unreleased ce5a826
+
+#### Purpose:
+
+Install the patched Main only for MediaPlayer so development testing no longer replaces the official system-wide MiSTer executable.
+
+#### Outcome:
+
+Source `ae533a1` makes `host/build/MiSTer_MediaPlayer` the canonical patched-Main output and adds a merge-only `MiSTer.ini` fragment containing the core-reported `[MediaPlayer]` section and `main=MiSTer_MediaPlayer`.  Current build and hardware-test guidance now installs that executable at `/media/fat/MiSTer_MediaPlayer`, retains `/media/fat/MiSTer` for every other core and explains the automatic return to official Main when the Menu core loads; the published v0.9.0 records remain unchanged as historical package provenance.  The pinned-Main build applies and compiles locally with GNU 10.2.1, shell syntax and the exact fragment contract pass, and the renamed 1,182,692-byte binary is byte-identical to the tested source-`ce5a826` Main at SHA-256 `99084bc5db9062e2984ec93f40158f4bfd4c265300b314c7a7ddbd6e8081f706`; the matched 966,052-byte helper remains SHA-256 `32c9a5846aac94f4c1ce2c1bb36a752b5a1c71bfa4ab0bcf304170ef58645e72`.  The host-only test archive `host/build/MiSTer_MediaPlayer_StreamBoundary_ae533a1.zip` contains the two executables, merge fragment, installation and provenance notes plus a five-entry manifest; ZIP integrity and a fresh-extraction manifest check pass.  It is 1,335,862 bytes at SHA-256 `ab9601a2c1c1f08c42aeec842187d822d0b69ea8bb4ddd697c3a7ec42b18697c`.  Helper behavior, Main behavior, RTL, RBF and visualizer are unchanged from `ce5a826`.
+
+#### Next Steps:
+
+Leave `/media/fat/MiSTer` untouched, extract the test archive, copy `MiSTer_MediaPlayer` and `linux/MediaPlayer_Helper` to the paths in `INSTALL.txt`, merge only its `[MediaPlayer]` fragment at the end of the existing `/media/fat/MiSTer.ini`, set both executables to mode 755 and reboot.  Confirm MediaPlayer enters the alternate Main and returning to the Menu core returns to official Main, then run Futurama disc one through every finite intro still into its automatic menu.  Acceptance requires continued playback after each still, visible background and moving selector, synchronized AC-3, responsive activation and fresh log, screenshot and telemetry evidence from the matched pair.
+
+#### Files Modified:
+
+- README.md
+- assets/MiSTer_MediaPlayer.ini.fragment
+- docs/BUILDING.md
+- docs/TEST_INSTRUCTIONS.md
+- host/build_arm_stack.sh
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 945 COMMIT Unreleased ce5a826 2026-09-03T06:33:43-07:00
 
 #### Coming From:
@@ -1181,39 +1214,6 @@ Extract the archive to the MiSTer paths documented in `INSTALL.txt`, preserve th
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 906 COMMIT Unreleased 8c90e2d 2026-09-02T07:56:41-07:00
-
-#### Coming From:
-
-Unreleased fddab62
-
-#### Purpose:
-
-Preserve an already-active DVD root menu and keep unsupported private audio from terminating otherwise playable DVD navigation.
-
-#### Outcome:
-
-The helper now queries libdvdnav's current title and menu identity before a root-menu command; an already-active root menu returns continuation status `already-root` without a VM jump, output discard or decoder barrier, while title-to-root and submenu-to-root navigation retain the existing hop.  DVD private audio substreams `0x90` through `0xaf` are now skipped with one bounded diagnostic per substream instead of terminating video and navigation; the forum capture's `0xa0` DVD LPCM menu can therefore remain silent while the established AC-3 selection is preserved for subsequent title playback.  Deterministic regressions reproduced the prior fatal `0xa0` behavior and then proved complete H.262 output with no fabricated PCM, 100 root-menu identity and reserve repetitions, 20 LPCM and overlay repetitions, all four real audio seek/timer formats, the complete native helper suite, and ASAN/UBSAN coverage.  The exact static ARMv7 artifact `host/build/MediaPlayer_Helper_MenuCompat_8c90e2d` is 961,956 bytes with SHA-256 `1cad3ba0a5beefb4090126e99f2cfd35fd83a5d8fe44c36c0764033f38338f3b`; Main, RTL, the visualizer, the transport capability string and RBF are unchanged.
-
-#### Next Steps:
-
-Install only the exact helper as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main and RBF.  For Blazing Saddles, allow the automatic root menu to appear and press `M`; the background and selector must remain active and telemetry should report `status=already-root` without a navigation reserve discard or READY/GO barrier.  For the forum disc, telemetry should report that unsupported DVD LPCM substream `0xa0` is skipped, the helper must remain alive through the menu even if that menu is silent, and activating the title must restore its supported AC-3 playback.  Recheck ordinary root-menu entry, selection and title playback with Coming to America and The Big Lebowski before accepting this commit on hardware.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- host/arm/media_source.c
-- tools/test_dvd_menu_hop.c
-- tools/test_private_audio_skip.sh
 
 #### Status:
 
