@@ -2,18 +2,20 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. **v0.8.0 is the current milestone**, adding a bounded 720x480 interlaced frame-DCT all-I path with native 480i presentation, AC-3 decode, and AC-3/DTS passthrough over S/PDIF, on the v0.7.0 Program Stream, PTS, and ARM-helper foundation.
-
-Current `master` extends that released baseline with simulation-qualified
-720x480 interlaced frame-picture P/B decoding, frame or field motion, and frame
-or field DCT. A clean Quartus fit and MiSTer playback qualification are still
-required before that extension becomes a released capability.
+> **Development status:** active, pre-1.0. **v0.9.0 is the upcoming milestone**,
+> adding encrypted DVD ISO and direct USB-disc playback, authored menus and
+> navigation, expanded native interlaced decoding, file/audio seeking, a
+> standalone-audio interface and an optional MPEG-2 visualizer. Final release
+> regression and packaging are still in progress.
 
 ## Current status
 
-The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.8.0 provides:
+The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`.
+The v0.9.0 release candidate provides:
 
-- raw MPEG-2 Video elementary-stream playback, a bounded H.222.0 MPEG-2 Program Stream path for `.mpg` and `.mpeg` files, and audio-only `.mp3`, `.wav`, `.flac` or Ogg Vorbis `.ogg` playback;
+- raw MPEG-2 Video elementary-stream playback, a bounded H.222.0 MPEG-2
+  Program Stream path for `.mpg`, `.mpeg` and `.vob` files, and audio-only
+  `.mp3`, `.wav`, `.flac` or Ogg Vorbis `.ogg` playback;
 - decrypted or CSS-encrypted DVD ISO and direct USB optical-disc playback,
   including authored first-play/root menus, highlighted button navigation,
   previous/next chapter controls and pause/resume;
@@ -27,22 +29,27 @@ The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.
 - cadence as a mandatory floor: PTS may delay a picture but never presents it earlier than its encoded H.262 frame cadence;
 - hardware-qualified H.262 frame-rate codes 1 through 5: `24000/1001`, exact 24, 25, `30000/1001`, and exact 30 fps;
 - MPEG Layer II Program Stream audio and standalone MPEG-1 Layer III audio at 44.1 kHz and 48 kHz through an 8,192-frame stereo PCM FIFO;
-- a standalone-audio 720x480p interface rendered by the ARM helper, with a full-screen 4:3 CRT-safe album-art, metadata, playlist and transport composition plus track-relative elapsed, total, remaining and progress presentation;
+- a standalone-audio 720x480p interface rendered by the ARM helper, with a
+  full-screen 4:3 CRT-safe layout reserving album-art, metadata and playlist
+  regions and implementing transport, elapsed, total, remaining and progress
+  presentation;
 - an optional legal-H.262 audio visualizer pack: a translucent scanline-style interface covers a seamless MPEG-2 loop for ten seconds without playback input, then clears while the loop's eight synchronized color grades follow decoded-PCM loudness with hysteresis and bounded transitions; activity restores the interface and a missing pack retains the normal screen;
 - a clean-video queue so decoder backpressure cannot prevent timely PCM delivery;
 - continuous progressive 4:2:0 I/P/B decoding, retained DDR3 reference banks, separate B scratch storage, and coded-order/display-order presentation;
 - full 8-bit Y, Cb, and Cr reconstruction with limited-range BT.601 presentation;
 - clean Program Stream and raw-stream terminal handling, including reordered-picture flush and one explicit PCM end marker;
-- a 720x480 interlaced frame-picture, frame-DCT, all-I subset with preserved top- or bottom-field-first order and native 480i timing;
+- 720x480 interlaced frame-picture I/P/B decoding with frame or field motion,
+  frame or field DCT, repeat-first-field scheduling, mixed ordinary-interlaced
+  and progressive-film frames, and native 480i timing;
 - AC-3 decode to stereo, and AC-3 or DTS passthrough to S/PDIF as IEC 61937 bursts for an external decoder.
 
 The supported subset is intentionally bounded while the architecture is being proven. These are implementation limits, not limits of H.262 or H.222.0.
 
 | Area | Current implementation |
 | --- | --- |
-| Input | Raw MPEG-2 Video `.m2v`, bounded MPEG-2 Program Stream `.mpg` / `.mpeg`, decrypted or CSS-encrypted DVD `.iso` and direct USB DVD playback through `/dev/sr0`, including authored menus, or audio-only MPEG-1 Layer III `.mp3`, RIFF WAVE `.wav`, FLAC `.flac` and Ogg Vorbis `.ogg` through the ARM helper |
+| Input | Raw MPEG-2 Video `.m2v`, bounded MPEG-2 Program Stream `.mpg` / `.mpeg` / `.vob`, decrypted or CSS-encrypted DVD `.iso` and direct USB DVD playback through `/dev/sr0`, including authored menus, or audio-only MPEG-1 Layer III `.mp3`, RIFF WAVE `.wav`, FLAC `.flac` and Ogg Vorbis `.ogg` through the ARM helper |
 | Video, progressive | 4:2:0 I, P and B pictures through 720x480 |
-| Video, interlaced | Current `master`: 720x480 at 30000/1001, 4:2:0 frame pictures with I, P and B coding, frame or field motion, frame or field DCT, top- or bottom-field-first presentation, and mixed ordinary-interlaced/progressive-film frames within one interlaced sequence. Field pictures remain unsupported; Quartus and MiSTer qualification are pending |
+| Video, interlaced | 720x480 at 30000/1001, 4:2:0 frame pictures with I, P and B coding, frame or field motion, frame or field DCT, top- or bottom-field-first presentation, repeat-first-field scheduling, and mixed ordinary-interlaced/progressive-film frames. Field pictures remain unsupported |
 | Picture types | Coded-order/display-order presentation with B reordering |
 | Presentation rates | H.262 frame-rate codes 1..5; codes 6..8 are rejected before transport |
 | Program Stream timing | Picture PTS on a 33-bit / 90 kHz FPGA timeline with cadence-floor enforcement |
@@ -59,7 +66,13 @@ The frozen `rtl/mpeg2fpga/` tree remains historical reference material and is no
 
 ## Installation
 
-Download the [v0.8.0 pre-release](https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.8.0). It requires three matching runtime files. Back up the existing files before replacing them, and verify the unpacked files against the package's `SHA256SUMS`.
+Until v0.9.0 is published, the latest public package is the
+[v0.8.0 pre-release](https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.8.0).
+The v0.9.0 package will contain a matching RBF, patched Main and helper plus the
+optional visualizer and optical-drive launcher. Back up the existing files,
+extract the ZIP at the root of `/media/fat`, preserve executable permissions
+and verify its `SHA256SUMS`. Do not combine runtime files from different
+releases.
 
 | Release file | MiSTer destination | SHA-256 |
 | --- | --- | --- |
@@ -69,7 +82,14 @@ Download the [v0.8.0 pre-release](https://github.com/aquasock/MiSTer-Media-Playe
 
 `MiSTer` is a patched Main and is not optional: it passes the core's `Audio output` selection to the helper and yields during backpressured media transfers to keep the menu responsive. An older Main may display the core's option without passing its selection to the helper. The helper must be executable. Reboot after installing Main. Mixing v0.8.0 components with a different Main, helper, or RBF is unsupported.
 
-Current development builds can also place `assets/USB DVD Drive.dvd` at the
+The v0.9.0 package adds these paths:
+
+| Release file | MiSTer destination | Required for |
+| --- | --- | --- |
+| `linux/MediaPlayer_Visualizer.mmpvis` | `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` | Standalone-audio visualizer; audio still works if omitted |
+| `games/MediaPlayer/USB DVD Drive.dvd` | `/media/fat/games/MediaPlayer/USB DVD Drive.dvd` | Direct playback from `/dev/sr0` |
+
+The launcher is tracked as `assets/USB DVD Drive.dvd` and is installed at the
 absolute path `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`. Selecting that
 launcher opens the inserted optical disc through `dvd:/dev/sr0`; the marker's
 contents are not media data. The drive does not need to be mounted.
@@ -78,13 +98,22 @@ session during preflight, then fills a 4 MiB launch reserve inside an 8 MiB
 HPS-RAM ring before playback begins. The ring is direct-disc-only and does not
 consume FPGA M10K memory.
 
-The development menu separates `Run DVD-Video`, `Open MPEG-2 Video`, and
+The v0.9.0 menu separates `Run DVD-Video`, `Open MPEG-2 Video`, and
 `Open WAV, MP3, FLAC, OGG` so each picker exposes only its relevant files.
 Aspect Ratio defaults to 16:9 with 4:3 as the alternate; Deinterlacer Mode
 offers Bob and Weave. Telemetry defaults to Off for normal playback; turning it
 On reveals the internally captured hardware snapshot and enables the combined
 Main/helper diagnostic log on the next playback start. The Audio Test and Audio
 Output choices are unchanged.
+
+- To play a disc in the USB drive, choose `Run DVD-Video` and select
+  `games/MediaPlayer/USB DVD Drive.dvd`.
+- To play an ISO or file, choose `Open MPEG-2 Video` and select `.iso`, `.m2v`,
+  `.mpg`, `.mpeg` or `.vob`.
+- To play standalone audio, choose `Open WAV, MP3, FLAC, OGG`.
+
+The `.dvd` launcher is required for direct optical playback. Merely installing
+the RBF, Main and helper does not add `/dev/sr0` to MiSTer's file browser.
 
 For `.iso` and `.dvd` playback, player-one Left and Right select the previous
 or next chapter and Start toggles pause/resume while the MiSTer OSD is closed.
@@ -123,29 +152,26 @@ Main-to-FPGA transport; a long pause can still raise the current FPGA audio
 FIFO-underrun telemetry because this ARM-only boundary cannot add an explicit
 pause state to the core.
 
-## Release qualification
+## v0.9.0 release qualification
 
-All three v0.8.0 runtime binaries reproduced byte for byte from source baseline `2f1d32c`. The published annotated tag points to `af43de2`; later documentation commits do not change the qualified binaries.
-
-The clean Quartus Prime Lite 17.0.2 build used fitter seed 17 and produced the RBF listed above:
-
-- RBF size: 4,332,740 bytes; 0 errors and 208 warnings, with the same warning identifier set as the accepted build;
-- fit: 31,464 ALMs (75%), 50,273 registers, 512 of 553 M10K blocks (93%), and 67 DSP blocks;
-- setup +0.243 ns, hold +0.251 ns, recovery +2.865 ns, removal +0.564 ns, and minimum pulse width +0.925 ns; all reported total negative slack is zero.
-
-The helper is 399,340 bytes and patched Main is 1,170,340 bytes, with the hashes in the installation table. Both reproduced using ARM GNU 10.2; Main uses pinned upstream `0a8fb44`.
-
-Recorded host regressions cover cadence telemetry, eleven DVD-ceiling tests, guarded Main transfers and fault handling, AC-3 decode/downmix, byte-identical AC-3/DTS passthrough, and the unchanged full-length MPEG Layer II PCM output. The corrected seven hand tests completed all 360 pictures each. Progressive I/P/B playback is supported by a run with 121 reference and 239 B pictures. Native interlaced tests had no deadline gaps; the native deadline counters are not a progressive cadence qualification.
-
-The Main responsiveness fix was measured separately: maximum media-poll occupancy on test one fell from 160,937 to 9,287 microseconds, and the user reported normal menu response. The 2,000-microsecond work budget is not a hard latency guarantee. Full-movie interlaced testing is recorded separately and retains the known one-or-two-slot repeat at a large-picture scene cut.
-
-The public ZIP and all three runtime hashes match the qualified package. A confirmation hardware run after installation from that final package remains unrecorded; publication and binary identity do not supply that missing evidence. See the [v0.8.0 release notes](docs/RELEASE_NOTES_v0.8.0.md) for the qualification scope and remaining limits.
+The current candidate uses the timing-qualified source-`dfe1057` RBF, source
+`3689cca` patched Main, the source-`932dc22` interface/visualizer behavior and
+source-`0f1165c` helper. The user is running the final functional and regression
+matrix; the required clean release reproduction and final package hashes remain
+open. See the [v0.9.0 release notes](docs/RELEASE_NOTES_v0.9.0.md) for current
+source provenance, timing/resource figures, validation scope and limitations.
 
 ## Releases
 
 Milestone releases use semantic-version tags on GitHub. RBF assets retain the normal MiSTer date-coded naming convention.
 
-Current milestone:
+Upcoming milestone:
+
+- **v0.9.0** — DVD ISO/direct-disc playback, authored menus, expanded native
+  interlaced decoding, seeking, consumer audio, visualizer and production
+  telemetry. Release qualification is in progress.
+
+Current published milestone:
 
 - **[v0.8.0](https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.8.0)** — bounded native 480i all-I playback, AC-3 decode, AC-3/DTS passthrough, and responsive Main media transfers; binary `MediaPlayer_20260827.rbf`.
 
@@ -154,59 +180,38 @@ Previous milestones:
 - **v0.7.0** — bounded Program Stream input, real picture PTS, MPEG Layer II audio, and full-length audio-video playback; binary `MediaPlayer_20260824.rbf`.
 - **v0.6.0** — sustained progressive 720x480 real-stream I/P/B playback with native 23.976/24/25-fps cadence; binary `MediaPlayer_20260822.rbf`.
 
-See [the v0.8.0 release notes](docs/RELEASE_NOTES_v0.8.0.md) for package size, hashes and publication provenance. Historical qualification remains in each version's notes and the [changelog](CHANGELOG.md).
+See the [v0.9.0 release-candidate notes](docs/RELEASE_NOTES_v0.9.0.md) for the
+new milestone and [v0.8.0 release notes](docs/RELEASE_NOTES_v0.8.0.md) for the
+current public package. Historical qualification remains in each version's
+notes and the [changelog](CHANGELOG.md).
 
 ## Converting media with FFmpeg
 
-Two shapes play: a progressive Program Stream, and the narrower interlaced 480i
-subset. Pick by what you want on screen, and read Known limitations first — most
-material that fails does so because of picture structure, not encoding quality.
-
-### Progressive
-
-Progressive 720x480 4:2:0 with I, P and B pictures, plus MPEG Layer II or AC-3
-audio. This exact-24-fps, 48 kHz recipe is a suitable starting point:
+This is the project's recommended "house recipe" for a conservative 720x480,
+exact-24-fps MPEG-2 Program Stream with optional stereo MP2 audio:
 
 ```bash
 ffmpeg -hide_banner -y \
-  -i "input.mp4" \
-  -map 0:v:0 -map 0:a:0 \
-  -vf "fps=24,scale=720:480:force_original_aspect_ratio=decrease:flags=bicubic,pad=720:480:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1" \
-  -c:v mpeg2video -pix_fmt yuv420p -threads 1 -flags +bitexact \
-  -g 24 -bf 2 -q:v 6 -qmin 2 -qmax 12 \
+  -i "input.*" \
+  -map 0:v:0 -map '0:a:0?' -sn -dn \
+  -vf "scale=w='if(gte(dar,16/9),720,2*round(405*dar/2))':h='if(gte(dar,16/9),2*round(1280/(3*dar)),480)':flags=lanczos+accurate_rnd:in_color_matrix=bt709:out_color_matrix=bt601:in_range=limited:out_range=limited,pad=720:480:(ow-iw)/2:(oh-ih)/2:black,setsar=32/27,format=yuv420p,fps=24" \
+  -c:v mpeg2video -profile:v main -level:v main \
+  -pix_fmt yuv420p -threads 1 -flags:v +bitexact \
+  -g 24 -bf 2 -b_strategy 0 -mbd rd -trellis 2 \
+  -q:v 3 -qmin 2 -qmax 12 \
+  -maxrate:v 8000k -bufsize:v 1835008 \
   -sc_threshold 1000000000 -mpv_flags +strict_gop \
-  -c:a mp2 -ar 48000 -ac 2 -b:a 192k \
-  -f vob "output.mpg"
+  -aspect 16:9 -colorspace smpte170m -color_range tv \
+  -c:a mp2 -ar 48000 -ac 2 -b:a 320k \
+  -f mpeg "output.mpg"
 
 tools/media.sh verify "output.mpg"
 ```
 
-Use `-an` and omit the audio codec options for a video-only Program Stream. Raw
-`.m2v` elementary streams remain supported.
-
-For AC-3 instead, replace the audio options with `-c:a ac3 -ar 48000 -ac 6 -b:a
-448k`. A 5.1 track is only heard as 5.1 through S/PDIF passthrough; in HDMI mode
-it is downmixed to stereo and its LFE is discarded.
-
-### Interlaced 480i
-
-The released v0.8.0 path is deliberately narrow: 720x480 at 30000/1001,
-4:2:0, I-pictures only, frame-structured, frame DCT and frame prediction.
-Current `master` additionally admits interlaced P and B frame pictures and
-implements both field motion and field DCT, including their combined case.
-Those additions are covered by deterministic pixel-oracle simulations but are
-not yet a hardware-qualified release.
-
-For a simple 15-minute compatibility clip, use the shared media command:
-
-```bash
-tools/media.sh convert input.vob output.mpg
-tools/media.sh probe output.mpg
-```
-
-The conversion command produces a conservative 720x480 MPEG-2 Program Stream
-with 48 kHz stereo AC-3 audio. Direct DVD/VOB playback remains the preferred
-test when qualifying the decoder's actual compatibility envelope.
+The optional audio map lets silent input convert successfully. Replace
+`input.*` with the source filename; this does not mean a shell wildcard is
+required. See [preparing media files](docs/MEDIA_CONVERSION.md) for what the
+recipe produces, verification guidance and the other supported file paths.
 
 ### Audio
 
@@ -309,7 +314,11 @@ ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host arm
 ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host main
 ```
 
-The build script pins minimp3, miniaudio, stb_vorbis, liba52, MiSTer Main, dependency hashes, and the Main patch. Release candidates require reproducible FPGA, helper, and Main binaries plus host and MiSTer regression evidence. See [building and testing](docs/BUILDING.md) for the current workflow.
+The build script pins minimp3, miniaudio, stb_vorbis, liba52, libdvdcss,
+libdvdread, libdvdnav, MiSTer Main, dependency hashes and the Main patch. Release
+candidates require reproducible FPGA, helper, Main and visualizer artifacts plus
+host and MiSTer regression evidence. See [building and testing](docs/BUILDING.md)
+for the current workflow.
 
 ## Known limitations
 
@@ -319,7 +328,12 @@ The build script pins minimp3, miniaudio, stb_vorbis, liba52, MiSTer Main, depen
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
 - The standalone-audio screen contains a CRT-safe 4:3 composition for album artwork, title/artist/album tags, the current playlist, transport controls, centered elapsed/total/remaining time and a duration-relative progress bar. Track timing, fixed keyboard seeking and absolute progress tracking are active; artwork, metadata, playlist entries, playlist summary fields, arbitrary-position scrubbing and FPGA-aware pause state remain later display boundaries.
 - The optional `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` asset is generated with `python3 tools/generate-audio-visualizer.py host/build/MediaPlayer_Visualizer.mmpvis`. It contains eight aligned, interlaced top-field-first, three-picture closed-GOP MPEG-2 variants, not malformed decoder input. The helper rejects progressive or otherwise incompatible packs so the native-480i player overlay cannot be bypassed. It sends one selected GOP at each source phase, limits every change to one adjacent grade per GOP, applies hysteresis to its fixed RMS thresholds, and limits each video admission to 4 KiB between PCM records. The two-bit player overlay uses a transparent background, a translucent dark panel and opaque text and borders; while it is present, the loop is capped at grade three. The helper clears that overlay after ten playback seconds without input, restores the full zero-through-seven brightness range without changing the GOP cadence, and restores the capped overlay on pause/resume or seek activity. The fixed thresholds do not provide per-track automatic gain.
-- Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. Current `master` also implements 720x480-at-30000/1001 interlaced frame-picture I/P/B decoding with frame or field motion, frame or field DCT, per-picture `repeat_first_field`, and mixed ordinary-interlaced/progressive-film frame pictures, but this remains simulation-qualified until a clean fit and MiSTer playback pass. Field pictures and 576i remain rejected. DVD subtitle tracks and broader systems-layer behavior remain separate limitations.
+- Progressive 4:2:0 video is supported through 720x480 and decodes I, P and B
+  pictures. The v0.9.0 candidate also supports 720x480-at-30000/1001
+  interlaced frame-picture I/P/B decoding with frame or field motion, frame or
+  field DCT, per-picture `repeat_first_field`, and mixed ordinary-interlaced/
+  progressive-film frames. Field pictures and 576i remain rejected. DVD
+  subtitle tracks and broader systems-layer behavior remain separate limits.
 - Comprehensive playback pixel accuracy remains unqualified. Simulation comparisons cover decoder reconstruction, and a targeted hardware-screenshot comparison found the chroma-edge difference below; that comparison is not a full playback pixel-validation suite.
 - Sharp colour transitions show one blended pixel column that an independent software decoder does not produce, consistent with horizontal chroma upsampling in the display path. It is obvious on synthetic colour bars and subtle on ordinary material, and it is not specific to any picture type.
 - On material whose peak coded picture is large enough, one or two display slots are missed at that picture, shown as a repeated frame rather than a dropped one. This is a property of input buffer depth against peak picture size, not of the stream; the qualified full-length fixture hits it once, at a scene cut.
@@ -376,9 +390,18 @@ tools/mister.sh screenshot-stream 60 playback-frames
 - `rtl/mpeg2fpga/` — frozen legacy reference; inactive in `files.qip`.
 - `docs/` — architecture, building, testing, and release documentation.
 
+See [preparing media files](docs/MEDIA_CONVERSION.md) for the recommended
+FFmpeg recipe.
+
 ## Development roadmap
 
-Future work can extend the qualified envelope toward 50/59.94/60 fps, field-picture structures and 576i, broader Program Stream handling, additional audio codecs and multi-track selection, qualification of playback pixel accuracy against a software decoder, improved chroma presentation, an FPGA-native pause state, DVD seeking and arbitrary-position scrubbing, DVD subtitle presentation and title/angle selection, optical-drive discovery, and qualification of native 480i through external HDMI-to-SDI hardware.
+Future work can extend the qualified envelope toward 50/59.94/60 fps,
+field-picture structures and 576i, broader Program Stream handling, DVD LPCM
+and additional audio codecs, multi-track selection, album-art/tag/playlist
+population, playback pixel qualification, improved chroma presentation, an
+FPGA-native pause state, DVD seeking and arbitrary-position scrubbing, DVD
+subtitle presentation and title/angle selection, optical-drive discovery, and
+qualification of native 480i through external HDMI-to-SDI hardware.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
@@ -452,7 +475,7 @@ The AI can propose RTL all day long. If the regression fails, timing fails, Quar
 If you want to experiment with AI-assisted FPGA development on this project:
 
 1. Fork or clone:
-   
+
    `https://github.com/aquasock/MiSTer-Media-Player`
 
 2. Configure your **local copies** of `.ai/core.md` and `.ai/core-bootstrap.md` for your own development environment.

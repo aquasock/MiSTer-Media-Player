@@ -6,6 +6,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ## Unreleased
 
+Target milestone: **v0.9.0**. The changes below are implemented in the current
+release candidate; final regression, clean-build and packaging qualification
+are still in progress.
+
 ### Added
 
 - Added authored DVD first-play and root-menu navigation for ISO images and
@@ -33,12 +37,27 @@ This project is still in active pre-release development. Published milestone rel
 - Added keyboard Space play/pause and P/N previous/next chapter bindings, and
   corrected physical player-one Start so it reaches the same Main-side pause
   action without changing the helper or FPGA image.
-- Added simulation-qualified 720x480 interlaced frame-picture P/B decoding with frame or field motion and frame or field DCT. Deterministic P, B and combined field-motion/field-DCT fixtures cover field selection, integer and half-sample prediction, all luma block layouts, chroma residuals, and coded-order/display-order presentation against independently FFmpeg-checked pixel oracles.
+- Added 720x480 interlaced frame-picture I/P/B decoding with frame or field
+  motion, frame or field DCT, repeat-first-field scheduling and mixed ordinary
+  interlaced/progressive-film frames. Deterministic fixtures cover the syntax
+  and reconstruction paths, and the current timing-qualified RBF has been
+  exercised with commercial DVD material.
 - Added helper-only RIFF WAVE playback through the existing MediaPlayer picker and PCM transport. Pinned miniaudio source is compiled into the static helper to convert ordinary PCM/float mono, stereo or multichannel WAV input to 44.1 or 48 kHz signed stereo without an FPGA change.
 - Added helper-only FLAC playback through the existing MediaPlayer picker and PCM transport. The same statically compiled miniaudio dependency converts 16- or 24-bit mono, stereo or multichannel FLAC input to 44.1 or 48 kHz signed stereo without an FPGA change.
 - Added helper-only Ogg Vorbis playback through a dedicated audio picker. The
   miniaudio backend uses pinned stb_vorbis source and converts decoded audio to
   44.1 or 48 kHz signed stereo without a target runtime library or FPGA change.
+- Added `.vob` selection and transactional fixed-step seeking for `.mpg` and
+  `.mpeg` Program Streams, with 10-second, 1-minute and 5-minute keyboard jumps.
+- Added an ARM-rendered standalone-audio interface with elapsed, total and
+  remaining time, duration-relative progress, matching fixed-step seeking and
+  replay-ready end-of-file behavior.
+- Added an optional helper-driven MPEG-2 audio visualizer. Eight validated
+  color/brightness grades follow decoded-PCM loudness while the player overlay
+  remains visible for ten seconds after playback starts or user input.
+- Added default-off production telemetry. Enabling it before playback exposes
+  the hardware snapshot and writes the combined Main/helper log to
+  `/tmp/MediaPlayer_ARM.log`.
 
 ### Changed
 
@@ -59,7 +78,19 @@ This project is still in active pre-release development. Published milestone rel
   preflight it reads through an 8 MiB asynchronous HPS-RAM ring with a 4 MiB
   launch reserve, insulating playback from transient optical-read stalls
   without consuming FPGA memory or changing file and ISO paths.
-- Opened the production P/B admission path for interlaced frame pictures and kept native 480i output ownership asserted across admitted I, P and B pictures. Quartus fit/timing and MiSTer playback qualification remain pending.
+- Replaced the old progressive diagnostic raster with native 720x480p output at
+  `60000/1001`, while supported interlaced material retains native 480i output.
+- Made clean `.mpg`, `.mpeg` and standalone-audio EOF retain the final display
+  in a paused replay-ready state; Play restarts the same file from its beginning.
+- Hardened direct optical playback with session reuse, interruptible output
+  discard and staged transitions for slow or picture-bearing authored menus.
+- Preserved DVD menu state across overlay-only submenus, finite and indefinite
+  stills, unsupported private audio, scene-page changes and title/menu returns.
+- Skip unsupported DVD LPCM/private audio without terminating navigation, so a
+  silent LPCM menu can still lead to a title with supported audio.
+- Added a narrowly gated helper compatibility normalization for malformed DVD
+  4:2:0 progressive-frame chroma flags, including repeated authored stills;
+  conforming streams remain byte-identical.
 - Reconciled current release, build, architecture and test guidance with the published v0.8.0 package; labelled older design and regression instructions as historical.
 - Corrected v0.8.0 tag provenance, compressed ZIP size, the role of patched Main, and the distinction between a targeted hardware pixel comparison and comprehensive playback qualification. Runtime code, the release tag and packaged binaries are unchanged.
 

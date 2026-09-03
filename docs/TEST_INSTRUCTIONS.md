@@ -1,36 +1,88 @@
-# Hardware playback test
+# v0.9.0 hardware playback test
 
-The stability target is straightforward: play the first 15 minutes of ordinary
-DVD/VOB material from many discs. DVD menus, MiSTer menu integration and full
-movie completion are outside this gate.
+Use a matched RBF, patched Main, ARM helper and visualizer pack. Reboot after
+replacing `MiSTer`; make the helper executable. For direct optical testing,
+install `USB DVD Drive.dvd` at
+`/media/fat/games/MediaPlayer/USB DVD Drive.dvd` and confirm the drive is
+present as readable `/dev/sr0`. The disc does not need to be mounted.
 
-Before testing, build and install the current core:
+Run normal playback first with `Telemetry` Off. Turn it On only for a fresh
+diagnostic run; the next playback creates `/tmp/MediaPlayer_ARM.log`, and later
+playback replaces it.
 
-```bash
-tools/build.sh install
-```
+## MPEG Program Stream
 
-For each disc:
+1. Open a recommended-recipe `.mpg` containing MPEG-2 I/P/B video and MP2
+   audio. Require clean native 480p video, audible synchronized audio and
+   responsive OSD access.
+2. Use Alt+Left/Right, Ctrl+Left/Right and Ctrl+Alt+Left/Right. Require clean
+   10-second, 1-minute and 5-minute jumps without old frames or audio crossing
+   the restart.
+3. Let the file end. The final frame may remain visible, but playback must be
+   paused and replay-ready. Press Space or player-one Start and require the file
+   to restart from the beginning.
+4. Spot-check an existing `.mpeg`, `.vob` and raw `.m2v`. Fixed seeking and
+   replay-ready EOF apply to Program Streams, not raw `.m2v`.
 
-1. Start a movie file and let it play for 15 minutes.
-2. Watch for corruption, stalls, audio loss, sync drift or a wedged core.
-3. Record the filename and whether it passed.
-4. Before starting another file, collect the helper log and a scaled screenshot:
+## Standalone audio
+
+1. Play representative MP3, WAV, FLAC and Ogg Vorbis files. Require clean audio
+   and a stable player interface with centered elapsed, total and remaining
+   times plus a moving duration-relative progress bar.
+2. With `MediaPlayer_Visualizer.mmpvis` installed, require the translucent
+   interface over the moving visualizer for the first ten playback seconds.
+   After ten seconds without input the overlay must clear and reveal the full
+   visualizer. Its color/brightness should change smoothly with loudness.
+3. Press Space to pause and resume, then exercise any fixed seek. User activity
+   must restore the interface immediately and restart the ten-second interval;
+   visualizer cadence must remain constant while playing and paused.
+4. Let one track reach EOF. The last valid presentation may remain visible, but
+   the player must enter its paused replay-ready state. Press Space or
+   player-one Start and require a restart from the beginning.
+5. Temporarily omit the visualizer pack and confirm audio still plays using the
+   ordinary full-frame interface.
+
+## DVD ISO and direct optical playback
+
+Use multiple authored commercial DVDs where legally permitted, including discs
+with scene-selection pages, finite or indefinite still menus, picture-bearing
+menu transitions and different supported audio layouts.
+
+For both one `.iso` and the `/dev/sr0` launcher:
+
+1. Start from a clean core launch and require first-play/title startup without
+   a helper exit, decoder latch or indefinite black screen.
+2. Press M or player-one Select to enter the root menu. Move in every direction,
+   activate a normal button and exercise an authored automatic action.
+3. Enter Scene Selection, change pages in both directions, launch a scene,
+   return to the menu, resume the saved title position, reopen Scene Selection
+   and change pages again.
+4. During title playback, use P/N or player-one Left/Right for previous/next
+   chapters, including several rapid changes. Require each hop to resume on a
+   clean picture with working audio and controls.
+5. Pause and resume with Space or player-one Start, then return to the root menu
+   after several minutes of playback.
+6. If a menu uses unsupported DVD LPCM, silence is expected there; navigation
+   must remain responsive and supported title audio must begin afterward.
+7. Repeat the navigation loop several times. A long optical read may delay a
+   transition, but it must not deadlock Main/helper transport.
+
+## Telemetry capture
+
+After reproducing a failure, leave that state visible and collect all three
+artifacts before starting another file:
 
 ```bash
 tools/mister.sh log disc-name.log
 tools/mister.sh screenshot disc-name.png
+tools/mister.sh screenshot-stream 60 disc-name-frames
 ```
 
-For periodic visual samples during playback, run:
+The stream command stores MiSTer's scaled 1440x1080 PNG output without resizing
+or recompression. Press Ctrl+C to stop an unlimited stream started without a
+duration. Also retain the decoded telemetry sidecar when the screenshot helper
+produces one.
 
-```bash
-tools/mister.sh screenshot-stream 900 disc-name-frames
-```
-
-The stream command stores MiSTer's native scaled 1440x1080 PNG output without
-resizing or recompression. Press Ctrl+C to stop an unlimited capture started
-without a duration.
-
-The core is considered stable when failures require hunting for unusual discs,
-rather than when only one known movie works.
+Record the exact source commit and installed SHA-256 values with every result.
+The candidate is ready for release only when the complete clean-built runtime
+set passes the MPEG, audio, ISO and direct-disc matrix without a new regression.

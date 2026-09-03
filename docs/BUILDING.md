@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Intel/Altera Quartus Prime 17.0.x; the v0.8.0 release used Lite 17.0.2 Build 602
+- Intel/Altera Quartus Prime 17.0.x; current release builds use Lite 17.0.2 Build 602
 - MiSTer-compatible DE10-Nano target hardware
 - the repository cloned with its `sys/` framework content present
 - ARM GNU 10.2 for the helper and patched MiSTer Main, plus a native C compiler for host verification
@@ -38,9 +38,11 @@ Do not treat a successful functional compile as sufficient when a change can aff
 
 ## Hardware validation
 
-The current [hardware test instructions](TEST_INSTRUCTIONS.md) use 15-minute
-segments from ordinary DVDs. This directly measures the compatibility target
-without keeping a simulation and generated-fixture framework in the repository.
+The current [hardware test instructions](TEST_INSTRUCTIONS.md) cover MPEG files,
+standalone audio, DVD ISO/direct-disc startup, authored menus, scene selection,
+chapters, pause/resume, telemetry and repeated navigation. Real commercial DVD
+testing complements the deterministic host and simulation suite because disc
+authoring and optical-drive behavior cannot be represented by one fixture.
 
 Install the matched RBF, helper and patched Main as described in the [README](../README.md#installation). Record installed hashes and playback observations; collect the helper log before another playback overwrites it, followed by a fresh scaled screenshot.
 
@@ -54,7 +56,27 @@ ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host arm
 ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host main
 ```
 
-The outputs are `host/build/media_player_helper.native`, `host/build/MediaPlayer_Helper`, and `host/build/MiSTer`. The script pins minimp3, miniaudio, stb_vorbis, liba52, libdvdcss, libdvdread, libdvdnav and upstream Main and verifies fetched dependencies. The DVD libraries are linked statically into the helper; encrypted ISO support does not use a target-installed `libdvdcss.so`. Check each command's exit status before using an output: the presence of an older binary or the absence of the word "error" in a log does not prove a successful build. Keep the toolchain in a persistent location.
+The outputs are `host/build/media_player_helper.native`,
+`host/build/MediaPlayer_Helper`, and `host/build/MiSTer`. The script pins
+minimp3, miniaudio, stb_vorbis, liba52, libdvdcss, libdvdread, libdvdnav and
+upstream Main and verifies fetched dependencies. The DVD libraries are linked
+statically into the helper; encrypted ISO or disc support does not use a
+target-installed `libdvdcss.so`. Check each command's exit status before using
+an output: the presence of an older binary or the absence of the word "error"
+in a log does not prove a successful build. Keep the toolchain in a persistent
+location.
+
+Generate the optional standalone-audio visualizer pack with FFmpeg:
+
+```bash
+python3 tools/generate-audio-visualizer.py \
+  host/build/MediaPlayer_Visualizer.mmpvis
+```
+
+The helper validates the pack signature, index, GOP structure and native
+interlaced picture metadata before using it. The target install path is
+`/media/fat/linux/MediaPlayer_Visualizer.mmpvis`; a missing or rejected pack
+falls back to the full-frame audio interface.
 
 The deterministic menu boundary tests are `tools/test_dvd_spu.c`,
 `tools/test_dvd_random_access.c` plus the three
@@ -100,7 +122,13 @@ Quartus-generated directories and reports are ignored by `.gitignore`, including
 
 For release qualification or suspicious incremental behavior, use a fresh checkout or export of the exact tracked source with no reused Quartus database or prior output binaries. Preserve the previous qualified artifacts. Compare new hashes only after all required commands exit successfully.
 
-v0.8.0 reproduced all three binaries from `2f1d32c`; its published tag is `af43de2`. Source and toolchain provenance, seed 17, runtime hashes and measured timing are recorded in the [v0.8.0 release notes](RELEASE_NOTES_v0.8.0.md). Reproducing a binary does not constitute a new hardware run.
+The v0.9.0 candidate's existing timing-qualified RBF provenance, source
+composition and open release gates are recorded in the
+[v0.9.0 release notes](RELEASE_NOTES_v0.9.0.md). Release qualification requires
+a clean tracked-source export, wiped generated/dependency directories, a fresh
+Quartus build, fresh ARM/Main/visualizer artifacts, checksum comparison and a
+final hardware pass. Reproducing a binary does not itself constitute a new
+hardware run.
 
 ## Known presentation limitation
 
