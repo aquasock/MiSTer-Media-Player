@@ -184,7 +184,10 @@ int main(void)
     state.menu_pci.hli.btnit[1].auto_action_mode = 1;
     state.menu_pci.hli.btn_colit.btn_coli[0][0] = 0x12345678u;
     state.menu_pci.hli.btn_colit.btn_coli[0][1] = 0x87654321u;
-    iso_refresh_highlight(&state, 1, 1);
+    failed |= require(iso_complete_directional_selection(&state, 1) ==
+                          MEDIA_SOURCE_DVD_MENU_CONTINUE,
+                      "ordinary directional selection lacked an explicit "
+                      "continuation decision");
     failed |= require(state.dvd_state.highlight_display &&
                       state.dvd_state.highlight_palette == 0x12345678u,
                       "selected button used the activation palette");

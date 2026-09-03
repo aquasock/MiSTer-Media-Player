@@ -63,9 +63,12 @@ does not assert the transport's end-of-input signal, five zero-valued
 implementation drain bytes follow the sequence end so the complete delimiter
 crosses the in-band extractor and downstream delivery lookahead. The resulting
 picture mark selects the normal staged decoder barrier. Highlight-only moves
-likewise do not reset the video stream. Directional commands explicitly select
-the authored target button; when that target carries `auto_action_mode`, the
-helper activates it and routes the resulting DVD VM action through the same
+likewise do not reset the video stream. Main marks every menu command as a
+pending navigation decision. Directional commands explicitly select the
+authored target button and return the existing menu-continuation acknowledgment
+for an ordinary, invalid or rejected highlight move, preserving the resident
+stream. When a valid target carries `auto_action_mode`, the helper activates it
+and instead routes the resulting DVD VM action through the same READY/GO
 pending-menu or stream-hop boundary as Enter. A rejected directional selection
 is ignored without terminating playback. Main maps player-one
 D-pad/A/Start/Select and keyboard arrows/Enter/M while an authored menu is

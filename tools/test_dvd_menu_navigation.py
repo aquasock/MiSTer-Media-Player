@@ -52,7 +52,9 @@ COMMAND_RE = re.compile(
     rb"media_source: (?:DVD|ISO) menu command="
     rb"(up|down|left|right|activate|root) pci_lbn=([0-9]+) "
     rb"buttons=([0-9]+) before=([0-9]+) target=([0-9]+) "
-    rb"after=([0-9]+) status=(ok|error|ignored) highlight=([01]) "
+    rb"after=([0-9]+) "
+    rb"status=(ok|error|ignored|ignored-error|auto-action|already-root) "
+    rb"highlight=([01]) "
     rb"rect=([0-9]+),([0-9]+),([0-9]+),([0-9]+) "
     rb"palette=([0-9a-fA-F]{8})"
 )
@@ -162,6 +164,8 @@ def main():
     action_due = None
     actions = [MENU_RIGHT, MENU_DOWN, MENU_LEFT, MENU_UP, MENU_ACTIVATE]
     action_index = 0
+    action_pending = False
+    action_decisions = 0
     root_sent = False
     menu_events = 0
     leave_events = 0
@@ -199,10 +203,11 @@ def main():
                 parent.send(bytes((ROOT_MENU,)))
                 root_sent = True
             if (ready_events and menu_events and counts[3] and
-                    action_index < len(actions) and
+                    action_index < len(actions) and not action_pending and
                     (action_due is None or now >= action_due)):
                 parent.send(bytes((actions[action_index],)))
                 action_index += 1
+                action_pending = True
                 action_due = now + 0.35
 
             activation_done = (hop_counts["activate"] and ready_events >= 2) or (
@@ -237,6 +242,9 @@ def main():
                         continue
                     if event[0] == READY:
                         ready_events += 1
+                        if action_pending:
+                            action_pending = False
+                            action_decisions += 1
                         parent.send(bytes((GO,)))
                     elif event[0] == MENU_ENTER:
                         menu_events += 1
@@ -244,6 +252,9 @@ def main():
                         leave_events += 1
                     elif event[0] == MENU_CONTINUE:
                         continue_events += 1
+                        if action_pending:
+                            action_pending = False
+                            action_decisions += 1
                     elif event[0] == 0xff:
                         raise RuntimeError("helper reported a control error")
                 elif key.data == "video":
@@ -365,7 +376,8 @@ def main():
                              activation_random_access and
                              video_bytes_after_second_ready > 0)
     passed = (return_code in (0, -15) and root_sent and activation_passed and
-              action_index == len(actions) and ready_events >= 1 and
+              action_index == len(actions) and not action_pending and
+              action_decisions == len(actions) and ready_events >= 1 and
               menu_events >= 1 and counts[1] >= 1 and counts[2] >= 1 and
               counts[3] >= 1 and counts[5] >= 86400 and
               overlay_state["visible_highlights"] >= 1 and
@@ -400,6 +412,7 @@ def main():
           f"visible_highlights={overlay_state['visible_highlights']} "
           f"highlight_pixels={overlay_state['highlight_pixels']} "
           f"commands={command_counts} transitions={direction_transitions} "
+          f"action_decisions={action_decisions}/{len(actions)} "
           f"root_sent={int(root_sent)} helper_rc={return_code} "
           f"elapsed={time.monotonic() - started:.2f}s")
     if not passed:

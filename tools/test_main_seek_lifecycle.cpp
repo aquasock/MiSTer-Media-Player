@@ -143,7 +143,8 @@ static int require_patch_markers(const char *path)
         "replay ready and paused; press Play to restart",
         "audio_visualizer_controls &&",
         "activity-command-error",
-        "if (helper_fd < 0 || chapter_barrier) return;"
+        "if (helper_fd < 0 || chapter_barrier) return;",
+        "navigation_pending = true;\n+\t\tif (!send_control(command))"
     };
     std::ifstream input(path);
 
@@ -156,6 +157,10 @@ static int require_patch_markers(const char *path)
     for (const char *marker : markers)
         failed |= require(patch.find(marker) != std::string::npos,
                           marker);
+    failed |= require(
+        patch.find("if (command != MEDIA_CONTROL_MENU_ACTIVATE &&") ==
+            std::string::npos,
+        "directional menu command bypasses the navigation decision");
     return failed;
 }
 
@@ -196,23 +201,23 @@ int main(int argc, char **argv)
     failed |= require(boundary.discards == 0,
                       "seek decision phase discarded active output");
 
-    MainLifecycle menu_continue_boundary;
-    menu_continue_boundary.submit(4096);
-    menu_continue_boundary.request_navigation();
-    menu_continue_boundary.submit(8192);
-    menu_continue_boundary.navigation_control(
+    MainLifecycle directional_continue_boundary;
+    directional_continue_boundary.submit(4096);
+    directional_continue_boundary.request_navigation();
+    directional_continue_boundary.submit(8192);
+    directional_continue_boundary.navigation_control(
         NavigationEvent::menu_continue);
-    menu_continue_boundary.submit(16384);
-    failed |= require(menu_continue_boundary.download_active &&
-                          !menu_continue_boundary.navigation_pending &&
-                          !menu_continue_boundary.chapter_barrier,
-                      "menu continuation left a pending state");
-    failed |= require(menu_continue_boundary.resets == 0 &&
-                          menu_continue_boundary.discards == 0 &&
-                          menu_continue_boundary.go_commands == 0,
-                      "menu continuation reset or discarded output");
-    failed |= require(menu_continue_boundary.submitted == 28672,
-                      "unresolved navigation stopped submitted output");
+    directional_continue_boundary.submit(16384);
+    failed |= require(directional_continue_boundary.download_active &&
+                          !directional_continue_boundary.navigation_pending &&
+                          !directional_continue_boundary.chapter_barrier,
+                      "directional continuation left a pending state");
+    failed |= require(directional_continue_boundary.resets == 0 &&
+                          directional_continue_boundary.discards == 0 &&
+                          directional_continue_boundary.go_commands == 0,
+                      "directional continuation reset or discarded output");
+    failed |= require(directional_continue_boundary.submitted == 28672,
+                      "directional continuation stopped submitted output");
 
     MainLifecycle navigation_hop_boundary;
     navigation_hop_boundary.submit(4096);
@@ -271,7 +276,7 @@ int main(int argc, char **argv)
     if (failed)
         return 1;
     std::cout << "main seek lifecycle PASS no-op_resets=0 valid_resets=1 "
-                 "navigation=drain-until-decision "
+                 "directional_navigation=continue-or-ready "
                  "clean_eof=replay-ready play=relaunch "
                  "failed_eof=released\n";
     return 0;

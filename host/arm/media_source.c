@@ -1002,6 +1002,13 @@ static int iso_menu_target_auto_action(pci_t *pci, int target)
            pci->hli.btnit[target - 1].auto_action_mode;
 }
 
+static int iso_complete_directional_selection(
+    struct iso_source_state *state, int32_t after)
+{
+    iso_refresh_highlight(state, after > 0, (int)after);
+    return MEDIA_SOURCE_DVD_MENU_CONTINUE;
+}
+
 static int iso_menu_identity_is_root(int32_t title, int32_t part)
 {
     return title == 0 && part == DVD_MENU_Root;
@@ -1095,7 +1102,7 @@ static int iso_menu_command(struct iso_source_state *state,
         if (status != DVDNAV_STATUS_OK) {
             iso_log_menu_command(state, command, pci, before, target, before,
                                  "ignored-error");
-            return MEDIA_SOURCE_DVD_NO_HOP;
+            return MEDIA_SOURCE_DVD_MENU_CONTINUE;
         }
         break;
     case MEDIA_SOURCE_DVD_MENU_ACTIVATE:
@@ -1145,14 +1152,13 @@ static int iso_menu_command(struct iso_source_state *state,
     if (dvdnav_get_current_highlight(state->navigation, &after) !=
             DVDNAV_STATUS_OK)
         after = 0;
-    iso_refresh_highlight(state, after > 0, (int)after);
     iso_log_menu_command(state, command, pci, before, target, after, "ok");
-    return 0;
+    return iso_complete_directional_selection(state, after);
 
 ignored:
     iso_log_menu_command(state, command, pci, before, target, before,
                          "ignored");
-    return 0;
+    return MEDIA_SOURCE_DVD_MENU_CONTINUE;
 }
 
 static int iso_seek(void *opaque, int64_t offset,
