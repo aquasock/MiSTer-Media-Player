@@ -1,3 +1,32 @@
+## 917 COMMIT Unreleased 101aa4a 2026-09-02T19:58:11-07:00
+
+#### Coming From:
+
+Unreleased 101aa4a
+
+#### Purpose:
+
+Qualify the terminal DVD still drain on Coming to America and isolate the later navigation hang after repeated Scene Selection input.
+
+#### Outcome:
+
+The user's physical source-`101aa4a` run validates the drain-tail boundary: multiple Scene Selection page activations update their authored backgrounds and overlays correctly, and the final 1,920-by-1,080 screenshot visibly shows the authored 9-through-12 scene page with a valid highlight.  Its checksum-valid schema-21 snapshot reports 224,821 decoder-accepted bytes from the final 224,817-byte authored still plus nine-byte terminal tail, proving the complete sequence end crossed the five-byte retained transport depth; `sequence_end_seen` and presentation completion are true, exactly one reference picture and one displayed picture completed, and decoder, presentation, PCM and overlay protocol errors are all clear.  The later apparent decoder hang is instead a deterministic helper exit: a Left command on NAV LBN 33,886 reports authored target 12 but returns highlight 2, which matches libdvdnav's directional auto-action path executing a button command and leaving that NAV packet; because the helper classified every successful arrow as highlight-only, it did not enter its existing pending-menu transition path.  The next Down command reused the departed NAV, libdvdnav returned an error, the helper exited with status one at 47.685666 seconds, and Main ended the download with reason `helper-error` while retaining the last good frame.  Before that exit the session delivered four complete overlay planes, fifty-three styles with thirty-three visual changes, and multiple successful staged still hops.  The 1,217,814-byte log, 752,950-byte screenshot and 597-byte telemetry report have SHA-256 `3bbb7824fefc4de517f97b6254890ff330fff3059757f86cd8bb87bd5558a961`, `ef5004a72a027b5263b087775f0beebcaf98bd518eb861a412c43ca48031e85f` and `cefcfd8a9389a429f290567c9f5e4b1205a9979047ba04f7f5fb6345c8dbd031`.
+
+#### Next Steps:
+
+Preserve the proven terminal still drain, staged decoder barrier, overlay continuation, Main, protocol, decoder, RTL, visualizer and RBF.  After user approval, replace libdvdnav's four directional convenience calls with explicit selection of the already-derived authored target, inspect that target's `auto_action_mode`, activate it when required, and classify the resulting action through the same existing menu-pending or stream-hop path used by Enter so a new NAV packet is consumed before later input.  Treat an independently rejected directional input as an ignored no-op rather than terminating the helper, while retaining fatal handling for activation and root-menu failures.  Extend the menu-hop regression with valid, invalid and auto-action authored targets, rerun strict native and GNU 10.2.1 ARM builds plus sanitizer, analyzer, navigation, staging, random-access, overlay, audio and seek coverage, and build only a new static ARMv7 helper for repeated Scene Selection paging and retained Blazing Saddles, The Big Lebowski and forum-disc tests.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 916 COMMIT Unreleased 101aa4a 2026-09-02T19:47:06-07:00
 
 #### Coming From:
@@ -1233,35 +1262,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 877 COMMIT Unreleased 326382a 2026-09-01T17:44:34-07:00
-
-#### Coming From:
-
-Unreleased 60d7c75
-
-#### Purpose:
-
-Perform the single permitted fitter reseed after the telemetry source passes regressions but the accepted seed-23 placement narrowly misses unrelated global setup timing.
-
-#### Outcome:
-
-The exact source-`60d7c75` build completes synthesis in 2 minutes 26 seconds, fitting in 11 minutes 22 seconds and assembly with zero errors, but is rejected by the project timing gate at negative 0.164-nanosecond global setup slack in the HDMI output clock domain.  Dedicated 60 MHz decoder and 54 MHz video setup remain clean at positive 0.265 and 2.021 nanoseconds, and global hold, recovery, removal and minimum-pulse-width slacks remain positive at 0.220, 3.826, 0.603 and 0.925 nanoseconds.  The fit uses 34,466 ALMs, 53,977 registers, 4,187,203 block-memory bits in 535 RAM blocks and 70 DSP blocks.  Source `326382a` changes only the fitter seed from 23 to 24 for the one permitted retry; the seed-23 RBF is rejected and the previously accepted source-`5f00e35` artifact remains the rollback.
-
-#### Next Steps:
-
-Change only the fitter seed from 23 to 24, rerun the ten passing focused and retained simulations from exact source, then perform one clean Quartus build and require positive global setup, hold, recovery, removal and minimum-pulse-width timing plus zero violations in the dedicated decoder and video reports.  Stop without further reseeding if seed 24 fails.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
