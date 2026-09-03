@@ -84,11 +84,13 @@ int main(void)
     char error[128];
     size_t index;
     uint32_t offset = 32u + TEST_ENTRIES * 8u;
-    static const unsigned attack[] = {1, 2, 3, 4, 5, 6, 7, 7};
+    static const unsigned covered_attack[] = {1, 2, 3, 3, 3, 3, 3, 3};
+    static const unsigned revealed_attack[] = {4, 5, 6, 7};
     static const unsigned decay[] = {6, 5, 4, 3, 2, 1, 0, 0};
     static const unsigned rise_to_two[] = {1, 2};
     static const unsigned level_two[] = {2};
     static const unsigned level_three[] = {3};
+    static const unsigned covered_recovery[] = {3, 3};
     int fd = mkstemp(path);
     FILE *stream;
 
@@ -123,8 +125,15 @@ int main(void)
         return 1;
     }
     analyze_many(visualizer, loud, 2048, 16000, 2);
-    if (expect_levels(visualizer, &capture, 480000, attack,
-                      sizeof(attack) / sizeof(attack[0])) < 0 ||
+    if (expect_levels(visualizer, &capture, 479999, covered_attack,
+                      sizeof(covered_attack) /
+                          sizeof(covered_attack[0])) < 0 ||
+        audio_visualizer_level(visualizer) != 3 ||
+        audio_visualizer_take_overlay_action(visualizer, 479999, 48000) ||
+        audio_visualizer_take_overlay_action(visualizer, 480000, 48000) != -1 ||
+        expect_levels(visualizer, &capture, 480000, revealed_attack,
+                      sizeof(revealed_attack) /
+                          sizeof(revealed_attack[0])) < 0 ||
         audio_visualizer_level(visualizer) != 7)
         return 1;
     analyze_many(visualizer, loud, 2048, 0, 64);
@@ -150,11 +159,13 @@ int main(void)
     if (expect_levels(visualizer, &capture, 480000, level_two, 1) < 0)
         return 1;
 
-    if (audio_visualizer_take_overlay_action(visualizer, 479999, 48000) ||
-        audio_visualizer_take_overlay_action(visualizer, 480000, 48000) != -1)
-        return 1;
+    analyze_many(visualizer, loud, 2048, 16000, 2);
     audio_visualizer_activity(visualizer, 480000);
-    if (audio_visualizer_take_overlay_action(visualizer, 480000, 48000) != 1)
+    if (audio_visualizer_take_overlay_action(visualizer, 480000, 48000) != 1 ||
+        expect_levels(visualizer, &capture, 480000, covered_recovery,
+                      sizeof(covered_recovery) /
+                          sizeof(covered_recovery[0])) < 0 ||
+        audio_visualizer_level(visualizer) != 3)
         return 1;
     audio_visualizer_seek(visualizer, 500000);
     if (audio_visualizer_gops_sent(visualizer) != 0)
@@ -166,8 +177,8 @@ int main(void)
                                  capture_write, &capture) != 1 ||
         audio_visualizer_service(visualizer, 500048, 48000,
                                  capture_write, &capture) != 0 ||
-        capture.writes != 2 || capture.levels[0] != 2 ||
-        capture.levels[1] != 2)
+        capture.writes != 2 || capture.levels[0] != 3 ||
+        capture.levels[1] != 3)
         return 1;
     audio_visualizer_destroy(visualizer);
 

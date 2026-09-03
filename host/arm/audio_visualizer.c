@@ -13,6 +13,7 @@
 #define VISUALIZER_LEAD_GOPS 2u
 #define VISUALIZER_IDLE_SECONDS 10u
 #define VISUALIZER_HYSTERESIS_DIVISOR 8u
+#define VISUALIZER_COVERED_LEVEL_MAX 3u
 
 static const uint32_t level_thresholds[AUDIO_VISUALIZER_LEVELS - 1u] = {
     450u, 700u, 1400u, 2500u, 4300u, 7000u, 10500u
@@ -303,6 +304,7 @@ int audio_visualizer_service(struct audio_visualizer *visualizer,
                              audio_visualizer_writer writer, void *opaque)
 {
     const struct visualizer_entry *entry;
+    unsigned selected_level;
     size_t count;
     size_t entry_index;
 
@@ -312,9 +314,13 @@ int audio_visualizer_service(struct audio_visualizer *visualizer,
         if (visualizer->gops_sent >= due_gops(visualizer,
                                               emitted_pcm_frames, rate_hz))
             return 0;
-        if (visualizer->level < visualizer->target_level)
+        selected_level = visualizer->target_level;
+        if (visualizer->overlay_visible &&
+            selected_level > VISUALIZER_COVERED_LEVEL_MAX)
+            selected_level = VISUALIZER_COVERED_LEVEL_MAX;
+        if (visualizer->level < selected_level)
             visualizer->level++;
-        else if (visualizer->level > visualizer->target_level)
+        else if (visualizer->level > selected_level)
             visualizer->level--;
         entry_index = (size_t)visualizer->level * visualizer->gop_count +
                       (size_t)(visualizer->gops_sent % visualizer->gop_count);

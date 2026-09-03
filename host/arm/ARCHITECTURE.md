@@ -243,10 +243,12 @@ a stereo RMS envelope with immediate weighted attack and slower decay, applies
 hysteresis to its fixed grade thresholds, slews by at most one adjacent grade
 per GOP, selects one complete GOP at the matching loop phase, and admits at
 most 4 KiB of its ordinary elementary bytes after a PCM record. Two GOPs of
-lead absorb coded-size variation. The native-480i DVD overlay initially covers
-this video with an opaque four-color quantization of the player screen; after
-ten seconds of emitted PCM
-without a control event, one CLEAR reveals the loop. A retained overlay STYLE
+lead absorb coded-size variation. The native-480i DVD overlay initially presents
+this video through a transparent background and translucent dark player panels
+while retaining opaque borders and text. While that interface is visible, the
+selected visualizer grade is capped at three; after ten seconds of emitted PCM
+without a control event, one CLEAR reveals the loop and restores its full
+zero-through-seven range without changing its GOP cadence. A retained overlay STYLE
 publication restores the screen immediately after activity while a new timed
 plane upload refreshes its progress and counters. Seek resets the GOP phase and
 the inactivity epoch behind the existing READY/GO decoder barrier. Successful

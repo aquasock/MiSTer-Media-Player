@@ -383,6 +383,15 @@ int main(void)
     size_t offset;
     int failed = 0;
 
+    audio_overlay_descriptor(&output, &overlay, 1);
+    failed |= require(overlay.visible && overlay.rgba[0][3] == 0x00 &&
+                      overlay.rgba[1][3] == 0xa0 &&
+                      overlay.rgba[2][3] == 0xff &&
+                      overlay.rgba[3][3] == 0xff,
+                      "audio overlay palette alpha changed");
+    failed |= require(!memcmp(overlay.rgba, overlay.highlight_rgba,
+                              sizeof(overlay.rgba)),
+                      "audio overlay highlight palette changed");
     for (offset = 0; offset < sizeof(pixels); ++offset)
         pixels[offset] = (uint8_t)(offset ^ (offset >> 8));
     overlay.pixels = pixels;
