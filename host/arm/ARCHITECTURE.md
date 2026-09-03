@@ -55,9 +55,12 @@ an overlay-only stage commits through the live session before its continuation
 acknowledgment, so generic Program Stream headers cannot blank a resident menu
 frame. If an authored still terminates a sequence-plus-I startup group before a
 later reference picture arrives, the helper uses that explicit end boundary to
-release the independently decodable still picture; the resulting picture mark
-selects the normal staged decoder barrier. Highlight-only moves likewise do not
-reset the video stream. Main maps player-one
+release the independently decodable still picture and appends one H.262
+sequence-end code after its unchanged bytes. That standard non-slice delimiter
+closes the final picture-data region and selects the decoder's existing
+one-picture end-of-sequence publication path; the resulting picture mark selects
+the normal staged decoder barrier. Highlight-only moves likewise do not reset
+the video stream. Main maps player-one
 D-pad/A/Start/Select and keyboard arrows/Enter/M while an authored menu is
 active.
 

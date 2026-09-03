@@ -175,8 +175,9 @@ static int test_terminal_still_stage(void)
         0x00, 0x00, 0x01, 0x00, 0x00, 1u << 3,
         0x00, 0x00, 0x01, 0x01, 0xaa, 0xbb
     };
+    static const uint8_t sequence_end[] = {0x00, 0x00, 0x01, 0xb7};
     struct output_state output = {0};
-    uint8_t received[sizeof(still_video)];
+    uint8_t received[sizeof(still_video) + sizeof(sequence_end)];
     size_t committed_bytes = 0;
     size_t committed_records = 0;
     int filtered;
@@ -186,7 +187,7 @@ static int test_terminal_still_stage(void)
     failed |= require(output.video != NULL,
                       "could not create terminal-still output stream");
     failed |= require(output_stage_create(&output.activation_stage,
-                                          sizeof(still_video)) == 0 &&
+                                          sizeof(received)) == 0 &&
                       output_stage_begin(output.activation_stage) == 0,
                       "could not start terminal-still activation stage");
     if (failed)
@@ -202,14 +203,13 @@ static int test_terminal_still_stage(void)
                       "terminal still escaped before its authored boundary");
     if (failed)
         goto done;
-    filtered = iso_filter_initial_random_access(&output, 1);
+    filtered = iso_finalize_terminal_random_access(&output);
     failed |= require(filtered == 1 &&
                       !output.iso_start_filter_active &&
-                      scheduler_drain(&output, 0) == 0 &&
                       output.picture_marks == 1 &&
-                      output_stage_records(output.activation_stage) == 1 &&
+                      output_stage_records(output.activation_stage) == 2 &&
                       output_stage_size(output.activation_stage) ==
-                          sizeof(still_video) &&
+                          sizeof(received) &&
                       output_stage_classify_still(
                           output.activation_stage, output.picture_marks,
                           0xffu) == OUTPUT_STAGE_STILL_HOP,
@@ -218,14 +218,17 @@ static int test_terminal_still_stage(void)
                           output.activation_stage,
                           write_output_stage_callback, &output,
                           &committed_bytes, &committed_records) == 0 &&
-                      committed_bytes == sizeof(still_video) &&
-                      committed_records == 1 &&
+                      committed_bytes == sizeof(received) &&
+                      committed_records == 2 &&
                       fflush(output.video) == 0 &&
                       fseek(output.video, 0, SEEK_SET) == 0 &&
                       fread(received, 1, sizeof(received), output.video) ==
                           sizeof(received) &&
-                      !memcmp(received, still_video, sizeof(received)),
-                      "terminal still stage changed its qualified picture");
+                      !memcmp(received, still_video, sizeof(still_video)) &&
+                      !memcmp(received + sizeof(still_video), sequence_end,
+                              sizeof(sequence_end)),
+                      "terminal still stage did not preserve its picture "
+                      "and append one sequence end");
 
 done:
     while (output.video_head)

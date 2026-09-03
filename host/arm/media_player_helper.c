@@ -1934,6 +1934,22 @@ static int scheduler_drain(struct output_state *output, int at_eof)
     return 0;
 }
 
+static int iso_finalize_terminal_random_access(struct output_state *output)
+{
+    static const uint8_t sequence_end[4] = {0, 0, 1, 0xb7};
+    int filtered = iso_filter_initial_random_access(output, 1);
+
+    if (filtered <= 0)
+        return filtered;
+    if (scheduler_drain(output, 0) < 0 ||
+        write_video_immediate(output, sequence_end, sizeof(sequence_end),
+                              "DVD terminal sequence end") < 0)
+        return -1;
+    fprintf(stderr,
+            "media_player_helper: DVD authored still appended sequence end\n");
+    return 1;
+}
+
 static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
                      int samples_per_channel, int channels, int rate_hz)
 {
@@ -3198,10 +3214,9 @@ static int wait_dvd_still(struct media_source *input,
             seconds == 0xffu ? "indefinite/" : "", seconds);
     if (menu->activation_pending && output->iso_start_filter_active &&
         output->video_head) {
-        int filtered = iso_filter_initial_random_access(output, 1);
+        int filtered = iso_finalize_terminal_random_access(output);
 
-        if (filtered < 0 ||
-            (filtered > 0 && scheduler_drain(output, 0) < 0))
+        if (filtered < 0)
             return -1;
         if (!filtered)
             fprintf(stderr,
