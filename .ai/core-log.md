@@ -1,3 +1,32 @@
+## 910 COMMIT Unreleased 338c4d5 2026-09-02T18:42:42-07:00
+
+#### Coming From:
+
+Unreleased 338c4d5
+
+#### Purpose:
+
+Qualify source `338c4d5` on Coming to America's authored Scene Selection submenu and isolate its retained stale background.
+
+#### Outcome:
+
+The user's physical run partially validates source `338c4d5`: Coming to America's root menu remains responsive, three Right commands select button four, activation succeeds at 20.903318 seconds, and the helper enters Scene Selection without the prior black reset or freeze.  The destination again reaches an indefinite still after 249 generic Program Stream start codes with zero emitted pictures and exactly 26 staged overlay records totaling 86,664 bytes; the new path commits those records, reports `overlay-indefinite-still`, and Main preserves the resident frame at 21.449442 seconds without READY/GO, a reserve discard, a fatal error, an audio underrun or an overlay protocol error.  The 726,845-byte screenshot visibly retains the root-menu background behind the newly selected submenu state, matching the user's report that Scene Selection backgrounds do not update.  Source inspection identifies the remaining boundary: every DVD navigation reset enables the initial random-access filter, that filter deliberately waits for an I picture plus a later I/P reference, and an authored single-picture still can reach its terminal still event with the complete sequence and I frame still queued rather than emitted or staged.  The 1,274,033-byte log, screenshot and 844-byte checksum-valid schema-21 telemetry report have SHA-256 `9b690188ccaad68ae7680fcc65843b03b6c6b7aca192884f2e6413f8c16061b0`, `238fb6333307a29408d98f76f32cdd3583de061e010305d8d29ae5bdc42359fb` and `aa1db16a7eb1c8fc76a9cbd67d3b4ba123a8ea0649087c27188af33e5353c8ed`.
+
+#### Next Steps:
+
+Preserve source `338c4d5` overlay-only continuation, genuine multi-picture activation hops, Main, RBF, decoder and protocol.  After user approval, extend DVD random-access filtering with an explicit authored-end finalization that accepts a complete sequence-plus-I still picture without requiring a later reference, neutralizes unsafe pre-context and trailing B pictures, and remains unavailable during ordinary streaming; invoke that finalization only when a DVD activation reaches its authored still boundary, drain the qualified queued video into the existing stage, and let its real picture mark select the established decoder barrier.  Add focused incomplete-stream, finalized-I-only, trailing-B, overlay-only and ordinary I/P regressions, rerun the complete helper and sanitizer suites, and build only a new ARM helper for Coming to America plus retained Blazing Saddles, The Big Lebowski and forum-disc testing.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 909 COMMIT Unreleased 338c4d5 2026-09-02T17:54:21-07:00
 
 #### Coming From:
@@ -1258,39 +1287,6 @@ Upload only `output_files/MediaPlayer_20260901_add7d00.rbf` to the MiSTer while 
 - tools/test_mpeg2_output_timing.sv
 - tools/test_mpeg2_progressive_cadence.sv
 - tools/test_mpeg2_progressive_framebuffer.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 870 COMMIT Unreleased 59f6312 2026-09-01T02:45:32-07:00
-
-#### Coming From:
-
-Unreleased 22e780a
-
-#### Purpose:
-
-Stage ambiguous post-activation DVD output until the authored menu destination can be classified without losing its background frame or regressing Play.
-
-#### Outcome:
-
-Source `59f6312` adds a bounded four-megabyte helper output transaction for ambiguous same-title DVD menu activations.  When libdvdnav returns pending activation, the helper resets its parser and audio scheduling state and stages all newly generated video, in-band PCM and overlay records with their record order and priority tags while the old physical-DVD reserve remains independently drainable.  A destination containing payload followed by an indefinite still now discards only that stale reserve, enters the established Main ready/go decoder barrier and commits the staged destination after rearm without clearing the newly decoded subpicture state; an empty indefinite still cancels its empty transaction and retains the resident-frame continuation, while a finite still commits immediately and retains the authored delay and later title-hop behavior.  Chapter, root, menu-leave and superseding-command paths cancel obsolete transactions explicitly, and partial commit failure retains only unwritten records.  One hundred repeated byte-exact stage tests, stale-reserve preservation, AddressSanitizer, UndefinedBehaviorSanitizer, GCC analyzer, strict native and sanitizer helper builds, capabilities, output-reserve, AC-3 recovery, random-access, subpicture and menu-hop tests plus twenty production 86,400-byte overlay reconstructions pass.  The Raspberry Pi GNU 10.2.1 toolchain builds `host/build/MediaPlayer_Helper_SceneStage_59f6312`, a 916,852-byte static stripped ARMv7 EABI5 hard-float executable with no dynamic section at SHA-256 `12946bc036c497088a9016db5a613f4a9c33c17e19c6fce75e97fd3f060026bc`; Main, RTL, the source-`1bf06db` RBF, record formats and Quartus are untouched.
-
-#### Next Steps:
-
-Exit MediaPlayer so the running helper releases its executable, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_SceneStage_59f6312`, restore executable mode if needed and verify the recorded size and SHA-256 while preserving the installed source-`22e780a` Main and source-`1bf06db` RBF.  Reboot or restart the core, enter the root menu, activate Scene Selection and require its authored background and selector to appear and remain interactive instead of retaining the root background and freezing; then activate a scene, return to the root menu, exercise Play, directional controls and several chapter hops, and capture a fresh helper/Main log, screenshot and telemetry for physical acceptance.  The decisive log path must show activation staging, a payload-bearing indefinite staged hop, stale reserve discard, ready/go release and staged commit without `MENU_CONTINUE` for the Scene Selection transition.
-
-#### Files Modified:
-
-- host/arm/Makefile
-- host/arm/media_player_helper.c
-- host/arm/output_stage.c
-- host/arm/output_stage.h
-- tools/test_output_stage.c
 
 #### Status:
 
