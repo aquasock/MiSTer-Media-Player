@@ -1,3 +1,32 @@
+## 916 COMMIT Unreleased 101aa4a 2026-09-02T19:47:06-07:00
+
+#### Coming From:
+
+Unreleased a0cdd43
+
+#### Purpose:
+
+Correct and execute the live sequence-end metadata regression on the authorized simulation PC before hardware testing the terminal DVD still drain.
+
+#### Outcome:
+
+The first exact-source Icarus Verilog 12.0 run on build PC `10.10.0.42` rejected the new regression because its blocking assignment updated the observed stream window before the detector expression shifted the current byte a second time; this was test instrumentation, not helper or extractor behavior.  Source `101aa4a` changes only that detector to compare the already-updated 32-bit window.  A clean isolated checkout of exact source `101aa4a` then compiles and passes `test_dvd_overlay_metadata.sv`, reconstructing thirteen clean stream bytes, preserving the three-byte `02 de ad` overlay payload under backpressure, and observing the complete `00 00 01 b7` sequence end while `input_end` remains low.  The GNU 10.2.1 ARM rebuild succeeds and produces the byte-identical 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_SceneDrain_101aa4a` at SHA-256 `9cde18ced068f6b39865a24f79ade13a3c07810324c185d1df6cf3d54a422d33`; source `a0cdd43` remains the helper implementation boundary, and Main, protocol, decoder, RTL, visualizer and RBF remain unchanged.
+
+#### Next Steps:
+
+Install only `host/build/MediaPlayer_Helper_SceneDrain_101aa4a` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  On Coming to America, enter Scene Selection and require its authored background plus selector to appear, remain responsive and launch a selected scene; return to the root menu and repeat the transition.  With telemetry enabled, require at least 224,828 decoder-accepted bytes for this still, sequence-end recognition, one completed reference picture and one displayed picture.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback and the forum disc's silent LPCM menu followed by supported AC-3 title playback, then provide a fresh log, screenshot and telemetry snapshot for qualification.
+
+#### Files Modified:
+
+- tools/test_dvd_overlay_metadata.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 915 COMMIT Unreleased a0cdd43 2026-09-02T19:41:21-07:00
 
 #### Coming From:
@@ -1229,41 +1258,6 @@ Change only the fitter seed from 23 to 24, rerun the ten passing focused and ret
 #### Files Modified:
 
 - MediaPlayer.qsf
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 876 COMMIT Unreleased 60d7c75 2026-09-01T17:15:50-07:00
-
-#### Coming From:
-
-Unreleased 5f00e35
-
-#### Purpose:
-
-Add a default-off production telemetry mode that preserves internal schema-21 capture while suppressing both its visible raster and ARM/Main diagnostic logging.
-
-#### Outcome:
-
-Source `60d7c75` assigns unused saved OSD status bit 125 to `Telemetry`, defaulting its zero state to Off.  FPGA schema-21 counters, capture timing and snapshot contents remain unconditional, while a three-stage video-domain synchronizer gates only diagnostic raster composition and an updated first-stage timing exception replaces the obsolete status-125 target from the deleted diagnostic generator.  Main samples the same bit before each helper launch: Off opens no diagnostic log, removes any stale RAM-backed `/tmp/MediaPlayer_ARM.log`, makes Main diagnostic writes no-ops and redirects helper standard error to `/dev/null`, while On retains the existing combined Main/helper log.  Both generated Main patches apply in order to pinned upstream `0a8fb44` and the resulting complete ARM translation unit builds successfully with GNU 10.2; the new focused RTL regression covers hidden capture, live reveal and re-hide.  Media bytes, decoder scheduling, PCM delivery, DVD navigation, audio-interface rendering and diagnostic schemas are unchanged.
-
-#### Next Steps:
-
-Push exact source `60d7c75`, run the focused visibility test and retained media, audio-interface, overlay and DDR regressions on build PC `10.10.0.42`, build strict native and ARM Main/helper artifacts, then build one timing-qualified RBF from the accepted seed-23 baseline.  Preserve the matched RBF and Main locally for user transfer, then require physical MPG, DVD and standalone-audio playback with no visible stripe or `/tmp/MediaPlayer_ARM.log` at Telemetry Off, plus a retained visible stripe and combined log after enabling Telemetry before playback.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-- MediaPlayer.sdc
-- README.md
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- host/main_mister/0002-mediaplayer-overlay-trace.patch
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/test_telemetry_visibility.sv
 
 #### Status:
 
