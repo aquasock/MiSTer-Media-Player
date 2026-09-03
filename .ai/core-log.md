@@ -1,4 +1,4 @@
-## 913 COMMIT Unreleased ??? 2026-09-02T19:06:18-07:00
+## 913 COMMIT Unreleased d75327e 2026-09-02T19:06:18-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Terminate a qualified single-picture DVD menu stream so the existing decoder com
 
 #### Outcome:
 
-The approved helper-only boundary will append the standard four-byte H.262 `sequence_end_code` after terminal random-access filtering qualifies and drains an authored sequence-plus-I group into the pending DVD activation stage.  The terminator will remain inside the same bounded transaction before its established READY/GO barrier, provide the non-slice delimiter required to close the final `picture_data()` region, and assert the decoder's existing one-picture end-of-sequence publication path.  It will not fabricate a picture, modify authored picture bytes, weaken ordinary random-access qualification, or change overlay-only continuation, Main, protocol, decoder logic, visualizer, RTL or RBF.
+Source `d75327e` appends the standard four-byte H.262 `sequence_end_code` after terminal random-access filtering qualifies and drains an authored sequence-plus-I group into the pending DVD activation stage.  The terminator remains inside the same bounded transaction before its established READY/GO barrier, provides the non-slice delimiter required to close the final `picture_data()` region, and asserts the decoder's existing one-picture end-of-sequence publication path without fabricating a picture or changing authored picture bytes.  The production-path regression proves the exact input sequence and I picture remain byte-identical, exactly one `00 00 01 b7` record follows them, the emitted picture count remains one and the stage retains picture-bearing hop classification.  Strict native, GNU 10.2.1 ARM, full helper sanitizer and analyzer builds pass, as do focused and retained random-access, overlay, staging, reserve, menu-hop, DVD SPU, AC-3, LPCM-skip, Program Stream seek, audio UI, timer and visualizer checks; high-risk repetitions complete at 100 random-access, 20 terminal overlay, 100 staging, 100 menu-hop and 20 LPCM-skip runs, and real MP3, WAV, FLAC and Ogg seek integrations pass.  The 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_SceneEnd_d75327e` has SHA-256 `fc5545cf2f652c5d92bc0cfd9fa77205fdc25fe9c5d823c47d30689f32c19ce5`; ordinary random access, overlay-only continuation, Main, protocol, decoder logic, visualizer, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Add the terminal delimiter only after successful terminal still qualification, document the authored-still contract, and extend the production-path stage regression to require unchanged source video followed by exactly one sequence-end code while preserving picture count and hop classification.  Run strict native, analyzer, sanitizer, random-access, overlay, staging, reserve, menu-hop, DVD SPU, AC-3, LPCM-skip, audio UI, visualizer and real audio-seek regressions with repeated high-risk cases, then build and verify one static ARMv7 helper for physical Coming to America Scene Selection testing plus retained Blazing Saddles, The Big Lebowski and forum-disc coverage.
+Install only `host/build/MediaPlayer_Helper_SceneEnd_d75327e` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  On Coming to America, enter Scene Selection and require its authored background plus selector to appear, remain responsive and launch a selected scene; return to the root menu and repeat entry to cover the full transition.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback, and the forum disc's silent LPCM menu followed by supported AC-3 title playback; if Scene Selection remains black, collect a fresh helper/Main log, screenshot and schema-21 telemetry to verify sequence-end recognition, one completed reference picture and one displayed picture.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Add the terminal delimiter only after successful terminal still qualification, d
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
