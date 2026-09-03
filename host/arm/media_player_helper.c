@@ -51,6 +51,7 @@
 #define PCM_STARTUP_VIDEO_BYTES     28672u
 #define PCM_RECORD_FRAMES           16u
 #define VIDEO_SLICE_BYTES           256u
+#define H262_RESTART_DIAGNOSTIC_PREFIX_BYTES 256u
 #define MP3_PROBE_BYTES             (64u * 1024u)
 #define ID3V2_TAG_LIMIT             (64u * 1024u * 1024u)
 #define ISO_PTS_DISCONTINUITY_TICKS (10u * 90000u)
@@ -1382,6 +1383,154 @@ static int queue_video(struct output_state *output, const uint8_t *data,
     return 0;
 }
 
+struct h262_restart_diagnostic {
+    int sequence_header_valid;
+    unsigned horizontal_size;
+    unsigned vertical_size;
+    unsigned aspect_ratio;
+    unsigned frame_rate_code;
+    unsigned sequence_marker;
+    int sequence_extension_valid;
+    size_t sequence_extension_offset;
+    uint8_t sequence_extension[6];
+    int picture_header_valid;
+    unsigned temporal_reference;
+    unsigned picture_coding_type;
+    int picture_extension_valid;
+    size_t picture_extension_offset;
+    uint8_t picture_extension[5];
+};
+
+static int h262_start_code_at(const uint8_t *data, size_t size,
+                              size_t offset, uint8_t code)
+{
+    return offset + 4u <= size && data[offset] == 0x00u &&
+           data[offset + 1u] == 0x00u && data[offset + 2u] == 0x01u &&
+           data[offset + 3u] == code;
+}
+
+static void collect_h262_restart_diagnostic(
+    const uint8_t *data, size_t size,
+    const struct dvd_random_access_result *restart,
+    struct h262_restart_diagnostic *diagnostic)
+{
+    size_t offset;
+
+    memset(diagnostic, 0, sizeof(*diagnostic));
+    diagnostic->sequence_extension_offset = SIZE_MAX;
+    diagnostic->picture_extension_offset = SIZE_MAX;
+
+    if (h262_start_code_at(data, size, restart->sequence_offset, 0xb3u) &&
+        restart->sequence_offset + 11u <= size) {
+        const uint8_t *header = data + restart->sequence_offset + 4u;
+
+        diagnostic->sequence_header_valid = 1;
+        diagnostic->horizontal_size =
+            ((unsigned)header[0] << 4) | ((unsigned)header[1] >> 4);
+        diagnostic->vertical_size =
+            (((unsigned)header[1] & 0x0fu) << 8) | header[2];
+        diagnostic->aspect_ratio = header[3] >> 4;
+        diagnostic->frame_rate_code = header[3] & 0x0fu;
+        diagnostic->sequence_marker = (header[6] >> 5) & 1u;
+    }
+
+    if (h262_start_code_at(data, size, restart->intra_offset, 0x00u) &&
+        restart->intra_offset + 6u <= size) {
+        const uint8_t *header = data + restart->intra_offset + 4u;
+
+        diagnostic->picture_header_valid = 1;
+        diagnostic->temporal_reference =
+            ((unsigned)header[0] << 2) | ((unsigned)header[1] >> 6);
+        diagnostic->picture_coding_type = (header[1] >> 3) & 7u;
+    }
+
+    for (offset = restart->sequence_offset + 4u;
+         offset + 10u <= size && offset < restart->intra_offset;
+         offset++) {
+        if (h262_start_code_at(data, size, offset, 0xb5u) &&
+            (data[offset + 4u] >> 4) == 1u) {
+            diagnostic->sequence_extension_valid = 1;
+            diagnostic->sequence_extension_offset = offset;
+            memcpy(diagnostic->sequence_extension, data + offset + 4u,
+                   sizeof(diagnostic->sequence_extension));
+            break;
+        }
+    }
+
+    for (offset = restart->intra_offset + 4u;
+         offset + 9u <= size && offset < restart->next_reference_offset;
+         offset++) {
+        if (h262_start_code_at(data, size, offset, 0xb5u) &&
+            (data[offset + 4u] >> 4) == 8u) {
+            diagnostic->picture_extension_valid = 1;
+            diagnostic->picture_extension_offset = offset;
+            memcpy(diagnostic->picture_extension, data + offset + 4u,
+                   sizeof(diagnostic->picture_extension));
+            break;
+        }
+    }
+}
+
+static void log_h262_restart_diagnostic(
+    const uint8_t *data, size_t size, int terminal,
+    const struct dvd_random_access_result *restart)
+{
+    static const char hex[] = "0123456789abcdef";
+    struct h262_restart_diagnostic diagnostic;
+    char prefix[H262_RESTART_DIAGNOSTIC_PREFIX_BYTES * 2u + 1u];
+    const uint8_t *picture;
+    size_t prefix_bytes = size;
+    size_t offset;
+
+    if (prefix_bytes > H262_RESTART_DIAGNOSTIC_PREFIX_BYTES)
+        prefix_bytes = H262_RESTART_DIAGNOSTIC_PREFIX_BYTES;
+    for (offset = 0; offset < prefix_bytes; offset++) {
+        prefix[offset * 2u] = hex[data[offset] >> 4];
+        prefix[offset * 2u + 1u] = hex[data[offset] & 0x0fu];
+    }
+    prefix[prefix_bytes * 2u] = '\0';
+    collect_h262_restart_diagnostic(data, size, restart, &diagnostic);
+    picture = diagnostic.picture_extension;
+
+    fprintf(stderr,
+            "media_player_helper: H262 restart diagnostic terminal=%d "
+            "bytes=%zu sequence=%zu intra=%zu next_reference=%zu "
+            "prefix_bytes=%zu prefix=%s\n",
+            terminal, size, restart->sequence_offset, restart->intra_offset,
+            restart->next_reference_offset, prefix_bytes, prefix);
+    fprintf(stderr,
+            "media_player_helper: H262 restart fields sequence_valid=%d "
+            "size=%ux%u aspect=%u rate=%u marker=%u "
+            "sequence_ext_valid=%d sequence_ext_offset=%zu "
+            "sequence_ext=%02x%02x%02x%02x%02x%02x "
+            "picture_valid=%d temporal=%u type=%u "
+            "picture_ext_valid=%d picture_ext_offset=%zu "
+            "picture_ext=%02x%02x%02x%02x%02x "
+            "f_code=%u,%u,%u,%u intra_dc=%u structure=%u top=%u "
+            "frame_pred=%u concealment=%u q_scale=%u intra_vlc=%u "
+            "alternate_scan=%u repeat=%u chroma420=%u progressive=%u\n",
+            diagnostic.sequence_header_valid, diagnostic.horizontal_size,
+            diagnostic.vertical_size, diagnostic.aspect_ratio,
+            diagnostic.frame_rate_code, diagnostic.sequence_marker,
+            diagnostic.sequence_extension_valid,
+            diagnostic.sequence_extension_offset,
+            diagnostic.sequence_extension[0], diagnostic.sequence_extension[1],
+            diagnostic.sequence_extension[2], diagnostic.sequence_extension[3],
+            diagnostic.sequence_extension[4], diagnostic.sequence_extension[5],
+            diagnostic.picture_header_valid,
+            diagnostic.temporal_reference, diagnostic.picture_coding_type,
+            diagnostic.picture_extension_valid,
+            diagnostic.picture_extension_offset, picture[0], picture[1],
+            picture[2], picture[3], picture[4], picture[0] & 0x0fu,
+            picture[1] >> 4, picture[1] & 0x0fu, picture[2] >> 4,
+            (picture[2] >> 2) & 3u, picture[2] & 3u,
+            picture[3] >> 7, (picture[3] >> 6) & 1u,
+            (picture[3] >> 5) & 1u, (picture[3] >> 4) & 1u,
+            (picture[3] >> 3) & 1u, (picture[3] >> 2) & 1u,
+            (picture[3] >> 1) & 1u, picture[3] & 1u,
+            picture[4] >> 7);
+}
+
 static int iso_filter_initial_random_access(struct output_state *output,
                                             int terminal)
 {
@@ -1425,6 +1574,8 @@ static int iso_filter_initial_random_access(struct output_state *output,
         free(video);
         return filtered;
     }
+
+    log_h262_restart_diagnostic(video, video_size, terminal, &filter_result);
 
     copied = 0;
     for (chunk = output->video_head; chunk; chunk = chunk->next) {

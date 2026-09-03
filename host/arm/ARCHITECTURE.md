@@ -122,7 +122,10 @@ sequence header, an I reference and the following I/P reference are all
 present. Contextless pictures before that sequence and open-GOP B pictures
 between the I and following reference have their start codes neutralized while
 all byte positions and timestamp records remain stable; the complete sequence
-context and every later authored picture remain unchanged. This delegates CSS
+context and every later authored picture remain unchanged. Each successful
+initial filter writes a diagnostic-only, 256-byte-bounded post-filter prefix
+and parsed sequence, picture and coding-extension fields to stderr; this does
+not alter, delay or duplicate any media byte. This delegates CSS
 access to libdvdcss and is not a claim of CSS conformance.
 
 The direct optical backend retains one authenticated libdvdnav session across

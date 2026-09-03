@@ -21,6 +21,81 @@ static int require(int condition, const char *message)
     return 1;
 }
 
+static int test_h262_restart_diagnostic_fields(void)
+{
+    uint8_t video[64] = {0};
+    uint8_t original[sizeof(video)];
+    struct dvd_random_access_result restart = {
+        .sequence_offset = 0,
+        .intra_offset = 24,
+        .next_reference_offset = sizeof(video)
+    };
+    struct h262_restart_diagnostic diagnostic;
+    static const uint8_t sequence_extension[] = {
+        0x14, 0x8a, 0x00, 0x01, 0x00, 0x23
+    };
+    static const uint8_t picture_extension[] = {
+        0x8f, 0xff, 0xf3, 0x80, 0x00
+    };
+    int failed = 0;
+
+    video[0] = 0x00;
+    video[1] = 0x00;
+    video[2] = 0x01;
+    video[3] = 0xb3;
+    video[4] = 0x2d;
+    video[5] = 0x01;
+    video[6] = 0xe0;
+    video[7] = 0x34;
+    video[10] = 0x20;
+    video[12] = 0x00;
+    video[13] = 0x00;
+    video[14] = 0x01;
+    video[15] = 0xb5;
+    memcpy(video + 16, sequence_extension, sizeof(sequence_extension));
+    video[24] = 0x00;
+    video[25] = 0x00;
+    video[26] = 0x01;
+    video[27] = 0x00;
+    video[28] = 0x00;
+    video[29] = 0x08;
+    video[32] = 0x00;
+    video[33] = 0x00;
+    video[34] = 0x01;
+    video[35] = 0xb5;
+    memcpy(video + 36, picture_extension, sizeof(picture_extension));
+    memcpy(original, video, sizeof(video));
+
+    collect_h262_restart_diagnostic(video, sizeof(video), &restart,
+                                    &diagnostic);
+    failed |= require(!memcmp(video, original, sizeof(video)),
+                      "H262 diagnostic changed the media bytes");
+    failed |= require(diagnostic.sequence_header_valid &&
+                          diagnostic.horizontal_size == 720 &&
+                          diagnostic.vertical_size == 480 &&
+                          diagnostic.aspect_ratio == 3 &&
+                          diagnostic.frame_rate_code == 4 &&
+                          diagnostic.sequence_marker == 1,
+                      "H262 diagnostic decoded the sequence header wrongly");
+    failed |= require(diagnostic.sequence_extension_valid &&
+                          diagnostic.sequence_extension_offset == 12 &&
+                          !memcmp(diagnostic.sequence_extension,
+                                  sequence_extension,
+                                  sizeof(sequence_extension)),
+                      "H262 diagnostic missed the sequence extension");
+    failed |= require(diagnostic.picture_header_valid &&
+                          diagnostic.temporal_reference == 0 &&
+                          diagnostic.picture_coding_type == 1,
+                      "H262 diagnostic decoded the picture header wrongly");
+    failed |= require(diagnostic.picture_extension_valid &&
+                          diagnostic.picture_extension_offset == 32 &&
+                          !memcmp(diagnostic.picture_extension,
+                                  picture_extension,
+                                  sizeof(picture_extension)),
+                      "H262 diagnostic missed the picture extension");
+    return failed;
+}
+
 static int read_pipe_bytes(int fd, uint8_t *data, size_t size)
 {
     size_t offset = 0;
@@ -383,6 +458,7 @@ int main(void)
     size_t offset;
     int failed = 0;
 
+    failed |= test_h262_restart_diagnostic_fields();
     audio_overlay_descriptor(&output, &overlay, 1);
     failed |= require(overlay.visible && overlay.rgba[0][3] == 0x00 &&
                       overlay.rgba[1][3] == 0xa0 &&
