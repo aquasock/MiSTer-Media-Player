@@ -1,3 +1,32 @@
+## 932 COMMIT Unreleased 932dc22 2026-09-02T23:55:22-07:00
+
+#### Coming From:
+
+Unreleased 932dc22
+
+#### Purpose:
+
+Accept the helper-only visualizer blend and localize The Big Lebowski's fresh failure to its initial non-menu authored still.
+
+#### Outcome:
+
+The user accepts source `932dc22`'s visualizer presentation.  The matched Big Lebowski capture instead isolates an independent DVD startup failure: after CSS setup and title inventory, the disc remains outside a menu and reaches a three-second authored still; the generalized terminal finalizer releases its 5,482-byte one-picture H.262 payload at sequence offset 0 and I-picture offset 170, appends sequence end plus drain, and Main submits the resulting 5,490 bytes.  The checksum-valid schema-21 snapshot records H.262 syntax error flag `0x0001` after only 187 accepted video bytes, zero completed or displayed pictures and zero swaps.  The helper neither crashes nor stalls: it proceeds through the following seven-second still and continues generating title video and audio, while Main has submitted 183,236,608 bytes by the 92.55-second capture endpoint with no transport block or audio underrun.  Source `9c00a20` broadened terminal still finalization from pending menu activations to every initial-filter still to repair direct Root Menu one-picture backgrounds; that now exposes this decoder-rejected non-menu first-play picture instead of retaining it behind the startup filter until a later complete random-access group supersedes it.  The 1,519,541-byte log, 1,445-byte telemetry barcode screenshot and 337-byte decoded sidecar have SHA-256 `8be2813b811564546c1ce79e4bf444fede5ff4cafac48f00ebb7bcda1cbeabc5`, `da9debc380f82fdfe9a656d5b8786310764e9582cd11f75a27ab6bf83337c067` and `4192d812816d56e8f24e2e7750c021efff272c61b614082df942fc9445b1811a`.  No runtime source was changed.
+
+#### Next Steps:
+
+After user approval, keep terminal finalization for an active DVD menu or pending authored menu activation, but leave an initial non-menu finite still queued under the existing random-access filter so a later complete sequence/I/reference group can replace its decoder entry point.  Add production-path regressions proving that a non-menu first-play still does not release or clear the filter, a direct Root Menu one-picture still still receives the terminal tail, and pending finite and indefinite menu activations retain their current staged policies.  Run strict random-access, overlay, navigation, staging, LPCM, audio and sanitizer suites, build one static ARMv7 helper without changing Main, the decoder, RBF, visualizer asset or accepted visualizer cadence, then retest Big Lebowski startup plus Blazing Saddles and Coming to America menu entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 931 COMMIT Unreleased 932dc22 2026-09-02T23:23:00-07:00
 
 #### Coming From:
@@ -28,7 +57,7 @@ Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with `ho
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
 
@@ -1196,35 +1225,6 @@ Install both `host/build/MediaPlayer_Helper_ReplayReady_09b1d28` as `/media/fat/
 - tools/test_audio_file_seek.py
 - tools/test_audio_ui_output.c
 - tools/test_main_seek_lifecycle.cpp
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 892 COMMIT Unreleased 4063cf0 2026-09-02T02:40:18-07:00
-
-#### Coming From:
-
-Unreleased 4063cf0
-
-#### Purpose:
-
-Record physical rejection of the clean standalone-audio EOF presentation and localize the distorted retained frame.
-
-#### Outcome:
-
-The fresh physical standalone-audio run rejects source `4063cf0` as a complete EOF fix while confirming that its Main lifecycle correction works: all 14 requested seeks receive one helper READY event and one Main reset, playback reaches natural EOF, the helper exits normally with status zero, Main records `finish reason=eof-retained` with download still asserted and no control, transport, read or process failure occurs.  The 2,527,165-byte combined log at SHA-256 `d66ccd4e85d476bd47c8c148ce707b4c3f440b986800d0946e91eddc82349503` instead proves that the final synchronous UI function starts command `0x10` at stream offset 33,322,040 while the ordinary UI frame opened at offset 33,186,232 still has only 24 of 127 data records, or 98,304 of 518,400 bytes, submitted.  The FPGA audio-UI receiver rejects a second BEGIN while `frame_open` is set but preserves the old write index, then accepts enough bytes from the new full frame to finish and commit a hybrid YUV buffer; the 19,322-byte 1,920-by-1,080 screenshot at SHA-256 `c5aac8ce6de56d320b913907206c13ae7f80ff7ad43402117241aa88a68b83b2` visibly shows the resulting shifted and repeated interface planes.  This is a helper publication-state fault introduced by the exact-final-frame addition, not a decoder crash, seek reset, failed clean-EOF retention or FPGA timing fault.  The 2,818-byte telemetry sidecar at SHA-256 `53805e1c7c4f1f4d44f0f0fa390382eb331781268afda439bb41aac8ac8e8456` contains no supported telemetry matrix and adds no contrary evidence.  MPG natural EOF was not exercised by this result set.
-
-#### Next Steps:
-
-Obtain approval for a helper-only correction that makes final UI completion drain the already-open projected final frame from its current byte offset through one COMMIT instead of resetting host state and emitting a second BEGIN.  Extend the renderer regression to complete a partially published final frame with exactly one BEGIN, 127 total data records, one COMMIT, full progress and zero remaining time, and make the real-helper parser reject nested BEGIN events so this hardware failure is reproducible locally.  Rebuild only the ARM helper, preserve source-`4063cf0` Main and the timing-qualified RBF, then repeat standalone-audio natural EOF and separately verify that an ordinary MPG retains its final frame.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
