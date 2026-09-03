@@ -1,4 +1,4 @@
-## 922 COMMIT Unreleased ??? 2026-09-02T20:55:28-07:00
+## 922 COMMIT Unreleased 6b63c91 2026-09-02T20:55:28-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make DVD chapter controls follow the currently playing authored program chain so
 
 #### Outcome:
 
-The approved helper-only boundary will replace the absolute `dvdnav_part_play()` call and initial-longest-title equality guard in `iso_change_chapter()` with libdvdnav's relative previous- and next-program navigation operations.  The existing producer stop, unread-buffer discard, demux reset, audio reset and READY/GO decoder barrier will remain intact, but source state will be reset and the direct-device producer restarted only after libdvdnav accepts the hop.  Diagnostics will record the current title and part, requested direction, resolved post-hop title and part, buffered bytes discarded and libdvdnav's error string on failure.  Focused native coverage will model original-title and menu-launched alternate-title success in both directions plus rejected boundary behavior without adding an ARM helper ABI, and the architecture note will document why chapter controls are relative to the active DVD VM path rather than the initially inventoried main feature.
+Source `6b63c91` replaces `iso_change_chapter()`'s initial-longest-title equality guard and absolute `dvdnav_part_play()` replay with libdvdnav's relative previous- and next-program operations against the active DVD VM path.  The selected-main-title metadata remains unchanged, while accepted hops still stop and reset the direct-device prefetch, clear the old block and menu state, restart the producer and enter the existing helper/Main reserve-discard plus READY/GO decoder barrier.  Rejected requests leave the source block boundary intact and now report direction, current title and part, buffered-byte count and libdvdnav detail; successful requests report both current and resolved title/part, making a future physical trace conclusive.  The focused production-unit test proves Previous on inventoried title 1, Next on a menu-launched title 7, preservation of the selected-title metadata, rejected-search state retention, menu-domain rejection and invalid-direction rejection.  Strict optimized, UndefinedBehaviorSanitizer, AddressSanitizer with host-incompatible leak scanning disabled, and GCC analyzer checks pass, as do the native helper build, retained AC-3, audio seek, Program Stream seek, DVD random-access, SPU, reserve, staging, menu, overlay-output, LPCM-skip, audio UI and visualizer coverage, real MP3, WAV, FLAC and Ogg integrations with and without the visualizer, one hundred menu/chapter, random-access and staging repetitions, and twenty overlay-output and LPCM-skip repetitions.  Build PC `10.10.0.42` repeats strict sanitizer and analyzer coverage plus one hundred menu/chapter runs, builds the exact native helper, passes all four real standalone-audio seeks and LPCM skip, and the retained Icarus test reconstructs thirteen stream bytes and the exact overlay payload while observing the live sequence end.  Its available fixtures include no DVD-Video image suitable for the alternate-title route.  GNU 10.2.1 builds the stripped static ARMv7 hard-float helper `host/build/MediaPlayer_Helper_ChapterVM_6b63c91`; it is 961,956 bytes, has no dynamic section and has SHA-256 `556b706c8c8b4fc60a4e11c21adb62ebb40daec4201d3f4c0052d8275b59fabb`.  Main, protocol, decoder RTL, visualizer assets and RBF are unchanged.
 
 #### Next Steps:
 
-Implement the recorded boundary, compile the focused test strictly and under AddressSanitizer and UndefinedBehaviorSanitizer, run GCC analyzer plus the retained menu-hop, random-access, SPU, reserve, staging, AC-3, LPCM-skip, Program Stream seek, audio UI, timer and visualizer regressions, and commit the exact passing source.  Pull that commit into an isolated build-PC checkout, repeat the relevant native and simulator tests, build and strip the static ARMv7 helper with GNU 10.2.1, then record its size and SHA-256 for a Big Lebowski hardware rerun; Main, decoder RTL, visualizer assets and the timing-qualified RBF are outside this change.
+Install only `host/build/MediaPlayer_Helper_ChapterVM_6b63c91` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining source-`3689cca` Main, the current visualizer pack and timing-qualified RBF; no reboot is required after stopping and relaunching the core, although rebooting is acceptable.  On The Big Lebowski, repeat the menu route that previously launched video and failed at Next Chapter, then require repeated Next and Previous requests to produce successful current/resolved-title diagnostics, READY/GO barrier completion, clean-picture restart and continued input response without `chapter control failed` or `control-error`.  Retest the accepted Coming to America second-visit Scene Selection route, Blazing Saddles root-menu loading and the forum disc's silent LPCM menu followed by supported title audio, then provide a fresh telemetry-enabled log and screenshot for hardware qualification.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Implement the recorded boundary, compile the focused test strictly and under Add
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
