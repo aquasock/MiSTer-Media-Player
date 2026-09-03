@@ -1,4 +1,4 @@
-## 934 COMMIT Unreleased ??? 2026-09-03T00:01:33-07:00
+## 934 COMMIT Unreleased ac13724 2026-09-03T00:01:33-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Capture the exact common H.262 header construct rejected near byte 188 in The Bi
 
 #### Outcome:
 
-Diagnostic implementation approved.  The helper will retain every filtered byte and existing publication decision while logging at most the first 256 post-filter bytes plus bounded parsed sequence-header, sequence-extension, picture-header and picture-coding-extension fields for each initial random-access group.  This is sufficient to map the physical disc's repeatable 187/188-byte syntax failure to one of the decoder frontend's explicit checks without changing the decoder, Main, RBF, visualizer, audio transport, menu policy or timing.
+Source `ac13724` retains every filtered byte and existing publication decision while logging at most the first 256 post-filter bytes plus bounded parsed sequence-header, sequence-extension, picture-header and picture-coding-extension fields for each successful initial random-access group.  A focused production-translation-unit regression proves the collector extracts 720x480 sequence, I-picture and raw extension fields without changing one input byte; the existing terminal-still regressions additionally prove the emitted picture bytes remain exact.  Strict native compilation and DVD random-access, menu-hop, reserve, staging, overlay, SPU, Program Stream seek, audio seek/UI/visualizer and private-audio/LPCM-skip suites pass, as do Address/Undefined sanitizers, GCC analyzer, native static build and the MP3/WAV/FLAC/Ogg real-helper seek/visualizer suite against both native and ARM executables.  The local static stripped ARMv7 diagnostic helper `host/build/MediaPlayer_Helper_H262Diag_ac13724` is 966,052 bytes with SHA-256 `15dc2ddb7d55fedac950ac3ce7401d56340a2d032edda45c1578c3cd04f986a1`; its capabilities match the accepted helper.  No decoder, Main, RBF, visualizer, media byte or scheduling behavior changed.
 
 #### Next Steps:
 
-Add a side-effect-free bounded restart-field collector and stderr diagnostic at the existing successful initial-filter boundary, cover its field extraction and retained byte identity in the production overlay regression, and run strict native, sanitizer, analyzer, DVD random-access, navigation, staging, overlay, LPCM and audio suites.  Build one static ARMv7 diagnostic helper locally, then reproduce Big Lebowski startup and press Root Menu once; the returned log must contain both bounded prefixes and parsed extension fields so the exact helper-side compatibility correction can be proposed from evidence.
+Install only `host/build/MediaPlayer_Helper_H262Diag_ac13724` as `/media/fat/linux/MediaPlayer_Helper`, enable telemetry, start The Big Lebowski and leave its failed startup visible briefly, then press Root Menu once and leave that failed screen visible briefly.  Return the updated results folder; its log should contain two `H262 restart diagnostic` prefixes and two `H262 restart fields` records, allowing the exact common byte-187/188 decoder rejection to be identified before any compatibility normalization is proposed.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Add a side-effect-free bounded restart-field collector and stderr diagnostic at 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
