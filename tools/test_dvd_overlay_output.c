@@ -241,6 +241,135 @@ done:
     return failed;
 }
 
+static int test_terminal_still_direct(void)
+{
+    static const uint8_t still_video[] = {
+        0x00, 0x00, 0x01, 0xb3, 0x31, 0x42,
+        0x00, 0x00, 0x01, 0x00, 0x00, 1u << 3,
+        0x00, 0x00, 0x01, 0x01, 0xcc, 0xdd
+    };
+    static const uint8_t terminal_tail[] = {
+        0x00, 0x00, 0x01, 0xb7, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    struct output_state output = {0};
+    uint8_t received[sizeof(still_video) + sizeof(terminal_tail)];
+    int failed = 0;
+
+    output.video = tmpfile();
+    failed |= require(output.video != NULL,
+                      "could not create direct-still output stream");
+    failed |= require(output_stage_create(&output.activation_stage,
+                                          sizeof(received)) == 0,
+                      "could not create inactive direct-still stage");
+    if (failed)
+        goto done;
+    output.scheduler_enabled = 1;
+    output.iso_start_filter_active = 1;
+    output.hold_active = 1;
+    output.hold_limit = PCM_SAMPLE_RATE;
+    failed |= require(queue_video(&output, still_video, sizeof(still_video),
+                                  0, 0, 0) == 0 &&
+                      finalize_dvd_still_random_access(&output) == 0 &&
+                      !output.iso_start_filter_active &&
+                      output.picture_marks == 1 &&
+                      !output_stage_active(output.activation_stage) &&
+                      output_stage_records(output.activation_stage) == 0,
+                      "direct Root Menu still was not finalized unstaged");
+    failed |= require(fflush(output.video) == 0 &&
+                      fseek(output.video, 0, SEEK_SET) == 0 &&
+                      fread(received, 1, sizeof(received), output.video) ==
+                          sizeof(received) &&
+                      !memcmp(received, still_video, sizeof(still_video)) &&
+                      !memcmp(received + sizeof(still_video), terminal_tail,
+                              sizeof(terminal_tail)),
+                      "direct Root Menu still changed its picture or tail");
+
+done:
+    while (output.video_head)
+        free_video_head(&output);
+    output_stage_destroy(output.activation_stage);
+    if (output.video)
+        fclose(output.video);
+    return failed;
+}
+
+static int test_motion_menu_stage_pressure(void)
+{
+    static const size_t finite_still_bytes = 3797120u;
+    struct dvd_menu_state menu = {0};
+    struct output_state output = {0};
+    uint8_t compare[65536];
+    uint8_t *payload = NULL;
+    size_t offset;
+    int control_command = 0;
+    int failed = 0;
+
+    payload = malloc(OUTPUT_ACTIVATION_STAGE_DECISION_BYTES);
+    output.video = tmpfile();
+    failed |= require(payload != NULL && output.video != NULL,
+                      "could not allocate motion-menu test state");
+    failed |= require(output_stage_create(&output.activation_stage,
+                                          OUTPUT_ACTIVATION_STAGE_BYTES) == 0 &&
+                      output_stage_begin(output.activation_stage) == 0,
+                      "could not start motion-menu activation stage");
+    if (failed)
+        goto done;
+    for (offset = 0; offset < OUTPUT_ACTIVATION_STAGE_DECISION_BYTES;
+         ++offset)
+        payload[offset] = (uint8_t)(offset ^ (offset >> 8) ^ (offset >> 16));
+    menu.menu_active = 1;
+    menu.activation_pending = 1;
+    output.picture_marks = 2;
+    failed |= require(output_stage_write(output.activation_stage, payload,
+                                         finite_still_bytes, 0) == 1 &&
+                      output_stage_classify_still(
+                          output.activation_stage, output.picture_marks, 5) ==
+                          OUTPUT_STAGE_STILL_COMMIT &&
+                      activation_stage_motion_hop(
+                          &menu, &output, &control_command) == 0 &&
+                      !menu.activation_staged_hop && control_command == 0,
+                      "accepted finite still crossed the motion watermark");
+    failed |= require(output_stage_write(
+                          output.activation_stage,
+                          payload + finite_still_bytes,
+                          OUTPUT_ACTIVATION_STAGE_DECISION_BYTES -
+                              finite_still_bytes,
+                          1) == 1 &&
+                      output_stage_size(output.activation_stage) ==
+                          OUTPUT_ACTIVATION_STAGE_DECISION_BYTES &&
+                      activation_stage_motion_hop(
+                          &menu, &output, &control_command) == 1 &&
+                      menu.activation_staged_hop &&
+                      control_command == MEDIA_PLAYER_CONTROL_MENU_ACTIVATE,
+                      "picture-bearing motion menu was not promoted");
+    failed |= require(commit_activation_stage(
+                          &output, "motion-menu-test") == 0 &&
+                      fflush(output.video) == 0 &&
+                      fseek(output.video, 0, SEEK_SET) == 0,
+                      "motion-menu stage did not commit after promotion");
+    for (offset = 0;
+         !failed && offset < OUTPUT_ACTIVATION_STAGE_DECISION_BYTES;) {
+        size_t count = OUTPUT_ACTIVATION_STAGE_DECISION_BYTES - offset;
+
+        if (count > sizeof(compare))
+            count = sizeof(compare);
+        failed |= require(fread(compare, 1, count, output.video) == count &&
+                          !memcmp(compare, payload + offset, count),
+                          "motion-menu promotion changed staged bytes");
+        offset += count;
+    }
+    failed |= require(!output_stage_active(output.activation_stage) &&
+                      output_stage_size(output.activation_stage) == 0,
+                      "motion-menu commit left its stage active");
+
+done:
+    output_stage_destroy(output.activation_stage);
+    if (output.video)
+        fclose(output.video);
+    free(payload);
+    return failed;
+}
+
 int main(void)
 {
     struct dvd_spu_overlay overlay = {0};
@@ -341,6 +470,10 @@ int main(void)
     if (test_reserve_stdio_ownership() < 0)
         return 1;
     if (test_terminal_still_stage())
+        return 1;
+    if (test_terminal_still_direct())
+        return 1;
+    if (test_motion_menu_stage_pressure())
         return 1;
     puts("DVD overlay output: exact plane and reserve ownership pass");
     return 0;

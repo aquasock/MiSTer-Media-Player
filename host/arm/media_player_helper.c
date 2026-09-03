@@ -39,7 +39,8 @@
  */
 #define VIDEO_QUEUE_LIMIT  (2u * 1024u * 1024u)
 #define OUTPUT_RESERVE_BYTES (4u * 1024u * 1024u)
-#define OUTPUT_ACTIVATION_STAGE_BYTES (4u * 1024u * 1024u)
+#define OUTPUT_ACTIVATION_STAGE_DECISION_BYTES (4u * 1024u * 1024u)
+#define OUTPUT_ACTIVATION_STAGE_BYTES (8u * 1024u * 1024u)
 #define PCM_SCHEDULE_RESERVE_FRAMES 8192u
 #define PCM_SCHEDULE_BATCH_FRAMES   2048u
 #define PCM_INITIAL_RELEASE_FRAMES  8192u
@@ -56,6 +57,12 @@
 #define AUDIO_VISUALIZER_PATH "/media/fat/linux/MediaPlayer_Visualizer.mmpvis"
 #define AUDIO_OVERLAY_RECORDS \
     (2u + (AUDIO_UI_OVERLAY_BYTES + 4095u) / 4096u)
+
+_Static_assert(OUTPUT_ACTIVATION_STAGE_BYTES >=
+                   OUTPUT_ACTIVATION_STAGE_DECISION_BYTES +
+                       VIDEO_QUEUE_LIMIT,
+               "activation stage must retain one video-queue drain of "
+               "headroom after its motion-menu decision");
 
 /*
  * Entry 429: the FPGA gates its whole in-band byte path on the PCM sink, so a
@@ -494,7 +501,8 @@ static int begin_activation_stage(struct output_state *output)
     }
     fprintf(stderr,
             "media_player_helper: DVD activation output stage started "
-            "capacity=%u\n", OUTPUT_ACTIVATION_STAGE_BYTES);
+            "capacity=%u decision=%u\n", OUTPUT_ACTIVATION_STAGE_BYTES,
+            OUTPUT_ACTIVATION_STAGE_DECISION_BYTES);
     return 0;
 }
 
@@ -1958,6 +1966,28 @@ static int iso_finalize_terminal_random_access(struct output_state *output)
     return 1;
 }
 
+/*
+ * A DVD still is an explicit authored end boundary regardless of how its VM
+ * path was entered.  Deferred button activations stage the completed picture;
+ * direct root-menu hops write it after their already-completed decoder barrier.
+ */
+static int finalize_dvd_still_random_access(struct output_state *output)
+{
+    int filtered;
+
+    if (!output->iso_start_filter_active || !output->video_head)
+        return 0;
+    filtered = iso_finalize_terminal_random_access(output);
+    if (filtered < 0)
+        return -1;
+    if (!filtered)
+        fprintf(stderr,
+                "media_player_helper: DVD authored still did not "
+                "complete a sequence/I startup group queued_video=%zu\n",
+                output->video_queued_bytes);
+    return 0;
+}
+
 static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
                      int samples_per_channel, int channels, int rate_hz)
 {
@@ -3220,18 +3250,8 @@ static int wait_dvd_still(struct media_source *input,
         deadline = monotonic_us() + (uint64_t)seconds * 1000000u;
     fprintf(stderr, "media_player_helper: DVD still wait %s%u seconds\n",
             seconds == 0xffu ? "indefinite/" : "", seconds);
-    if (menu->activation_pending && output->iso_start_filter_active &&
-        output->video_head) {
-        int filtered = iso_finalize_terminal_random_access(output);
-
-        if (filtered < 0)
-            return -1;
-        if (!filtered)
-            fprintf(stderr,
-                    "media_player_helper: DVD authored still did not "
-                    "complete a sequence/I startup group queued_video=%zu\n",
-                    output->video_queued_bytes);
-    }
+    if (finalize_dvd_still_random_access(output) < 0)
+        return -1;
     if (menu->activation_pending && menu->activation_payloads)
         fprintf(stderr,
                 "media_player_helper: DVD menu activation pending reached "
@@ -3363,6 +3383,32 @@ static int wait_dvd_still(struct media_source *input,
     }
 }
 
+static int activation_stage_motion_hop(struct dvd_menu_state *menu,
+                                       struct output_state *output,
+                                       int *control_command)
+{
+    size_t bytes;
+
+    if (!menu->activation_pending || !menu->menu_active ||
+        !output_stage_active(output->activation_stage) ||
+        output->iso_start_filter_active || !output->picture_marks)
+        return 0;
+    bytes = output_stage_size(output->activation_stage);
+    if (bytes < OUTPUT_ACTIVATION_STAGE_DECISION_BYTES)
+        return 0;
+    menu->activation_staged_hop = 1;
+    *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
+    fprintf(stderr,
+            "media_player_helper: DVD picture-bearing motion menu "
+            "requires staged stream hop pictures=%u records=%zu bytes=%zu "
+            "decision=%u capacity=%u\n",
+            output->picture_marks,
+            output_stage_records(output->activation_stage), bytes,
+            OUTPUT_ACTIVATION_STAGE_DECISION_BYTES,
+            OUTPUT_ACTIVATION_STAGE_BYTES);
+    return 1;
+}
+
 static int process_program_stream(struct media_source *input,
                                   struct audio_state *audio,
                                   struct output_state *output,
@@ -3435,6 +3481,8 @@ static int process_program_stream(struct media_source *input,
             fprintf(stderr,
                     "media_player_helper: ignoring unexpected control "
                     "0x%02x during playback\n", command);
+        if (activation_stage_motion_hop(menu, output, control_command))
+            return 1;
         int found;
 
         if (menu->resume_code_valid) {

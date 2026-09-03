@@ -61,7 +61,11 @@ while the helper advances the overlay. A nonempty indefinite activation stage
 requires that barrier only after the H.262 output path has emitted a picture;
 an overlay-only stage commits through the live session before its continuation
 acknowledgment, so generic Program Stream headers cannot blank a resident menu
-frame. If an authored still terminates a sequence-plus-I startup group before a
+frame. A picture-bearing motion menu that supplies neither a still nor a menu
+domain exit is promoted through the same staged barrier at a 4 MiB decision
+watermark; the 8 MiB stage retains one complete bounded scheduler-drain of
+headroom, so the decision cannot itself race the old capacity limit. If an
+authored still terminates a sequence-plus-I startup group before a
 later reference picture arrives, the helper uses that explicit end boundary to
 release the independently decodable still picture and appends one H.262
 sequence-end code after its unchanged bytes. That standard non-slice delimiter
@@ -69,9 +73,11 @@ closes the final picture-data region and selects the decoder's existing
 one-picture end-of-sequence publication path. Because a live indefinite menu
 does not assert the transport's end-of-input signal, five zero-valued
 implementation drain bytes follow the sequence end so the complete delimiter
-crosses the in-band extractor and downstream delivery lookahead. The resulting
-picture mark selects the normal staged decoder barrier. Highlight-only moves
-likewise do not reset the video stream. Main marks every menu command as a
+crosses the in-band extractor and downstream delivery lookahead. This terminal
+finalization applies after direct Root Menu barriers as well as deferred button
+activations; the resulting picture mark selects staged publication only when a
+stage is active. Highlight-only moves likewise do not reset the video stream.
+Main marks every menu command as a
 pending navigation decision. Directional commands explicitly select the
 authored target button and return the existing menu-continuation acknowledgment
 for an ordinary, invalid or rejected highlight move, preserving the resident
