@@ -991,6 +991,17 @@ static int iso_menu_direction_target(pci_t *pci, int32_t button,
     }
 }
 
+static int iso_menu_target_valid(pci_t *pci, int target)
+{
+    return pci && target > 0 && target <= pci->hli.hl_gi.btn_ns;
+}
+
+static int iso_menu_target_auto_action(pci_t *pci, int target)
+{
+    return iso_menu_target_valid(pci, target) &&
+           pci->hli.btnit[target - 1].auto_action_mode;
+}
+
 static int iso_menu_identity_is_root(int32_t title, int32_t part)
 {
     return title == 0 && part == DVD_MENU_Root;
@@ -1024,6 +1035,18 @@ static void iso_log_menu_command(struct iso_source_state *state,
             (unsigned)area.palette);
 }
 
+static int iso_complete_button_action(struct iso_source_state *state,
+                                      const char *command)
+{
+    int32_t title = 0;
+    int32_t part = 0;
+
+    if (dvdnav_current_title_info(state->navigation, &title, &part) ==
+            DVDNAV_STATUS_OK && title == 0)
+        return iso_complete_menu_pending(state, command);
+    return iso_complete_menu_hop(state, command);
+}
+
 static int iso_menu_command(struct iso_source_state *state,
                             enum media_source_dvd_command command)
 {
@@ -1043,42 +1066,49 @@ static int iso_menu_command(struct iso_source_state *state,
     target = iso_menu_direction_target(pci, before, command);
     switch (command) {
     case MEDIA_SOURCE_DVD_MENU_UP:
-        if (!state->dvd_state.menu_active || !pci)
-            goto ignored;
-        status = dvdnav_upper_button_select(state->navigation, pci);
-        break;
     case MEDIA_SOURCE_DVD_MENU_DOWN:
-        if (!state->dvd_state.menu_active || !pci)
-            goto ignored;
-        status = dvdnav_lower_button_select(state->navigation, pci);
-        break;
     case MEDIA_SOURCE_DVD_MENU_LEFT:
-        if (!state->dvd_state.menu_active || !pci)
-            goto ignored;
-        status = dvdnav_left_button_select(state->navigation, pci);
-        break;
     case MEDIA_SOURCE_DVD_MENU_RIGHT:
-        if (!state->dvd_state.menu_active || !pci)
+        if (!state->dvd_state.menu_active ||
+            !iso_menu_target_valid(pci, target))
             goto ignored;
-        status = dvdnav_right_button_select(state->navigation, pci);
+        /*
+         * libdvdnav's directional wrappers can activate an authored
+         * auto-action target, but expose only a generic success status.  Use
+         * the same public select/activate operations explicitly so that a
+         * resulting VM transition enters the normal pending/hop path.
+         */
+        status = dvdnav_button_select(state->navigation, pci, target);
+        if (status == DVDNAV_STATUS_OK &&
+            iso_menu_target_auto_action(pci, target)) {
+            status = dvdnav_button_activate(state->navigation, pci);
+            if (status == DVDNAV_STATUS_OK) {
+                if (dvdnav_get_current_highlight(state->navigation, &after) !=
+                        DVDNAV_STATUS_OK)
+                    after = 0;
+                iso_log_menu_command(state, command, pci, before, target,
+                                     after, "auto-action");
+                return iso_complete_button_action(state,
+                                                  "directional auto-action");
+            }
+        }
+        if (status != DVDNAV_STATUS_OK) {
+            iso_log_menu_command(state, command, pci, before, target, before,
+                                 "ignored-error");
+            return MEDIA_SOURCE_DVD_NO_HOP;
+        }
         break;
     case MEDIA_SOURCE_DVD_MENU_ACTIVATE:
         if (!state->dvd_state.menu_active || !pci)
             goto ignored;
         status = dvdnav_button_activate(state->navigation, pci);
         if (status == DVDNAV_STATUS_OK) {
-            int32_t title = 0;
-            int32_t part = 0;
-
             if (dvdnav_get_current_highlight(state->navigation, &after) !=
                     DVDNAV_STATUS_OK)
                 after = 0;
             iso_log_menu_command(state, command, pci, before, target, after,
                                  "ok");
-            if (dvdnav_current_title_info(state->navigation, &title, &part) ==
-                    DVDNAV_STATUS_OK && title == 0)
-                return iso_complete_menu_pending(state, "activate");
-            return iso_complete_menu_hop(state, "activate");
+            return iso_complete_button_action(state, "activate");
         }
         break;
     case MEDIA_SOURCE_DVD_ROOT_MENU:

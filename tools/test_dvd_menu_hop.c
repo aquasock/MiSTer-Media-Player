@@ -181,6 +181,7 @@ int main(void)
     state.menu_pci.hli.btnit[0].x_end = 30;
     state.menu_pci.hli.btnit[0].y_end = 40;
     state.menu_pci.hli.btnit[0].right = 2;
+    state.menu_pci.hli.btnit[1].auto_action_mode = 1;
     state.menu_pci.hli.btn_colit.btn_coli[0][0] = 0x12345678u;
     state.menu_pci.hli.btn_colit.btn_coli[0][1] = 0x87654321u;
     iso_refresh_highlight(&state, 1, 1);
@@ -196,6 +197,14 @@ int main(void)
                           &state.menu_pci, 1,
                           MEDIA_SOURCE_DVD_MENU_RIGHT) == 2,
                       "authored directional target was not retained");
+    failed |= require(iso_menu_target_valid(&state.menu_pci, 2) &&
+                          !iso_menu_target_valid(&state.menu_pci, 0) &&
+                          !iso_menu_target_valid(&state.menu_pci, 3),
+                      "authored directional target bounds changed");
+    failed |= require(iso_menu_target_auto_action(&state.menu_pci, 2) &&
+                          !iso_menu_target_auto_action(&state.menu_pci, 1) &&
+                          !iso_menu_target_auto_action(&state.menu_pci, 3),
+                      "authored directional auto-action was not classified");
 
     if (failed)
         return 1;
