@@ -1,3 +1,32 @@
+## 914 COMMIT Unreleased d75327e 2026-09-02T19:23:06-07:00
+
+#### Coming From:
+
+Unreleased d75327e
+
+#### Purpose:
+
+Qualify source `d75327e` on Coming to America's Scene Selection submenu and isolate why its authored background remains black.
+
+#### Outcome:
+
+The user's physical source-`d75327e` run reproduces the black authored background with the correct green Scene Selection selector visible and responsive.  Terminal random-access filtering again qualifies a sequence at offset zero and one I picture at offset 106 in 224,824 authored bytes, then stages 139 records totaling 311,501 bytes after appending the four-byte H.262 sequence-end marker; the prior build staged 138 records and 311,497 bytes, proving the exact terminator reached the helper's bounded activation transaction.  The checksum-valid schema-21 snapshot nevertheless reports only 224,823 decoder-accepted bytes, exactly five fewer than the 224,828 authored-plus-terminator bytes sent, while sequence-end recognition, completed reference pictures, displayed pictures and swaps all remain zero and 209,739 stall cycles remain inside the unfinished I picture with no decoder error flags.  The replacement overlay independently completes one clear, configuration and commit with twenty-two data records and 86,400 plane bytes, no protocol error and the expected visible rectangle.  The hardware count and RTL source agree that the terminator is retained behind the in-band extractor and downstream delivery lookahead because `input_end` cannot assert while the live indefinite DVD-menu session remains open; the 1,834,541-byte log, 5,456-byte screenshot and 571-byte telemetry report have SHA-256 `dd40b250b253492d83c6254254dc70001e82fdc47d25303ce63c17ceeb1141b2`, `4c69b6424bee7b913cb7cf0e7c16db2607fbad595f63eaab006adc0649701c04` and `f34038759b19fa823ad3e2f458dad2c86f62a0c62ba0d334e75c41d3c799e671`.
+
+#### Next Steps:
+
+After user approval, preserve the qualified authored bytes and append five zero-valued transport drain bytes after the sequence-end marker only for a terminal DVD still activation, allowing the complete four-byte marker to cross the observed five-byte lookahead while leaving the session alive for overlay and navigation commands.  Extend the production-path regression to require the exact nine-byte terminal tail and add focused metadata-path coverage proving sequence-end delivery before `input_end`, then rerun strict native, GNU 10.2.1 ARM, sanitizer, analyzer, staging, random-access, overlay, menu-hop, audio and seek suites and build only a new static ARMv7 helper.  Retest Coming to America Scene Selection for its authored background, responsive selector and scene launch, followed by Blazing Saddles, The Big Lebowski and the forum disc; Main, protocol, decoder interpretation, RTL, visualizer and RBF remain unchanged.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 913 COMMIT Unreleased d75327e 2026-09-02T19:06:18-07:00
 
 #### Coming From:
@@ -1237,33 +1266,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 874 COMMIT Unreleased 5f00e35 2026-09-01T07:09:16-07:00
-
-#### Coming From:
-
-Unreleased f0fba4d
-
-#### Purpose:
-
-Restore the known seed-23 placement for the synchronized audio-interface source and require a clean full-core timing result.
-
-#### Outcome:
-
-Source `5f00e35` restores seed 23 while retaining the source-`f0fba4d` three-stage audio-startup blank synchronizer and its resolved first-stage-only timing exception.  The exact source matches on Raspberry Pi and build PC `10.10.0.42`; the focused audio-interface regression reconstructs all 64,800 DDR words and one safe commit, and the retained DDR-arbiter priority and response-ownership regression passes.  Quartus Prime 17.0.2 completes synthesis in 3 minutes 11 seconds, fitting in 11 minutes 45 seconds, assembly and the full timing gate with zero errors.  Global setup, hold, recovery, removal and minimum-pulse-width slacks are positive at 0.110, 0.124, 4.037, 0.597 and 0.925 nanoseconds; dedicated 60 MHz decoder and 54 MHz video setup slacks are 0.689 and 2.528 nanoseconds with no violations.  The fit uses 34,837 ALMs, 54,693 registers, 4,187,011 block-memory bits in 535 RAM blocks and 70 DSP blocks.  The byte-identical local and build-PC artifact `output_files/MediaPlayer_20260901_5f00e35.rbf` is 4,462,772 bytes at SHA-256 `74a529213b4dfdcb4f2784f9c21129d625743d489315c211058f20e61da6603a`; the matching 916,852-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_AudioUI_5f00e35` has SHA-256 `5de3178711e7893d23ad75e22f1ef19a7905454bf48fc71c9bf98a95db6977a4`.
-
-#### Next Steps:
-
-Exit MediaPlayer so the running helper releases its executable, transfer `host/build/MediaPlayer_Helper_AudioUI_5f00e35` as `/media/fat/linux/MediaPlayer_Helper`, preserve executable mode, and upload `output_files/MediaPlayer_20260901_5f00e35.rbf` as a new core file while retaining the accepted source-`add7d00` rollback.  Test standalone MP3, WAV, FLAC and Ogg Vorbis playback for uninterrupted audio, stable native 720-by-480 output, the reserved album-art viewport, static controls and once-per-second activity motion; then retest a known-good progressive MPG and physical DVD menu before reporting acceptance or collecting a fresh helper/Main log, screenshot and telemetry for any failure.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
