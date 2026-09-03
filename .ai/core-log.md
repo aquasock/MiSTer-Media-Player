@@ -1,3 +1,37 @@
+## 920 COMMIT Unreleased 3689cca 2026-09-02T20:31:21-07:00
+
+#### Coming From:
+
+Unreleased 7186fb4
+
+#### Purpose:
+
+Synchronize every directional DVD menu command with an explicit continuation or stream-hop decision so authored auto-actions cannot deadlock Main and the helper.
+
+#### Outcome:
+
+Source `621dff7` removes Main's highlight-only directional bypass and marks every DVD menu command as a pending navigation decision.  The menu source now classifies ordinary, invalid and library-rejected directional selections as `MEDIA_SOURCE_DVD_MENU_CONTINUE`, causing the helper's existing acknowledgment path to preserve the resident stream, while authored auto-actions retain the existing READY/GO reset, drain and replacement-stream barrier.  The navigation integration driver now sends only one menu action at a time and requires one explicit decision per action, and the modeled Main regression rejects any reintroduction of the directional bypass.  Source `3689cca` corrects only the generated new-file hunk length exposed by the first pinned-Main application attempt and is the final build source.  Strict native helper and modeled Main builds, GCC analyzer, AddressSanitizer and UndefinedBehaviorSanitizer checks, all retained DVD random-access, SPU, overlay, reserve, staging, LPCM-skip, AC-3, Program Stream seek, audio UI, timer and visualizer tests, real MP3, WAV, FLAC and Ogg seek integrations, one hundred menu-hop, Main lifecycle, random-access and staging repetitions, and twenty overlay-output repetitions pass locally.  On build PC `10.10.0.42`, one hundred exact-source menu-hop and Main lifecycle repetitions pass, the live sequence-end Icarus regression reconstructs thirteen stream bytes and the exact overlay payload, and GNU 10.2.1 builds both final ARMv7 binaries against pinned Main `0a8fb44`.  The static stripped 961,956-byte helper `host/build/MediaPlayer_Helper_MenuSync_3689cca` has SHA-256 `88a348aefe8e27dac2adafc613ef4126ae053aaa8375f1b8e1e049cb3a3ab898`; the dynamically linked stripped 1,182,692-byte Main `host/build/MiSTer_MenuSync_3689cca` has SHA-256 `1b3387170083be269831bf4c3a828f1cce6bcb3b93c519d8cde32cb9768bedf9`.  The available small ISO is not DVD-Video, while the scripted Big Lebowski driver issues Root during that disc's initial three-second first-play still and is rejected before entering a menu, so neither fixture substitutes for the required physical route test; decoder RTL, the visualizer asset and the timing-qualified RBF are unchanged.
+
+#### Next Steps:
+
+Install `host/build/MediaPlayer_Helper_MenuSync_3689cca` as `/media/fat/linux/MediaPlayer_Helper` with executable mode and `host/build/MiSTer_MenuSync_3689cca` as `/media/fat/MiSTer`, then reboot while retaining the current visualizer pack and timing-qualified RBF.  On Coming to America, repeat the exact reported route: enter Scene Selection, move among scenes, play one, return to the menu, use Play to resume the saved movie point, enter Scene Selection again, and advance from scene 4 to the next page.  Require ordinary arrows to update highlights without resetting, every authored page action to complete its READY/GO transition without an unexpected `0x81`, and subsequent input to remain responsive.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback and the forum disc's silent LPCM menu followed by supported AC-3 title playback, then provide a fresh log, screenshot and telemetry snapshot.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_source.c
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_dvd_menu_hop.c
+- tools/test_dvd_menu_navigation.py
+- tools/test_main_seek_lifecycle.cpp
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 919 COMMIT Unreleased 7186fb4 2026-09-02T20:16:16-07:00
 
 #### Coming From:
@@ -1230,35 +1264,6 @@ Distribute the archive explicitly as an unreleased `dfe1057` community test and 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 880 COMMIT Unreleased dfe1057 2026-09-01T18:30:20-07:00
-
-#### Coming From:
-
-Unreleased 40dd64d
-
-#### Purpose:
-
-Remove the nine residual HDMI setup violations by shortening the three remaining ASCAL logic-depth clusters without adding visible latency.
-
-#### Outcome:
-
-Source `dfe1057` registers the normal line-plus-burst address during its existing request-preparation cycle, splits the vertical RGB maximum across the existing pixel and coefficient stages, and precomputes the horizontal adaptive enable while preserving vertical-over-horizontal priority, sampled values, Avalon request timing and scaler alignment.  All ten exact-source telemetry, progressive cadence, framebuffer geometry, output timing, audio-interface, DDR-arbiter, DVD-overlay metadata, engine, integrated delivery and snapshot regressions pass.  Quartus Prime 17.0.2 seed 24 completes synthesis in 2 minutes 25 seconds, fitting in 12 minutes 23 seconds and assembly with zero errors; global setup, hold, recovery, removal and minimum-pulse-width margins are positive at 0.180, 0.190, 3.758, 0.644 and 0.925 nanoseconds, with zero violated paths, while dedicated 60 MHz decoder and 54 MHz video setup are positive at 1.220 and 2.215 nanoseconds.  The fit uses 34,859 ALMs, 54,492 registers, 4,187,219 block-memory bits in 536 RAM blocks and 70 DSP blocks.  The byte-identical local and build-PC artifact `output_files/MediaPlayer_20260901_dfe1057.rbf` is 4,480,236 bytes at SHA-256 `6389fa57b2d642b5b4e85980c6ccf8746ea8d20869cbe480f80b0ea172bcdb4b`; the matched 1,178,588-byte telemetry-aware patched Main is collected as `host/build/MiSTer_TelemetryOff_dfe1057` at SHA-256 `74b354977d3ce56c0ad27c90089936d303258a869fa75fa73c80ef6a2edbfd29`, and the accepted 916,852-byte helper remains unchanged at SHA-256 `5de3178711e7893d23ad75e22f1ef19a7905454bf48fc71c9bf98a95db6977a4`.
-
-#### Next Steps:
-
-Preserve the accepted source-`5f00e35` rollback, install `output_files/MediaPlayer_20260901_dfe1057.rbf` and `host/build/MiSTer_TelemetryOff_dfe1057`, retain the unchanged accepted helper, and reboot because Main changes.  Physical validation should confirm normal MPG, DVD and standalone-audio playback with Telemetry Off producing neither the diagnostic raster nor `/tmp/MediaPlayer_ARM.log`, then enable Telemetry before a fresh playback and confirm the diagnostic raster and combined Main/helper log remain available; do not mark this entry Passed until that MiSTer test succeeds.
-
-#### Files Modified:
-
-- sys/ascal.vhd
 
 #### Status:
 
