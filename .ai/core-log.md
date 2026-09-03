@@ -1,3 +1,32 @@
+## 930 COMMIT Unreleased 366a227 2026-09-02T23:10:33-07:00
+
+#### Coming From:
+
+Unreleased 366a227
+
+#### Purpose:
+
+Record the first native-interlaced visualizer result and localize the striped player interface visible during its ten-second cover interval.
+
+#### Outcome:
+
+The user confirms that source `366a227` now preserves the intended state transition: during the first ten seconds the player overlay is selected, and at the timer boundary it clears completely to the accepted visualizer with normal audio.  Hardware rejects the covered presentation because the 423,052-byte screenshot at SHA-256 `00e3908c7dbd9095a8cc7c5400d2d91d2cf68d5b54203b5b640b76481d83fdd5` shows the interface broken into horizontal stripes with the moving visualizer visible between them.  The matching 150,175-byte log at SHA-256 `faf3d160f2e2441ef95773365f4d83111afc30604b4c8334fa2c2f7247384bf4` proves that the helper loads the new pack, publishes one complete 86,400-byte opaque overlay by 0.329255 seconds, keeps it visible through the 5.850755-second capture and starts valid timed refreshes without an early clear or protocol error.  The checksum-valid schema-21 snapshot at SHA-256 `06d2baf746d976507f2de88d1475c2fa59986af06e4a4b371e9db26dc464846f` reports one successful plane and video-domain publication with zero bad commits, but only 14,302 returned overlay row tags and 7,732,126 matched active pixels; at this elapsed native-480i cadence a continuously available plane would have approximately 79,000 row opportunities and 57 million active pixels.  Static localization explains that shortfall: the DDR arbiter grants every simultaneous presentation read ahead of the overlay line-cache reader, so continuous decoded-video readout starves most one-row-ahead overlay fetches, the two parity request slots collapse obsolete rows, and every unmatched row deliberately falls through to base video.  The prior progressive pack merely hid this pre-existing full-motion overlay bandwidth boundary by leaving native overlay composition disabled.
+
+#### Next Steps:
+
+After user approval, preserve source `366a227`, the helper, asset, decoder behavior and ten-second timing while making one bounded RBF-only arbitration correction: allow a pending overlay line-cache read to win one descriptor grant ahead of a simultaneous presentation request, after which the overlay engine must receive its fixed 23-word row and cannot request another until that response completes.  Extend the arbiter regression to prove the single bounded overlay grant and exact response ownership under a continuously asserted display reader, add an integrated native-raster stress test requiring every visible row tag and opaque sample to match while full-motion presentation reads continue, run the retained decoder, DDR, overlay and audio simulations on the build PC, perform a clean timing-qualified Quartus build, then repeat the first-ten-second audio test and require a solid interface with no base-video stripes before the normal clear reveals the visualizer.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 929 COMMIT Unreleased 366a227 2026-09-02T22:47:52-07:00
 
 #### Coming From:
@@ -1200,35 +1229,6 @@ Exit MediaPlayer and install `host/build/MediaPlayer_Helper_SeekEOFTime_4063cf0`
 - tools/test_audio_file_seek.py
 - tools/test_audio_ui_output.c
 - tools/test_main_seek_lifecycle.cpp
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 890 COMMIT Unreleased e05ede0 2026-09-02T01:45:42-07:00
-
-#### Coming From:
-
-Unreleased e05ede0
-
-#### Purpose:
-
-Record physical rejection of the oversized standalone-audio seek no-op and localize the apparently crashing black end state shared by FLAC and MPG playback.
-
-#### Outcome:
-
-The fresh 8,190,216-byte combined Main/helper log at SHA-256 `43714a1990debf89f5b455fbcc8636e7cf0e3b9199add230a506cba717ced8f8` proves that source `e05ede0` preserves three valid ten-second forward seeks, two valid one-minute forward seeks, one valid five-minute forward seek and four valid ten-second backward seeks, each with its READY/GO barrier and continued FLAC playback.  The final five-minute forward command at 132.644028 seconds is correctly rejected by the helper at frame 24,173,800 of 32,108,544, but patched Main has already toggled download, set `chapter_barrier` and begun discarding helper output before it sends every seek command.  Because the helper's boundary no-op sends neither READY nor a continuation event, Main never releases that barrier, submits no byte beyond 96,983,816 and repeatedly drains all later PCM and audio-interface records without hardware pacing; the helper consequently races through the remaining file and reaches EOF only 8.173783 seconds later.  It exits normally with wait status `0x0`, no signal, fatal report or transport fault, so this is not a process crash, but Main releases download and the 1,920-by-1,080 screenshot at SHA-256 `d29ecd17bc05dc3f2f280ad4ea2d85a6b69bc4b9d611efd648687dde93f12146` is completely black, reproducing the user's apparent end-of-file crash.  The user additionally reports the same visible behavior when an MPG reaches its end; there is no fresh MPG log in this result set, but static inspection confirms that every ordinary helper EOF, regardless of file type, calls Main's shared `finish_download`, deasserts download and therefore removes the resident presentation.  The unchanged 2,818-byte telemetry sidecar at SHA-256 `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004` contains no diagnostic matrix and adds no FPGA fault evidence.  This rejects `e05ede0` as a complete hardware fix, exposes the missing Main/helper seek-decision handshake that the helper-only real-file regression did not model and separately identifies the black clean-EOF presentation as a shared lifecycle policy rather than an MPG or audio decoder crash.
-
-#### Next Steps:
-
-Preserve the current timing-qualified RBF and treat two corrections as separate approval boundaries.  First, make seek decision a distinct helper/Main protocol phase: Main sends a requested jump without toggling download or discarding output, the helper reports an explicit no-op continuation when the target is the current boundary, and only a valid target's READY event makes Main reset download, discard the old session boundary and send GO; an integrated patched-Main regression must require zero reset, zero barrier and continued submitted output for exact-end and past-end requests while retaining exactly one reset and READY/GO barrier for every valid seek.  Second, after the user selects the desired clean-EOF behavior, change the shared Main lifecycle so normal FLAC, other standalone audio and MPG completion no longer looks like a crash, with focused coverage distinguishing a successful exit from a signaled or nonzero helper failure.  Build only the helper and patched Main locally, preserve the RBF and repeat physical FLAC plus MPG validation after the approved boundaries.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
