@@ -1,3 +1,32 @@
+## 921 COMMIT Unreleased 3689cca 2026-09-02T20:51:04-07:00
+
+#### Coming From:
+
+Unreleased 3689cca
+
+#### Purpose:
+
+Qualify the synchronized Coming to America Scene Selection route and diagnose The Big Lebowski's slow startup, slow menu presentation and fatal chapter-forward request.
+
+#### Outcome:
+
+The user reports that the exact second-visit Coming to America Scene Selection route now works, providing hardware acceptance of source `3689cca` for the directional menu-decision deadlock fixed by entry 920.  The fresh physical-disc Big Lebowski run starts `dvdmenu:/dev/sr0`, identifies title 1 as the 23-chapter longest title and remains alive through normal video, root-menu entry, four directional selections, activation and the resulting stream hop.  Its apparent 21.54-second startup is divided between approximately 10.29 seconds spent by libdvdnav retrieving CSS keys and inventorying titles and approximately 10.26 seconds of authored three- and seven-second first-play stills before the first qualified video byte; the root-menu command itself reaches READY in 55.86 milliseconds and releases its barrier in 68.11 milliseconds, after which the disc declares an authored 15-second menu still.  At 96.566683 seconds, a Next Chapter command discards 112,125 stale bytes, but `iso_change_chapter()` rejects the request and the helper reports `chapter control failed`; Main then correctly records `control-error`, stops the helper and releases download.  Because libdvdnav prints no `dvdnav_part_play()` range or VM error, the evidence is consistent with the preceding guard rejecting a valid current DVD title that differs from the initially inventoried longest title after authored menu navigation.  The current chapter implementation requires `current_title == state->title` and then calls absolute `dvdnav_part_play(state->title, target)`, so it cannot navigate an alternate title or program chain launched by a DVD menu.  The all-black 1,920-by-1,080 screenshot contains no telemetry matrix and the sidecar contains the decoder's expected no-telemetry error.  The 2,630,142-byte log, 559-byte screenshot and 2,818-byte sidecar have SHA-256 `d114fa9c24227738fd69c8dba96b59247f40af032546e4ada2ae36654838f89d`, `12c8ca81f403f6edaecb60d88b1c580ddbb0353ce8b9d16f349164fb4f724f19` and `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004`.
+
+#### Next Steps:
+
+After user approval, preserve the proven menu synchronization and replacement-stream barrier but change physical-DVD and ISO chapter requests to libdvdnav's relative previous/next-program navigation against the current program chain instead of requiring and replaying the initially selected longest title.  Log the current title and part before the request plus libdvdnav's diagnostic string on failure, reset and restart the direct-device buffer only after a successful hop, and add focused tests covering the original longest title, a menu-launched alternate title, boundary failure and both directions.  Rebuild the static ARM helper, run strict native, sanitizer, analyzer, DVD navigation, random-access, staging, overlay, audio and seek regressions, exercise the equivalent transition in the build-PC simulator where its fixture permits, and then retest Big Lebowski title and chapter navigation on hardware while retaining Coming to America, Blazing Saddles and forum-disc menu regressions.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 920 COMMIT Unreleased 3689cca 2026-09-02T20:31:21-07:00
 
 #### Coming From:
@@ -1235,35 +1264,6 @@ Exit MediaPlayer, install `host/build/MediaPlayer_Helper_ProgramSeek_68f8f26` as
 - host/arm/program_stream_seek.h
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - tools/test_program_stream_seek.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 881 COMMIT Unreleased dfe1057 2026-09-01T19:17:39-07:00
-
-#### Coming From:
-
-Unreleased dfe1057
-
-#### Purpose:
-
-Bundle the timing-qualified telemetry build as a release-format community-test archive without creating a semantic-version release.
-
-#### Outcome:
-
-`host/build/MiSTer_Media_Player_dfe1057.zip` follows the current public-package layout with the date-coded `MediaPlayer_20260901.rbf`, patched `MiSTer`, `linux/MediaPlayer_Helper`, `SHA256SUMS`, installation and source-provenance notes, the project licence and all currently bundled dependency licences.  The archive contains the qualified source-`dfe1057` seed-24 RBF, the matched telemetry-aware Main and the unchanged hardware-accepted helper; their respective SHA-256 values are `6389fa57b2d642b5b4e85980c6ccf8746ea8d20869cbe480f80b0ea172bcdb4b`, `74b354977d3ce56c0ad27c90089936d303258a869fa75fa73c80ef6a2edbfd29` and `5de3178711e7893d23ad75e22f1ef19a7905454bf48fc71c9bf98a95db6977a4`.  Fresh extraction preserves executable mode on Main and the helper, all thirteen internal checksum checks pass, ZIP integrity reports no error, and the 3,321,895-byte archive has SHA-256 `38b43973499027cf5788833d8e86a067acaa2dd0acd337e97b8399a0022646ba`.
-
-#### Next Steps:
-
-Distribute the archive explicitly as an unreleased `dfe1057` community test and retain the source-`5f00e35` runtime set as rollback.  Testers should install all three packaged runtime files, reboot, report the source identifier with MPG, DVD, standalone-audio and menu observations, and verify that Telemetry Off creates neither the diagnostic raster nor `/tmp/MediaPlayer_ARM.log` while enabling Telemetry before playback retains both diagnostic paths; community results do not mark the source Passed until the user's current MiSTer test accepts it.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
