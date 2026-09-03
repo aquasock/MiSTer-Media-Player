@@ -679,6 +679,78 @@ done:
     return failed;
 }
 
+static int test_late_audio_after_silent_release(void)
+{
+    struct output_state output = {0};
+    uint8_t *payload = NULL;
+    uint8_t compare[4096];
+    size_t payload_size = VIDEO_QUEUE_LIMIT - 8u;
+    size_t offset;
+    int failed = 0;
+
+    payload = malloc(payload_size);
+    output.video = tmpfile();
+    failed |= require(payload != NULL && output.video != NULL,
+                      "could not allocate late-audio fixture");
+    if (failed)
+        goto done;
+    for (offset = 0; offset < payload_size; ++offset)
+        payload[offset] = (uint8_t)(offset ^ (offset >> 8) ^ (offset >> 16));
+
+    output.scheduler_enabled = 1;
+    output.hold_active = 1;
+    output.have_video_pts = 1;
+    output.max_video_pts = 90000u;
+    failed |= require(queue_video(&output, payload, payload_size,
+                                  1, 0, 180000u) == 0,
+                      "could not queue the bounded video lookahead");
+    failed |= require(video_queue_would_overflow(&output, 16u, 0),
+                      "late-audio fixture did not reach the 2 MiB boundary");
+    failed |= require(scheduler_release_silent_video(&output) == 0,
+                      "silent-video release failed");
+    failed |= require(output.silent_video_mode &&
+                          !output.scheduler_enabled &&
+                          output.scheduler_started &&
+                          !output.hold_active &&
+                          output.video_head == NULL &&
+                          output.video_tail == NULL &&
+                          output.video_queued_bytes == 0 &&
+                          output.video_bytes == payload_size &&
+                          output.have_video_pts &&
+                          output.max_video_pts == 180000u,
+                      "silent-video release state changed");
+    failed |= require(reject_late_audio(
+                          &output, "AC-3", 1, 270000u) < 0,
+                      "late AC-3 was not rejected after silent release");
+    failed |= require(reject_late_audio(
+                          &output, "MPEG Layer II", 1, 90000u) < 0,
+                      "behind-horizon MPEG audio was not rejected");
+    failed |= require(reject_late_audio(
+                          &output, "DTS", 0, 0) < 0,
+                      "untimestamped DTS was not rejected");
+    failed |= require(fflush(output.video) == 0 &&
+                          fseek(output.video, 0, SEEK_SET) == 0,
+                      "could not rewind released video");
+    for (offset = 0; !failed && offset < payload_size;) {
+        size_t count = payload_size - offset;
+
+        if (count > sizeof(compare))
+            count = sizeof(compare);
+        failed |= require(fread(compare, 1, count, output.video) == count &&
+                              !memcmp(compare, payload + offset, count),
+                          "silent release changed queued video bytes");
+        offset += count;
+    }
+
+done:
+    while (output.video_head)
+        free_video_head(&output);
+    if (output.video)
+        fclose(output.video);
+    free(payload);
+    return failed;
+}
+
 int main(void)
 {
     struct dvd_spu_overlay overlay = {0};
@@ -795,6 +867,8 @@ int main(void)
     if (test_terminal_still_direct())
         return 1;
     if (test_motion_menu_stage_pressure())
+        return 1;
+    if (test_late_audio_after_silent_release())
         return 1;
     puts("DVD overlay output: exact plane and reserve ownership pass");
     return 0;

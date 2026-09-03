@@ -2127,6 +2127,9 @@ static int cancel_pending_menu_activation(struct dvd_menu_state *menu,
  */
 static int scheduler_release_silent_video(struct output_state *output)
 {
+    size_t queued_bytes = output->video_queued_bytes;
+    uint64_t video_bytes_before = output->video_bytes;
+
     if (output->iso_start_filter_active) {
         fprintf(stderr,
                 "media_player_helper: stream ended before a complete "
@@ -2149,7 +2152,47 @@ static int scheduler_release_silent_video(struct output_state *output)
         scheduler_accept_video_pts(output, chunk);
         free_video_head(output);
     }
+    fprintf(stderr,
+            "media_player_helper: video lookahead classified silent "
+            "limit=%u queued=%zu released=%llu total_video=%llu "
+            "pictures=%u video_pts_valid=%d max_video_pts=%llu\n",
+            (unsigned)VIDEO_QUEUE_LIMIT, queued_bytes,
+            (unsigned long long)(output->video_bytes - video_bytes_before),
+            (unsigned long long)output->video_bytes, output->picture_marks,
+            output->have_video_pts,
+            (unsigned long long)output->max_video_pts);
     return 0;
+}
+
+static int reject_late_audio(const struct output_state *output,
+                             const char *codec, int has_pts, uint64_t pts)
+{
+    const char *relation = "unknown";
+    uint64_t delta = 0;
+
+    if (has_pts && output->have_video_pts) {
+        if (pts > output->max_video_pts) {
+            relation = "ahead";
+            delta = pts - output->max_video_pts;
+        } else if (pts < output->max_video_pts) {
+            relation = "behind";
+            delta = output->max_video_pts - pts;
+        } else {
+            relation = "equal";
+        }
+    }
+    fprintf(stderr,
+            "media_player_helper: %s audio begins beyond the bounded video "
+            "lookahead audio_pts_valid=%d audio_pts=%llu "
+            "video_pts_valid=%d max_video_pts=%llu relation=%s "
+            "delta90k=%llu total_video=%llu queued_video=%zu\n",
+            codec, has_pts, (unsigned long long)pts,
+            output->have_video_pts,
+            (unsigned long long)output->max_video_pts, relation,
+            (unsigned long long)delta,
+            (unsigned long long)output->video_bytes,
+            output->video_queued_bytes);
+    return -1;
 }
 
 /* The startup lead ends only when both its bounds are satisfied. */
@@ -3377,12 +3420,9 @@ static int process_pes(struct media_source *input, uint8_t code,
             result = 0;
             goto done;
         }
-        if (output->silent_video_mode) {
-            fprintf(stderr,
-                    "media_player_helper: MPEG Layer II audio begins beyond "
-                    "the bounded video lookahead\n");
+        if (output->silent_video_mode &&
+            reject_late_audio(output, "MPEG Layer II", has_pts, pts) < 0)
             goto done;
-        }
         output->audio_pes_seen = 1;
         if (has_pts && !output->have_audio_pts) {
             output->first_audio_pts = pts;
@@ -3502,12 +3542,9 @@ static int process_private_pes(struct media_source *input,
             result = 0;
             goto done;
         }
-        if (output->silent_video_mode) {
-            fprintf(stderr,
-                    "media_player_helper: AC-3 audio begins beyond the "
-                    "bounded video lookahead\n");
+        if (output->silent_video_mode &&
+            reject_late_audio(output, "AC-3", has_pts, pts) < 0)
             goto done;
-        }
         /*
          * The two-byte pointer locates this packet's first frame header, one
          * based, so it only matters before the decoder has synchronized; once
@@ -3567,12 +3604,9 @@ static int process_private_pes(struct media_source *input,
             result = 0;
             goto done;
         }
-        if (output->silent_video_mode) {
-            fprintf(stderr,
-                    "media_player_helper: DTS audio begins beyond the bounded "
-                    "video lookahead\n");
+        if (output->silent_video_mode &&
+            reject_late_audio(output, "DTS", has_pts, pts) < 0)
             goto done;
-        }
         first_frame = ((size_t)packet[payload_offset + 2] << 8) |
                       packet[payload_offset + 3];
         if (!audio->a52_synced && first_frame) {
