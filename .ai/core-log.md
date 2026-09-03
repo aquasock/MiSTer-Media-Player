@@ -1,3 +1,37 @@
+## 945 COMMIT Unreleased ce5a826 2026-09-03T06:33:43-07:00
+
+#### Coming From:
+
+Unreleased cea2add
+
+#### Purpose:
+
+Reopen the FPGA decoder at autonomous DVD stream boundaries without discarding the completed still or hiding the late-audio synchronization failure.
+
+#### Outcome:
+
+Source `ce5a826` adds control event `0x86` as a coordinated helper/Main stream boundary.  Every expired finite DVD still now drains its intentional sequence-end transport, and an automatic menu transition out of a silent epoch preserves the already-consumed Program Stream start code; in both cases the helper flushes its exclusive reserve, resets demux, audio, PTS, random-access and bounded scheduling state, sends the boundary event and waits for GO.  Main continues submitting through an exact pipe-empty observation, including an odd final byte, then toggles download exactly once and releases the helper without discarding old media or clearing the overlay.  Input polls the control socket before acting and all controls are suppressed during the boundary, while a paused session still drains it.  Static inspection established that `dvdmenu:` and `isomenu:` deliberately bypass the optical prefetch ring, so their libdvdnav state is already consumer-synchronous and `media_source.c` required no change.  The focused production-translation-unit and Main lifecycle regressions pass optimized strict builds, AddressSanitizer and UndefinedBehaviorSanitizer; focused GCC analysis passes with the established audio-overlay leak false positive suppressed.  The updated patch applies to pinned Main `0a8fb44` and both local GNU 10.2.1 ARM builds succeed.  `host/build/MiSTer_StreamBoundary_ce5a826` is 1,182,692 bytes at SHA-256 `99084bc5db9062e2984ec93f40158f4bfd4c265300b314c7a7ddbd6e8081f706`; the static stripped ARMv7 `host/build/MediaPlayer_Helper_StreamBoundary_ce5a826` is 966,052 bytes at SHA-256 `32c9a5846aac94f4c1ce2c1bb36a752b5a1c71bfa4ab0bcf304170ef58645e72` and has no dynamic section.  RTL and the RBF are unchanged.
+
+#### Next Steps:
+
+Install the matched `MiSTer_StreamBoundary_ce5a826` and `MediaPlayer_Helper_StreamBoundary_ce5a826`, preserving the accepted RBF and visualizer, and reboot for Main.  Run Futurama disc one from first-play through all finite intro stills into the automatic menu; require one `DVD stream boundary pending` and `released after drain` pair for each terminal still, fresh accepted-byte progress after every reset, visible menu background and selector movement, synchronized AC-3, overlay records in the active telemetry session, title activation and return-to-menu.  Then recheck Blazing Saddles redundant-root behavior, Coming to America overlay-only Scene Selections, The Big Lebowski navigation and the forum disc's silent LPCM menu before accepting the matched host pair on hardware.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_dvd_overlay_output.c
+- tools/test_main_seek_lifecycle.cpp
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 944 COMMIT Unreleased cea2add 2026-09-03T06:15:39-07:00
 
 #### Coming From:
@@ -1180,35 +1214,6 @@ Install only the exact helper as `/media/fat/linux/MediaPlayer_Helper` with exec
 - host/arm/media_source.c
 - tools/test_dvd_menu_hop.c
 - tools/test_private_audio_skip.sh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 905 COMMIT Unreleased fddab62 2026-09-02T07:49:36-07:00
-
-#### Coming From:
-
-Unreleased fddab62
-
-#### Purpose:
-
-Qualify the media-only DVD navigation barrier on physical hardware and isolate the remaining Blazing Saddles root-menu blank.
-
-#### Outcome:
-
-The user's physical source-`fddab62` capture accepts the media-only ownership fix: Blazing Saddles no longer terminates the helper, the root command at 13.035470 seconds discards 3,055,569 reserved bytes, navigation is ready 11.212 milliseconds later, and Main releases its decoder barrier after another 5.459 milliseconds without `Resource temporarily unavailable` or any helper error.  The disc enters a four-button menu autonomously at 11.938842 seconds, 1.096628 seconds before the user presses `M`; the root call then reports the same NAV PCI LBN 333, selected button 1 and highlight rectangle before resetting Main.  Libdvdnav re-emits the 86,400-byte overlay and reaches an indefinite menu still, but after that overlay commit every one of 245 pipe reads is at most 96 bytes and carries only overlay style records, so no replacement MPEG background follows the redundant same-menu hop and the decoder remains black.  This is distinct from the resolved output-ownership crash and from CSS setup: the helper survives for the remaining capture, while the user separately reports Coming to America and The Big Lebowski still load their menus.  The 4,153,418-byte log has SHA-256 `58b480f1d441d64729d14c1bc84e4604914c7b77c54308aad64d5f8375ca84d3`; the 559-byte black screenshot and telemetry decode failure have SHA-256 `9677a233b9b21aa34e041950e2ce422df808f6fa3a5db233eeb0c7f7bb98ee27` and `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004`.
-
-#### Next Steps:
-
-Preserve Main, the RBF, reserve discard, media-only ownership and normal authored menu hops.  After user approval, make the helper treat `M` as a no-op when libdvdnav already reports the root menu, retaining the queued or displayed MPEG background and current overlay rather than issuing a same-menu VM jump and decoder barrier; calls from title playback or a non-root submenu must continue through the existing hop path.  Add focused native coverage for root-menu identity, submenu-to-root transitions and title-to-root transitions, rerun all helper regressions and build a helper-only ARM artifact for physical retest.  On Blazing Saddles, allow its autonomous menu entry to finish and press `M` again while the root menu is active; acceptance requires the background and selector to remain visible, no decoder reset, responsive authored buttons and unchanged behavior on Coming to America and The Big Lebowski.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
