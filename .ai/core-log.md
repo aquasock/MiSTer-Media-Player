@@ -1,3 +1,33 @@
+## 941 COMMIT Unreleased ??? 2026-09-03T04:56:54-07:00
+
+#### Coming From:
+
+v0.9.0 b1a6dcb
+
+#### Purpose:
+
+Instrument and reproduce Futurama's late-menu-audio rejection so the permanent silent-video classification can be corrected without hiding an A/V synchronization failure.
+
+#### Outcome:
+
+The fresh `FUTURAMA_S1D1` physical-disc capture reaches its authored menu, publishes one valid still and selector overlay, and then leaves that frame resident after the helper exits normally with status one.  The checksum-valid schema-21 snapshot reports one completed and displayed I picture, sequence-end and presentation completion, zero decoder error flags, zero transport blocks and zero audio underruns.  The helper log identifies the software boundary: before any audio PES appears, the bounded 2 MiB video queue fills and `scheduler_release_silent_video()` irreversibly disables scheduling; the later valid AC-3 private substream `0x80` reaches the deliberate `AC-3 audio begins beyond the bounded video lookahead` rejection, after which Main drains the already-reserved bytes and observes helper EOF.  This is an implementation classification failure rather than an H.262, overlay, CSS, optical-transport or FPGA failure.  The approved diagnostic commit will preserve output behavior while recording the silent-release video PTS horizon and the late audio packet's PTS, and will add a deterministic focused regression for the exact video-before-audio state transition.
+
+#### Next Steps:
+
+Add bounded diagnostics at the silent-video release and late MPEG, AC-3 and DTS rejection paths, including queue, byte, picture and PTS state without changing media output or error policy.  Extend the focused production-translation-unit regression to force the 2 MiB queue boundary and verify the one-way late-audio rejection plus preserved queued video, then run strict native compilation, AddressSanitizer, UndefinedBehaviorSanitizer, GCC analyzer and retained DVD random-access, overlay, staging, menu, private-audio, AC-3 and consumer-audio tests.  Build a static ARMv7 helper locally and use one Futurama menu rerun to establish whether its first AC-3 PTS is ahead of or behind the already-released video horizon before proposing the synchronization correction.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 940 COMMIT Unreleased 177886b 2026-09-03T03:51:20-07:00
 
 #### Coming From:
@@ -1183,35 +1213,6 @@ Exit MediaPlayer, replace only `/media/fat/MiSTer` with `host/build/MiSTer_NavDr
 
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - tools/test_main_seek_lifecycle.cpp
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 901 COMMIT Unreleased 78646bd 2026-09-02T06:48:08-07:00
-
-#### Coming From:
-
-Unreleased 78646bd
-
-#### Purpose:
-
-Record the first physical result for interruptible reserve discard and localize the remaining root-menu freeze to Main's pre-classification drain hold.
-
-#### Outcome:
-
-The user's golden physical-DVD run with the source-`78646bd` helper still freezes on the first `M`, but it no longer reaches the prior post-classification deadlock.  Main submits root command `0x09` at 5.389484 seconds after transferring 6,088,666 bytes, and the 179,060-byte log at SHA-256 `2877bfd845095dae6de6e2a0a55f01fcf3fd7255fde98f154a310a9d3964a461` ends immediately without libdvdnav's command, hop or continuation diagnostic, the new reserve-discard completion, `READY`, download reset or `GO`.  The 382,102-byte screenshot at SHA-256 `ea2f2ff083b18310376c1ff9142fcad6ff79eeceb8ea66b84d49a6f929a5ce1e` is another intact resident frame rather than decoder corruption, and the 675-byte schema-21 sidecar at SHA-256 `ebc29db93702f67d2d2a73d12d0de5cde6c252bf473da6da343ac29f3586342d` is checksum-valid.  Static control-flow comparison proves the earlier circular wait now occurs before command classification: Main returns from every poll while `navigation_pending`, the helper is blocked producing into the undrained reserve and pipe, and its single program-stream thread therefore cannot return to `control_read_command`; ordinary file seeking already avoids this exact failure by continuing media transfer while `seek_pending` until the helper decides between continuation and `READY`.  Source `78646bd` remains necessary for the later classified-hop discard boundary but is rejected alone on hardware.
-
-#### Next Steps:
-
-Preserve the source-`78646bd` helper, libdvdnav behavior, decoder, RTL, RBF and visualizer asset.  After user approval, make one bounded Main correction that treats unresolved DVD navigation like the existing unresolved seek decision: poll the control channel first, continue ordinary transfer while only `navigation_pending` remains, and stop immediately when `READY` converts it into the existing reset barrier; `MENU_CONTINUE` will retain byte-exact uninterrupted output, while a stream hop can only send old-session bytes before the helper's reserve discard and Main's subsequent reset remove them.  Extend the modeled Main lifecycle test to require submitted bytes during unresolved navigation, zero discard or reset on continuation, and exactly one reset plus `GO` on `READY`; apply and compile the complete patch stack against pinned upstream, build only a new Main locally, and repeat the same first `M` with the source-`78646bd` helper.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
