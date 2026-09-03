@@ -181,11 +181,15 @@ size_t output_stage_records(const struct output_stage *stage)
 }
 
 enum output_stage_still_action output_stage_classify_still(
-    int active, unsigned payloads, unsigned seconds)
+    const struct output_stage *stage, unsigned video_pictures,
+    unsigned seconds)
 {
-    if (!active)
+    if (!output_stage_active(stage))
         return OUTPUT_STAGE_STILL_NONE;
     if (seconds != 0xffu)
         return OUTPUT_STAGE_STILL_COMMIT;
-    return payloads ? OUTPUT_STAGE_STILL_HOP : OUTPUT_STAGE_STILL_CANCEL;
+    if (video_pictures)
+        return OUTPUT_STAGE_STILL_HOP;
+    return output_stage_records(stage) ? OUTPUT_STAGE_STILL_CONTINUE :
+                                         OUTPUT_STAGE_STILL_CANCEL;
 }

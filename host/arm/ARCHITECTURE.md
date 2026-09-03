@@ -49,8 +49,11 @@ Menu-mode sources use the same channel for directional, activate and root-menu
 commands. Root calls and button activations that enter a title use the ready/go
 barrier.  An activation that remains in menu space receives a distinct
 menu-continuation acknowledgment, so Main preserves the resident video frame
-while the helper advances the overlay. Highlight-only moves likewise do not
-reset the video stream. Main maps player-one
+while the helper advances the overlay. A nonempty indefinite activation stage
+requires that barrier only after the H.262 output path has emitted a picture;
+an overlay-only stage commits through the live session before its continuation
+acknowledgment, so generic Program Stream headers cannot blank a resident menu
+frame. Highlight-only moves likewise do not reset the video stream. Main maps player-one
 D-pad/A/Start/Select and keyboard arrows/Enter/M while an authored menu is
 active.
 

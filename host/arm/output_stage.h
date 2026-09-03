@@ -12,6 +12,7 @@ enum output_stage_still_action {
     OUTPUT_STAGE_STILL_NONE = 0,
     OUTPUT_STAGE_STILL_COMMIT,
     OUTPUT_STAGE_STILL_CANCEL,
+    OUTPUT_STAGE_STILL_CONTINUE,
     OUTPUT_STAGE_STILL_HOP
 };
 
@@ -29,6 +30,7 @@ int output_stage_active(const struct output_stage *stage);
 size_t output_stage_size(const struct output_stage *stage);
 size_t output_stage_records(const struct output_stage *stage);
 enum output_stage_still_action output_stage_classify_still(
-    int active, unsigned payloads, unsigned seconds);
+    const struct output_stage *stage, unsigned video_pictures,
+    unsigned seconds);
 
 #endif

@@ -3195,22 +3195,32 @@ static int wait_dvd_still(struct media_source *input,
     if (menu->activation_pending && menu->activation_payloads)
         fprintf(stderr,
                 "media_player_helper: DVD menu activation pending reached "
-                "still payloads=%u duration=%s%u\n",
-                menu->activation_payloads,
+                "still payloads=%u pictures=%u records=%zu duration=%s%u\n",
+                menu->activation_payloads, output->picture_marks,
+                output_stage_records(output->activation_stage),
                 seconds == 0xffu ? "indefinite/" : "", seconds);
 
     stage_action = output_stage_classify_still(
-        output_stage_active(output->activation_stage),
-        menu->activation_payloads, seconds);
+        output->activation_stage, output->picture_marks, seconds);
     if (stage_action == OUTPUT_STAGE_STILL_HOP) {
         menu->activation_staged_hop = 1;
         *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
         fprintf(stderr,
                 "media_player_helper: DVD payload-bearing indefinite menu "
-                "requires staged stream hop records=%zu bytes=%zu\n",
+                "requires staged stream hop pictures=%u records=%zu bytes=%zu\n",
+                output->picture_marks,
                 output_stage_records(output->activation_stage),
                 output_stage_size(output->activation_stage));
         return 2;
+    }
+    if (stage_action == OUTPUT_STAGE_STILL_CONTINUE) {
+        if (commit_activation_stage(output,
+                                    "overlay-indefinite-menu-continuation") < 0)
+            return -1;
+        if (acknowledge_menu_continuation(
+                menu, control_fd, "overlay-indefinite-still") < 0)
+            return -1;
+        return 1;
     }
     if (stage_action == OUTPUT_STAGE_STILL_CANCEL) {
         if (cancel_activation_stage(output, "empty-indefinite-still") < 0)
