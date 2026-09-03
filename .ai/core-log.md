@@ -1,4 +1,4 @@
-## 939 COMMIT Unreleased ??? 2026-09-03T03:19:43-07:00
+## 939 COMMIT Unreleased 7759f87 2026-09-03T03:19:43-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Prepare the repository documentation and release-candidate notes for the v0.9.0 
 
 #### Outcome:
 
-The user reports that the source-`0f1165c` candidate now looks good and is conducting the final functional and regression pass independently.  Documentation remains fragmented between v0.8.0 release facts and later development notes, so this approved documentation boundary will describe the current video, Program Stream, consumer-audio, visualizer, DVD ISO, encrypted-disc, direct-optical, authored-menu, navigation, seeking, EOF and telemetry behavior without representing the untagged candidate as already published.  It will also make the supplied 720-by-480 exact-24-fps MPEG-2 Program Stream FFmpeg command the project's recommended file-conversion recipe and reserve final runtime hashes, clean-build figures and publication provenance for release qualification.
+The user reports that the source-`0f1165c` candidate looks good and is conducting the final functional and regression pass independently.  Source `7759f87` reconciles the README, changelog, architecture, build and hardware-test documentation with the complete v0.9.0 candidate: native 480p and expanded native-480i decoding, Program Stream seeking and replay-ready EOF, standalone consumer audio and its timed visualizer overlay, encrypted ISO and direct-optical DVD playback, authored menus and scene selection, unsupported LPCM behavior, telemetry and current limitations.  It adds dedicated v0.9.0 release-candidate notes with the tested component identities, exact candidate artifact hashes and established timing/resources while explicitly reserving publication provenance for the clean release build.  It also adds a focused media-preparation guide and promotes the user's 720-by-480 exact-24-fps MPEG-2 Program Stream FFmpeg command as the project recipe.  That command produces the documented Main Profile, 4:2:0, 32:27-SAR output with a 48 kHz 320-kilobit MP2 track and also succeeds without an input audio stream; local links, code fences, whitespace and staged-diff checks pass.  No runtime source or artifact changed.
 
 #### Next Steps:
 
-Update the README, changelog, architecture, building and hardware-test guidance; add focused media-conversion guidance and v0.9.0 release-candidate notes; cross-check controls, install paths, bundled dependencies and known limitations against the current source; then run documentation structure, link and whitespace checks.  Commit and push the documentation without tagging or publishing v0.9.0 while the user's regression testing and the required clean release build remain open.
+Complete the user's functional and regression matrix, then perform the required clean/from-scratch Quartus, helper, Main and visualizer release build from the exact accepted source.  Once those artifacts reproduce and pass the final hardware gate, update the changelog from Unreleased to the dated v0.9.0 boundary, replace candidate language with final package filenames and hashes, and have the user create the annotated tag and pre-release from that exact documentation commit.  Do not tag or publish v0.9.0 before those gates close.
 
 #### Files Modified:
 
@@ -28,7 +28,7 @@ Update the README, changelog, architecture, building and hardware-test guidance;
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
