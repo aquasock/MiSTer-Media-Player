@@ -1,3 +1,32 @@
+## 935 COMMIT Unreleased ??? 2026-09-03T00:16:48-07:00
+
+#### Coming From:
+
+Unreleased ac13724
+
+#### Purpose:
+
+Bundle the source-`ac13724` H.262 restart diagnostic helper with its matched runtime set and physical-drive launcher for forum testing.
+
+#### Outcome:
+
+Forum package assembly approved.  The archive will combine the exact source-`ac13724` static ARMv7 diagnostic helper, accepted source-`3689cca` Main, current source-`366a227` interlaced visualizer pack, timing-qualified source-`dfe1057` RBF, USB DVD Drive launcher, installation and provenance notes, project licence and all bundled dependency licences without rebuilding or changing any runtime component.
+
+#### Next Steps:
+
+Assemble `host/build/MiSTer_Media_Player_H262Diag_ac13724.zip` in the established root-relative MiSTer layout, identify it clearly as an unreleased diagnostic community test, generate an internal SHA-256 manifest, verify a fresh extraction byte-for-byte against the qualified inputs, executable modes and launcher placement, run ZIP integrity validation, and record the resulting archive size and digest for the forum upload.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 934 COMMIT Unreleased ac13724 2026-09-03T00:01:33-07:00
 
 #### Coming From:
@@ -1173,49 +1202,6 @@ Preserve Main, RTL, the timing-qualified RBF, the inactivity and overlay paths, 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 895 COMMIT Unreleased 532bd8e 2026-09-02T04:45:00-07:00
-
-#### Coming From:
-
-Unreleased 7e152d5
-
-#### Purpose:
-
-Prototype an inactivity-triggered standalone-audio visualizer by coupling PCM loudness to synchronized legal MPEG-2 loop variants while preserving the normal player interface and existing decoder behavior.
-
-#### Outcome:
-
-Source `532bd8e` adds a deterministic four-level visualizer pack generator and a bounded ARM runtime that validates every indexed payload as one sequence-led, closed, intra-starting legal H.262 GOP, computes a fast-attack and slow-decay stereo RMS envelope, selects a complete synchronized color grade at each loop phase, and admits at most 4,096 video bytes at a PCM boundary with two GOPs of lead.  The accepted player interface is quantized into the existing opaque two-bit DVD overlay, remains visible with elapsed, total, remaining and progress updates, clears after ten emitted-audio seconds without activity, restores from its resident plane when Main reports pause or resume, and republishes completely after every seek reset and at clean EOF; a missing or invalid pack retains the prior full-color framebuffer UI.  The generated 1,751,247-byte pack has twenty three-picture GOPs at each of four levels, its deliberately level-switched stream decodes without FFmpeg errors as 720-by-480 at 30000/1001, and a twelve-second modeled transport measured approximately 0.49 MB/s including PCM, video and overlay against the prior physical path's approximately 0.82 MB/s.  Strict unit, sanitizer, fallback and real-helper regressions pass; native and exact ARMv7 helpers pass MP3, WAV, FLAC and Ogg with two READY/GO seeks, one boundary continuation, post-reset overlay republishing, one inactivity clear and 369 to 375 decodable selected pictures, while the patched Main applies to pinned upstream and compiles with GNU 10.2.  GNU 10.2 produced the 961,956-byte static ARMv7 helper `host/build/MediaPlayer_Helper_Visualizer_532bd8e` at SHA-256 `6b7079525f87907e8c45241f28501cd8ee01eae00b0ebcf1357b9b1c03f1d836`, the 1,182,692-byte ARMv7 Main `host/build/MiSTer_Visualizer_532bd8e` at SHA-256 `f2da76ee4882faa0192e086ca12882959c3bb26fea403de0facfc3c73c768d57`, and `host/build/MediaPlayer_Visualizer_532bd8e.mmpvis` at SHA-256 `2024e8d4e4536bb45662d9e8787d3cf098583442bc24d6aa12a73a4db4dbf85a`; the H.262 decoder, display protocol, RTL and timing-qualified RBF are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer, install `host/build/MediaPlayer_Helper_Visualizer_532bd8e` as `/media/fat/linux/MediaPlayer_Helper`, `host/build/MiSTer_Visualizer_532bd8e` as `/media/fat/MiSTer`, and `host/build/MediaPlayer_Visualizer_532bd8e.mmpvis` as `/media/fat/linux/MediaPlayer_Visualizer.mmpvis`, preserve executable mode on the two programs and the current timing-qualified RBF, then reboot because Main changed.  Play a dynamic standalone audio track and require the normal player interface for the first ten seconds, a seamless moving background afterward, visible color and brightness response to quiet, normal, loud and peak passages without damaged frames, interface restoration and a fresh ten-second delay after resume or seek, correct timers after seeking, and a completed interface at clean EOF before Play restarts the file.  Spot-check all four standalone formats and temporarily rename the pack once to confirm fallback to the accepted full-color screen; report acceptance or place fresh Main/helper logs and screenshots in `.ai/current_results` for any failure.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/Makefile
-- host/arm/audio_ui.c
-- host/arm/audio_ui.h
-- host/arm/audio_visualizer.c
-- host/arm/audio_visualizer.h
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/generate-audio-visualizer.py
-- tools/test_audio_file_seek.py
-- tools/test_audio_ui_output.c
-- tools/test_audio_visualizer.c
-- tools/test_main_seek_lifecycle.cpp
 
 #### Status:
 
