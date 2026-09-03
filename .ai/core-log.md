@@ -1,3 +1,32 @@
+## 912 COMMIT Unreleased efe2a76 2026-09-02T19:04:18-07:00
+
+#### Coming From:
+
+Unreleased efe2a76
+
+#### Purpose:
+
+Qualify terminal single-picture DVD menu delivery on Coming to America and isolate the remaining black background.
+
+#### Outcome:
+
+The user's physical source-`efe2a76` run improves the Scene Selection transition from a stale root-menu background to the correct replacement selector over black, but does not yet display the authored background.  Activation succeeds at 20.065338 seconds, terminal filtering finds a sequence at offset zero and one I picture at offset 106 in 224,824 queued video bytes, the helper records one emitted picture, and the existing barrier commits 138 staged records totaling 311,497 bytes.  The checksum-valid schema-21 snapshot confirms 224,819 accepted decoder bytes and final picture type I, but reports zero completed reference pictures, zero displayed pictures, zero swaps and no sequence end; all 209,923 decoder stall cycles belong to the unfinished I picture while error flags remain clear.  In contrast, the replacement overlay completes exactly one clear, configuration and commit with twenty-two data records and 86,400 plane bytes, no protocol error, and the visible rectangle shown in the 1,920-by-1,080 screenshot.  Source inspection matches the hardware evidence: the picture parser completes `picture_data()` only after observing a following non-slice start code, and native one-picture startup already uses `sequence_end_seen` to publish an end-of-stream frame.  The 1,038,477-byte log, 5,516-byte screenshot and 571-byte telemetry report have SHA-256 `e427eb237cb56a26fae0625aed228f7e2d7a44ed83d66a42aaa5d67521358b27`, `1abfda3f3895ff4e1c0919735b66f83b82ad37051b4c80cd349e9ba122b14b57` and `4286d8d8a1eb0c75774891f03ad1c24178099464dd100c178de9752db68a1530`.
+
+#### Next Steps:
+
+Preserve terminal sequence-plus-I qualification, ordinary open-ended random access, overlay-only continuation, Main, protocol, decoder, RTL and RBF.  After user approval, append the valid four-byte H.262 `sequence_end_code` only after a terminal authored-still group qualifies and drains into the activation stage, so the existing parser closes the final slice region and native startup releases the completed one-picture frame; do not synthesize a second picture or alter decoder interpretation.  Extend the production-path still regression to require the exact terminator after unchanged authored bytes, retain ordinary I/P, terminal I-only, trailing-B and overlay-only coverage, rerun strict native, sanitizer, analyzer, staging, reserve, menu-hop, audio and seek suites with repeated high-risk cases, and build only a new static ARMv7 helper for another Coming to America Scene Selection test plus retained Blazing Saddles, The Big Lebowski and forum-disc regressions.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 911 COMMIT Unreleased efe2a76 2026-09-02T18:46:53-07:00
 
 #### Coming From:
@@ -1250,34 +1279,5 @@ Pause at source `f0fba4d` as requested and preserve the physically accepted sour
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 872 COMMIT Unreleased add7d00 2026-09-01T04:57:47-07:00
-
-#### Coming From:
-
-Unreleased add7d00
-
-#### Purpose:
-
-Record physical acceptance of native progressive presentation while confirming that the retained DVD path remains unchanged.
-
-#### Outcome:
-
-The user physically accepts source `add7d00` and its 4,478,208-byte `MediaPlayer_20260901_add7d00.rbf`: progressive MPG files play well through the new native 720-by-480p path and DVD playback behaves the same as before, closing the removal of the 800-by-600 presentation mode.  The collected 1,793,035-byte Main/helper log at SHA-256 `14ecb520c5d8d6f845e5b7ba12febbbde66a74fc80d5c51bb9c511d0d8931eed` independently confirms a complete physical-DVD run with successful root-menu entry, right and left navigation across all four buttons, activation, the authored finite still, staged destination output, delayed stream hop, post-hop random access and one complete 22-record, 86,400-byte overlay at zero order errors, with no transport fault, fatal event, unsupported-stream report or decoder error.  The 566,331-byte 1,920-by-1,080 screenshot at SHA-256 `ac586df0d0ca936ceb208f4a4e08927ff89169f54dd67d6c70eaeb75746b6691` shows stable displayed video, and the 818-byte schema-21 snapshot at SHA-256 `f268ca46da9cd93f4cc02a06bac18b8c9a277937844acaf7451610a1d5277329` passes all 64 prefixes, row indices and parity bits with checksum `36a563a4` matching word 63.
-
-#### Next Steps:
-
-Preserve source `add7d00`, the accepted RBF and the existing Main/helper as the hardware baseline.  Prepare showcase media as progressive 720-by-480 4:2:0 MPEG-2 Program Streams at the source-appropriate supported rate from 24000/1001 through 30 frames per second, with I, P and B pictures and 48 kHz stereo MPEG Layer II audio; begin a new development cycle only when a reproducible unsupported stream or separate requested feature provides the next boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
