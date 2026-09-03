@@ -1,3 +1,35 @@
+## 938 COMMIT Unreleased ??? 2026-09-03T02:28:26-07:00
+
+#### Coming From:
+
+Unreleased 490dc02
+
+#### Purpose:
+
+Normalize each qualifying malformed DVD H.262 sequence boundary across PES fragmentation instead of correcting only the session's initial random-access group.
+
+#### Outcome:
+
+Implementation approved from entry 937's physical proof that source `490dc02` corrects and displays The Big Lebowski's first authored still but leaves the immediately following seven-second still unchanged, where the decoder repeats the same source-21 failure after exactly 188 new accepted bytes.  The change will remain helper-only and preserve the decoder, Main, RBF, stream length, offsets and every conforming or out-of-scope picture while carrying bounded elementary-stream syntax state across DVD video PES payloads and delaying only the byte needed to validate `progressive_frame` before conditionally setting its preceding `chroma_420_type` bit.
+
+#### Next Steps:
+
+Implement a DVD/ISO video-payload normalizer that recognizes valid 4:2:0 sequence extensions, initial I pictures and complete-frame picture coding extensions across arbitrary PES splits, emits all bytes in original order with bounded one-byte lookahead, flushes or discards that held byte at the existing terminal and navigation boundaries, and logs every correction.  Extend the focused production regression with two consecutive captured malformed still prefixes split at every critical header boundary plus conforming, interlaced, non-I and non-4:2:0 controls; extend the Icarus regression to admit both normalized stills without source 21; run strict, sanitizer, analyzer, DVD navigation/output and audio integration suites; then build one static ARM helper for physical Big Lebowski startup, title, Root Menu and repeated-menu testing with Blazing Saddles and Coming to America regression checks.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+- tools/test_h262_restart_normalization.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 937 COMMIT Unreleased 490dc02 2026-09-03T00:41:17-07:00
 
 #### Coming From:
@@ -1167,35 +1199,6 @@ The user's golden physical-DVD run starts successfully from `/dev/sr0`, inventor
 #### Next Steps:
 
 Preserve libdvdnav behavior, the decoder, RTL, RBF, menu-continuation semantics and the accepted visualizer work.  After user approval, make one bounded navigation-transport correction that prevents the reserve writer from blocking discard completion while Main is waiting for `READY`, without discarding valid output when root or activation resolves as `MENU_CONTINUE`; add a deterministic filled-pipe regression that issues a root hop during an active multi-write record and requires bounded discard completion, exactly one `READY` and clean `GO`, retain the existing continuation case byte-for-byte, rebuild the helper and any required Main component locally, then repeat an early `M`, later `M`, activation and chapter-hop sequence on the golden disc.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 898 COMMIT Unreleased 5327358 2026-09-02T06:17:38-07:00
-
-#### Coming From:
-
-Unreleased 5327358
-
-#### Purpose:
-
-Record the eight-grade physical result and separate its remaining transition discontinuity from the unexpected startup-delay behavior.
-
-#### Outcome:
-
-The user's physical source-`5327358` run accepts the eight-grade visual range and loudness mapping: compared with four grades, intensity changes are easier to follow and quiet music remains dark and muted while louder, faster passages become brighter.  Hardware still rejects the transition itself because every selected three-picture GOP is encoded at one complete grade, so even the bounded adjacent-level slew necessarily cuts at a GOP boundary; additional envelope smoothing cannot remove that coded-picture discontinuity.  The user also reports that the visualizer appears as soon as music starts rather than after ten seconds.  No new result files were captured, and the source inactivity code remains unchanged and requests its first overlay CLEAR only after ten emitted-audio seconds, so current evidence cannot distinguish an interface overlay that never becomes visible from one that appears and is cleared early.
-
-#### Next Steps:
-
-Preserve the accepted radial animation, eight endpoint/intermediate grades, loudness thresholds, hysteresis, Main, RTL and timing-qualified RBF.  After user confirmation of whether the normal player screen never appears or appears briefly, make one helper-and-asset boundary: encode eight steady grade families plus the fourteen legal adjacent up/down transition families, interpolate each transition across its three pictures, and have the existing one-step selector choose a transition GOP so every old-to-new boundary is continuous while playback bandwidth remains unchanged.  Extend the real-helper regression to count emitted PCM frames at the first overlay CLEAR and require exactly ten seconds after launch and activity; if that passes but hardware starts visibly animated, correct initial overlay/video ordering, while an early software CLEAR requires fixing the inactivity epoch instead.  Audit the resulting versioned pack against the sixteen-megabyte loader ceiling, decode every steady and transition path with FFmpeg, rebuild only the helper and asset locally, and repeat the same FLAC passage.
 
 #### Files Modified:
 
