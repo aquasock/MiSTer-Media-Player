@@ -1,3 +1,33 @@
+## 943 COMMIT Unreleased cea2add 2026-09-03T05:54:12-07:00
+
+#### Coming From:
+
+Unreleased 401148e
+
+#### Purpose:
+
+Rearm bounded Program Stream scheduling when a silent first-play DVD epoch automatically enters an authored menu with its own synchronized audio timeline.
+
+#### Outcome:
+
+Source `cea2add` fixes the stale-state cause without weakening the late-audio guard.  `process_program_stream` now refreshes libdvdnav menu state immediately after `find_start_code` exposes a new block and before that payload is processed; a false-to-true menu transition rearms output only when the preceding epoch was already classified silent.  The rearm uses the established navigation reset to reacquire initial random-access video, PTS normalization, bounded lookahead and PCM startup hold while preserving the output reserve and activation stage and emitting no decoder barrier, Main reset or overlay clear, so the prior resident frame remains available until menu video replaces it.  The production-translation-unit regression queues 2,097,144 bytes of silent first-play video with PTS 151,777, proves the old state rejects AC-3 PTS 45,045 as 106,732 ticks behind, rearms the automatic menu epoch, qualifies fresh sequence/I/P video at PTS 45,045 and accepts that synchronized AC-3 through the real private-PES path.  Strict optimized compilation, focused GCC analyzer, AddressSanitizer address checks, UndefinedBehaviorSanitizer, DVD random-access, SPU, menu-hop, overlay, reserve, staging, AC-3 recovery, Program Stream seek, private LPCM skip, audio UI, visualizer and audio-file seek tests pass; LeakSanitizer remains unavailable in the ptrace-hosted local environment.  Local GNU 10.2.1 produced the 966,052-byte static stripped ARMv7 EABI5 helper `host/build/MediaPlayer_Helper_MenuEpoch_cea2add` with SHA-256 `23547d0d777cbc666759f0623d6b7d5b899902698a95e7da98c914405926791e`; it has no dynamic section, passes its protocol-one capability probe and passes real MP3, WAV, FLAC, Ogg and private-LPCM integrations under local ARM execution.  Main, media-source navigation policy, decoder, visualizer, RTL and RBF are unchanged.
+
+#### Next Steps:
+
+Replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_MenuEpoch_cea2add`, preserve executable mode and retain the accepted v0.9.0 Main, visualizer and RBF.  Run the same `FUTURAMA_S1D1` physical disc from first-play into its automatic menu with telemetry; acceptance requires the silent lookahead record followed by `DVD menu entered` and `DVD automatic menu scheduling epoch rearmed`, a surviving helper, audible synchronized menu AC-3 and visibly moving selector highlights.  Activate a title, return to the menu and exercise each selector direction once, then return fresh log, screenshot and telemetry results.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 942 COMMIT Unreleased 401148e 2026-09-03T05:40:29-07:00
 
 #### Coming From:
@@ -1183,35 +1213,6 @@ Exit MediaPlayer so the old helper stops, replace only `/media/fat/linux/MediaPl
 - host/arm/media_source.c
 - tools/test_dvd_menu_hop.c
 - tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 903 COMMIT Unreleased 46638c7 2026-09-02T07:07:46-07:00
-
-#### Coming From:
-
-Unreleased 46638c7
-
-#### Purpose:
-
-Record the physical result for Main's unresolved-navigation drain correction and localize the remaining root-menu failure.
-
-#### Outcome:
-
-The user's golden physical-DVD run rejects source `46638c7`, but proves its Main correction removed the prior pre-classification deadlock.  Main sends root-menu command `0x09` at 8.639313 seconds after submitting 3,297,484 bytes; the helper immediately reports a successful libdvdnav root command and stream hop, Main continues through pipe-read events 205 through 209 and reaches 3,377,823 submitted bytes, then the helper reports `flushing navigation barrier failed: Resource temporarily unavailable`, closes stdout and exits with code one at 8.700876 seconds.  No navigation-reserve completion, `READY`, Main reset or `GO` follows.  The 234,438-byte log at SHA-256 `8be78e6d0944ee3ad894087acfeed43b4356bd7e428073ccb6ab8afc399c1500` therefore narrows the failure to the helper's redundant post-discard `fflush`: once the physical-DVD reserve exists, every video and overlay write bypasses stdio and uses the reserve, whose worker intentionally owns the underlying descriptor in nonblocking mode, yet `discard_reserved_output` flushes the unused `FILE` after a successful reserve discard and treats its `EAGAIN` as fatal.  The 339,869-byte screenshot at SHA-256 `402f425f293bcc3e514b9419ec078d2a7bf967d6db06011e93479587891e518c` shows the resident dark DVD frame with telemetry rather than new decoder corruption, and the 675-byte schema-21 sidecar at SHA-256 `5bbd46558cbd8e698b199e615352b5c026acd83a2fcd9a572dfb4f70a293f1fa` is checksum-valid with XOR `2ef579fc`.  Source `46638c7` is retained as the correct Main boundary but is not hardware-accepted with the source-`78646bd` helper.
-
-#### Next Steps:
-
-Preserve Main source `46638c7`, libdvdnav behavior, decoder, visualizer, RTL and RBF.  After user approval, make one helper-only ownership correction so reserve-backed output either drains or discards the reserve and never also flushes its unused stdio stream: make normal flush select reserve drain or `fflush` exclusively, remove the post-discard `fflush`, and remember reserve ownership through shutdown so destroying the reserve is not followed by another stdio flush.  Extend the production helper-output regression with a full nonblocking pipe and buffered stdio sentinel that reproduces the current fatal `EAGAIN`, while retaining the stalled-sink discard, exact-output, menu-hop, random-access, AC-3, seek and visualizer regressions; build only a new helper locally and repeat the same early root-menu command with Main `46638c7` retained.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
