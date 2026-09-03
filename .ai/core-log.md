@@ -1,3 +1,32 @@
+## 936 COMMIT Unreleased ac13724 2026-09-03T00:38:42-07:00
+
+#### Coming From:
+
+Unreleased ac13724
+
+#### Purpose:
+
+Use the source-`ac13724` physical-disc diagnostics to identify The Big Lebowski's common startup and Root Menu H.262 rejection.
+
+#### Outcome:
+
+The user reports that the complete forum ZIP works perfectly on a fresh MiSTer, and after creating that installation's initially absent `/media/fat/screenshots` directory the intended capture succeeds.  The startup still terminal-filters 5,473 bytes and the Root Menu still terminal-filters 128,368 bytes, both with sequence offset zero and I-picture offset 170; their 256-byte prefixes are identical through byte 190 and first differ only in slice payload byte 191, after the decoder has already failed.  Both carry a 720-by-480, aspect-code-two, rate-code-four sequence with valid marker, sequence extension `148200010000` identifying profile/level `0x48`, non-progressive sequence and 4:2:0 chroma, followed by the same I frame and picture-coding extension `8ffff3c080`: all four `f_code` values are 15, picture structure is frame, frame prediction is set, concealment is clear, `progressive_frame` is one and `chroma_420_type` is zero.  Project reference H262-033 and H.262 6.3.10 require `chroma_420_type` to equal `progressive_frame` for 4:2:0; the frontend's source-21 check is the unique early check violated by these fields, and it evaluates on stream byte 186 immediately before the first slice at byte 187, matching the reset session's 188 accepted bytes, error flag `0x0001`, and zero completed or displayed pictures.  The helper remains alive beyond 386 seconds and Main submits more than 912 MB, excluding a transport or helper failure.  The 6,497,185-byte log, 1,451-byte screenshot and 376-byte checksum-valid schema-21 sidecar have SHA-256 `140890eff54f08712d07da8d9bf4d85034c8b3e5038195047c11ad181a958c0d`, `8cfc68f0bb767f52ce2ac7ca38d101ff349639b3b7e21bd1d5a80f979e58ce97` and `a720e6a6355b778971f8138b56e9940e55045d21babde553343919f9cb1d6c46`.
+
+#### Next Steps:
+
+After user approval, preserve the decoder, RBF, Main, random-access structure, byte count and every conforming stream while adding one helper-side compatibility normalization at the already-buffered initial I-picture boundary: only when a parsed sequence extension identifies 4:2:0 and the parsed frame-picture coding extension has `progressive_frame=1` with the nonconforming `chroma_420_type=0`, change that one field from zero to one and log the exact offset and before/after byte.  Add captured-header and conforming-control regressions proving only byte 185 changes from `0xc0` to `0xc1`, simulate the frontend to prove source 21 clears and the first slice is admitted, run the full strict, sanitizer, analyzer, DVD, LPCM and audio suites, build only a new static ARM helper, then retest both Big Lebowski stills plus the accepted Blazing Saddles and Coming to America menu routes.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 935 COMMIT Unreleased ac13724 2026-09-03T00:16:48-07:00
 
 #### Coming From:
@@ -1173,35 +1202,6 @@ Exit MediaPlayer so its helper stops, replace `/media/fat/linux/MediaPlayer_Help
 - host/arm/audio_visualizer.h
 - tools/generate-audio-visualizer.py
 - tools/test_audio_visualizer.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 896 COMMIT Unreleased 532bd8e 2026-09-02T05:42:18-07:00
-
-#### Coming From:
-
-Unreleased 532bd8e
-
-#### Purpose:
-
-Record the first physical audio-visualizer result and localize its visible color and brightness snapping.
-
-#### Outcome:
-
-The user's physical FLAC run accepts the source-`532bd8e` visualizer as a functional and visually appealing MPEG background: the synchronized radial color pattern moves continuously, the ten-second inactivity path reaches it, and the 708,093-byte screenshot at SHA-256 `8bcc72a81f281ff1eab5b5b4efeda0fad9c2ef036ce0dcfb2d90d2f04b6b9e64` shows a clean decoded frame with the two-bit interface overlay and visible telemetry.  The matching 1,893,060-byte Main/helper log at SHA-256 `4418b5547d4e7791cc2c2695668522d8578f9bf1cec0fa7fae96a720ea31e9d4` proves the intended visualizer asset loaded, a 44.1-kHz FLAC session remained active through approximately 64.7 seconds and Main continued submitting media without a helper, transport or decoder failure; the 766-byte checksum-valid schema-21 word dump has SHA-256 `4ee1a9cd22d31b63663002b49963dc9cc5346060c532b5b2b453cdc90426a8cc`.  Hardware rejects only the response quality: color or brightness appears to snap unpredictably while the underlying pattern changes gently.  Static localization shows that the prototype selects one of four widely separated brightness, contrast and saturation grades at every independent three-picture GOP from an RMS envelope with fixed thresholds and no hysteresis, so ordinary threshold crossings create the observed abrupt cuts; this is deterministic loudness quantization rather than damaged MPEG data or random decoder behavior.
-
-#### Next Steps:
-
-Preserve Main, RTL, the timing-qualified RBF, the inactivity and overlay paths, and the legal synchronized independent-GOP architecture.  After user approval, refine only the helper and generated visualizer asset to use eight closely spaced grades across the accepted range, threshold hysteresis and a one-grade-per-GOP slew limit so rapid loudness changes become short ramps and near-threshold material cannot chatter; add deterministic attack, decay, deadband and maximum-step tests, rebuild the ARM helper and asset locally, verify the deliberately switched stream with FFmpeg, then repeat the same dynamic FLAC passage and require continuous motion with visibly smoother loudness-correlated pulses and no abrupt grade cuts.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
