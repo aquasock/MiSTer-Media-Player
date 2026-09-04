@@ -1,4 +1,4 @@
-## 971 COMMIT Unreleased ??? 2026-09-04T04:09:25-07:00
+## 971 COMMIT Unreleased 8a86b77 2026-09-04T04:09:25-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Present coherent Audio CD metadata with aligned labels and a built-in default di
 
 #### Outcome:
 
-This cycle will use the audio UI's existing TOC-backed playlist state as the Audio CD presentation discriminator, mirror its selected `TRACK nn` label into the title value, preserve `---` for artist and album, and place every metadata value after one shared colon column.  The empty artwork placeholder will become a deterministic helper-rendered Audio CD graphic sized for the existing physically square CRT-safe viewport, avoiding a new external asset or protocol.  Ordinary audio files will retain their current placeholders, and the helper's transport, timing, visualizer, Main, RTL and RBF behavior will remain unchanged.
+Source `8a86b77` uses the existing TOC-backed playlist state as the Audio CD presentation discriminator and formats the title from the same selected physical track byte as the corresponding `TRACK nn` row, preventing title and selector drift across beginning, middle and end changes.  A shared metadata-row renderer right-aligns TITLE, ARTIST and ALBUM before one fixed colon column, keeps artist and album at `---`, and preserves the ordinary-file title placeholder.  The prior empty artwork box now contains a bounded concentric-disc graphic and `AUDIO CD` caption; its ellipse width compensates for the native mode's 8:9 pixel aspect and requires no asset or protocol change.  Strict optimized and ASAN/UBSAN pixel tests pass selector/title changes `09` to `01` to `18`, all three aligned colons, both retained placeholders, default-art palette and bounds, ordinary-file fallback, timing and progress; GCC analyzer, CDDA reader tests, static Main contracts and native real-helper integrations also pass.  GNU 10.2.1 produced the 978,340-byte static stripped ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `2e87ba05eb6e5dcce4f42712626e19f773126a683d529672ae23a4f25b8d42e2`, and that exact artifact passes idle plus MP3, WAV, FLAC, Ogg and pause integration.  Main, protocol, visualizer pack, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Refactor metadata drawing into aligned label and value columns, add a bounded procedural disc-art renderer selected only when a TOC playlist is configured, and extend pixel tests to prove the current track title follows beginning, middle and end selection changes while the artist and album placeholders, colon alignment, artwork bounds and ordinary-file placeholder view remain stable.  Run strict optimized, sanitizer, analyzer, static Main and real-helper audio regressions, then build one static stripped ARMv7 helper locally for hardware validation.
+Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`8a86b77` artifact, preserving executable mode, then re-enter the core and load a physical Audio CD.  Require the default disc image to stay inside the album-art box, all three metadata colons to align, TITLE to match the selected playlist row through natural, previous and next track changes, and ARTIST plus ALBUM to remain `---`; spot-check the accepted timing fields and one ordinary audio file before marking this source hardware-passed.
 
 #### Files Modified:
 
@@ -27,7 +27,7 @@ Refactor metadata drawing into aligned label and value columns, add a bounded pr
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
