@@ -286,7 +286,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,1023 @@
+@@ -0,0 +1,1030 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -1156,15 +1156,22 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +				                 read_events, (int)count, (unsigned long long)read_elapsed, pending_size);
 +			}
 +			else if (!count) { pending_eof = true; diagnostic_write("helper stdout eof\n"); }
-+			else if (read_errno == EAGAIN || read_errno == EWOULDBLOCK || read_errno == EINTR)
++			else if (read_errno == EINTR)
++				return;
++			else if (read_errno == EAGAIN || read_errno == EWOULDBLOCK)
 +			{
 +				++would_block_events;
 +				if (would_block_events <= 4 || !(would_block_events & (would_block_events - 1)))
 +					diagnostic_write("would_block count=%u submitted=%llu\n", would_block_events, (unsigned long long)submitted_bytes);
-+				if (stream_boundary_pending &&
++				if (!stream_boundary_pending ||
 +				    pending_size == pending_offset)
-+					stream_boundary_pipe_empty = true;
-+				return;
++				{
++					if (stream_boundary_pending)
++						stream_boundary_pipe_empty = true;
++					return;
++				}
++				diagnostic_write("DVD stream boundary pipe quiescent odd_tail=%u\n",
++				                 pending_size - pending_offset);
 +			}
 +			else
 +			{

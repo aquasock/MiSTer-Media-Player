@@ -14,6 +14,11 @@ enum class NavigationEvent {
     menu_continue
 };
 
+enum class PipeReadEvent {
+    would_block,
+    interrupted
+};
+
 struct MainLifecycle {
     bool download_active = true;
     bool seek_pending = false;
@@ -28,6 +33,9 @@ struct MainLifecycle {
     unsigned go_commands = 0;
     unsigned replay_launches = 0;
     unsigned releases = 0;
+    unsigned buffered_bytes = 0;
+    unsigned transfer_calls = 0;
+    bool stream_boundary_pipe_empty = false;
 
     void submit(std::uint64_t bytes)
     {
@@ -88,17 +96,39 @@ struct MainLifecycle {
         if (stream_boundary_pending)
             throw "duplicate stream boundary";
         stream_boundary_pending = true;
+        stream_boundary_pipe_empty = false;
+    }
+
+    void buffer(unsigned bytes)
+    {
+        buffered_bytes += bytes;
+    }
+
+    void short_pipe_read(PipeReadEvent event)
+    {
+        if (event == PipeReadEvent::interrupted)
+            return;
+        if (!stream_boundary_pending || !buffered_bytes) {
+            if (stream_boundary_pending && !buffered_bytes)
+                stream_boundary_pipe_empty = true;
+            return;
+        }
+        submit(buffered_bytes);
+        ++transfer_calls;
+        buffered_bytes = 0;
     }
 
     void stream_boundary_drained()
     {
-        if (!stream_boundary_pending)
-            throw "drain without stream boundary";
+        if (!stream_boundary_pending || !stream_boundary_pipe_empty ||
+            buffered_bytes)
+            throw "incomplete stream boundary drain";
         download_active = false;
         ++resets;
         download_active = true;
         ++go_commands;
         stream_boundary_pending = false;
+        stream_boundary_pipe_empty = false;
     }
 
     void helper_eof(bool clean, bool file_source)
@@ -165,7 +195,9 @@ static int require_patch_markers(const char *path)
         "activity-command-error",
         "if (helper_fd < 0 || chapter_barrier) return;",
         "navigation_pending = true;\n+\t\tif (!send_control(command))",
-        "stream_boundary_pending &&\n+\t\t\t\t    pending_size == pending_offset",
+        "read_errno == EINTR)\n+\t\t\t\treturn;",
+        "if (!stream_boundary_pending ||\n+\t\t\t\t    pending_size == pending_offset)",
+        "DVD stream boundary pipe quiescent odd_tail=%u",
         "DVD stream boundary released after drain",
         "if (playback_paused && !stream_boundary_pending) return;",
         "if (!pending_eof && !stream_boundary_pending) available &= ~1u;"
@@ -260,14 +292,37 @@ int main(int argc, char **argv)
                           navigation_hop_boundary.submitted == 28672,
                       "navigation decision phase lost submitted output");
 
+    MainLifecycle ordinary_lone_byte;
+    ordinary_lone_byte.buffer(1);
+    ordinary_lone_byte.short_pipe_read(PipeReadEvent::would_block);
+    failed |= require(ordinary_lone_byte.buffered_bytes == 1 &&
+                          ordinary_lone_byte.transfer_calls == 0 &&
+                          ordinary_lone_byte.submitted == 0,
+                      "ordinary lone byte was padded in the middle of a stream");
+
     MainLifecycle automatic_boundary;
-    automatic_boundary.submit(224665);
+    automatic_boundary.submit(224682);
+    automatic_boundary.buffer(1);
     automatic_boundary.stream_boundary();
-    automatic_boundary.submit(115);
+    automatic_boundary.short_pipe_read(PipeReadEvent::interrupted);
     failed |= require(automatic_boundary.stream_boundary_pending &&
+                          automatic_boundary.buffered_bytes == 1 &&
+                          automatic_boundary.transfer_calls == 0 &&
                           automatic_boundary.resets == 0 &&
                           automatic_boundary.go_commands == 0,
-                      "automatic boundary reset before the old stream drained");
+                      "interrupted boundary read changed the odd tail");
+    automatic_boundary.short_pipe_read(PipeReadEvent::would_block);
+    failed |= require(automatic_boundary.stream_boundary_pending &&
+                          !automatic_boundary.stream_boundary_pipe_empty &&
+                          automatic_boundary.buffered_bytes == 0 &&
+                          automatic_boundary.transfer_calls == 1 &&
+                          automatic_boundary.submitted == 224683 &&
+                          automatic_boundary.resets == 0 &&
+                          automatic_boundary.go_commands == 0,
+                      "quiescent boundary did not submit its exact odd tail");
+    automatic_boundary.short_pipe_read(PipeReadEvent::would_block);
+    failed |= require(automatic_boundary.stream_boundary_pipe_empty,
+                      "drained boundary did not observe an empty pipe");
     automatic_boundary.stream_boundary_drained();
     automatic_boundary.submit(9035621);
     failed |= require(automatic_boundary.download_active &&
@@ -275,7 +330,7 @@ int main(int argc, char **argv)
                           automatic_boundary.resets == 1 &&
                           automatic_boundary.go_commands == 1 &&
                           automatic_boundary.discards == 0 &&
-                          automatic_boundary.submitted == 9260401,
+                          automatic_boundary.submitted == 9260304,
                       "automatic boundary did not drain, reset once, and resume");
 
     boundary.helper_eof(true, true);

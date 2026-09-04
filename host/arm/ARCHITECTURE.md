@@ -176,7 +176,11 @@ waits; Main submits through pipe-empty, toggles download exactly once and sends
 GO before the helper resets demux, audio, PTS, random-access and bounded
 scheduling state. Automatic entry into a menu from an already-silent epoch uses
 the same handshake and saves the consumed Program Stream start code for the new
-epoch. Unlike an explicit navigation hop, this boundary discards no old media
+epoch. An ordinary one-byte pipe read remains held for its partner, but after
+the boundary event a nonblocking empty read proves the old epoch is quiescent;
+Main then submits any retained final byte through its existing zero-padded
+16-bit transport word and waits for a subsequent empty read before GO. Unlike
+an explicit navigation hop, this boundary discards no old media
 and does not clear the menu overlay. Future work may add optical-device
 discovery beyond the explicit `/dev/sr0` launcher. Angles, track selection and
 general seeking remain separate work.
