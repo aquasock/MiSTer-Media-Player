@@ -1,3 +1,32 @@
+## 984 COMMIT Unreleased 0a2e2af 2026-09-04T16:37:40-07:00
+
+#### Coming From:
+
+Unreleased 0a2e2af
+
+#### Purpose:
+
+Use the fresh rollback capture to determine whether the remaining progressive Simpsons desynchronization originates in helper PCM scheduling or FPGA video presentation.
+
+#### Outcome:
+
+The fresh physical capture accepts the source-`0a2e2af` rollback for audible continuity but not A/V synchronization: the user reports no cutouts, yet audio still moves progressively ahead of video.  The log contains no rejected title-clock marker and records 195 title scheduling samples across 238.246268 seconds; over that interval emitted PCM advances only 236.906667 seconds at 0.994377 real time and the maximum video PTS advances 237.320422 seconds at 0.996114 real time, while the helper's apparent lead over its wall-time diagnostic shrinks from 2.926312 to 1.586708 seconds.  Host PCM delivery is therefore not running fast and another helper wall-clock correction would move in the wrong direction.  The checksum-valid 30-second schema-21 FPGA snapshot instead records zero shared-transport blocks, 1,465,356,865 decoder-backpressure cycles, 251,102,880 presentation-stall cycles, 319 display-gap outliers with the three largest at 83.448450, 83.384883 and 66.733333 milliseconds, 93 timestamp-advance conflicts and zero timestamp-delay conflicts.  This localizes the accumulating error to video decode or presentation failing to maintain the audio-derived STC, but schema 21 reuses the full-width display-counter words for overlay telemetry and leaves only wrapping eight-bit display counts, so the exact displayed-frame rate and accumulated displayed-PTS lateness cannot yet be recovered.  The snapshot still latches one PCM underrun with FIFO floor zero and no transport block, but its count remains one and the user heard no cutout, making it a launch transient rather than the progressive drift mechanism.  The 7,871,841-byte log, 611,591-byte screenshot and 779-byte sidecar have SHA-256 `b995097f6e8146169a69d7b78ba9f836195d292a6335a2fde5f8bb81f790481b`, `b35a5f2bbc9ea92543dc3faac92d0ec48055c9530ee44782351918dc4acc6e24` and `01e9b2c95ca225cc6d492ad336b2a5cb72150a1c5528be67f0ee53aff9ffe9af`.
+
+#### Next Steps:
+
+Retain source `0a2e2af` and do not change helper PCM scheduling.  After user approval, add a nonfunctional schema-22 presentation diagnostic using the currently zero deadline words 58 through 62 to retain full-width displayed-picture and PCM-consumption counts, the audio-derived STC versus displayed and pending picture PTS, and separate missed-presentation causes for unavailable decode output, cadence gating and timestamp gating; update the screenshot decoder and focused telemetry simulations, then build only a diagnostic RBF while keeping Main and the helper unchanged.  A 30-second Simpsons title capture will then distinguish insufficient decoder throughput from native-film cadence mismatch and quantify whether the eventual correction belongs in late-video catch-up or presentation-aware audio holding before any functional synchronization change is attempted.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 983 COMMIT Unreleased 0a2e2af 2026-09-04T15:49:33-07:00
 
 #### Coming From:
@@ -1248,35 +1277,6 @@ Install the matched `MiSTer_StreamBoundary_ce5a826` and `MediaPlayer_Helper_Stre
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - tools/test_dvd_overlay_output.c
 - tools/test_main_seek_lifecycle.cpp
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 944 COMMIT Unreleased cea2add 2026-09-03T06:15:39-07:00
-
-#### Coming From:
-
-Unreleased cea2add
-
-#### Purpose:
-
-Use the physical Futurama result to distinguish the automatic-menu scheduler correction from an earlier terminal-still decoder-session freeze.
-
-#### Outcome:
-
-The physical `FUTURAMA_S1D1` run rejects source `cea2add` visually but proves the helper did not freeze.  The first authored ten-second still is finalized from 224,665 bytes of sequence-plus-I video, receives sequence end and transport drain, and is the only payload the schema-21 FPGA snapshot accepts: 224,780 bytes, one I picture, one reference and one displayed picture, sequence-end seen and presentation complete, with zero decoder error flags, transport blocks or audio underruns.  Three finite-still expirations then resume the same completed download session without a READY/GO decoder reset.  The helper continues, classifies later first-play video silent, enters the menu at 40.449462 seconds, rearms source `cea2add`, selects AC-3 substream `0x80`, publishes seven complete overlay planes and accepts an Up command at 63.111029 seconds that changes the authored button from one to four; it remains alive beyond 71 seconds.  Main submits through overlay offset 9,035,621, but telemetry retains zero overlay records, zero PCM samples and the first still's 224,780 accepted bytes, proving every later video, audio and overlay record remains outside the terminal FPGA session.  The black 1,600-by-1,200 screenshot contains valid telemetry but no decoded menu background.  The 1,477,359-byte log, 2,788-byte screenshot and 441-byte sidecar have SHA-256 `19bf6160b410268650e34db63b7507c1d7f5b21396a4d9314da5ebe3fc9d7518`, `bba7649ac2ac61c546f485a5f52d6f9bd09a7b9e4b17552b7ee0aed2ea380a1d` and `abe2bbe935177401657cdb1090b2e3b8b63d3c17368ccd20e4d5a990bf57318c`.  The helper-only menu rearm is therefore insufficient because it cannot reopen an FPGA session already closed by the first finite still.
-
-#### Next Steps:
-
-After user approval, replace the helper-only assumption with an explicit autonomous DVD stream-boundary handshake shared by Main and the helper while retaining the decoder and RTL.  Associate buffered libdvdnav transition metadata with its consumed payload position rather than exposing producer-ahead menu state; when a finite authored still expires or a synchronized automatic menu domain begins after a terminal or silent epoch, finish the intentional old transport, notify Main without requiring a user navigation command, drain rather than discard the completed boundary, deassert and reassert download exactly once, then send GO so the helper resets demux, audio, PTS, random-access and bounded scheduling before consuming the new epoch.  Remove the unsynchronized `cea2add` post-`find_start_code` rearm.  Add regressions for multiple finite first-play stills followed by a silent segment and an automatic video-plus-AC-3 menu, verifying one decoder reset per terminal boundary, consumer-position menu notification, accepted background video, PCM and overlay records, while retaining directional continuations, explicit navigation hops, staged menus, silent Program Streams, late-audio rejection, reserve ownership, seek, audio and sanitizer coverage.  Build Main and the static ARM helper locally; no RTL simulation is required unless implementation evidence unexpectedly reaches the transport decoder.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
