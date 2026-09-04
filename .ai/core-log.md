@@ -1,4 +1,4 @@
-## 957 COMMIT Unreleased ??? 2026-09-03T21:18:06-07:00
+## 957 COMMIT Unreleased d34c292 2026-09-03T21:18:06-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Expose the proven native NTSC raster as standards-signalled 525i59.94 HDMI for e
 
 #### Outcome:
 
-The user limits the first external-processing milestone to NTSC 480i and reports that the existing native bypass already drives a standard CRT correctly through analog output, accepting the decoder's field reconstruction and the core's 858-by-525 half-line-phased raster as the hardware control.  The remaining first boundary is confined to the per-core Main and ADV7513 configuration: retain the core's 54 MHz clock with each 13.5 MHz source sample held for four cycles, divide that input by two inside the transmitter, emit a 27 MHz HDMI link with two samples per source pixel, advertise CTA 525i59.94 VIC 6 or 7 according to the core aspect ratio, identify BT.601 colorimetry and limited RGB, and use the corresponding 27 MHz audio CTS.  The existing `[MediaPlayer]` Main isolation will enable Direct Video only for this core; Bob and Weave, decoder RTL, helper protocol, media scheduling and the accepted RBF remain unchanged for this initial MD-LX lock test.
+Source `d34c292` adds an experimental NTSC-only direct-HDMI boundary to the isolated patched Main without changing the decoder, helper or RBF.  It activates only for the reported `MediaPlayer` core with per-core `direct_video=1`, divides the core's 54 MHz ADV7513 input clock by two, samples every 13.5 MHz content pixel twice at 27 MHz, advertises manual x2 pixel repetition without multiplying that already-correct link clock, selects negative-sync CTA VIC 6 or 7 from status bit 121, identifies BT.601 and limited RGB, forces the full-to-limited CSC and uses CTS 27,000 for 48 or 96 kHz audio.  Generic Main behavior remains behind the existing branches, the aspect and AVI state refresh without a scaler mode change, the tracked INI fragment leaves Direct Video commented by default, and the README and architecture document the initial native-interlaced-only test boundary.  The new static register-policy test passes, all three Main patches apply cleanly in order to pinned upstream `0a8fb44`, and GNU 10.2.1 builds the 1,182,684-byte stripped ARMv7 `host/build/MiSTer_MediaPlayer` with SHA-256 `6aeded222240b6abd324b5d1525ce88d4ef6d56984a80c1d9d0332aaa2675462`.
 
 #### Next Steps:
 
-Add a focused custom-Main patch and modeled register-policy regression, extend the per-core INI fragment and documentation, then build the isolated Main locally and require strict patch-application, compiler and policy tests.  Deliver only the replacement `MiSTer_MediaPlayer` executable plus INI-line changes for the forum tester to connect MiSTer's HDMI output to the Decimator MD-LX, require the MD-LX to identify and convert 525i59.94 without scaling or deinterlacing, confirm field motion, aspect signalling and continuous HDMI audio, and retain the already-proven analog CRT path as the timing control before considering 576i, 60.000 Hz or a live core-menu switch.
+Replace only `/media/fat/MiSTer_MediaPlayer`, retain the accepted helper and RBF, add `direct_video=1` beneath the existing `[MediaPlayer]` section, reboot and test native-interlaced NTSC DVD material through MiSTer's HDMI port and the Decimator MD-LX.  Require the MD-LX and downstream processor to identify and hold 525i59.94, confirm continuous picture and HDMI audio through menus and title playback, exercise both 4:3 and 16:9 signalling, inspect field motion for intact interlace rather than Bob or Weave, and remove `direct_video=1` after the test because progressive and standalone-audio output are intentionally not qualified in this first boundary; return the updated results before considering 576i, 60.000 Hz or a live core-menu switch.
 
 #### Files Modified:
 
@@ -28,7 +28,7 @@ Add a focused custom-Main patch and modeled register-policy regression, extend t
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
