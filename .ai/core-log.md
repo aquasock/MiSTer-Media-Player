@@ -1,3 +1,37 @@
+## 971 COMMIT Unreleased ??? 2026-09-04T04:09:25-07:00
+
+#### Coming From:
+
+Unreleased 2ab755b
+
+#### Purpose:
+
+Present coherent Audio CD metadata with aligned labels and a built-in default disc image.
+
+#### Outcome:
+
+This cycle will use the audio UI's existing TOC-backed playlist state as the Audio CD presentation discriminator, mirror its selected `TRACK nn` label into the title value, preserve `---` for artist and album, and place every metadata value after one shared colon column.  The empty artwork placeholder will become a deterministic helper-rendered Audio CD graphic sized for the existing physically square CRT-safe viewport, avoiding a new external asset or protocol.  Ordinary audio files will retain their current placeholders, and the helper's transport, timing, visualizer, Main, RTL and RBF behavior will remain unchanged.
+
+#### Next Steps:
+
+Refactor metadata drawing into aligned label and value columns, add a bounded procedural disc-art renderer selected only when a TOC playlist is configured, and extend pixel tests to prove the current track title follows beginning, middle and end selection changes while the artist and album placeholders, colon alignment, artwork bounds and ordinary-file placeholder view remain stable.  Run strict optimized, sanitizer, analyzer, static Main and real-helper audio regressions, then build one static stripped ARMv7 helper locally for hardware validation.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_ui.c
+- tools/test_audio_ui_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 970 COMMIT Unreleased 2ab755b 2026-09-04T04:08:26-07:00
 
 #### Coming From:
@@ -1254,39 +1288,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 931 COMMIT Unreleased 932dc22 2026-09-02T23:23:00-07:00
-
-#### Coming From:
-
-Unreleased 366a227
-
-#### Purpose:
-
-Minimize the striped standalone-audio interface artifact with helper-only overlay transparency and a covered-visualizer brightness limit while preserving the accepted animation cadence.
-
-#### Outcome:
-
-Source `932dc22` makes standalone-audio overlay palette index zero fully transparent, the dark panel color alpha `0xa0`, and both border/text colors opaque, so missed or background-only rows expose the continuously decoded visualizer while retained UI detail reads as a translucent scanline-style HUD.  While that overlay is visible, the already-scheduled GOP selector limits the displayed grade to level 3 of 7; the existing ten-second CLEAR restores the full zero-through-seven loudness range, and activity or seek reapplies the cap without changing `due_gops`, GOP phase, source frame rate, slice size or service cadence.  Focused strict and ASAN/UBSAN tests prove exact palette alpha, covered attack `1,2,3,3...`, revealed recovery `4,5,6,7`, and renewed capping after activity and seek; GCC analyzer passes both changed translation units.  Native real-helper tests pass MP3, WAV, FLAC and Ogg with 378 through 381 decoded pictures and one CLEAR each, and the final ARMv7 helper passes the same four formats with 372 through 381 pictures and one CLEAR each.  GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_Scanline_932dc22` at SHA-256 `a87a6a81e21996735abc0d218d9d301ad8e349f96b0eeb8d891a172b86c70b09`.  The visualizer asset, decoder, Main and RBF are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_Scanline_932dc22` using executable mode, preserving the installed visualizer pack, Main and timing-qualified RBF.  Play standalone audio and require the first ten seconds to show a readable translucent scanline-style interface with the disruptive full-width dark bars removed or materially minimized; after the existing CLEAR, require the normal full-brightness visualizer.  Press Space during playback and pause, require the interface to return immediately over the animation with its quieter brightness ceiling, and confirm that the visualizer motion rate remains constant in both states and returns to full range after another ten seconds without input.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/audio_visualizer.c
-- host/arm/media_player_helper.c
-- tools/test_audio_visualizer.c
-- tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
