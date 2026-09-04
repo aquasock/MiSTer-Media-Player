@@ -1,3 +1,32 @@
+## 966 COMMIT Unreleased e0f6f9a 2026-09-04T03:16:49-07:00
+
+#### Coming From:
+
+Unreleased e0f6f9a
+
+#### Purpose:
+
+Record hardware acceptance of the overlay-first audio pause barrier and scope selectable visualizer-pack support against the current decoder-safe asset format.
+
+#### Outcome:
+
+The user reports that source `e0f6f9a` works perfectly on MiSTer, accepting the first-Space overlay reveal, stopped audio and visualizer, and second-Space resume behavior; this closes the hardware check left open by entry 965.  Alternate visualizers can reuse the current version-two `.mmpvis` container and generator while changing the underlying 720-by-480 artwork or animation, provided all eight steady grades, seven rising transitions and seven falling transitions remain phase-aligned native-interlaced MPEG-2 closed GOPs with the validated three-picture structure.  Production currently opens only `/media/fat/linux/MediaPlayer_Visualizer.mmpvis`, although tests may override it through `MMP_VISUALIZER_PATH`.  Manual replacement therefore works now without another build, while an on-screen `Load Visualizer` file picker would require a small `CONF_STR` addition and thus one Quartus/RBF build, plus isolated Main path selection and helper launch plumbing; no decoder datapath or visualizer format change is inherently required.  Hot-swapping during active audio would need a larger live-control transaction, whereas selecting while idle and applying the choice to the next helper launch is the safer first boundary.
+
+#### Next Steps:
+
+Preserve source `e0f6f9a` and its accepted runtime artifacts.  If selectable visualizers are approved, first create several deterministic version-two packs from distinct source animations and add a session-scoped `Load Visualizer` picker that validates the selected `.mmpvis`, restarts the idle helper immediately and uses the choice for subsequent audio-file and Audio CD launches; defer active-song hot-swapping and optional persistent configuration until the basic selection route is hardware-proven, and perform only one Quartus seed for the required menu-string RBF change.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 965 COMMIT Unreleased e0f6f9a 2026-09-04T02:52:38-07:00
 
 #### Coming From:
@@ -1234,35 +1263,6 @@ The fresh telemetry-enabled trace disproves a helper crash: after approximately 
 #### Next Steps:
 
 After user approval, make one helper-only commit containing both diagnosed boundaries.  Generalize terminal DVD-still finalization so any active initial random-access filter with queued video, including a direct Root Menu hop, receives the existing sequence-end and transport-drain tail before waiting; retain activation staging only as the destination publication policy.  Separately give picture-bearing deferred motion-menu staging bounded headroom beyond the existing 4 MiB decision watermark and promote such a destination through the existing staged READY/GO stream-hop path before `ENOSPC`.  Add exact production-path regressions for an unstaged Root Menu one-picture indefinite still, the existing staged terminal still, an over-watermark motion menu with byte-exact post-barrier commit, the accepted 3,797,120-byte finite-still route below the watermark and overlay-only continuation, then run strict native, sanitizer, analyzer, DVD navigation, staging, random-access, overlay, LPCM, audio and seek suites locally and on the build PC before producing one static ARM helper for the specified Big Lebowski and Blazing Saddles hardware routes.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 926 COMMIT Unreleased 6b63c91 2026-09-02T22:10:56-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Qualify a fresh live Blazing Saddles run and decide whether its preceding unlogged black attempt warrants a bundled source correction.
-
-#### Outcome:
-
-The new telemetry-enabled run is healthy through the live capture endpoint: Blazing Saddles starts `dvdmenu:/dev/sr0`, automatically enters its authored root menu, publishes a complete overlay and responds to a later Root Menu request with `already-root` plus `MENU_CONTINUE`, preserving the resident frame.  Activation leaves the menu, completes the existing READY/GO navigation barrier and begins movie playback; Next Chapter then succeeds from current title 2 part 1 to resolved title 2 part 2 and releases its barrier normally.  At 67.288 seconds Main remains actively reading and transferring helper output, with approximately 56.2 MB submitted and no helper EOF, child exit, control error, staging failure or transport failure.  The checksum-valid schema-21 snapshot measures 200 pictures and 199 swaps over 29.940731 seconds, a completed presentation with no decoder error, zero audio underruns, zero transport blocks and no overlay protocol error.  The visible 1,920-by-1,080 movie screenshot, 2,224,070-byte log and 766-byte sidecar have SHA-256 `98815a3c19614ae4bab11aa350524bf51d519b0de2de5d5b6a069f4a01d2edad`, `615eb08ed3c7eace5cb8809384357af3e3d9d2a1399652adb65be4df3e7fed22` and `f1c4dab826a2e841ae0840776c39e42da3165d40a1cb3777b075de459e1261c6`.  Because a telemetry-active helper crash would ordinarily leave Main's child-wait and exit diagnostics, the earlier attempt's missing log cannot establish a helper crash; the same build and disc now complete the route, so no reproducible Blazing Saddles defect or defensible second code change exists.
-
-#### Next Steps:
-
-Do not bundle a speculative Blazing Saddles change.  Preserve this run as acceptance of its startup, root-menu continuation, title launch and active-program chapter hop, and make the next approved helper boundary only the already-diagnosed Big Lebowski picture-bearing motion-menu staging promotion from entry 924.  Retest Big Lebowski Scene Selection as the primary acceptance route while retaining this exact Blazing Saddles route, Coming to America's finite and indefinite Scene Selection paths, ordinary movie chapters and the forum disc's LPCM-menu behavior; if the black Blazing Saddles attempt recurs with a fresh log, diagnose that trace as a separate reproducible boundary.
 
 #### Files Modified:
 
