@@ -1,3 +1,32 @@
+## 968 COMMIT Unreleased 04360e9 2026-09-04T03:50:04-07:00
+
+#### Coming From:
+
+Unreleased 04360e9
+
+#### Purpose:
+
+Record hardware acceptance of the TOC-backed Audio CD playlist and define the requested per-track and whole-album timing semantics.
+
+#### Outcome:
+
+The user reports that source `04360e9` looks good on the test MiSTer, accepting the `TRACK nn` playlist population, moving selection and six-row scrolling window delivered by entry 967.  The next requested display boundary is now explicit for Audio CD playback: `ELAPSED` is elapsed time within the selected track, `REMAIN` is time left within that track, `TOTAL` is that track's complete duration, and `PLAYLIST` is the complete duration of every filtered audio track on the disc.  Existing controls, playlist labels, current-track selection, audio transport and ordinary audio-file timing remain unchanged.
+
+#### Next Steps:
+
+Proceed with a separate approved helper-only proposal that exposes current-track start and duration from the CD TOC, derives the four requested clocks from the existing absolute CDDA sample position, and validates boundary, seek, natural-transition and mixed-mode behavior without rebuilding Main or the RBF.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 967 COMMIT Unreleased 04360e9 2026-09-04T03:25:13-07:00
 
 #### Coming From:
@@ -1247,37 +1276,6 @@ Exit MediaPlayer, replace `/media/fat/linux/MediaPlayer_Helper` with `host/build
 - host/arm/audio_visualizer.c
 - tools/generate-audio-visualizer.py
 - tools/test_audio_visualizer.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 928 COMMIT Unreleased 9c00a20 2026-09-02T22:31:00-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Complete picture-bearing motion-menu transitions before their activation stage fills and publish terminal one-picture DVD menus after every navigation route.
-
-#### Outcome:
-
-Source `9c00a20` preserves the 4 MiB classification boundary but expands the bounded activation stage to 8 MiB, statically reserving at least one complete 2 MiB video-queue drain beyond that decision; a pending picture-qualified motion menu still in the menu domain now requests the existing staged READY/GO hop at the watermark and publishes its bytes atomically after the decoder reset instead of failing at capacity.  DVD still waiting now applies the existing byte-exact terminal random-access finalizer whenever an initial filter retains queued video, independent of deferred activation state, so direct Root Menu transitions such as the reproduced long-running Blazing Saddles route receive the H.262 sequence end and five transport-drain bytes while staged destinations retain their prior publication policy.  New production-path regressions verify the exact unstaged terminal tail, the accepted 3,797,120-byte finite-still classification below the watermark and an exact 4 MiB motion-menu commit; strict native DVD, staging, reserve, random-access, overlay, audio, visualizer, LPCM-skip and seek suites pass locally and on the build PC, including 20 focused and 50 staging/menu-hop local repetitions plus focused ASAN and UBSAN on both hosts.  GCC analyzer finds no change-related fault after demoting its pre-existing audio-overlay allocation warning.  ARM GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_MenuTransitions_9c00a20` with SHA-256 `cbd5359271c10c2788b66b83d21fc21f82631e7b77c49e2697b715bfc805f143`; Main, RTL, the RBF and libdvdnav policy are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer and install only `host/build/MediaPlayer_Helper_MenuTransitions_9c00a20` as `/media/fat/linux/MediaPlayer_Helper` with executable mode while preserving the installed Main, visualizer asset and timing-qualified RBF.  On The Big Lebowski, enter Scene Selection, change pages, play a scene, return to the menu, resume the saved title position, re-enter Scene Selection and change pages again; acceptance requires a logged `DVD picture-bearing motion menu requires staged stream hop` at or beyond 4 MiB, READY/GO completion and continued navigation without `No space left on device`.  On Blazing Saddles, play for several minutes and press Root Menu; acceptance requires a logged terminal random-access group and authored-still drain followed by a visible responsive menu.  Retain shorter Coming to America Scene Selection, ordinary chapter, forum-disc LPCM-menu and title-audio checks before marking this source hardware-passed.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
 
 #### Status:
 
