@@ -1,3 +1,35 @@
+## 983 COMMIT Unreleased ??? 2026-09-04T15:49:33-07:00
+
+#### Coming From:
+
+Unreleased d007afd
+
+#### Purpose:
+
+Remove the rejected physical-DVD title wall-clock PCM floor and restore presentation-timestamp scheduling without disturbing the accepted automatic-menu pacing path.
+
+#### Outcome:
+
+The approved change will reverse only source `d007afd`: remove the physical-title clock state, target and hold-ceiling pacing, restore the automatic-menu-specific elapsed-frame and wait helpers, remove its regression, and restore the associated architecture and changelog text.  The earlier source-`715ff18` automatic-menu clock, navigation behavior, Main, decoder, visualizer, protocol, RTL and RBF will remain unchanged.  No replacement title-boundary algorithm will be added without a fresh source-`d007afd` capture because the returned artifacts are still the prior source-`715ff18` run and cannot identify the brief-cutout boundary mechanism.
+
+#### Next Steps:
+
+Apply the exact inverse of source `d007afd`, verify the resulting four source files match their source-`715ff18` versions, then run the strict native helper build, focused DVD overlay and scheduling regression, sanitizer and retained audio integration coverage.  Build the static ARMv7 hard-float helper twice and require identical hashes, static linkage and the expected protocol-one capabilities.  After committing and documenting the rollback, manually replace only the MiSTer helper and repeat the Simpsons route with fresh log, screenshot and telemetry files; acceptance requires no progressive audio lead, while any remaining brief cutout will guide a separate boundary-specific diagnostic.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 982 COMMIT Unreleased d007afd 2026-09-04T07:29:00-07:00
 
 #### Coming From:
@@ -1245,36 +1277,6 @@ After user approval, replace the helper-only assumption with an explicit autonom
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 943 COMMIT Unreleased cea2add 2026-09-03T05:54:12-07:00
-
-#### Coming From:
-
-Unreleased 401148e
-
-#### Purpose:
-
-Rearm bounded Program Stream scheduling when a silent first-play DVD epoch automatically enters an authored menu with its own synchronized audio timeline.
-
-#### Outcome:
-
-Source `cea2add` fixes the stale-state cause without weakening the late-audio guard.  `process_program_stream` now refreshes libdvdnav menu state immediately after `find_start_code` exposes a new block and before that payload is processed; a false-to-true menu transition rearms output only when the preceding epoch was already classified silent.  The rearm uses the established navigation reset to reacquire initial random-access video, PTS normalization, bounded lookahead and PCM startup hold while preserving the output reserve and activation stage and emitting no decoder barrier, Main reset or overlay clear, so the prior resident frame remains available until menu video replaces it.  The production-translation-unit regression queues 2,097,144 bytes of silent first-play video with PTS 151,777, proves the old state rejects AC-3 PTS 45,045 as 106,732 ticks behind, rearms the automatic menu epoch, qualifies fresh sequence/I/P video at PTS 45,045 and accepts that synchronized AC-3 through the real private-PES path.  Strict optimized compilation, focused GCC analyzer, AddressSanitizer address checks, UndefinedBehaviorSanitizer, DVD random-access, SPU, menu-hop, overlay, reserve, staging, AC-3 recovery, Program Stream seek, private LPCM skip, audio UI, visualizer and audio-file seek tests pass; LeakSanitizer remains unavailable in the ptrace-hosted local environment.  Local GNU 10.2.1 produced the 966,052-byte static stripped ARMv7 EABI5 helper `host/build/MediaPlayer_Helper_MenuEpoch_cea2add` with SHA-256 `23547d0d777cbc666759f0623d6b7d5b899902698a95e7da98c914405926791e`; it has no dynamic section, passes its protocol-one capability probe and passes real MP3, WAV, FLAC, Ogg and private-LPCM integrations under local ARM execution.  Main, media-source navigation policy, decoder, visualizer, RTL and RBF are unchanged.
-
-#### Next Steps:
-
-Replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_MenuEpoch_cea2add`, preserve executable mode and retain the accepted v0.9.0 Main, visualizer and RBF.  Run the same `FUTURAMA_S1D1` physical disc from first-play into its automatic menu with telemetry; acceptance requires the silent lookahead record followed by `DVD menu entered` and `DVD automatic menu scheduling epoch rearmed`, a surviving helper, audible synchronized menu AC-3 and visibly moving selector highlights.  Activate a title, return to the menu and exercise each selector direction once, then return fresh log, screenshot and telemetry results.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
 
 #### Status:
 
