@@ -1,3 +1,39 @@
+## 959 COMMIT Unreleased ??? 2026-09-03T22:22:02-07:00
+
+#### Coming From:
+
+Unreleased d34c292
+
+#### Purpose:
+
+Rename the DVD picker and physical-drive launcher to concise user-facing labels without changing playback routing.
+
+#### Outcome:
+
+The approved change will replace the core-menu label `Run DVD-Video` with `Load Disk`, rename the tracked launcher from `USB DVD Drive.dvd` to `Video DVD.dvd`, and update current setup and testing documentation plus the Unreleased changelog.  Patched Main will continue mapping every selected `.dvd` file to `dvdmenu:/dev/sr0`, so the helper protocol, source selection and DVD playback behavior remain unchanged; the immutable v0.9.0 release manifests and package hashes will retain the historical launcher name they actually shipped.
+
+#### Next Steps:
+
+Apply the menu and asset rename, update only current documentation references, verify that no live reference still depends on the old name, and run repository consistency checks.  Commit and push the source, then pull that exact source on build PC `10.10.0.42`, perform a clean Quartus build because the menu string is compiled into the RBF, copy back and checksum the dated core binary, and provide the new RBF plus `Video DVD.dvd` for installation while leaving Main and the helper unchanged.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer.sv
+- README.md
+- assets/USB DVD Drive.dvd
+- assets/Video DVD.dvd
+- docs/BUILDING.md
+- docs/MEDIA_CONVERSION.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 958 COMMIT Unreleased d34c292 2026-09-03T21:59:59-07:00
 
 #### Coming From:
@@ -1185,35 +1221,6 @@ Install `host/build/MediaPlayer_Helper_MenuSync_3689cca` as `/media/fat/linux/Me
 - tools/test_dvd_menu_hop.c
 - tools/test_dvd_menu_navigation.py
 - tools/test_main_seek_lifecycle.cpp
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 919 COMMIT Unreleased 7186fb4 2026-09-02T20:16:16-07:00
-
-#### Coming From:
-
-Unreleased 7186fb4
-
-#### Purpose:
-
-Diagnose the second-visit Coming to America Scene Selection stall when a directional auto-action advances to the next page.
-
-#### Outcome:
-
-The user's source-`7186fb4` run proves the directional target and helper-side auto-action fix work: on the second Scene Selection visit, Right from button 4 selects authored button 15, recognizes `auto_action_mode`, explicitly activates it and stages a complete 311,502-byte one-picture indefinite menu replacement.  The apparent decoder stall is a deterministic Main/helper control-protocol deadlock immediately afterward.  Because Main marks only Enter and Root Menu as pending navigation commands, it handles a directional command as highlight-only; the helper returns READY (`0x81`) for the auto-action stream hop, Main logs it as an unexpected event instead of resetting the download and sending GO, and the helper thereafter logs Down and Left controls as ignored while waiting for GO.  The screenshot retains a correctly decoded Scene Selection page, and its checksum-valid schema-21 telemetry reports 224,829 accepted bytes, one completed reference and displayed picture, a recognized sequence end, completed presentation and no decoder, presentation, PCM or overlay protocol errors.  The helper remains alive and polling, which distinguishes this from the prior helper exit.  The 3,389,750-byte log, 729,406-byte screenshot and 597-byte telemetry report have SHA-256 `a3c73e8e20e60a1d77f4c352a8dd2f0a46a34997400b369f16f78ae8bc204630`, `cb4301d6bb2c687c5fadfcd4c1f45908fd2c91014f2091665f6c222a55c6e165` and `055501f2a8bac9a1565e2d4e6df6e71368101da27067629c49a8432dfc471eb6`.
-
-#### Next Steps:
-
-After user approval, make every accepted DVD menu direction a pending navigation transaction in Main and have the helper explicitly return MENU_CONTINUE for ordinary no-hop directional moves, while retaining READY for directional auto-action hops.  Main should preserve the resident stream on MENU_CONTINUE and execute the existing reset, drain and GO barrier on READY.  Add focused protocol coverage for both replies, rebuild Main and the static ARM helper, run strict native, sanitizer, analyzer, menu-hop, staging, random-access, overlay, audio and seek regressions, then exercise the exact resume-to-menu-to-next-page route on hardware and retain the existing disc regressions.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
