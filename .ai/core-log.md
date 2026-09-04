@@ -1,3 +1,32 @@
+## 976 COMMIT Unreleased 36dc0ac 2026-09-04T05:41:53-07:00
+
+#### Coming From:
+
+Unreleased 36dc0ac
+
+#### Purpose:
+
+Evaluate the source-`36dc0ac` PCM-pressure continuation on the physical Simpsons DVD and isolate the reported first-episode freeze.
+
+#### Outcome:
+
+The physical result rejects source `36dc0ac` while proving that its new pressure boundary removes the previous delay and memory exhaustion.  Main sends Activate at 134.012841 seconds, libdvdnav accepts button one but remains in menu space, and the helper reaches PCM pressure almost immediately: it rebases PTS 45,045 above prior PTS 647,273, commits the exact 193,064-byte stage, preserves the resident decoder with 183,808 held frames at the 192,000-frame ceiling and acknowledges continuation at 134.152018 seconds.  The restored automatic-menu fallback then exposes a false pacing assumption: because video PTS remains fixed at 647,274, every newly decoded AC-3 packet is drained toward the 96,000-frame watermark as fast as the source and SPI path accept it.  In 93.626 seconds the helper emits 55,625,472 PCM frames where a 48 kHz clock accounts for 4,494,031, a 12.38-times overrun, and Main submission grows from 25,739,948 to more than 276 million bytes while only 4,770,764 video bytes advance.  No menu leave, delayed hop or second navigation command occurs before capture, so the helper is still replaying the authored menu rather than loading the episode.  The checksum-valid schema-21 snapshot independently excludes an RTL decoder freeze: during its 4.293-second window the decoder accepts 4,885,648 bytes, displays 124 pictures with 123 swaps and remains decode-active, with no PCM protocol error or audio underrun.  Its `0x2000` error is the overlay protocol flag after the fast loop publishes repeated style/configuration records, not an H.262 or PCM failure.  The 7,770,561-byte log, 242,955-byte screenshot and 844-byte sidecar have SHA-256 `ab81a858da3698f19f75db7223d358db23672e1641177293e3c49c316c122945`, `9845554240c28b57768256e61ba52f1e1e093bf1905545e464c278009e366e1d` and `544460c424dbf34fb10dce93923c656b2772b5ad0e27005d86722baa2bcf7e94`.  No runtime source was changed.
+
+#### Next Steps:
+
+After user approval, replace the fallback's source-rate drain with an explicit monotonic 48 kHz budget: retain the initial bounded release, admit only elapsed-clock PCM thereafter, and wait at the existing hold ceiling so a fast optical source cannot outrun playback or grow memory.  Treat a PCM-pressure resident-context release as provisional rather than erasing the delayed activation classification; continue watching libdvdnav until a later menu leave requests the existing decoder barrier, or a proven continuing menu resolves the activation, while a superseding command remains able to cancel it.  Extend the production regression with a source that supplies AC-3 much faster than real time and require emitted PCM to stay within its startup allowance plus elapsed clock, held PCM to remain bounded and a delayed menu-to-title transition to retain its stream-hop barrier.  Retain the video-pressure continuation, qualified restart, still, Futurama, Audio CD and ordinary-audio controls, then build only a new local ARM helper for another Simpsons first-episode run; Main, RTL and the RBF should remain unchanged.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 975 COMMIT Unreleased 36dc0ac 2026-09-04T05:19:48-07:00
 
 #### Coming From:
@@ -1263,34 +1292,5 @@ The next helper-only change should apply the identical narrow normalization at e
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 936 COMMIT Unreleased ac13724 2026-09-03T00:38:42-07:00
-
-#### Coming From:
-
-Unreleased ac13724
-
-#### Purpose:
-
-Use the source-`ac13724` physical-disc diagnostics to identify The Big Lebowski's common startup and Root Menu H.262 rejection.
-
-#### Outcome:
-
-The user reports that the complete forum ZIP works perfectly on a fresh MiSTer, and after creating that installation's initially absent `/media/fat/screenshots` directory the intended capture succeeds.  The startup still terminal-filters 5,473 bytes and the Root Menu still terminal-filters 128,368 bytes, both with sequence offset zero and I-picture offset 170; their 256-byte prefixes are identical through byte 190 and first differ only in slice payload byte 191, after the decoder has already failed.  Both carry a 720-by-480, aspect-code-two, rate-code-four sequence with valid marker, sequence extension `148200010000` identifying profile/level `0x48`, non-progressive sequence and 4:2:0 chroma, followed by the same I frame and picture-coding extension `8ffff3c080`: all four `f_code` values are 15, picture structure is frame, frame prediction is set, concealment is clear, `progressive_frame` is one and `chroma_420_type` is zero.  Project reference H262-033 and H.262 6.3.10 require `chroma_420_type` to equal `progressive_frame` for 4:2:0; the frontend's source-21 check is the unique early check violated by these fields, and it evaluates on stream byte 186 immediately before the first slice at byte 187, matching the reset session's 188 accepted bytes, error flag `0x0001`, and zero completed or displayed pictures.  The helper remains alive beyond 386 seconds and Main submits more than 912 MB, excluding a transport or helper failure.  The 6,497,185-byte log, 1,451-byte screenshot and 376-byte checksum-valid schema-21 sidecar have SHA-256 `140890eff54f08712d07da8d9bf4d85034c8b3e5038195047c11ad181a958c0d`, `8cfc68f0bb767f52ce2ac7ca38d101ff349639b3b7e21bd1d5a80f979e58ce97` and `a720e6a6355b778971f8138b56e9940e55045d21babde553343919f9cb1d6c46`.
-
-#### Next Steps:
-
-After user approval, preserve the decoder, RBF, Main, random-access structure, byte count and every conforming stream while adding one helper-side compatibility normalization at the already-buffered initial I-picture boundary: only when a parsed sequence extension identifies 4:2:0 and the parsed frame-picture coding extension has `progressive_frame=1` with the nonconforming `chroma_420_type=0`, change that one field from zero to one and log the exact offset and before/after byte.  Add captured-header and conforming-control regressions proving only byte 185 changes from `0xc0` to `0xc1`, simulate the frontend to prove source 21 clears and the first slice is admitted, run the full strict, sanitizer, analyzer, DVD, LPCM and audio suites, build only a new static ARM helper, then retest both Big Lebowski stills plus the accepted Blazing Saddles and Coming to America menu routes.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
