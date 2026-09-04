@@ -1,3 +1,40 @@
+## 962 COMMIT Unreleased ??? 2026-09-04T01:23:00-07:00
+
+#### Coming From:
+
+Unreleased 3e4f7ea
+
+#### Purpose:
+
+Keep the existing MPEG-2 visualizer loop active whenever the MediaPlayer core is idle while preserving immediate video takeover and the current ten-second audio-player overlay.
+
+#### Outcome:
+
+The approved implementation will remain entirely in isolated Main and the ARM helper because the FPGA already accepts the visualizer, ordinary MPEG-2 video and packed audio-player overlay through the same stream and display protocol.  The helper will gain a dedicated source that validates and emits the existing visualizer pack continuously at its encoded cadence using a monotonic-time virtual sample clock without producing silent PCM or a player overlay.  Main will start that idle source after recognizing the MediaPlayer core, stop it before any physical-disc or file selection, and restore it after playback finishes or fails while retaining the established audio-file and Audio CD path whose player overlay clears after ten seconds.  No RBF, RTL, menu-string, visualizer-asset or protocol change is planned.
+
+#### Next Steps:
+
+Implement explicit idle-session state so automatic startup cannot overwrite the last playback source or consume playback controls, make clean and error exits return to the background without restart loops when the asset or helper is unavailable, and preserve core-change shutdown.  Add focused helper pacing and Main lifecycle contracts, run strict native and sanitizer coverage plus retained audio, DVD, seek, UI and visualizer regressions, apply the Main patch stack to pinned upstream Main, and build and checksum only `MediaPlayer_Helper` and `MiSTer_MediaPlayer` locally for MiSTer validation.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/BUILDING.md
+- docs/TEST_INSTRUCTIONS.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_audio_visualizer.c
+- tools/test_main_cdda.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 961 COMMIT Unreleased 3e4f7ea 2026-09-04T00:07:31-07:00
 
 #### Coming From:
@@ -1211,37 +1248,6 @@ Exit the core and ensure no MediaPlayer helper process is running, then copy `ho
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 922 COMMIT Unreleased 6b63c91 2026-09-02T20:55:28-07:00
-
-#### Coming From:
-
-Unreleased 3689cca
-
-#### Purpose:
-
-Make DVD chapter controls follow the currently playing authored program chain so menu-launched alternate titles cannot terminate playback.
-
-#### Outcome:
-
-Source `6b63c91` replaces `iso_change_chapter()`'s initial-longest-title equality guard and absolute `dvdnav_part_play()` replay with libdvdnav's relative previous- and next-program operations against the active DVD VM path.  The selected-main-title metadata remains unchanged, while accepted hops still stop and reset the direct-device prefetch, clear the old block and menu state, restart the producer and enter the existing helper/Main reserve-discard plus READY/GO decoder barrier.  Rejected requests leave the source block boundary intact and now report direction, current title and part, buffered-byte count and libdvdnav detail; successful requests report both current and resolved title/part, making a future physical trace conclusive.  The focused production-unit test proves Previous on inventoried title 1, Next on a menu-launched title 7, preservation of the selected-title metadata, rejected-search state retention, menu-domain rejection and invalid-direction rejection.  Strict optimized, UndefinedBehaviorSanitizer, AddressSanitizer with host-incompatible leak scanning disabled, and GCC analyzer checks pass, as do the native helper build, retained AC-3, audio seek, Program Stream seek, DVD random-access, SPU, reserve, staging, menu, overlay-output, LPCM-skip, audio UI and visualizer coverage, real MP3, WAV, FLAC and Ogg integrations with and without the visualizer, one hundred menu/chapter, random-access and staging repetitions, and twenty overlay-output and LPCM-skip repetitions.  Build PC `10.10.0.42` repeats strict sanitizer and analyzer coverage plus one hundred menu/chapter runs, builds the exact native helper, passes all four real standalone-audio seeks and LPCM skip, and the retained Icarus test reconstructs thirteen stream bytes and the exact overlay payload while observing the live sequence end.  Its available fixtures include no DVD-Video image suitable for the alternate-title route.  GNU 10.2.1 builds the stripped static ARMv7 hard-float helper `host/build/MediaPlayer_Helper_ChapterVM_6b63c91`; it is 961,956 bytes, has no dynamic section and has SHA-256 `556b706c8c8b4fc60a4e11c21adb62ebb40daec4201d3f4c0052d8275b59fabb`.  Main, protocol, decoder RTL, visualizer assets and RBF are unchanged.
-
-#### Next Steps:
-
-Install only `host/build/MediaPlayer_Helper_ChapterVM_6b63c91` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining source-`3689cca` Main, the current visualizer pack and timing-qualified RBF; no reboot is required after stopping and relaunching the core, although rebooting is acceptable.  On The Big Lebowski, repeat the menu route that previously launched video and failed at Next Chapter, then require repeated Next and Previous requests to produce successful current/resolved-title diagnostics, READY/GO barrier completion, clean-picture restart and continued input response without `chapter control failed` or `control-error`.  Retest the accepted Coming to America second-visit Scene Selection route, Blazing Saddles root-menu loading and the forum disc's silent LPCM menu followed by supported title audio, then provide a fresh telemetry-enabled log and screenshot for hardware qualification.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_source.c
-- tools/test_dvd_menu_hop.c
 
 #### Status:
 
