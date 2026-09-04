@@ -53,6 +53,7 @@
 #define PCM_RECORD_FRAMES           16u
 #define VIDEO_SLICE_BYTES           256u
 #define AUTOMATIC_MENU_STALLED_VIDEO_BYTES (256u * 1024u)
+#define AUTOMATIC_MENU_PACE_SLEEP_NS (2u * 1000u * 1000u)
 #define H262_RESTART_DIAGNOSTIC_PREFIX_BYTES 256u
 #define MP3_PROBE_BYTES             (64u * 1024u)
 #define ID3V2_TAG_LIMIT             (64u * 1024u * 1024u)
@@ -259,6 +260,8 @@ struct output_state {
     unsigned automatic_menu_stalled_pts;
     int automatic_menu_pcm_fallback;
     uint64_t automatic_menu_pcm_fallback_frames;
+    uint64_t automatic_menu_pcm_fallback_initial_frames;
+    uint64_t automatic_menu_pcm_clock_start_us;
     int iso_start_filter_active;
     int iso_pts_normalization;
     int h262_chroma_normalization;
@@ -379,6 +382,7 @@ struct dvd_menu_state {
     uint16_t highlight_x2;
     uint16_t highlight_y2;
     int activation_pending;
+    int activation_followup_pending;
     unsigned activation_payloads;
     int activation_staged_hop;
     int activation_prior_pts_valid;
@@ -1077,6 +1081,7 @@ static int acknowledge_menu_continuation(struct dvd_menu_state *menu,
     if (control_send(control_fd, MEDIA_PLAYER_CONTROL_MENU_CONTINUE) < 0)
         return -1;
     menu->activation_pending = 0;
+    menu->activation_followup_pending = 0;
     menu->activation_payloads = 0;
     menu->activation_staged_hop = 0;
     menu->activation_prior_pts_valid = 0;
@@ -1084,6 +1089,32 @@ static int acknowledge_menu_continuation(struct dvd_menu_state *menu,
     fprintf(stderr,
             "media_player_helper: DVD menu continuation reason=%s\n",
             reason);
+    return 0;
+}
+
+/*
+ * PCM pressure can arrive before enough post-command video exists to prove
+ * whether an authored button action is a context-dependent menu continuation
+ * or a delayed menu-to-title transition.  Main must be released so the live
+ * resident-context prefix can play, but the helper must retain ownership of
+ * that unresolved classification.  A later menu exit uses the already
+ * asynchronous stream-boundary handshake, so no second navigation command or
+ * Main/protocol change is required.
+ */
+static int acknowledge_provisional_menu_continuation(
+    struct dvd_menu_state *menu, int control_fd, const char *reason)
+{
+    if (control_send(control_fd, MEDIA_PLAYER_CONTROL_MENU_CONTINUE) < 0)
+        return -1;
+    menu->activation_pending = 0;
+    menu->activation_followup_pending = 1;
+    menu->activation_payloads = 0;
+    menu->activation_staged_hop = 0;
+    menu->activation_prior_pts_valid = 0;
+    menu->activation_prior_pts = 0;
+    fprintf(stderr,
+            "media_player_helper: DVD provisional menu continuation "
+            "reason=%s\n", reason);
     return 0;
 }
 
@@ -2051,12 +2082,12 @@ static int hold_emit_frames(struct output_state *output, uint64_t frames)
 
 /*
  * The physical-DVD reserve is intentionally large enough to bridge optical
- * stalls during ordinary playback.  Once a timestamp-stalled menu falls back
- * to sink pacing, however, allowing that reserve to absorb decoded PCM turns
- * four MiB into roughly twenty seconds of audio lead.  Drain it before each
- * fallback scheduler batch so the pipe and FPGA credit, rather than reserve
- * capacity, set the delivery rate.  Each individual write remains bounded even
- * when hold pressure requires several writes in one scheduler pass.
+ * stalls during ordinary playback.  Once a timestamp-stalled menu enters its
+ * explicit monotonic scheduler, allowing that reserve to absorb a permitted
+ * batch would still hide the helper's chosen delivery point behind up to four
+ * MiB of older output.  Drain it before each clock-admitted batch so the batch
+ * reaches Main promptly; the monotonic budget, not reserve, pipe or SPI
+ * acceptance, owns its maximum rate.  Each individual write remains bounded.
  */
 static int scheduler_emit_pcm(struct output_state *output, uint64_t frames)
 {
@@ -2172,6 +2203,9 @@ static void scheduler_accept_video_pts(struct output_state *output,
                     (unsigned long long)
                         output->automatic_menu_pcm_fallback_frames);
             output->automatic_menu_pcm_fallback = 0;
+            output->automatic_menu_pcm_fallback_frames = 0;
+            output->automatic_menu_pcm_fallback_initial_frames = 0;
+            output->automatic_menu_pcm_clock_start_us = 0;
         }
     }
     output->max_video_pts = chunk->pts;
@@ -2311,6 +2345,7 @@ static int start_pending_menu_activation(struct dvd_menu_state *menu,
     reset_audio_for_navigation(audio);
     reset_output_for_navigation(output, hold_limit, 1);
     menu->activation_pending = 1;
+    menu->activation_followup_pending = 0;
     menu->activation_payloads = 0;
     menu->activation_staged_hop = 0;
     menu->activation_prior_pts_valid = have_prior_pts;
@@ -2330,6 +2365,7 @@ static int cancel_pending_menu_activation(struct dvd_menu_state *menu,
         cancel_activation_stage(output, reason) < 0)
         return -1;
     menu->activation_pending = 0;
+    menu->activation_followup_pending = 0;
     menu->activation_payloads = 0;
     menu->activation_staged_hop = 0;
     menu->activation_prior_pts_valid = 0;
@@ -2565,24 +2601,63 @@ static void scheduler_log_progress(struct output_state *output)
  * Some authored motion menus leave the video horizon at the first audio PTS,
  * repeat one video PTS indefinitely, or stop carrying video timestamps.  Once
  * one of those conditions is established and the normal PTS target is
- * exhausted, release held PCM as bounded batches until half of the configured
- * hold limit remains, or the ordinary startup reserve when that is larger.
- * This leaves symmetric safety headroom without draining the complete optical
- * stall cushion in one pass.  The unchanged output and FPGA FIFO credit pace
- * those writes at the sink clock.  Any later PTS advance disables this fallback
- * before its new timestamp target is evaluated.
+ * exhausted, make one bounded release down to half of the configured hold
+ * limit (or the ordinary startup reserve when larger), then admit no more than
+ * the selected PCM rate permits against CLOCK_MONOTONIC.  Entry 976's physical
+ * run proved that pipe/SPI acceptance is not an audio clock: source-rate
+ * draining otherwise emitted 55.6 million frames in 93.6 seconds.  When a
+ * fast source fills the remaining half of the hold, short sleeps keep it at
+ * the hard ceiling until the next clock budget is due.  Any later PTS advance
+ * disables this fallback before its new timestamp target is evaluated.
  */
+static uint64_t automatic_menu_elapsed_frames(uint64_t elapsed_us,
+                                              unsigned rate_hz)
+{
+    uint64_t seconds = elapsed_us / 1000000u;
+    uint64_t fraction = elapsed_us % 1000000u;
+    uint64_t frames;
+
+    if (seconds > UINT64_MAX / rate_hz)
+        return UINT64_MAX;
+    frames = seconds * rate_hz;
+    fraction = fraction * rate_hz / 1000000u;
+    return frames > UINT64_MAX - fraction ? UINT64_MAX : frames + fraction;
+}
+
+static int automatic_menu_pace_wait(void)
+{
+    struct timespec remaining = {
+        0, (long)AUTOMATIC_MENU_PACE_SLEEP_NS
+    };
+
+    while (nanosleep(&remaining, &remaining) < 0) {
+        if (errno != EINTR) {
+            fprintf(stderr,
+                    "media_player_helper: automatic menu PCM pacing wait "
+                    "failed: %s\n", strerror(errno));
+            return -1;
+        }
+    }
+    return 0;
+}
+
 static int scheduler_automatic_menu_pcm(struct output_state *output,
                                         uint64_t timestamp_due)
 {
     uint64_t video_since_pts;
+    uint64_t now;
+    uint64_t elapsed_frames;
+    uint64_t allowed;
+    uint64_t due;
     size_t available;
     size_t watermark;
+    size_t ceiling;
     size_t excess;
     size_t emit;
 
     if (!output->automatic_menu_epoch || timestamp_due ||
-        !output->have_audio_pts || !output->have_video_pts)
+        !output->have_audio_pts || !output->have_video_pts ||
+        output->hold_rate_hz <= 0)
         return 0;
     video_since_pts = output->video_bytes > output->max_video_pts_byte ?
                       output->video_bytes - output->max_video_pts_byte : 0;
@@ -2591,31 +2666,85 @@ static int scheduler_automatic_menu_pcm(struct output_state *output,
         video_since_pts < AUTOMATIC_MENU_STALLED_VIDEO_BYTES)
         return 0;
     watermark = scheduler_automatic_menu_pcm_watermark(output);
+    ceiling = output->hold_limit > watermark ?
+              output->hold_limit : watermark;
     available = hold_available(output);
-    if (available <= watermark)
-        return 0;
     if (!output->automatic_menu_pcm_fallback) {
+        if (available <= watermark)
+            return 0;
+        now = monotonic_us();
+        if (!now) {
+            fprintf(stderr,
+                    "media_player_helper: automatic menu PCM clock "
+                    "unavailable\n");
+            return -1;
+        }
         output->automatic_menu_pcm_fallback = 1;
+        output->automatic_menu_pcm_fallback_frames = 0;
+        output->automatic_menu_pcm_fallback_initial_frames =
+            available - watermark;
+        output->automatic_menu_pcm_clock_start_us = now;
         fprintf(stderr,
                 "media_player_helper: automatic menu PCM fallback "
                 "activated stalled_pts=%llu repeats=%u video_since_pts=%llu "
-                "held=%zu watermark=%zu reserve=%u paced_batch=%u\n",
+                "held=%zu watermark=%zu initial=%llu reserve=%u "
+                "paced_batch=%u rate=%d\n",
                 (unsigned long long)output->max_video_pts,
                 output->automatic_menu_stalled_pts,
                 (unsigned long long)video_since_pts, available,
-                watermark, PCM_SCHEDULE_RESERVE_FRAMES,
-                PCM_SCHEDULE_BATCH_FRAMES);
+                watermark,
+                (unsigned long long)
+                    output->automatic_menu_pcm_fallback_initial_frames,
+                PCM_SCHEDULE_RESERVE_FRAMES, PCM_SCHEDULE_BATCH_FRAMES,
+                output->hold_rate_hz);
     }
-    do {
+    for (;;) {
+        now = monotonic_us();
+        if (!now || now < output->automatic_menu_pcm_clock_start_us) {
+            fprintf(stderr,
+                    "media_player_helper: automatic menu PCM clock "
+                    "failed\n");
+            return -1;
+        }
+        elapsed_frames = automatic_menu_elapsed_frames(
+            now - output->automatic_menu_pcm_clock_start_us,
+            (unsigned)output->hold_rate_hz);
+        if (elapsed_frames > UINT64_MAX -
+                output->automatic_menu_pcm_fallback_initial_frames)
+            allowed = UINT64_MAX;
+        else
+            allowed = output->automatic_menu_pcm_fallback_initial_frames +
+                      elapsed_frames;
+        due = allowed > output->automatic_menu_pcm_fallback_frames ?
+              allowed - output->automatic_menu_pcm_fallback_frames : 0;
+        available = hold_available(output);
+        if (available <= watermark || !due) {
+            if (available <= ceiling)
+                return 0;
+            if (automatic_menu_pace_wait() < 0)
+                return -1;
+            continue;
+        }
         excess = available - watermark;
         emit = excess > PCM_SCHEDULE_BATCH_FRAMES ?
                PCM_SCHEDULE_BATCH_FRAMES : excess;
+        if ((uint64_t)emit > due)
+            emit = (size_t)due;
         if (scheduler_emit_pcm(output, emit) < 0)
             return -1;
         output->automatic_menu_pcm_fallback_frames += emit;
-        available = hold_available(output);
-    } while (available > watermark);
-    return 0;
+        if (output->automatic_menu_pcm_fallback_frames ==
+                output->automatic_menu_pcm_fallback_initial_frames) {
+            now = monotonic_us();
+            if (!now) {
+                fprintf(stderr,
+                        "media_player_helper: automatic menu PCM clock "
+                        "restart failed\n");
+                return -1;
+            }
+            output->automatic_menu_pcm_clock_start_us = now;
+        }
+    }
 }
 
 static int scheduler_check_automatic_menu_hold(struct output_state *output)
@@ -2867,6 +2996,7 @@ static int release_unqualified_menu_activation(
 {
     int video_pressure;
     int pcm_pressure;
+    int provisional;
     const char *pressure;
     size_t queued;
     size_t staged;
@@ -2882,7 +3012,8 @@ static int release_unqualified_menu_activation(
         hold_available(output) >= output->hold_limit;
     if (!video_pressure && !pcm_pressure)
         return 0;
-    pressure = pcm_pressure ? "pcm" : "video";
+    pressure = video_pressure ? "video" : "pcm";
+    provisional = pcm_pressure && !video_pressure;
     queued = output->video_queued_bytes;
     if (rebase_unqualified_menu_activation_pts(
             menu, output, incoming_has_pts, incoming_pts) < 0)
@@ -2920,16 +3051,23 @@ static int release_unqualified_menu_activation(
             return -1;
     }
     output->automatic_menu_epoch = 1;
-    if (acknowledge_menu_continuation(
-            menu, control_fd, "unqualified-random-access") < 0)
+    if (provisional) {
+        if (acknowledge_provisional_menu_continuation(
+                menu, control_fd, "pcm-pressure") < 0)
+            return -1;
+    } else if (acknowledge_menu_continuation(
+                   menu, control_fd,
+                   "unqualified-random-access") < 0) {
         return -1;
+    }
     fprintf(stderr,
             "media_player_helper: DVD menu activation preserved resident "
             "decoder context pressure=%s queued=%zu remaining=%zu "
-            "held=%zu hold_limit=%zu staged_records=%zu staged_bytes=%zu\n",
+            "held=%zu hold_limit=%zu provisional=%d staged_records=%zu "
+            "staged_bytes=%zu\n",
             pressure,
             queued, output->video_queued_bytes, hold_available(output),
-            output->hold_limit, records, staged);
+            output->hold_limit, provisional, records, staged);
     return 1;
 }
 
@@ -4351,32 +4489,45 @@ static int wait_dvd_still(struct media_source *input,
 
         if (seconds != 0xffu && monotonic_us() >= deadline) {
             int navigation = media_source_dvd_still_skip(
-                input, menu->activation_pending);
+                input, menu->activation_pending ||
+                       menu->activation_followup_pending);
 
             if (navigation < 0)
                 return -1;
             fprintf(stderr, "media_player_helper: DVD finite still complete\n");
             if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
                 return -1;
-            if (menu->activation_pending) {
+            if (menu->activation_pending ||
+                menu->activation_followup_pending) {
                 if (navigation == MEDIA_SOURCE_DVD_STREAM_HOP) {
+                    int provisional =
+                        menu->activation_followup_pending;
+
                     menu->activation_pending = 0;
+                    menu->activation_followup_pending = 0;
                     menu->activation_payloads = 0;
                     menu->activation_prior_pts_valid = 0;
                     menu->activation_prior_pts = 0;
-                    *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
+                    *control_command = provisional ?
+                        MEDIA_PLAYER_CONTROL_STREAM_BOUNDARY :
+                        MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
                     fprintf(stderr,
-                            "media_player_helper: DVD delayed activation "
-                            "stream hop\n");
+                            "media_player_helper: DVD delayed activation %s "
+                            "after finite still\n",
+                            provisional ? "provisional stream boundary" :
+                                          "stream hop");
                     return 2;
                 }
                 if (navigation == MEDIA_SOURCE_DVD_MENU_PENDING) {
                     fprintf(stderr,
                             "media_player_helper: DVD delayed activation "
-                            "remains pending after finite still\n");
+                            "%s remains pending after finite still\n",
+                            menu->activation_followup_pending ?
+                                "provisional continuation" : "stage");
                     return 1;
                 }
-                if (acknowledge_menu_continuation(
+                if (menu->activation_pending &&
+                    acknowledge_menu_continuation(
                         menu, control_fd, "finite-still-menu") < 0)
                     return -1;
             }
@@ -4416,6 +4567,33 @@ static int activation_stage_motion_hop(struct dvd_menu_state *menu,
             output_stage_records(output->activation_stage), bytes,
             OUTPUT_ACTIVATION_STAGE_DECISION_BYTES,
             OUTPUT_ACTIVATION_STAGE_BYTES);
+    return 1;
+}
+
+static int delayed_activation_leave_before_payload(
+    struct dvd_menu_state *menu, struct output_state *output,
+    uint8_t code, int *control_command)
+{
+    int provisional;
+
+    if ((!menu->activation_pending &&
+         !menu->activation_followup_pending) || menu->menu_active)
+        return 0;
+    provisional = menu->activation_followup_pending;
+    if (cancel_pending_menu_activation(
+            menu, output,
+            provisional ? "provisional-menu-leave" : "menu-leave") < 0)
+        return -1;
+    menu->resume_code = code;
+    menu->resume_code_valid = 1;
+    *control_command = provisional ?
+        MEDIA_PLAYER_CONTROL_STREAM_BOUNDARY :
+        MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
+    fprintf(stderr,
+            "media_player_helper: DVD delayed activation %s before "
+            "payload code=0x%02x\n",
+            provisional ? "provisional stream boundary" : "stream hop",
+            code);
     return 1;
 }
 
@@ -4541,28 +4719,20 @@ static int process_program_stream(struct media_source *input,
         }
         if (pes_offset >= 0)
             pes_offset -= 4;
-        if (menu->activation_pending) {
+        if (menu->activation_pending ||
+            menu->activation_followup_pending) {
+            int leave;
+
             if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
                 return -1;
-            if (!menu->menu_active) {
-                if (output_stage_active(output->activation_stage) &&
-                    cancel_activation_stage(output, "menu-leave") < 0)
-                    return -1;
-                menu->activation_pending = 0;
-                menu->activation_payloads = 0;
-                menu->activation_staged_hop = 0;
-                menu->activation_prior_pts_valid = 0;
-                menu->activation_prior_pts = 0;
-                menu->resume_code = code;
-                menu->resume_code_valid = 1;
-                *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
-                fprintf(stderr,
-                        "media_player_helper: DVD delayed activation "
-                        "stream hop before payload\n");
+            leave = delayed_activation_leave_before_payload(
+                menu, output, code, control_command);
+            if (leave < 0)
+                return -1;
+            if (leave)
                 return 1;
-            }
-            ++menu->activation_payloads;
-            if (menu->activation_payloads == 1)
+            if (menu->activation_pending &&
+                ++menu->activation_payloads == 1)
                 fprintf(stderr,
                         "media_player_helper: DVD menu activation pending "
                         "through payload code=0x%02x\n", code);
@@ -5507,6 +5677,7 @@ int main(int argc, char **argv)
                             &output, "payload-indefinite-menu-hop") < 0)
                         goto done;
                     dvd_menu.activation_pending = 0;
+                    dvd_menu.activation_followup_pending = 0;
                     dvd_menu.activation_payloads = 0;
                     dvd_menu.activation_staged_hop = 0;
                     dvd_menu.activation_prior_pts_valid = 0;

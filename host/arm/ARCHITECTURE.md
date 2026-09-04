@@ -84,11 +84,15 @@ reset. The helper rebases every queued and triggering PTS above the prior live
 epoch, releases the startup filter, drains the exact staged stream through the
 normal audio scheduler, commits it and acknowledges a menu continuation. A
 low-bitrate branch may reach the existing PCM hold ceiling before that video
-guard; this is an equivalent continuation decision, so the helper commits its
-finite stage first and only then restores the automatic-menu epoch and live
-sink-paced PCM fallback. This prevents drive-speed AC-3 decode from growing the
-hold toward system memory or filling the activation stage while preserving its
-ordered prefix. The queue guard and restart-qualified motion-menu barrier
+guard. The helper commits its finite resident-context prefix, acknowledges Main
+so that prefix can play, and marks this earlier decision provisional rather than
+discarding the delayed navigation classification. A later libdvdnav menu exit
+therefore requests the existing asynchronous stream-boundary handshake; an
+ordinary later menu command supersedes the provisional state. The helper only
+then restores the automatic-menu epoch and its bounded PCM fallback. This
+prevents drive-speed AC-3 decode from growing the hold toward system memory or
+filling the activation stage while preserving its ordered prefix and a possible
+later title barrier. The queue guard and restart-qualified motion-menu barrier
 remain unchanged. If an
 authored still terminates a sequence-plus-I startup group before a
 later reference picture arrives, the helper uses that explicit end boundary to
@@ -230,12 +234,14 @@ repeats a timestamped video PTS, or delivers 256 KiB of video without advancing
 it, exhausting the normal timestamp-derived PCM target activates a menu-only
 fallback. It drains held audio as individually bounded ordinary PCM batches
 until half of the configured hold limit remains,
-or the startup reserve when that is larger. For a physical DVD, every batch
-first drains the asynchronous output reserve; the pipe and unchanged FPGA FIFO
-credit therefore pace fallback delivery instead of allowing the four-megabyte
-optical-stall reserve to become roughly twenty seconds of decoded-audio lead.
-The default four-second hold consequently settles at a two-second low watermark
-and retains equal safety headroom for later Program Stream audio bursts.
+or the startup reserve when that is larger. That is the fallback's one bounded
+initial release. Subsequent PCM admission is limited by elapsed monotonic time
+at the selected sample rate; if source decode fills the remaining half of the
+hold first, the helper waits in bounded interrupt-safe intervals at the hard
+ceiling. For a physical DVD, every admitted batch also drains the asynchronous
+output reserve. The default four-second hold consequently settles at a
+two-second low watermark, retains equal safety headroom for later Program
+Stream audio bursts and cannot run at optical-drive or SPI acceptance speed.
 Ordinary advancing-timestamp title playback retains its reserve unchanged. A
 later video PTS advance immediately restores the normal timestamp scheduler.
 The hold limit remains a hard post-drain invariant in this fallback domain, so

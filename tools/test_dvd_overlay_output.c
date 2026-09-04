@@ -792,6 +792,7 @@ static int test_unqualified_menu_activation_continuation(void)
                               descriptors[1], &video_code, &audio_code,
                               NULL, -1) == 0 &&
                           !menu.activation_pending &&
+                          !menu.activation_followup_pending &&
                           !menu.activation_prior_pts_valid &&
                           !output.iso_start_filter_active &&
                           output.automatic_menu_epoch &&
@@ -963,6 +964,75 @@ done:
         fclose(output.video);
     free(payload);
     return failed;
+}
+
+static int test_provisional_menu_activation_followup(void)
+{
+    struct dvd_menu_state menu = {0};
+    struct audio_state audio = {0};
+    struct output_state output = {0};
+    uint8_t event = 0;
+    int descriptors[2] = {-1, -1};
+    int control_command = 0;
+    int failed = 0;
+
+    output.video = tmpfile();
+    output.hold_limit = PCM_SAMPLE_RATE;
+    menu.enabled = 1;
+    menu.menu_active = 1;
+    audio.a52_substream = -1;
+    audio.dts_substream = -1;
+    failed |= require(output.video != NULL && pipe(descriptors) == 0 &&
+                          output_stage_create(
+                              &output.activation_stage,
+                              OUTPUT_ACTIVATION_STAGE_BYTES) == 0,
+                      "could not allocate provisional-followup fixture");
+    if (failed)
+        goto done;
+    failed |= require(acknowledge_provisional_menu_continuation(
+                          &menu, descriptors[1], "test") == 0 &&
+                          !menu.activation_pending &&
+                          menu.activation_followup_pending &&
+                          read(descriptors[0], &event, sizeof(event)) == 1 &&
+                          event == MEDIA_PLAYER_CONTROL_MENU_CONTINUE,
+                      "provisional continuation did not release Main");
+    menu.menu_active = 0;
+    failed |= require(delayed_activation_leave_before_payload(
+                          &menu, &output, 0xbau,
+                          &control_command) == 1 &&
+                          !menu.activation_pending &&
+                          !menu.activation_followup_pending &&
+                          menu.resume_code_valid &&
+                          menu.resume_code == 0xbau &&
+                          control_command ==
+                              MEDIA_PLAYER_CONTROL_STREAM_BOUNDARY,
+                      "provisional menu leave lost its asynchronous barrier");
+
+    menu.menu_active = 1;
+    menu.activation_followup_pending = 1;
+    failed |= require(start_pending_menu_activation(
+                          &menu, &audio, &output) == 0 &&
+                          menu.activation_pending &&
+                          !menu.activation_followup_pending &&
+                          output_stage_active(output.activation_stage),
+                      "superseding activation retained stale follow-up state");
+    failed |= require(cancel_pending_menu_activation(
+                          &menu, &output, "test-cleanup") == 0 &&
+                          !menu.activation_pending &&
+                          !menu.activation_followup_pending &&
+                          !output_stage_active(output.activation_stage),
+                      "provisional follow-up cancellation was incomplete");
+
+done:
+    free(output.hold);
+    output_stage_destroy(output.activation_stage);
+    if (output.video)
+        fclose(output.video);
+    if (descriptors[0] >= 0)
+        close(descriptors[0]);
+    if (descriptors[1] >= 0)
+        close(descriptors[1]);
+    return failed ? -1 : 0;
 }
 
 static void encode_pes_pts(uint8_t encoded[5], uint64_t pts)
@@ -1151,6 +1221,7 @@ static int test_pcm_pressure_menu_activation_continuation(void)
                               &input, &audio, &output, &menu,
                               descriptors[1]) == 0 &&
                           !menu.activation_pending &&
+                          menu.activation_followup_pending &&
                           !output_stage_active(output.activation_stage) &&
                           !output.iso_start_filter_active &&
                           output.automatic_menu_epoch &&
@@ -1388,7 +1459,12 @@ static int test_automatic_menu_scheduling_epoch(void)
                               1, 0, menu_pts) == 0 &&
                               write_pcm(&output, pcm + pcm_offset * 2u,
                                         (int)pcm_count, 2,
-                                        PCM_SAMPLE_RATE) == 0 &&
+                                        PCM_SAMPLE_RATE) == 0,
+                          "long menu PCM and video could not queue");
+        if (output.automatic_menu_pcm_fallback)
+            output.automatic_menu_pcm_clock_start_us -=
+                (uint64_t)pcm_count * 1000000u / PCM_SAMPLE_RATE;
+        failed |= require(!failed &&
                               scheduler_drain(&output, 0) == 0 &&
                               hold_available(&output) <= output.hold_limit,
                           "long menu PCM and video did not drain boundedly");
@@ -1403,7 +1479,12 @@ static int test_automatic_menu_scheduling_epoch(void)
             pcm_count = 1536u;
         failed |= require(write_pcm(&output, pcm + pcm_offset * 2u,
                                     (int)pcm_count, 2,
-                                    PCM_SAMPLE_RATE) == 0 &&
+                                    PCM_SAMPLE_RATE) == 0,
+                          "automatic menu PCM tail could not queue");
+        if (output.automatic_menu_pcm_fallback)
+            output.automatic_menu_pcm_clock_start_us -=
+                (uint64_t)pcm_count * 1000000u / PCM_SAMPLE_RATE;
+        failed |= require(!failed &&
                               scheduler_drain(&output, 0) == 0 &&
                               hold_available(&output) <= output.hold_limit,
                           "automatic menu PCM tail did not drain boundedly");
@@ -1478,11 +1559,17 @@ static int test_automatic_menu_advancing_pts_schedule(void)
     output.max_video_pts = 180000u;
     output.automatic_menu_stalled_pts = 7;
     output.automatic_menu_pcm_fallback = 1;
+    output.automatic_menu_pcm_fallback_frames = 1234u;
+    output.automatic_menu_pcm_fallback_initial_frames = 1024u;
+    output.automatic_menu_pcm_clock_start_us = 1u;
     advancing.has_pts = 1;
     advancing.pts = 180001u;
     scheduler_accept_video_pts(&output, &advancing);
     failed |= require(!output.automatic_menu_stalled_pts &&
                           !output.automatic_menu_pcm_fallback &&
+                          !output.automatic_menu_pcm_fallback_frames &&
+                          !output.automatic_menu_pcm_fallback_initial_frames &&
+                          !output.automatic_menu_pcm_clock_start_us &&
                           output.max_video_pts == 180001u,
                       "advancing menu PTS did not restore normal scheduling");
     failed |= require(hold_push(&output, pcm, 12000) == 0 &&
@@ -1501,9 +1588,17 @@ static int test_automatic_menu_advancing_pts_schedule(void)
 static int test_automatic_menu_pcm_batch_pacing(void)
 {
     struct output_state output = {0};
-    int16_t pcm[60000u * 2u];
+    enum {
+        FIRST_BURST = 48000,
+        SECOND_BURST = 12000,
+        CEILING_BURST = 24001,
+        TOTAL_FRAMES = FIRST_BURST + SECOND_BURST + CEILING_BURST
+    };
+    int16_t pcm[TOTAL_FRAMES * 2u];
     size_t watermark;
-    size_t expected_frames;
+    uint64_t before_fast_burst;
+    uint64_t fast_burst_frames;
+    size_t expected_frames = 60001u;
     size_t i;
     int failed = 0;
 
@@ -1518,7 +1613,7 @@ static int test_automatic_menu_pcm_batch_pacing(void)
                       "could not create automatic-menu pacing reserve");
     if (failed)
         goto done;
-    for (i = 0; i < 60000u; ++i) {
+    for (i = 0; i < TOTAL_FRAMES; ++i) {
         pcm[i * 2u] = (int16_t)(i * 23u + 5u);
         pcm[i * 2u + 1u] = (int16_t)(0x5000u - i * 31u);
     }
@@ -1533,27 +1628,59 @@ static int test_automatic_menu_pcm_batch_pacing(void)
     output.max_video_pts = 90000u;
     output.pcm_emitted_frames = PCM_SCHEDULE_RESERVE_FRAMES;
     watermark = scheduler_automatic_menu_pcm_watermark(&output);
-    expected_frames = 60000u - watermark;
     failed |= require(watermark == PCM_SAMPLE_RATE / 2u &&
-                          hold_push(&output, pcm, 48000u) == 0 &&
+                          hold_push(&output, pcm, FIRST_BURST) == 0 &&
                           scheduler_drain(&output, 0) == 0 &&
                           output.automatic_menu_pcm_fallback &&
                           output.automatic_menu_pcm_fallback_frames ==
-                              48000u - watermark &&
+                              FIRST_BURST - watermark &&
+                          output.automatic_menu_pcm_fallback_initial_frames ==
+                              FIRST_BURST - watermark &&
+                          output.automatic_menu_pcm_clock_start_us != 0 &&
                           output.pcm_emitted_frames ==
                               PCM_SCHEDULE_RESERVE_FRAMES +
-                                  48000u - watermark &&
+                                  FIRST_BURST - watermark &&
                           hold_available(&output) ==
                               watermark,
                       "fallback pass did not reach its PCM watermark");
-    failed |= require(hold_push(&output, pcm + 48000u * 2u, 12000u) == 0 &&
+    before_fast_burst = output.automatic_menu_pcm_fallback_frames;
+    failed |= require(hold_push(&output, pcm + FIRST_BURST * 2u,
+                                SECOND_BURST) == 0 &&
                           scheduler_drain(&output, 0) == 0 &&
+                          output.automatic_menu_pcm_fallback_frames >=
+                              before_fast_burst,
+                      "clocked fallback rejected a fast PCM burst");
+    fast_burst_frames = output.automatic_menu_pcm_fallback_frames -
+                        before_fast_burst;
+    failed |= require(fast_burst_frames <= PCM_SAMPLE_RATE / 10u &&
+                          hold_available(&output) ==
+                              watermark + SECOND_BURST - fast_burst_frames,
+                      "unadvanced fallback clock drained source-rate PCM");
+    output.automatic_menu_pcm_clock_start_us -= 250000u;
+    failed |= require(scheduler_drain(&output, 0) == 0 &&
                           hold_available(&output) == watermark &&
+                          output.automatic_menu_pcm_fallback_frames ==
+                              FIRST_BURST - watermark + SECOND_BURST &&
+                          output.pcm_emitted_frames ==
+                              PCM_SCHEDULE_RESERVE_FRAMES + FIRST_BURST -
+                                  watermark + SECOND_BURST,
+                      "elapsed fallback clock did not admit its exact budget");
+    failed |= require(hold_push(
+                          &output,
+                          pcm + (FIRST_BURST + SECOND_BURST) * 2u,
+                          CEILING_BURST) == 0 &&
+                          hold_available(&output) ==
+                              output.hold_limit + 1u,
+                      "clocked fallback did not reach its hard ceiling");
+    output.automatic_menu_pcm_clock_start_us -= 500021u;
+    failed |= require(scheduler_drain(&output, 0) == 0 &&
+                          hold_available(&output) == watermark &&
+                          hold_available(&output) <= output.hold_limit &&
                           output.automatic_menu_pcm_fallback_frames ==
                               expected_frames &&
                           output.pcm_emitted_frames ==
                               PCM_SCHEDULE_RESERVE_FRAMES + expected_frames,
-                      "multi-batch fallback did not absorb a later PCM burst");
+                      "clocked fallback did not throttle at its PCM ceiling");
     if (output.reserve) {
         failed |= require(output_reserve_destroy(output.reserve) == 0,
                           "paced fallback reserve did not drain");
@@ -1729,6 +1856,8 @@ int main(void)
     if (test_unqualified_menu_activation_continuation())
         return 1;
     if (test_pcm_pressure_menu_activation_continuation())
+        return 1;
+    if (test_provisional_menu_activation_followup())
         return 1;
     if (test_late_audio_after_silent_release())
         return 1;

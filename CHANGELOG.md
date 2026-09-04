@@ -8,6 +8,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Clocked the DVD automatic-menu PCM fallback explicitly at its selected sample
+  rate after the existing bounded initial release. A fast optical source now
+  waits at the decoded-audio ceiling instead of flooding Main at source/SPI
+  speed, and a PCM-pressure resident-context continuation remains provisionally
+  tracked so a later menu-to-title exit still receives the decoder barrier.
 - Bounded decoded audio during deferred same-menu DVD activations. Low-bitrate
   menu branches can now commit their resident-context continuation when the
   existing PCM hold ceiling is reached instead of waiting only for video queue
