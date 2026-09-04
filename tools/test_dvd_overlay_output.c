@@ -1170,6 +1170,7 @@ static int test_pcm_pressure_menu_activation_continuation(void)
         pcm[offset * 2u + 1u] = (int16_t)(0x5000u - offset * 19u);
     }
     output.hold_limit = HOLD_LIMIT_FRAMES;
+    output.physical_dvd = 1;
     output.iso_pts_normalization = 1;
     output.have_iso_video_pts = 1;
     output.iso_pts_raw_max = prior_pts;
@@ -1338,6 +1339,7 @@ static int test_automatic_menu_scheduling_epoch(void)
             (uint8_t)((offset ? 2u : 1u) << 3);
     }
     output.scheduler_enabled = 1;
+    output.physical_dvd = 1;
     output.hold_active = 1;
     output.hold_limit = PCM_SAMPLE_RATE;
     output.iso_pts_normalization = 1;
@@ -1382,6 +1384,7 @@ static int test_automatic_menu_scheduling_epoch(void)
     failed |= require(rearm_for_automatic_menu(&audio, &output) == 0,
                       "automatic menu scheduling rearm failed");
     failed |= require(output.scheduler_enabled &&
+                          output.physical_dvd &&
                           output.automatic_menu_epoch &&
                           !output.scheduler_started &&
                           !output.iso_start_filter_active &&
@@ -1550,6 +1553,8 @@ static int test_automatic_menu_advancing_pts_schedule(void)
         pcm[i] = (int16_t)(i * 11u + 7u);
     output.scheduler_enabled = 1;
     output.scheduler_started = 1;
+    output.physical_dvd = 1;
+    output.dvd_menu_active = 1;
     output.automatic_menu_epoch = 1;
     output.hold_rate_hz = PCM_SAMPLE_RATE;
     output.hold_limit = PCM_SAMPLE_RATE;
@@ -1619,6 +1624,8 @@ static int test_automatic_menu_pcm_batch_pacing(void)
     }
     output.scheduler_enabled = 1;
     output.scheduler_started = 1;
+    output.physical_dvd = 1;
+    output.dvd_menu_active = 1;
     output.automatic_menu_epoch = 1;
     output.hold_rate_hz = PCM_SAMPLE_RATE;
     output.hold_limit = PCM_SAMPLE_RATE;
@@ -1715,6 +1722,8 @@ static int test_automatic_menu_pcm_hold_limit(void)
         goto done;
     output.scheduler_enabled = 1;
     output.scheduler_started = 1;
+    output.physical_dvd = 1;
+    output.dvd_menu_active = 1;
     output.automatic_menu_epoch = 1;
     output.hold_rate_hz = PCM_SAMPLE_RATE;
     output.hold_limit = PCM_SAMPLE_RATE;
@@ -1732,6 +1741,130 @@ done:
     free(output.hold);
     if (output.video)
         fclose(output.video);
+    free(pcm);
+    return failed ? -1 : 0;
+}
+
+static int test_dvd_title_pcm_clock_floor(void)
+{
+    enum { PCM_FRAMES = 120000 };
+    struct output_state output = {0};
+    struct output_state iso_control = {0};
+    int16_t *pcm = NULL;
+    uint64_t base;
+    uint64_t before;
+    uint64_t clock_target;
+    unsigned iteration;
+    int failed = 0;
+
+    pcm = calloc((size_t)PCM_FRAMES * 2u, sizeof(*pcm));
+    output.video = tmpfile();
+    iso_control.video = tmpfile();
+    failed |= require(pcm != NULL && output.video != NULL &&
+                          iso_control.video != NULL,
+                      "could not create DVD-title PCM clock fixture");
+    if (failed)
+        goto done;
+
+    output.scheduler_enabled = 1;
+    output.scheduler_started = 1;
+    output.physical_dvd = 1;
+    output.hold_rate_hz = PCM_SAMPLE_RATE;
+    output.hold_limit = PCM_SAMPLE_RATE * 4u;
+    output.have_audio_pts = 1;
+    output.first_audio_pts = 90000u;
+    output.have_video_pts = 1;
+    output.max_video_pts = output.first_audio_pts;
+    output.pcm_emitted_frames = PCM_SCHEDULE_RESERVE_FRAMES;
+    failed |= require(hold_push(&output, pcm, PCM_FRAMES) == 0 &&
+                          scheduler_drain(&output, 0) == 0 &&
+                          output.dvd_title_pcm_clock_active &&
+                          output.dvd_title_pcm_clock_rate_hz ==
+                              PCM_SAMPLE_RATE &&
+                          output.dvd_title_pcm_clock_start_us != 0 &&
+                          output.dvd_title_pcm_clock_start_frames ==
+                              PCM_SCHEDULE_RESERVE_FRAMES,
+                      "physical title did not establish its PCM clock");
+    base = output.dvd_title_pcm_clock_start_frames;
+
+    /* Simulate the captured sparse-PTS interval without sleeping. */
+    output.dvd_title_pcm_clock_start_us -= 500000u;
+    for (iteration = 0; iteration < 16u; ++iteration)
+        failed |= require(scheduler_drain(&output, 0) == 0,
+                          "DVD-title PCM clock could not drain a batch");
+    failed |= require(scheduler_dvd_title_pcm_target(
+                          &output, &clock_target) == 0 &&
+                          output.pcm_emitted_frames <= clock_target &&
+                          output.pcm_emitted_frames >=
+                              base + PCM_SAMPLE_RATE / 2u -
+                                  PCM_REFILL_FRAMES,
+                      "sparse title PTS fell behind the elapsed PCM floor");
+
+    before = output.pcm_emitted_frames;
+    failed |= require(scheduler_drain(&output, 0) == 0 &&
+                          scheduler_dvd_title_pcm_target(
+                              &output, &clock_target) == 0 &&
+                          output.pcm_emitted_frames >= before &&
+                          output.pcm_emitted_frames <= clock_target,
+                      "unadvanced title clock drained source-rate PCM");
+
+    output.hold_limit = 60000u;
+    output.dvd_title_pcm_clock_start_us -= 1000000u;
+    failed |= require(scheduler_drain(&output, 0) == 0 &&
+                          scheduler_dvd_title_pcm_target(
+                              &output, &clock_target) == 0 &&
+                          hold_available(&output) <= output.hold_limit &&
+                          output.pcm_emitted_frames <= clock_target,
+                      "fast DVD title did not wait at its PCM hold ceiling");
+
+    /* A genuinely advancing PTS horizon remains the primary authority. */
+    output.max_video_pts = output.first_audio_pts + 2u * 90000u;
+    before = output.pcm_emitted_frames;
+    failed |= require(scheduler_drain(&output, 0) == 0 &&
+                          output.pcm_emitted_frames ==
+                              before + PCM_SCHEDULE_BATCH_FRAMES,
+                      "advancing title PTS did not override the clock floor");
+
+    /* Menu state owns its established fallback, even after a title clock. */
+    output.dvd_menu_active = 1;
+    output.max_video_pts = output.first_audio_pts;
+    output.dvd_title_pcm_clock_start_us -= 1000000u;
+    before = output.pcm_emitted_frames;
+    failed |= require(scheduler_drain(&output, 0) == 0 &&
+                          output.pcm_emitted_frames == before,
+                      "title clock leaked into a DVD menu epoch");
+
+    reset_output_for_navigation(&output, output.hold_limit, 1);
+    failed |= require(output.physical_dvd &&
+                          !output.dvd_title_pcm_clock_active &&
+                          !output.dvd_title_pcm_clock_rate_hz &&
+                          !output.dvd_title_pcm_clock_start_us &&
+                          !output.dvd_title_pcm_clock_start_frames,
+                      "navigation did not reset the DVD-title PCM clock");
+
+    iso_control.scheduler_enabled = 1;
+    iso_control.scheduler_started = 1;
+    iso_control.hold_rate_hz = PCM_SAMPLE_RATE;
+    iso_control.hold_limit = PCM_SAMPLE_RATE * 4u;
+    iso_control.have_audio_pts = 1;
+    iso_control.first_audio_pts = 90000u;
+    iso_control.have_video_pts = 1;
+    iso_control.max_video_pts = iso_control.first_audio_pts;
+    iso_control.pcm_emitted_frames = PCM_SCHEDULE_RESERVE_FRAMES;
+    failed |= require(hold_push(&iso_control, pcm, PCM_FRAMES) == 0 &&
+                          scheduler_drain(&iso_control, 0) == 0 &&
+                          !iso_control.dvd_title_pcm_clock_active &&
+                          iso_control.pcm_emitted_frames ==
+                              PCM_SCHEDULE_RESERVE_FRAMES,
+                      "non-physical Program Stream entered the title clock");
+
+done:
+    free(output.hold);
+    free(iso_control.hold);
+    if (output.video)
+        fclose(output.video);
+    if (iso_control.video)
+        fclose(iso_control.video);
     free(pcm);
     return failed ? -1 : 0;
 }
@@ -1868,6 +2001,8 @@ int main(void)
     if (test_automatic_menu_pcm_batch_pacing())
         return 1;
     if (test_automatic_menu_pcm_hold_limit())
+        return 1;
+    if (test_dvd_title_pcm_clock_floor())
         return 1;
     puts("DVD overlay output: exact plane and reserve ownership pass");
     return 0;

@@ -8,6 +8,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Added a sample-clock lower bound to physical-DVD title PCM scheduling. Video
+  PTS remains authoritative whenever it advances, while sparse or stalled
+  title timestamps can no longer consume the FPGA's startup lead despite
+  already-decoded audio being held; menu, ISO and ordinary-file scheduling are
+  unchanged.
 - Clocked the DVD automatic-menu PCM fallback explicitly at its selected sample
   rate after the existing bounded initial release. A fast optical source now
   waits at the decoded-audio ceiling instead of flooding Main at source/SPI
