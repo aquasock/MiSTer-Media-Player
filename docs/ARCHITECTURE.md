@@ -127,7 +127,27 @@ identified decoder failure.
 
 Supported interlaced input is kept as two correctly ordered fields in a native 480i raster. On normal HDMI, MiSTer's scaler processes that raster and the core's `HDMI scaler deinterlacer` menu requests either Weave or Bob. Weave prioritizes stable vertical detail; Bob prioritizes motion handling at the expected cost of reduced vertical stability.
 
-The second tier preserves native 480i for an external processor and eventual HDMI-to-SDI conversion. The core does not deinterlace or scale this tier. Raw, unscaled HDMI also requires MiSTer's global `direct_video` configuration: that framework input arrives as `cfg[10]` and cannot be changed by a core status-menu option. Native 480i therefore describes the core's output format, not an automatic promise that direct video is enabled.
+The second tier preserves native 480i for an external processor and
+HDMI-to-SDI conversion. The core does not deinterlace or scale this tier. Raw,
+unscaled HDMI also requires MiSTer's per-core `direct_video` configuration:
+that framework input arrives as `cfg[10]` and cannot be changed by a core
+status-menu option. Native 480i therefore describes the core's output format,
+not an automatic promise that direct video is enabled.
+
+The isolated patched Main recognizes `direct_video=1` only when the reported
+core name is `MediaPlayer`. In that boundary the DE10-Nano still presents the
+core's 54 MHz bus to the ADV7513, with each 13.5 MHz raster sample held for four
+bus clocks. The transmitter divides the input clock by two and therefore sees
+two identical 27 MHz samples for each content pixel. Manual pixel-repetition
+signaling reports that x2 relationship without multiplying the already-27 MHz
+TMDS clock. VIC 6/7, negative sync, BT.601, limited RGB and 27 MHz-derived audio
+CTS complete the initial CTA 525i59.94 signaling contract. The resulting HDMI
+can feed an external SD-HDMI-to-SDI converter; the core does not generate an
+SDI serial stream.
+
+This initial mode is intentionally limited to native-interlaced 720x480 DVD
+testing. It does not dynamically return to progressive signaling for the audio
+interface or progressive video, and it does not implement PAL/576i or HD-SDI.
 
 ## Clocking and CDC
 

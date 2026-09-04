@@ -37,6 +37,7 @@ main_commit=0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f
 main_patches=(
     "$root_dir/host/main_mister/0001-mediaplayer-arm-loader.patch"
     "$root_dir/host/main_mister/0002-mediaplayer-overlay-trace.patch"
+    "$root_dir/host/main_mister/0003-mediaplayer-ntsc-480i-hdmi.patch"
 )
 
 mkdir -p "$deps_dir" "$build_dir"

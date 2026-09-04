@@ -2,3 +2,5 @@
 ; Do not replace the complete MiSTer.ini file with this fragment.
 [MediaPlayer]
 main=MiSTer_MediaPlayer
+; Experimental native NTSC 480i HDMI/HDMI-to-SDI test only:
+; direct_video=1

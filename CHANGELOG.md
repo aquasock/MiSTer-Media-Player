@@ -6,7 +6,15 @@ This project is still in active pre-release development. Published milestone rel
 
 ## Unreleased
 
-No changes yet.
+### Added
+
+- Added an experimental MediaPlayer-only NTSC 480i direct-HDMI mode to the
+  isolated patched Main. With `direct_video=1` in the `[MediaPlayer]` INI
+  section, the ADV7513 consumes the core's proven native 525-line raster at a
+  divided 27 MHz input clock, advertises VIC 6 or 7 with BT.601 and limited RGB,
+  reports two samples per content pixel, and uses matching 48/96 kHz audio CTS.
+  This first boundary targets HDMI-to-SDI lock testing and does not add PAL,
+  576i, HD-SDI, or a live Bob/Weave/Raw menu switch.
 
 ## [0.9.0] - 2026-09-03 — DVD navigation, native video and consumer-audio milestone
 
