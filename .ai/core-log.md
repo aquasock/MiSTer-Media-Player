@@ -1,4 +1,4 @@
-## 962 COMMIT Unreleased ??? 2026-09-04T01:23:00-07:00
+## 962 COMMIT Unreleased 8d0ab99 2026-09-04T01:23:00-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Keep the existing MPEG-2 visualizer loop active whenever the MediaPlayer core is
 
 #### Outcome:
 
-The approved implementation will remain entirely in isolated Main and the ARM helper because the FPGA already accepts the visualizer, ordinary MPEG-2 video and packed audio-player overlay through the same stream and display protocol.  The helper will gain a dedicated source that validates and emits the existing visualizer pack continuously at its encoded cadence using a monotonic-time virtual sample clock without producing silent PCM or a player overlay.  Main will start that idle source after recognizing the MediaPlayer core, stop it before any physical-disc or file selection, and restore it after playback finishes or fails while retaining the established audio-file and Audio CD path whose player overlay clears after ten seconds.  No RBF, RTL, menu-string, visualizer-asset or protocol change is planned.
+Source `8d0ab99` adds an `idle:` helper source that validates and continuously emits the existing closed-GOP visualizer pack at its encoded cadence from a monotonic-time virtual sample clock without silent PCM or an audio-player overlay.  Isolated Main now starts that background after recognizing the MediaPlayer core, replaces it for every physical-disc or file selection, and restores it after playback finishes or fails while preserving the prior replay source and the established audio-file and Audio CD overlay timeout.  A failed idle helper or missing asset is suppressed until a successful media cycle or core reload so it cannot create a polling fork loop.  Strict native, AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer coverage passes together with focused idle pacing, audio UI, audio-file, CDDA, DVD, seek, output and Main lifecycle regressions, and the complete Main patch stack applies and cross-builds against pinned upstream `0a8fb44`.  GNU 10.2.1 produced the 974,244-byte static stripped ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `f4d392f08d2538b9b2c38e285cb4925f6bc10133915060acd97f6aa7f8559696` and the 1,182,684-byte stripped ARMv7 `host/build/MiSTer_MediaPlayer` with SHA-256 `58971dd7b558238fe6dafca269c36d5e595e7ff326e32ee6e3f50a093b006aa1`; no RBF, RTL, menu-string or visualizer-asset change was required.
 
 #### Next Steps:
 
-Implement explicit idle-session state so automatic startup cannot overwrite the last playback source or consume playback controls, make clean and error exits return to the background without restart loops when the asset or helper is unavailable, and preserve core-change shutdown.  Add focused helper pacing and Main lifecycle contracts, run strict native and sanitizer coverage plus retained audio, DVD, seek, UI and visualizer regressions, apply the Main patch stack to pinned upstream Main, and build and checksum only `MediaPlayer_Helper` and `MiSTer_MediaPlayer` locally for MiSTer validation.
+Exit MediaPlayer, replace `/media/fat/linux/MediaPlayer_Helper` and `/media/fat/MiSTer_MediaPlayer` with the two new build artifacts, preserve executable permissions, retain the accepted `MediaPlayer_20260904.rbf`, visualizer pack and per-core INI, and reboot because Main changed.  Validate that the visualizer appears on core entry and behind the OSD, DVD and MPEG-2 sources take over immediately, audio-file and Audio CD playback retain the player overlay for about ten seconds before revealing the visualizer, and the idle background returns after finite playback before marking this source hardware-passed.
 
 #### Files Modified:
 
@@ -24,13 +24,15 @@ Implement explicit idle-session state so automatic startup cannot overwrite the 
 - docs/TEST_INSTRUCTIONS.md
 - host/arm/ARCHITECTURE.md
 - host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_audio_visualizer.c
+- tools/test_audio_file_seek.py
 - tools/test_main_cdda.py
+- tools/test_main_seek_lifecycle.cpp
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
