@@ -1,4 +1,4 @@
-## 983 COMMIT Unreleased ??? 2026-09-04T15:49:33-07:00
+## 983 COMMIT Unreleased 0a2e2af 2026-09-04T15:49:33-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Remove the rejected physical-DVD title wall-clock PCM floor and restore presenta
 
 #### Outcome:
 
-The approved change will reverse only source `d007afd`: remove the physical-title clock state, target and hold-ceiling pacing, restore the automatic-menu-specific elapsed-frame and wait helpers, remove its regression, and restore the associated architecture and changelog text.  The earlier source-`715ff18` automatic-menu clock, navigation behavior, Main, decoder, visualizer, protocol, RTL and RBF will remain unchanged.  No replacement title-boundary algorithm will be added without a fresh source-`d007afd` capture because the returned artifacts are still the prior source-`715ff18` run and cannot identify the brief-cutout boundary mechanism.
+Source `0a2e2af` cleanly reverses only `d007afd`: it removes the physical-title clock state, target, hold-ceiling pacing and regression, restores the automatic-menu-specific elapsed-frame and wait helpers, and restores the associated architecture and changelog text.  All four affected source files are byte-identical to source `715ff18`, so its accepted automatic-menu clock and navigation behavior remain intact; Main, decoder, visualizer, protocol, RTL and RBF are unchanged.  The strict optimized native helper build passes, as do the focused production-translation-unit DVD overlay and scheduling regression, AddressSanitizer with leak detection disabled for the ptrace environment, UndefinedBehaviorSanitizer, private DVD LPCM skip, and real MP3, WAV, FLAC and Ogg seek integrations.  Two GNU 10.2.1 hard-float ARMv7 builds are identical and reproduce the prior 982,436-byte stripped static `host/build/MediaPlayer_Helper` with SHA-256 `5bfcd9e13d87f1e0683c64e3d55bd9c54e997261ce89405f6614c614dc0cd62d`; it has no interpreter or dynamic section, and the native helper reports the expected protocol-one capability surface.  No speculative title-boundary correction was added because the returned artifacts remain the old source-`715ff18` capture.
 
 #### Next Steps:
 
-Apply the exact inverse of source `d007afd`, verify the resulting four source files match their source-`715ff18` versions, then run the strict native helper build, focused DVD overlay and scheduling regression, sanitizer and retained audio integration coverage.  Build the static ARMv7 hard-float helper twice and require identical hashes, static linkage and the expected protocol-one capabilities.  After committing and documenting the rollback, manually replace only the MiSTer helper and repeat the Simpsons route with fresh log, screenshot and telemetry files; acceptance requires no progressive audio lead, while any remaining brief cutout will guide a separate boundary-specific diagnostic.
+Exit MediaPlayer and manually replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper`, preserving executable mode; retain the installed Main, RBF and visualizer.  Enable telemetry and repeat the same two-menu Simpsons first-episode route long enough to verify that audio no longer develops a progressive lead, then replace all three files in `.ai/current_results` with the fresh log, screenshot and telemetry output.  Report whether brief cutouts remain; if so, use the new title-boundary evidence for a separate presentation-clock-safe diagnostic before continuing with Futurama menu, Audio CD and ordinary-audio checks.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Apply the exact inverse of source `d007afd`, verify the resulting four source fi
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
