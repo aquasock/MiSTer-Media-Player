@@ -1,3 +1,34 @@
+## 952 COMMIT Unreleased ??? 2026-09-03T18:36:35-07:00
+
+#### Coming From:
+
+Unreleased 0df8570
+
+#### Purpose:
+
+Bound automatic-menu PCM scheduling when a repeated video timestamp exhausts the normal timestamp-derived audio target.
+
+#### Outcome:
+
+The planned source change will preserve the continuous automatic-menu decoder epoch and all normal advancing-timestamp scheduling, while adding an automatic-menu-only fallback that emits decoded PCM above the established reserve in bounded batches whenever the timestamp target schedules no audio.  FPGA FIFO credit will continue to provide the unchanged transport's real-time backpressure, and an explicit hold-limit invariant will stop the helper with a diagnostic instead of permitting target memory exhaustion.
+
+#### Next Steps:
+
+Implement the scoped fallback and diagnostic, document the scheduling invariant, and extend the production regression with repeated or nonadvancing menu PTS and sustained patterned PCM to require exact continuous sample output, bounded held memory and byte-exact video while retaining an advancing-PTS control path.  Rerun strict optimized, analyzer and sanitizer coverage plus the retained DVD and audio suites, then build only the static ARM helper locally for another Futurama test; Main, protocol, RTL and RBF remain unchanged.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 951 COMMIT Unreleased 0df8570 2026-09-03T18:32:13-07:00
 
 #### Coming From:
@@ -1180,35 +1211,6 @@ Install only `host/build/MediaPlayer_Helper_SceneEnd_d75327e` as `/media/fat/lin
 - host/arm/ARCHITECTURE.md
 - host/arm/media_player_helper.c
 - tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 912 COMMIT Unreleased efe2a76 2026-09-02T19:04:18-07:00
-
-#### Coming From:
-
-Unreleased efe2a76
-
-#### Purpose:
-
-Qualify terminal single-picture DVD menu delivery on Coming to America and isolate the remaining black background.
-
-#### Outcome:
-
-The user's physical source-`efe2a76` run improves the Scene Selection transition from a stale root-menu background to the correct replacement selector over black, but does not yet display the authored background.  Activation succeeds at 20.065338 seconds, terminal filtering finds a sequence at offset zero and one I picture at offset 106 in 224,824 queued video bytes, the helper records one emitted picture, and the existing barrier commits 138 staged records totaling 311,497 bytes.  The checksum-valid schema-21 snapshot confirms 224,819 accepted decoder bytes and final picture type I, but reports zero completed reference pictures, zero displayed pictures, zero swaps and no sequence end; all 209,923 decoder stall cycles belong to the unfinished I picture while error flags remain clear.  In contrast, the replacement overlay completes exactly one clear, configuration and commit with twenty-two data records and 86,400 plane bytes, no protocol error, and the visible rectangle shown in the 1,920-by-1,080 screenshot.  Source inspection matches the hardware evidence: the picture parser completes `picture_data()` only after observing a following non-slice start code, and native one-picture startup already uses `sequence_end_seen` to publish an end-of-stream frame.  The 1,038,477-byte log, 5,516-byte screenshot and 571-byte telemetry report have SHA-256 `e427eb237cb56a26fae0625aed228f7e2d7a44ed83d66a42aaa5d67521358b27`, `1abfda3f3895ff4e1c0919735b66f83b82ad37051b4c80cd349e9ba122b14b57` and `4286d8d8a1eb0c75774891f03ad1c24178099464dd100c178de9752db68a1530`.
-
-#### Next Steps:
-
-Preserve terminal sequence-plus-I qualification, ordinary open-ended random access, overlay-only continuation, Main, protocol, decoder, RTL and RBF.  After user approval, append the valid four-byte H.262 `sequence_end_code` only after a terminal authored-still group qualifies and drains into the activation stage, so the existing parser closes the final slice region and native startup releases the completed one-picture frame; do not synthesize a second picture or alter decoder interpretation.  Extend the production-path still regression to require the exact terminator after unchanged authored bytes, retain ordinary I/P, terminal I-only, trailing-B and overlay-only coverage, rerun strict native, sanitizer, analyzer, staging, reserve, menu-hop, audio and seek suites with repeated high-risk cases, and build only a new static ARMv7 helper for another Coming to America Scene Selection test plus retained Blazing Saddles, The Big Lebowski and forum-disc regressions.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
