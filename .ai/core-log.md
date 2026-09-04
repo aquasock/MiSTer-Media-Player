@@ -1,3 +1,35 @@
+## 981 COMMIT Unreleased d007afd 2026-09-04T07:11:42-07:00
+
+#### Coming From:
+
+Unreleased 715ff18
+
+#### Purpose:
+
+Prevent sparse physical-DVD title timestamps from starving the PCM sink when decoded audio is already available.
+
+#### Outcome:
+
+Source `d007afd` adds a physical-DVD title PCM clock without changing Main, the protocol, decoder, visualizer, RTL or RBF.  After the ordinary startup hold releases, the helper anchors emitted frames to `CLOCK_MONOTONIC` at the selected sample rate and uses the greater of that floor and the existing video-PTS target, rounded down to the established 128-frame refill unit and emitted in at most 2,048-frame batches.  Video PTS therefore remains the primary authority when it advances, while the captured high-byte, sparse-PTS interval can no longer consume the FPGA's fixed audio lead despite held decoded PCM.  A fast optical source waits at the existing decoded-audio ceiling until PTS or elapsed time earns another batch.  Explicit menu state and the automatic-menu epoch exclude the new title clock, non-physical Program Streams remain unchanged, and every navigation or stream-boundary reset clears the anchor while preserving the physical-source identity.  The production-translation-unit regression covers sparse PTS, sample-clock rate limiting, the hold ceiling, advancing-PTS takeover, menu exclusion, non-physical exclusion and navigation reset.  Strict optimized, AddressSanitizer with leak detection disabled for the ptrace environment, UndefinedBehaviorSanitizer and focused GCC analyzer runs pass, as do twenty production repetitions, one hundred menu-hop repetitions, fifty reserve and stage repetitions, retained DVD random-access, SPU, AC-3, Program Stream seek, CDDA, audio UI, visualizer, private-LPCM and static Main checks, plus real MP3, WAV, FLAC and Ogg seek, pause and visualizer integrations.  The strict native build passes with the established host-only `-Wno-attributes` exception.  Two identical GNU 10.2.1 builds produced the 982,436-byte stripped static hard-float ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `b8a61f0d82c5affbfe3bd415d7f1e01374ffc464a1d53c88327e5c875a4e427a`; it has no dynamic section and the native helper retains the protocol-one capability surface.
+
+#### Next Steps:
+
+Exit MediaPlayer and manually replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper`, preserving executable mode; retain the installed Main, RBF and visualizer.  Enable telemetry and repeat the same two-menu Simpsons first-episode route, requiring one `DVD title PCM clock started` record after the title boundary, continuous episode audio, sustained advancing playback and a fresh schema-21 snapshot with PCM underrun zero.  Then spot-check Futurama root and nested menus to confirm their existing automatic-menu fallback, followed by Audio CD and one ordinary audio file, and return the updated results before hardware acceptance.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 980 COMMIT Unreleased 715ff18 2026-09-04T06:45:38-07:00
 
 #### Coming From:
@@ -1248,35 +1280,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 941 COMMIT Unreleased 401148e 2026-09-03T04:56:54-07:00
-
-#### Coming From:
-
-v0.9.0 b1a6dcb
-
-#### Purpose:
-
-Instrument and reproduce Futurama's late-menu-audio rejection so the permanent silent-video classification can be corrected without hiding an A/V synchronization failure.
-
-#### Outcome:
-
-The fresh `FUTURAMA_S1D1` physical-disc capture reaches its authored menu, publishes one valid still and selector overlay, and then leaves that frame resident after the helper exits normally with status one.  The checksum-valid schema-21 snapshot reports one completed and displayed I picture, sequence-end and presentation completion, zero decoder error flags, zero transport blocks and zero audio underruns.  The helper log identifies the software boundary: before any audio PES appears, the bounded 2 MiB video queue fills and `scheduler_release_silent_video()` irreversibly disables scheduling; the later valid AC-3 private substream `0x80` reaches the deliberate late-audio rejection, after which Main drains the already-reserved bytes and observes helper EOF.  Source `401148e` preserves that fail-fast behavior and every media byte while logging the exact silent-release queue, released and total-video counts, picture count and final video PTS horizon, followed by the late MPEG Layer II, AC-3 or DTS packet's PTS validity, value, horizon relation and absolute 90 kHz delta.  The focused production-translation-unit regression forces the 2 MiB boundary, proves its queued video remains byte-identical and verifies ahead, behind and untimestamped late-audio diagnostics.  Strict optimized compilation, focused GCC analyzer, AddressSanitizer, UndefinedBehaviorSanitizer, DVD random-access, SPU, overlay, reserve, output-stage, menu-hop, private-LPCM-skip, AC-3 recovery, Program Stream seek, audio UI, visualizer and audio-seek tests pass.  Real MP3, WAV, FLAC and Ogg integrations pass against both native and final ARM helpers with 378 or 381 pictures and one clear record per file.  Local GNU 10.2.1 produced the 966,052-byte static stripped ARMv7 EABI5 helper `host/build/MediaPlayer_Helper_LateAudioDiag_401148e` with SHA-256 `19020ff3e785718854fe399f23462720428012129082335f9c3c61414fa371c7`; its protocol-one capability probe passes and it has no dynamic section.  Main, decoder, RBF, visualizer and RTL are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_LateAudioDiag_401148e`, preserving executable mode and the installed Main, RBF and visualizer.  Enable telemetry, launch Futurama disc one, wait until the menu and selector appear and allow the helper to reach its expected clean rejection without needing to press a direction.  Return the fresh helper log; its `video lookahead classified silent` and expanded `AC-3 audio begins beyond` records will establish whether the first audio PTS is ahead of, equal to or behind the already-released video horizon.  Do not suppress the rejection or increase the queue from this diagnostic evidence alone; use the measured temporal relationship to propose the bounded state transition that retains genuinely silent Program Streams and synchronized late-starting DVD audio.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
