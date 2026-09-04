@@ -1,3 +1,38 @@
+## 957 COMMIT Unreleased ??? 2026-09-03T21:18:06-07:00
+
+#### Coming From:
+
+Unreleased f93c6ba
+
+#### Purpose:
+
+Expose the proven native NTSC raster as standards-signalled 525i59.94 HDMI for external processing through the Decimator MD-LX.
+
+#### Outcome:
+
+The user limits the first external-processing milestone to NTSC 480i and reports that the existing native bypass already drives a standard CRT correctly through analog output, accepting the decoder's field reconstruction and the core's 858-by-525 half-line-phased raster as the hardware control.  The remaining first boundary is confined to the per-core Main and ADV7513 configuration: retain the core's 54 MHz clock with each 13.5 MHz source sample held for four cycles, divide that input by two inside the transmitter, emit a 27 MHz HDMI link with two samples per source pixel, advertise CTA 525i59.94 VIC 6 or 7 according to the core aspect ratio, identify BT.601 colorimetry and limited RGB, and use the corresponding 27 MHz audio CTS.  The existing `[MediaPlayer]` Main isolation will enable Direct Video only for this core; Bob and Weave, decoder RTL, helper protocol, media scheduling and the accepted RBF remain unchanged for this initial MD-LX lock test.
+
+#### Next Steps:
+
+Add a focused custom-Main patch and modeled register-policy regression, extend the per-core INI fragment and documentation, then build the isolated Main locally and require strict patch-application, compiler and policy tests.  Deliver only the replacement `MiSTer_MediaPlayer` executable plus INI-line changes for the forum tester to connect MiSTer's HDMI output to the Decimator MD-LX, require the MD-LX to identify and convert 525i59.94 without scaling or deinterlacing, confirm field motion, aspect signalling and continuous HDMI audio, and retain the already-proven analog CRT path as the timing control before considering 576i, 60.000 Hz or a live core-menu switch.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- assets/MiSTer_MediaPlayer.ini.fragment
+- docs/ARCHITECTURE.md
+- host/build_arm_stack.sh
+- host/main_mister/0003-mediaplayer-ntsc-480i-hdmi.patch
+- tools/test_main_ntsc_480i.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 956 COMMIT Unreleased f93c6ba 2026-09-03T20:32:38-07:00
 
 #### Coming From:
@@ -1181,35 +1216,6 @@ Install only `host/build/MediaPlayer_Helper_MenuAuto_7186fb4` as `/media/fat/lin
 - host/arm/ARCHITECTURE.md
 - host/arm/media_source.c
 - tools/test_dvd_menu_hop.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 917 COMMIT Unreleased 101aa4a 2026-09-02T19:58:11-07:00
-
-#### Coming From:
-
-Unreleased 101aa4a
-
-#### Purpose:
-
-Qualify the terminal DVD still drain on Coming to America and isolate the later navigation hang after repeated Scene Selection input.
-
-#### Outcome:
-
-The user's physical source-`101aa4a` run validates the drain-tail boundary: multiple Scene Selection page activations update their authored backgrounds and overlays correctly, and the final 1,920-by-1,080 screenshot visibly shows the authored 9-through-12 scene page with a valid highlight.  Its checksum-valid schema-21 snapshot reports 224,821 decoder-accepted bytes from the final 224,817-byte authored still plus nine-byte terminal tail, proving the complete sequence end crossed the five-byte retained transport depth; `sequence_end_seen` and presentation completion are true, exactly one reference picture and one displayed picture completed, and decoder, presentation, PCM and overlay protocol errors are all clear.  The later apparent decoder hang is instead a deterministic helper exit: a Left command on NAV LBN 33,886 reports authored target 12 but returns highlight 2, which matches libdvdnav's directional auto-action path executing a button command and leaving that NAV packet; because the helper classified every successful arrow as highlight-only, it did not enter its existing pending-menu transition path.  The next Down command reused the departed NAV, libdvdnav returned an error, the helper exited with status one at 47.685666 seconds, and Main ended the download with reason `helper-error` while retaining the last good frame.  Before that exit the session delivered four complete overlay planes, fifty-three styles with thirty-three visual changes, and multiple successful staged still hops.  The 1,217,814-byte log, 752,950-byte screenshot and 597-byte telemetry report have SHA-256 `3bbb7824fefc4de517f97b6254890ff330fff3059757f86cd8bb87bd5558a961`, `ef5004a72a027b5263b087775f0beebcaf98bd518eb861a412c43ca48031e85f` and `cefcfd8a9389a429f290567c9f5e4b1205a9979047ba04f7f5fb6345c8dbd031`.
-
-#### Next Steps:
-
-Preserve the proven terminal still drain, staged decoder barrier, overlay continuation, Main, protocol, decoder, RTL, visualizer and RBF.  After user approval, replace libdvdnav's four directional convenience calls with explicit selection of the already-derived authored target, inspect that target's `auto_action_mode`, activate it when required, and classify the resulting action through the same existing menu-pending or stream-hop path used by Enter so a new NAV packet is consumed before later input.  Treat an independently rejected directional input as an ignored no-op rather than terminating the helper, while retaining fatal handling for activation and root-menu failures.  Extend the menu-hop regression with valid, invalid and auto-action authored targets, rerun strict native and GNU 10.2.1 ARM builds plus sanitizer, analyzer, navigation, staging, random-access, overlay, audio and seek coverage, and build only a new static ARMv7 helper for repeated Scene Selection paging and retained Blazing Saddles, The Big Lebowski and forum-disc tests.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
