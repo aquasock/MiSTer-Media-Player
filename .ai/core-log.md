@@ -1,4 +1,4 @@
-## 959 COMMIT Unreleased ??? 2026-09-03T22:22:02-07:00
+## 959 COMMIT Unreleased 5fc7a1e 2026-09-03T22:22:02-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Rename the DVD picker and physical-drive launcher to concise user-facing labels 
 
 #### Outcome:
 
-The approved change will replace the core-menu label `Run DVD-Video` with `Load Disk`, rename the tracked launcher from `USB DVD Drive.dvd` to `Video DVD.dvd`, and update current setup and testing documentation plus the Unreleased changelog.  Patched Main will continue mapping every selected `.dvd` file to `dvdmenu:/dev/sr0`, so the helper protocol, source selection and DVD playback behavior remain unchanged; the immutable v0.9.0 release manifests and package hashes will retain the historical launcher name they actually shipped.
+Source `5fc7a1e` replaces the core-menu label `Run DVD-Video` with `Load Disk`, renames the tracked launcher from `USB DVD Drive.dvd` to `Video DVD.dvd`, and updates current setup and testing documentation plus the Unreleased changelog.  Patched Main continues mapping every selected `.dvd` file to `dvdmenu:/dev/sr0`, so the helper protocol, source selection and DVD playback behavior remain unchanged; the immutable v0.9.0 release manifests and package hashes retain the historical launcher name they actually shipped.  Static checks confirm the new menu string, asset contents and extension routing, and the source commit is pushed without staging the user's unrelated local changes.
 
 #### Next Steps:
 
-Apply the menu and asset rename, update only current documentation references, verify that no live reference still depends on the old name, and run repository consistency checks.  Commit and push the source, then pull that exact source on build PC `10.10.0.42`, perform a clean Quartus build because the menu string is compiled into the RBF, copy back and checksum the dated core binary, and provide the new RBF plus `Video DVD.dvd` for installation while leaving Main and the helper unchanged.
+Retain source `5fc7a1e` as the naming boundary and incorporate its pending RBF change into the approved Audio CD development cycle rather than performing a separate Quartus compile.  The combined cycle should add `.cd` picker support and physical CDDA playback, rebuild the affected Main and helper, then perform one clean timing-gated Quartus build with the established seed unless timing requires the single authorized reseed.
 
 #### Files Modified:
 
