@@ -21,6 +21,8 @@ static int require(int condition, const char *message)
     return 1;
 }
 
+static void encode_pes_pts(uint8_t encoded[5], uint64_t pts);
+
 static int test_h262_restart_diagnostic_fields(void)
 {
     uint8_t video[64] = {0};
@@ -675,6 +677,217 @@ done:
     output_stage_destroy(output.activation_stage);
     if (output.video)
         fclose(output.video);
+    free(payload);
+    return failed;
+}
+
+static int test_unqualified_menu_activation_continuation(void)
+{
+    static const uint8_t staged_marker[] = {0x91, 0x82, 0x73, 0x64};
+    static const uint64_t prior_pts = 900000u;
+    static const uint64_t activation_pts = 45000u;
+    static const uint64_t continued_pts = prior_pts + 1u;
+    const size_t payload_size = VIDEO_QUEUE_LIMIT - 80u;
+    enum { INCOMING_VIDEO_BYTES = 64 };
+    const size_t held_frames = PCM_SCHEDULE_RESERVE_FRAMES +
+        ((payload_size + PCM_MAX_FREE_VIDEO_BYTES - 1u) /
+             PCM_MAX_FREE_VIDEO_BYTES + 1u) * PCM_REFILL_FRAMES;
+    struct dvd_menu_state menu = {0};
+    struct audio_state audio = {0};
+    struct output_state output = {0};
+    struct media_source input = {0};
+    uint8_t pes[2u + 3u + 5u + INCOMING_VIDEO_BYTES];
+    uint8_t expected_pts[9];
+    uint8_t actual_pts[9];
+    uint8_t compare[65536];
+    uint8_t event = 0;
+    uint8_t *payload = NULL;
+    int descriptors[2] = {-1, -1};
+    size_t video_bytes = 0;
+    uint64_t queued_pts = 0;
+    unsigned pts_records = 0;
+    char input_path[] = "/tmp/mmp-menu-continuation-XXXXXX";
+    char source_error[128];
+    int video_code = -1;
+    int audio_code = -1;
+    int input_fd = -1;
+    int input_open = 0;
+    int value;
+    int failed = 0;
+
+    payload = malloc(payload_size);
+    output.video = tmpfile();
+    failed |= require(payload != NULL && output.video != NULL &&
+                          pipe(descriptors) == 0,
+                      "could not allocate context-continuation fixture");
+    if (failed)
+        goto done;
+    memset(payload, 0x55, payload_size);
+    output.iso_pts_normalization = 1;
+    output.have_iso_video_pts = 1;
+    output.iso_pts_raw_max = prior_pts;
+    output.iso_pts_normalized_max = prior_pts;
+    menu.enabled = 1;
+    menu.menu_active = 1;
+    audio.a52_substream = -1;
+    audio.dts_substream = -1;
+    failed |= require(output_stage_create(&output.activation_stage,
+                                          OUTPUT_ACTIVATION_STAGE_BYTES) == 0,
+                      "could not create context-continuation stage");
+    failed |= require(start_pending_menu_activation(
+                          &menu, &audio, &output) == 0 &&
+                          menu.activation_pending &&
+                          menu.activation_prior_pts_valid &&
+                          menu.activation_prior_pts == prior_pts &&
+                          output.iso_start_filter_active,
+                      "pending activation did not retain its live PTS floor");
+    output.audio_pes_seen = 1;
+    output.have_audio_pts = 1;
+    output.first_audio_pts = activation_pts;
+    output.hold = calloc(held_frames * 2u, sizeof(*output.hold));
+    output.hold_count = held_frames * 2u;
+    output.hold_capacity = output.hold_count;
+    output.hold_rate_hz = PCM_SAMPLE_RATE;
+    failed |= require(output.hold != NULL,
+                      "could not allocate context-continuation PCM horizon");
+    failed |= require(write_output_priority(
+                          &output, staged_marker, sizeof(staged_marker),
+                          "context-continuation marker") == 0,
+                      "could not stage context-continuation marker");
+    failed |= require(normalize_video_pts(
+                          &output, activation_pts, &queued_pts) == 0 &&
+                          queued_pts == activation_pts,
+                      "could not establish the staged activation PTS");
+    failed |= require(queue_h262_video(
+                          &output, payload, payload_size, 1, 1,
+                          queued_pts) == 0 &&
+                          iso_filter_initial_random_access(&output, 0) == 0 &&
+                          output.iso_start_filter_active &&
+                          video_queue_would_overflow(
+                              &output, INCOMING_VIDEO_BYTES, 1),
+                      "sequence-free activation did not reach queue pressure");
+    pes[0] = 0;
+    pes[1] = (uint8_t)(sizeof(pes) - 2u);
+    pes[2] = 0x80;
+    pes[3] = 0x80;
+    pes[4] = 0x05;
+    encode_pes_pts(pes + 5, activation_pts);
+    memset(pes + 10, 0x55, INCOMING_VIDEO_BYTES);
+    input_fd = mkstemp(input_path);
+    failed |= require(input_fd >= 0 &&
+                          write(input_fd, pes, sizeof(pes)) ==
+                              (ssize_t)sizeof(pes) &&
+                          close(input_fd) == 0,
+                      "could not create the pressure-triggering PES");
+    input_fd = -1;
+    failed |= require(!failed &&
+                          media_source_open(&input, input_path, source_error,
+                                            sizeof(source_error)) ==
+                              MEDIA_SOURCE_OK,
+                      "could not open the pressure-triggering PES");
+    input_open = !failed;
+    failed |= require(!failed &&
+                          process_pes(
+                              &input, 0xe0, &audio, &output, &menu,
+                              descriptors[1], &video_code, &audio_code,
+                              NULL, -1) == 0 &&
+                          !menu.activation_pending &&
+                          !menu.activation_prior_pts_valid &&
+                          !output.iso_start_filter_active &&
+                          !output_stage_active(output.activation_stage) &&
+                          output.video_head == NULL &&
+                          output.video_queued_bytes == 0 &&
+                          output.have_video_pts &&
+                          output.max_video_pts == continued_pts &&
+                          output.iso_pts_normalized_max == continued_pts &&
+                          output.iso_pts_epoch_offset ==
+                              continued_pts - activation_pts,
+                      "production PES path did not preserve resident context");
+    failed |= require(read(descriptors[0], &event, sizeof(event)) == 1 &&
+                          event == MEDIA_PLAYER_CONTROL_MENU_CONTINUE,
+                      "context continuation was not acknowledged");
+    failed |= require(flush_h262_video(&output) == 0 &&
+                          scheduler_drain(&output, 0) == 0 &&
+                          fflush(output.video) == 0 &&
+                          fseek(output.video, 0, SEEK_SET) == 0,
+                      "context-continuation output did not finish");
+    encode_video_pts(expected_pts, continued_pts);
+    failed |= require(fread(compare, 1, sizeof(staged_marker), output.video) ==
+                              sizeof(staged_marker) &&
+                          !memcmp(compare, staged_marker,
+                                  sizeof(staged_marker)),
+                      "staged prefix changed");
+    while (!failed && (value = fgetc(output.video)) != EOF) {
+        if (value == 0) {
+            uint8_t record_header[4];
+            unsigned frames;
+            size_t pcm_bytes;
+
+            record_header[0] = 0;
+            failed |= require(fread(record_header + 1, 1, 3,
+                                    output.video) == 3 &&
+                                  record_header[1] == 0 &&
+                                  record_header[2] == 1,
+                              "context continuation truncated a record");
+            if (failed)
+                break;
+            if (record_header[3] == MEDIA_PLAYER_PTS_MARKER_CODE) {
+                memcpy(actual_pts, record_header, sizeof(record_header));
+                failed |= require(fread(actual_pts + sizeof(record_header),
+                                        1,
+                                        sizeof(actual_pts) -
+                                            sizeof(record_header),
+                                        output.video) ==
+                                      sizeof(actual_pts) -
+                                          sizeof(record_header) &&
+                                      !memcmp(actual_pts, expected_pts,
+                                              sizeof(expected_pts)),
+                                  "rebased PTS record changed");
+                pts_records++;
+                continue;
+            }
+            failed |= require(record_header[3] ==
+                                  MEDIA_PLAYER_PCM_MARKER_CODE,
+                              "context continuation emitted an unknown record");
+            value = fgetc(output.video);
+            failed |= require(value != EOF,
+                              "context continuation truncated a PCM record");
+            if (failed)
+                break;
+            frames = (unsigned)value >> 2;
+            pcm_bytes = (size_t)frames * 4u;
+            failed |= require(frames > 0 && frames <= PCM_RECORD_FRAMES &&
+                                  pcm_bytes <= sizeof(compare) &&
+                                  fread(compare, 1, pcm_bytes,
+                                        output.video) == pcm_bytes,
+                              "context continuation PCM record is invalid");
+            continue;
+        }
+        failed |= require(value == 0x55,
+                          "context continuation changed a video byte");
+        video_bytes++;
+    }
+    failed |= require(pts_records == 2 &&
+                          video_bytes ==
+                              payload_size + INCOMING_VIDEO_BYTES,
+                      "context continuation changed PTS or video byte count");
+
+done:
+    if (input_open)
+        media_source_close(&input);
+    if (input_fd >= 0)
+        close(input_fd);
+    unlink(input_path);
+    while (output.video_head)
+        free_video_head(&output);
+    free(output.hold);
+    output_stage_destroy(output.activation_stage);
+    if (output.video)
+        fclose(output.video);
+    if (descriptors[0] >= 0)
+        close(descriptors[0]);
+    if (descriptors[1] >= 0)
+        close(descriptors[1]);
     free(payload);
     return failed;
 }
@@ -1340,6 +1553,8 @@ int main(void)
     if (test_terminal_still_direct())
         return 1;
     if (test_motion_menu_stage_pressure())
+        return 1;
+    if (test_unqualified_menu_activation_continuation())
         return 1;
     if (test_late_audio_after_silent_release())
         return 1;

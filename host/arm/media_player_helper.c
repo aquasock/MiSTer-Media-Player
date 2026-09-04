@@ -381,6 +381,8 @@ struct dvd_menu_state {
     int activation_pending;
     unsigned activation_payloads;
     int activation_staged_hop;
+    int activation_prior_pts_valid;
+    uint64_t activation_prior_pts;
     int resume_code_valid;
     uint8_t resume_code;
 };
@@ -1077,6 +1079,8 @@ static int acknowledge_menu_continuation(struct dvd_menu_state *menu,
     menu->activation_pending = 0;
     menu->activation_payloads = 0;
     menu->activation_staged_hop = 0;
+    menu->activation_prior_pts_valid = 0;
+    menu->activation_prior_pts = 0;
     fprintf(stderr,
             "media_player_helper: DVD menu continuation reason=%s\n",
             reason);
@@ -2296,6 +2300,8 @@ static int start_pending_menu_activation(struct dvd_menu_state *menu,
                                          struct output_state *output)
 {
     size_t hold_limit = output->hold_limit;
+    uint64_t prior_pts = output->iso_pts_normalized_max;
+    int have_prior_pts = output->have_iso_video_pts;
 
     if (output_stage_active(output->activation_stage) &&
         cancel_activation_stage(output, "superseded-activation") < 0)
@@ -2307,8 +2313,12 @@ static int start_pending_menu_activation(struct dvd_menu_state *menu,
     menu->activation_pending = 1;
     menu->activation_payloads = 0;
     menu->activation_staged_hop = 0;
+    menu->activation_prior_pts_valid = have_prior_pts;
+    menu->activation_prior_pts = prior_pts;
     fprintf(stderr,
-            "media_player_helper: DVD menu activation deferred\n");
+            "media_player_helper: DVD menu activation deferred "
+            "prior_pts_valid=%d prior_pts=%llu\n",
+            have_prior_pts, (unsigned long long)prior_pts);
     return 0;
 }
 
@@ -2322,6 +2332,8 @@ static int cancel_pending_menu_activation(struct dvd_menu_state *menu,
     menu->activation_pending = 0;
     menu->activation_payloads = 0;
     menu->activation_staged_hop = 0;
+    menu->activation_prior_pts_valid = 0;
+    menu->activation_prior_pts = 0;
     return 0;
 }
 
@@ -2730,6 +2742,172 @@ static int scheduler_drain(struct output_state *output, int at_eof)
     if (output->scheduler_started && !output->hold_active)
         scheduler_log_progress(output);
     return 0;
+}
+
+/*
+ * A deferred button activation normally starts a fresh random-access epoch so
+ * its staged video can cross a decoder barrier safely.  Some authored menu
+ * branches instead continue the already-running elementary sequence and do
+ * not repeat a complete sequence/I/reference startup group.  If that branch
+ * reaches the ordinary queue guard while libdvdnav still reports menu space,
+ * it can only be decoded using the resident context.  Rebase its queued PTS
+ * records above the prior live epoch, release the filter, and preserve exact
+ * byte order while the existing scheduler drains into the activation stage.
+ */
+static int rebase_unqualified_menu_activation_pts(
+    struct dvd_menu_state *menu, struct output_state *output,
+    int incoming_has_pts, uint64_t *incoming_pts)
+{
+    struct video_chunk *chunk;
+    uint64_t first = UINT64_MAX;
+    uint64_t delta = 0;
+    uint64_t prior;
+    int have_current = 0;
+
+    if (!menu->activation_prior_pts_valid)
+        return 0;
+    prior = menu->activation_prior_pts;
+    if (prior == UINT64_MAX) {
+        fprintf(stderr,
+                "media_player_helper: DVD menu continuation PTS overflow\n");
+        return -1;
+    }
+    for (chunk = output->video_head; chunk; chunk = chunk->next) {
+        if (chunk->has_pts && (!have_current || chunk->pts < first)) {
+            first = chunk->pts;
+            have_current = 1;
+        }
+    }
+    if (output->h262_pending_has_pts &&
+        (!have_current || output->h262_pending_pts < first)) {
+        first = output->h262_pending_pts;
+        have_current = 1;
+    }
+    if (output->have_audio_pts &&
+        (!have_current || output->first_audio_pts < first)) {
+        first = output->first_audio_pts;
+        have_current = 1;
+    }
+    if (incoming_has_pts &&
+        (!have_current || *incoming_pts < first)) {
+        first = *incoming_pts;
+        have_current = 1;
+    }
+    if (!have_current) {
+        output->iso_pts_normalized_max = prior;
+        output->iso_pts_rebase_floor = prior;
+        output->iso_pts_rebase_pending = 1;
+        fprintf(stderr,
+                "media_player_helper: DVD menu continuation PTS rebase "
+                "deferred prior=%llu\n",
+                (unsigned long long)prior);
+        return 0;
+    }
+    if (first <= prior)
+        delta = prior + 1u - first;
+    if (delta > UINT64_MAX - output->iso_pts_epoch_offset ||
+        (output->have_audio_pts &&
+         delta > UINT64_MAX - output->first_audio_pts) ||
+        (output->have_video_pts &&
+         delta > UINT64_MAX - output->max_video_pts) ||
+        (output->h262_pending_has_pts &&
+         delta > UINT64_MAX - output->h262_pending_pts) ||
+        (incoming_has_pts && delta > UINT64_MAX - *incoming_pts) ||
+        (output->have_iso_video_pts &&
+         delta > UINT64_MAX - output->iso_pts_normalized_max)) {
+        fprintf(stderr,
+                "media_player_helper: DVD menu continuation PTS overflow\n");
+        return -1;
+    }
+    for (chunk = output->video_head; chunk; chunk = chunk->next) {
+        if (!chunk->has_pts)
+            continue;
+        if (delta > UINT64_MAX - chunk->pts ||
+            (chunk->has_record && chunk->size < 9u)) {
+            fprintf(stderr,
+                    "media_player_helper: invalid DVD menu continuation "
+                    "timestamp queue\n");
+            return -1;
+        }
+    }
+    output->iso_pts_epoch_offset += delta;
+    if (output->have_audio_pts)
+        output->first_audio_pts += delta;
+    if (output->have_video_pts)
+        output->max_video_pts += delta;
+    if (output->h262_pending_has_pts)
+        output->h262_pending_pts += delta;
+    if (incoming_has_pts)
+        *incoming_pts += delta;
+    for (chunk = output->video_head; chunk; chunk = chunk->next) {
+        if (!chunk->has_pts)
+            continue;
+        chunk->pts += delta;
+        if (chunk->has_record)
+            encode_video_pts(chunk->data, chunk->pts);
+    }
+    if (output->have_iso_video_pts)
+        output->iso_pts_normalized_max += delta;
+    if (output->iso_pts_normalized_max < prior)
+        output->iso_pts_normalized_max = prior;
+    output->iso_pts_rebase_floor = prior;
+    output->iso_pts_rebase_pending = 0;
+    fprintf(stderr,
+            "media_player_helper: DVD menu continuation PTS rebased "
+            "prior=%llu first=%llu delta=%llu\n",
+            (unsigned long long)prior, (unsigned long long)first,
+            (unsigned long long)delta);
+    return 0;
+}
+
+static int release_unqualified_menu_activation(
+    struct dvd_menu_state *menu, struct output_state *output,
+    int control_fd, size_t incoming_size, int incoming_has_record,
+    int incoming_has_pts, uint64_t *incoming_pts)
+{
+    size_t queued;
+    size_t staged;
+    size_t records;
+
+    if (!menu || !menu->activation_pending || !menu->menu_active ||
+        !output_stage_active(output->activation_stage) ||
+        !output->iso_start_filter_active ||
+        !video_queue_would_overflow(output, incoming_size,
+                                    incoming_has_record))
+        return 0;
+    queued = output->video_queued_bytes;
+    if (rebase_unqualified_menu_activation_pts(
+            menu, output, incoming_has_pts, incoming_pts) < 0)
+        return -1;
+    output->iso_start_filter_active = 0;
+    if (scheduler_drain(output, 0) < 0)
+        return -1;
+    if (video_queue_would_overflow(output, incoming_size,
+                                   incoming_has_record)) {
+        if (!output->audio_pes_seen) {
+            if (scheduler_release_silent_video(output) < 0)
+                return -1;
+        } else {
+            fprintf(stderr,
+                    "media_player_helper: DVD menu continuation could not "
+                    "drain queued video queued=%zu incoming=%zu\n",
+                    output->video_queued_bytes, incoming_size);
+            return -1;
+        }
+    }
+    staged = output_stage_size(output->activation_stage);
+    records = output_stage_records(output->activation_stage);
+    if (commit_activation_stage(
+            output, "unqualified-random-access-menu-continuation") < 0 ||
+        acknowledge_menu_continuation(
+            menu, control_fd, "unqualified-random-access") < 0)
+        return -1;
+    fprintf(stderr,
+            "media_player_helper: DVD menu activation preserved resident "
+            "decoder context queued=%zu remaining=%zu staged_records=%zu "
+            "staged_bytes=%zu\n",
+            queued, output->video_queued_bytes, records, staged);
+    return 1;
 }
 
 static int iso_finalize_terminal_random_access(struct output_state *output)
@@ -3675,8 +3853,9 @@ static int preflight_input(struct media_source *input, int is_program_stream)
 
 static int process_pes(struct media_source *input, uint8_t code,
                        struct audio_state *audio,
-                       struct output_state *output, int *video_code,
-                       int *audio_code,
+                       struct output_state *output,
+                       struct dvd_menu_state *menu, int control_fd,
+                       int *video_code, int *audio_code,
                        struct program_stream_seek_index *seek_index,
                        int64_t pes_offset)
 {
@@ -3740,6 +3919,10 @@ static int process_pes(struct media_source *input, uint8_t code,
         has_record = has_pts && pts_record_wanted(output);
         video_size = length - payload_offset;
 
+        if (release_unqualified_menu_activation(
+                menu, output, control_fd, video_size, has_record,
+                has_pts, &pts) < 0)
+            goto done;
         if (output->scheduler_enabled && !output->iso_start_filter_active &&
             !output->audio_pes_seen &&
             video_queue_would_overflow(output, video_size, has_record) &&
@@ -4149,6 +4332,8 @@ static int wait_dvd_still(struct media_source *input,
                 if (navigation == MEDIA_SOURCE_DVD_STREAM_HOP) {
                     menu->activation_pending = 0;
                     menu->activation_payloads = 0;
+                    menu->activation_prior_pts_valid = 0;
+                    menu->activation_prior_pts = 0;
                     *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
                     fprintf(stderr,
                             "media_player_helper: DVD delayed activation "
@@ -4336,6 +4521,8 @@ static int process_program_stream(struct media_source *input,
                 menu->activation_pending = 0;
                 menu->activation_payloads = 0;
                 menu->activation_staged_hop = 0;
+                menu->activation_prior_pts_valid = 0;
+                menu->activation_prior_pts = 0;
                 menu->resume_code = code;
                 menu->resume_code_valid = 1;
                 *control_command = MEDIA_PLAYER_CONTROL_MENU_ACTIVATE;
@@ -4362,6 +4549,7 @@ static int process_program_stream(struct media_source *input,
         }
         if ((code & 0xf0) == 0xe0 || (code & 0xe0) == 0xc0) {
             if (process_pes(input, code, audio, output,
+                            menu, control_fd,
                             video_code, audio_code, seek_index,
                             pes_offset) < 0)
                 return -1;
@@ -5290,6 +5478,8 @@ int main(int argc, char **argv)
                     dvd_menu.activation_pending = 0;
                     dvd_menu.activation_payloads = 0;
                     dvd_menu.activation_staged_hop = 0;
+                    dvd_menu.activation_prior_pts_valid = 0;
+                    dvd_menu.activation_prior_pts = 0;
                 } else {
                     dvd_spu_reset(dvd_menu.decoder);
                     dvd_menu.overlay_emitted = 0;

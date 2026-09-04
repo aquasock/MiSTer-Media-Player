@@ -76,7 +76,14 @@ acknowledgment, so generic Program Stream headers cannot blank a resident menu
 frame. A picture-bearing motion menu that supplies neither a still nor a menu
 domain exit is promoted through the same staged barrier at a 4 MiB decision
 watermark; the 8 MiB stage retains one complete bounded scheduler-drain of
-headroom, so the decision cannot itself race the old capacity limit. If an
+headroom, so the decision cannot itself race the old capacity limit. If the
+activation remains in menu space but the 2 MiB video queue reaches its guard
+without a complete sequence-header, I-picture and following-reference startup
+group, the destination requires the resident decoder context rather than a
+reset. The helper rebases every queued and triggering PTS above the prior live
+epoch, releases the startup filter, drains the exact staged stream through the
+normal audio scheduler, commits it and acknowledges a menu continuation. The
+queue guard and restart-qualified motion-menu barrier remain unchanged. If an
 authored still terminates a sequence-plus-I startup group before a
 later reference picture arrives, the helper uses that explicit end boundary to
 release the independently decodable still picture and appends one H.262

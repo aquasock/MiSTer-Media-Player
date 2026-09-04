@@ -8,6 +8,13 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Fixed deferred DVD button activations that remain in menu space and continue
+  an existing MPEG-2 sequence without repeating an independently decodable
+  startup group. At the existing video-queue guard, the helper now rebases the
+  staged timestamps above the prior live epoch and commits the exact queued
+  stream through the resident decoder instead of aborting before its larger
+  motion-menu decision threshold; qualified restarts and title exits retain
+  their decoder barriers.
 - Filled the Audio CD metadata panel from the existing TOC selection: title now
   mirrors the active `TRACK nn` playlist row, artist and album retain `---`, and
   all three colons align. Audio CDs also receive a built-in aspect-corrected
