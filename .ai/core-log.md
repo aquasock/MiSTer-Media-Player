@@ -1,3 +1,34 @@
+## 956 COMMIT Unreleased ??? 2026-09-03T20:32:38-07:00
+
+#### Coming From:
+
+Unreleased 67ce19d
+
+#### Purpose:
+
+Keep automatic-menu PCM below its safety ceiling without recreating the long downstream audio lead.
+
+#### Outcome:
+
+The approved helper-only correction will retain source `67ce19d`'s reserve-drain pacing boundary and replace its fixed one-batch fallback ceiling with pressure-driven 2,048-frame runs.  Each stalled-timestamp automatic-menu pass will drain held PCM to a low watermark equal to half the configured hold limit when that is above the existing 8,192-frame scheduling reserve, which is 96,000 frames at the default four-second limit; the normal advancing-timestamp scheduler, ordinary title reserve, overlay priority and transport byte order will remain unchanged.  This gives the default route two seconds of hold-limit headroom, bounds the initial sink-paced catch-up from the observed 183,808 frames to approximately 1.83 seconds, and makes subsequent fallback work proportional to each newly decoded Program Stream audio burst instead of permitting a net-growing hold.
+
+#### Next Steps:
+
+Implement the low-watermark calculation and paced batch loop, update the architecture and production regression to cover a single fallback pass whose held PCM exceeds one batch and prove exact samples, final watermark, bounded output reserve and unchanged advancing-PTS behavior.  Run strict optimized, AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer checks plus retained helper, DVD, audio, visualizer and seek suites with repeated focused runs, then build only the stripped static ARMv7 helper locally for another Futurama and multi-disc automatic-menu hardware test.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 955 COMMIT Unreleased 67ce19d 2026-09-03T20:28:11-07:00
 
 #### Coming From:
@@ -1179,35 +1210,6 @@ Preserve the proven terminal still drain, staged decoder barrier, overlay contin
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 916 COMMIT Unreleased 101aa4a 2026-09-02T19:47:06-07:00
-
-#### Coming From:
-
-Unreleased a0cdd43
-
-#### Purpose:
-
-Correct and execute the live sequence-end metadata regression on the authorized simulation PC before hardware testing the terminal DVD still drain.
-
-#### Outcome:
-
-The first exact-source Icarus Verilog 12.0 run on build PC `10.10.0.42` rejected the new regression because its blocking assignment updated the observed stream window before the detector expression shifted the current byte a second time; this was test instrumentation, not helper or extractor behavior.  Source `101aa4a` changes only that detector to compare the already-updated 32-bit window.  A clean isolated checkout of exact source `101aa4a` then compiles and passes `test_dvd_overlay_metadata.sv`, reconstructing thirteen clean stream bytes, preserving the three-byte `02 de ad` overlay payload under backpressure, and observing the complete `00 00 01 b7` sequence end while `input_end` remains low.  The GNU 10.2.1 ARM rebuild succeeds and produces the byte-identical 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_SceneDrain_101aa4a` at SHA-256 `9cde18ced068f6b39865a24f79ade13a3c07810324c185d1df6cf3d54a422d33`; source `a0cdd43` remains the helper implementation boundary, and Main, protocol, decoder, RTL, visualizer and RBF remain unchanged.
-
-#### Next Steps:
-
-Install only `host/build/MediaPlayer_Helper_SceneDrain_101aa4a` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  On Coming to America, enter Scene Selection and require its authored background plus selector to appear, remain responsive and launch a selected scene; return to the root menu and repeat the transition.  With telemetry enabled, require at least 224,828 decoder-accepted bytes for this still, sequence-end recognition, one completed reference picture and one displayed picture.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback and the forum disc's silent LPCM menu followed by supported AC-3 title playback, then provide a fresh log, screenshot and telemetry snapshot for qualification.
-
-#### Files Modified:
-
-- tools/test_dvd_overlay_metadata.sv
 
 #### Status:
 
