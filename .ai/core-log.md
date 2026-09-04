@@ -1,3 +1,32 @@
+## 974 COMMIT Unreleased cd484ba 2026-09-04T05:17:58-07:00
+
+#### Coming From:
+
+Unreleased cd484ba
+
+#### Purpose:
+
+Evaluate the source-`cd484ba` context-preserving Simpsons menu activation on physical MiSTer hardware and isolate its remaining delay and failure.
+
+#### Outcome:
+
+The physical Simpsons run proves source `cd484ba` crosses the former two-megabyte deadlock and reaches the next authored menu, but rejects the complete activation behavior.  Main sends the only recorded Activate command at 100.605542 seconds, libdvdnav remains in menu space, and the helper starts its deferred stage with prior PTS 647,273; at 136.779520 seconds it rebases the destination's first PTS 45,045 by 602,229 ticks, commits 4,094,728 staged bytes and 14,848 records, acknowledges the unqualified continuation at 137.254611 seconds and preserves the resident decoder.  That 36.65-second interval accounts for the reported slow transition.  The continuation then leaves video PTS fixed at 647,274 while decoded AC-3 PCM grows from 33,475,584 held frames to 113,378,816 frames, approximately 453.5 MiB of stereo samples, because `start_pending_menu_activation()` clears `automatic_menu_epoch` and the new fallback does not restore it; both the established sink-paced menu fallback and its 192,000-frame safety check are therefore disabled.  Linux terminates the helper with signal nine at 181.191730 seconds, consistent with exhausting the target's approximately 492 MiB visible RAM, and Main reports `helper-error`.  The screenshot shows the destination's `PLAY EPISODE` menu with its selector rather than title playback, and no second navigation command reached the helper.  The checksum-valid schema-21 snapshot covers an earlier 30-second session with 5,122,483 accepted bytes, 131 displayed pictures, 130 swaps, zero decoder errors, zero transport blocks and zero audio underruns, so it does not contradict the later host-side exhaustion.  The 5,718,761-byte log, 308,326-byte screenshot and 740-byte sidecar have SHA-256 `e31c33e3d19531094e8d951e785729dce29b955fab8e0ea0e4aeb9bf24135b70`, `740cf96bbee3222f8235304d7e3b66c93b9ed04e48e47d315d0c4d6846befba8` and `4fb87049d01c8d7d1df9e5198fa6d2972382d87df7258767784f37f201fd87b0`.  No runtime source was changed.
+
+#### Next Steps:
+
+After user approval, add audio pressure as a second bounded same-menu activation decision so a context-dependent branch commits before decoded PCM exceeds the existing hold ceiling instead of waiting only for two megabytes of video.  Commit and acknowledge the finite activation stage first, then restore the automatic-menu epoch so the established live sink-paced fallback drains toward its 96,000-frame watermark without filling the eight-megabyte stage; retain the current video guard, timestamp rebase, qualified restart barrier and menu-to-title barrier.  Add a production regression whose low-bitrate menu reaches PCM pressure before video pressure and proves bounded staging, prompt continuation acknowledgment, exact output, sink-paced PCM and a stable hold, while retaining the source-`cd484ba` video-pressure case and all qualified restart, still, title, DVD and audio controls; then build only a new local ARM helper for the same Simpsons route.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 973 COMMIT Unreleased cd484ba 2026-09-04T04:34:35-07:00
 
 #### Coming From:
@@ -1255,37 +1284,6 @@ Upload `host/build/MiSTer_Media_Player_H262Diag_ac13724.zip` to the forum and ha
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 934 COMMIT Unreleased ac13724 2026-09-03T00:01:33-07:00
-
-#### Coming From:
-
-Unreleased 932dc22
-
-#### Purpose:
-
-Capture the exact common H.262 header construct rejected near byte 188 in The Big Lebowski's startup and Root Menu stills without changing playback behavior.
-
-#### Outcome:
-
-Source `ac13724` retains every filtered byte and existing publication decision while logging at most the first 256 post-filter bytes plus bounded parsed sequence-header, sequence-extension, picture-header and picture-coding-extension fields for each successful initial random-access group.  A focused production-translation-unit regression proves the collector extracts 720x480 sequence, I-picture and raw extension fields without changing one input byte; the existing terminal-still regressions additionally prove the emitted picture bytes remain exact.  Strict native compilation and DVD random-access, menu-hop, reserve, staging, overlay, SPU, Program Stream seek, audio seek/UI/visualizer and private-audio/LPCM-skip suites pass, as do Address/Undefined sanitizers, GCC analyzer, native static build and the MP3/WAV/FLAC/Ogg real-helper seek/visualizer suite against both native and ARM executables.  The local static stripped ARMv7 diagnostic helper `host/build/MediaPlayer_Helper_H262Diag_ac13724` is 966,052 bytes with SHA-256 `15dc2ddb7d55fedac950ac3ce7401d56340a2d032edda45c1578c3cd04f986a1`; its capabilities match the accepted helper.  No decoder, Main, RBF, visualizer, media byte or scheduling behavior changed.
-
-#### Next Steps:
-
-Install only `host/build/MediaPlayer_Helper_H262Diag_ac13724` as `/media/fat/linux/MediaPlayer_Helper`, enable telemetry, start The Big Lebowski and leave its failed startup visible briefly, then press Root Menu once and leave that failed screen visible briefly.  Return the updated results folder; its log should contain two `H262 restart diagnostic` prefixes and two `H262 restart fields` records, allowing the exact common byte-187/188 decoder rejection to be identified before any compatibility normalization is proposed.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
 
 #### Status:
 
