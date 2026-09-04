@@ -157,10 +157,14 @@ The `cdda:` route is separate from `media_source` because an Audio CD is not a
 mounted byte-stream file. It opens the absolute optical-device path with
 `O_NONBLOCK`, inventories track and lead-out LBAs with the Linux CD-ROM TOC
 controls, drops data-track spans, and concatenates the remaining audio spans
-into one sample-frame timeline. Bounded `CDROMREADAUDIO` requests fetch up to
-eight 2,352-byte sectors and retry one sector when a drive rejects the larger
-request. Each sector contributes 588 interleaved 16-bit stereo frames at
-44.1 kHz to the existing PCM writer; no MPEG or FPGA audio decoder is involved.
+into one sample-frame timeline. The same filtered inventory supplies physical
+track numbers to the audio UI. Its six-row window selects the current track,
+targets the fourth row when there is room on both sides, clamps at either list
+boundary and refreshes after natural playback crossings or existing clean
+reposition barriers. Bounded `CDROMREADAUDIO` requests fetch up to eight
+2,352-byte sectors and retry one sector when a drive rejects the larger request.
+Each sector contributes 588 interleaved 16-bit stereo frames at 44.1 kHz to the
+existing PCM writer; no MPEG or FPGA audio decoder is involved.
 
 The non-menu direct optical backend retains one authenticated libdvdnav session
 across signature and stream preflight rewinds. Only after preflight, a producer
@@ -285,14 +289,16 @@ its 224-by-200-raster-pixel artwork box is physically square at the mode's 8:9
 pixel aspect, and every album, metadata, playlist, transport, time and progress
 placeholder remains inside a 32-pixel horizontal and approximately 24-pixel
 vertical CRT-safe margin. A fixed bitmap font is part of the renderer; it does
-not parse tags, artwork or playlists. Once miniaudio has established the exact
-output-frame length, a one-time consumer callback configures that length in the
-renderer. The bar and elapsed/remaining counters use the absolute output-frame
-position, project it to the next one-hertz publication and rescale together
-after every fixed seek. Elapsed, total track and remaining time occupy three
-independently centered fields on the same baseline. Elapsed time truncates
-completed seconds; the fixed total and changing remaining time round a partial
-second up. At successful track completion the helper
+not parse tags, artwork or file playlists. Audio CD playback separately gives
+it the filtered TOC track numbers and active physical track, which it renders as
+`TRACK 01`-style rows at the existing scale. Once miniaudio or CDDA has
+established the exact output-frame length, a one-time consumer callback
+configures that length in the renderer. The bar and elapsed/remaining counters
+use the absolute output-frame position, project it to the next one-hertz
+publication and rescale together after every fixed seek. Elapsed, total track
+and remaining time occupy three independently centered fields on the same
+baseline. Elapsed time truncates completed seconds; the fixed total and changing
+remaining time round a partial second up. At successful track completion the helper
 drains the already-open projected final frame from its current record boundary
 through one commit, producing full progress and zero remaining time without a
 nested frame start.

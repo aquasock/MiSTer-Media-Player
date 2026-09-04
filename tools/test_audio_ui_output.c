@@ -422,6 +422,90 @@ static unsigned overlay_pixel(const uint8_t *plane, unsigned x, unsigned y)
     return (plane[pixel >> 2] >> (6u - (pixel & 3u) * 2u)) & 3u;
 }
 
+static int overlay_digit_matches(const uint8_t *plane, unsigned x, unsigned y,
+                                 char digit, unsigned foreground)
+{
+    const uint8_t *rows = time_glyph_rows(digit);
+    unsigned row;
+
+    if (!rows)
+        return 0;
+    for (row = 0; row < 7u; ++row) {
+        unsigned column;
+
+        for (column = 0; column < 5u; ++column) {
+            unsigned expected = rows[row] & (1u << (4u - column)) ?
+                                foreground : 1u;
+            unsigned sy;
+
+            for (sy = 0; sy < 2u; ++sy) {
+                unsigned sx;
+
+                for (sx = 0; sx < 2u; ++sx) {
+                    if (overlay_pixel(plane, x + column * 2u + sx,
+                                      y + row * 2u + sy) != expected)
+                        return 0;
+                }
+            }
+        }
+    }
+    return 1;
+}
+
+static int run_playlist_window(void)
+{
+    static const unsigned tracks[] = {
+        1u, 3u, 4u, 5u, 7u, 9u, 10u, 12u, 15u, 18u
+    };
+    static const unsigned invalid_tracks[] = {1u, 3u, 3u};
+    struct audio_ui *ui = NULL;
+    uint8_t *plane = malloc(AUDIO_UI_OVERLAY_BYTES);
+    int failed = 0;
+
+    if (!plane || audio_ui_create(&ui) < 0 ||
+        audio_ui_set_track_length(ui, 100u * 44100u, 44100u) < 0 ||
+        audio_ui_set_playlist(ui, tracks,
+                              sizeof(tracks) / sizeof(tracks[0]), 9u) < 0 ||
+        audio_ui_render_overlay(ui, 0, plane, AUDIO_UI_OVERLAY_BYTES) < 0) {
+        free(plane);
+        audio_ui_destroy(ui);
+        return 1;
+    }
+
+    /* Track 09 is row three, with Track 04 at the top of the window. */
+    failed |= !overlay_digit_matches(plane, 366u, 88u, '0', 2u);
+    failed |= !overlay_digit_matches(plane, 378u, 88u, '4', 2u);
+    failed |= !overlay_digit_matches(plane, 366u, 214u, '0', 3u);
+    failed |= !overlay_digit_matches(plane, 378u, 214u, '9', 3u);
+
+    if (audio_ui_set_current_track(ui, 1u) < 0 ||
+        audio_ui_render_overlay(ui, 0, plane, AUDIO_UI_OVERLAY_BYTES) < 0)
+        failed = 1;
+    failed |= !overlay_digit_matches(plane, 366u, 88u, '0', 3u);
+    failed |= !overlay_digit_matches(plane, 378u, 88u, '1', 3u);
+    failed |= !overlay_digit_matches(plane, 366u, 130u, '0', 2u);
+    failed |= !overlay_digit_matches(plane, 378u, 130u, '3', 2u);
+
+    if (audio_ui_set_current_track(ui, 18u) < 0 ||
+        audio_ui_render_overlay(ui, 0, plane, AUDIO_UI_OVERLAY_BYTES) < 0)
+        failed = 1;
+    failed |= !overlay_digit_matches(plane, 366u, 88u, '0', 2u);
+    failed |= !overlay_digit_matches(plane, 378u, 88u, '7', 2u);
+    failed |= !overlay_digit_matches(plane, 366u, 298u, '1', 3u);
+    failed |= !overlay_digit_matches(plane, 378u, 298u, '8', 3u);
+
+    failed |= audio_ui_set_current_track(ui, 2u) == 0;
+    failed |= audio_ui_set_playlist(ui, invalid_tracks, 3u, 1u) == 0;
+    free(plane);
+    audio_ui_destroy(ui);
+    if (failed) {
+        fputs("audio UI playlist window mismatch\n", stderr);
+        return 1;
+    }
+    puts("audio UI playlist PASS labels=physical selection=live window=6");
+    return 0;
+}
+
 static int run_overlay_quantization(void)
 {
     struct audio_ui *ui = NULL;
@@ -469,6 +553,8 @@ int main(int argc, char **argv)
     if (run_large_progress() != 0)
         return 1;
     if (run_overlay_quantization() != 0)
+        return 1;
+    if (run_playlist_window() != 0)
         return 1;
     return 0;
 }

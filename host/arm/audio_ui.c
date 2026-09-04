@@ -35,6 +35,7 @@ enum audio_ui_state {
 
 struct audio_ui {
     uint8_t *frame;
+    uint8_t playlist_tracks[AUDIO_UI_MAX_PLAYLIST_TRACKS];
     size_t offset;
     unsigned chunk_index;
     unsigned sequence;
@@ -42,6 +43,8 @@ struct audio_ui {
     uint64_t position_pcm_frames;
     uint64_t length_pcm_frames;
     uint64_t frame_start_pcm;
+    unsigned playlist_count;
+    unsigned playlist_selected;
     int service_started;
     enum audio_ui_state state;
 };
@@ -312,25 +315,55 @@ static void render_frame(struct audio_ui *ui)
     draw_text(ui, 46, 280, "ARTIST: ---", 2, UI_TEXT_Y);
     draw_text(ui, 46, 310, "ALBUM: ---", 2, UI_TEXT_Y);
 
-    /* Right column: a static playlist reservation with one neutral selection. */
+    /* Right column: six visible playlist rows at the established text scale. */
     fill_rect(ui, 272, 24, 416, 328, UI_PANEL_Y, UI_CB, UI_CR);
     border_rect(ui, 272, 24, 416, 328, 2,
                 UI_ACCENT_Y, UI_ACCENT_CB, UI_ACCENT_CR);
     draw_text(ui, 288, 40, "CURRENT PLAYLIST", 2, UI_TEXT_Y);
     fill_rect(ui, 288, 64, 384, 2, UI_MUTED_Y, UI_CB, UI_CR);
-    fill_rect(ui, 282, 76, 396, 34, UI_PANEL_ALT_Y, UI_CB, UI_CR);
-    for (row = 0; row < 6u; ++row) {
+    if (ui->playlist_count) {
+        unsigned first = ui->playlist_selected > 3u ?
+                         ui->playlist_selected - 3u : 0u;
+
+        if (first + 6u > ui->playlist_count)
+            first = ui->playlist_count > 6u ?
+                    ui->playlist_count - 6u : 0u;
+        for (row = 0; row < 6u; ++row) {
+            unsigned index = first + row;
+            unsigned y = 88u + row * 42u;
+
+            if (index < ui->playlist_count) {
+                char track[24];
+                int selected = index == ui->playlist_selected;
+
+                if (selected)
+                    fill_rect(ui, 282, y - 12u, 396, 34,
+                              UI_PANEL_ALT_Y, UI_CB, UI_CR);
+                (void)snprintf(track, sizeof(track), "TRACK %02u",
+                               (unsigned)ui->playlist_tracks[index]);
+                draw_text(ui, 294, y, track, 2,
+                          selected ? UI_TEXT_Y : UI_MUTED_Y);
+            }
+            if (row != 5u)
+                fill_rect(ui, 288, y + 20u, 384, 1,
+                          UI_TRACK_Y, UI_CB, UI_CR);
+        }
+    } else {
         static const char *const tracks[] = {
             "01  TRACK TITLE", "02  TRACK TITLE", "03  TRACK TITLE",
             "04  TRACK TITLE", "05  TRACK TITLE", "06  TRACK TITLE"
         };
-        unsigned y = 88u + row * 42u;
 
-        draw_text(ui, 294, y, tracks[row], 2,
-                  row ? UI_MUTED_Y : UI_TEXT_Y);
-        if (row != 5u)
-            fill_rect(ui, 288, y + 20u, 384, 1,
-                      UI_TRACK_Y, UI_CB, UI_CR);
+        fill_rect(ui, 282, 76, 396, 34, UI_PANEL_ALT_Y, UI_CB, UI_CR);
+        for (row = 0; row < 6u; ++row) {
+            unsigned y = 88u + row * 42u;
+
+            draw_text(ui, 294, y, tracks[row], 2,
+                      row ? UI_MUTED_Y : UI_TEXT_Y);
+            if (row != 5u)
+                fill_rect(ui, 288, y + 20u, 384, 1,
+                          UI_TRACK_Y, UI_CB, UI_CR);
+        }
     }
 
     /* Transport plus the absolute track-relative time display. */
@@ -404,6 +437,55 @@ int audio_ui_set_track_length(struct audio_ui *ui,
     ui->position_pcm_frames = projected_position(ui, 0);
     render_frame(ui);
     return 0;
+}
+
+int audio_ui_set_playlist(struct audio_ui *ui,
+                          const unsigned *track_numbers,
+                          unsigned track_count,
+                          unsigned current_track)
+{
+    unsigned selected = track_count;
+    unsigned index;
+
+    if (!ui || !track_numbers || !track_count ||
+        track_count > AUDIO_UI_MAX_PLAYLIST_TRACKS)
+        return -1;
+    for (index = 0; index < track_count; ++index) {
+        if (!track_numbers[index] || track_numbers[index] > 99u ||
+            (index && track_numbers[index] <= track_numbers[index - 1u]))
+            return -1;
+        if (track_numbers[index] == current_track)
+            selected = index;
+    }
+    if (selected == track_count)
+        return -1;
+    for (index = 0; index < track_count; ++index)
+        ui->playlist_tracks[index] = (uint8_t)track_numbers[index];
+    ui->playlist_count = track_count;
+    ui->playlist_selected = selected;
+    if (ui->state == AUDIO_UI_BEGIN)
+        render_frame(ui);
+    return 0;
+}
+
+int audio_ui_set_current_track(struct audio_ui *ui,
+                               unsigned current_track)
+{
+    unsigned index;
+
+    if (!ui || !ui->playlist_count)
+        return -1;
+    for (index = 0; index < ui->playlist_count; ++index) {
+        if (ui->playlist_tracks[index] != current_track)
+            continue;
+        if (ui->playlist_selected == index)
+            return 0;
+        ui->playlist_selected = index;
+        if (ui->state == AUDIO_UI_BEGIN)
+            render_frame(ui);
+        return 0;
+    }
+    return -1;
 }
 
 int audio_ui_service(struct audio_ui *ui, uint64_t emitted_pcm_frames,

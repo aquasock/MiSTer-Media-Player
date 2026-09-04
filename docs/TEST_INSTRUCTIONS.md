@@ -70,12 +70,17 @@ playback replaces it.
 
 1. Insert a standard Audio CD, choose `Load Physical Disc`, then `Audio CD`.
    Require the audio UI and clean 44.1 kHz stereo playback from the first audio
-   track.
+   track. Require the playlist to show the disc as `TRACK 01`, `TRACK 02`, and
+   so on, with the playing row selected.
 2. Test a mixed-mode disc where available. Data tracks must be skipped and must
    never be emitted as noise.
 3. Press P/N or player-one Left/Right to move between audio tracks. Previous
    restarts the current track after three seconds or selects the preceding
-   audio track near its start; Next selects the following audio track.
+   audio track near its start; Next selects the following audio track. Require
+   the selected playlist row to follow every change without changing the
+   existing key behavior. On a disc with more than six tracks, require the list
+   to scroll and keep the playing track on the fourth visible row except near
+   the beginning or end, where the window must stop at the list boundary.
 4. Exercise the fixed-time keyboard seeks, then let the overlay clear and press
    Space once. Require the player UI to reappear before audio and visualizer
    stop, with the next press resuming both and restarting the ten-second

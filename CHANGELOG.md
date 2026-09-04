@@ -8,6 +8,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Populated the Audio CD player playlist from the drive TOC with `TRACK 01`-style
+  labels. The playing track is selected across natural boundaries, previous or
+  next track changes and fixed seeks, while a six-row window keeps it near the
+  vertical center when list boundaries permit; controls are unchanged.
 - Changed standalone-audio pause ordering so the first Space or Start press
   reveals the player overlay, drains that in-band style update, and only then
   holds audio and visualizer transport at a helper/Main pause barrier. Resume

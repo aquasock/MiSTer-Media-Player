@@ -31,7 +31,8 @@ v0.9.0 provides:
 - a standalone-audio 720x480p interface rendered by the ARM helper, with a
   full-screen 4:3 CRT-safe layout reserving album-art, metadata and playlist
   regions and implementing transport, elapsed, total, remaining and progress
-  presentation;
+  presentation; Audio CD playback fills the playlist with numbered TOC tracks
+  and follows the active track in a six-row scrolling window;
 - an optional legal-H.262 visualizer pack: its seamless MPEG-2 loop is the idle
   background whenever the core is loaded, DVD or MPEG-2 media replaces it,
   and standalone audio overlays its translucent player interface for ten
@@ -62,7 +63,7 @@ The supported subset is intentionally bounded while the architecture is being pr
 | Audio passthrough | AC-3 and DTS carried to S/PDIF as IEC 61937 bursts for an external decoder. DTS is passthrough only; there is no DTS decoder |
 | Audio output | A menu option selects HDMI or S/PDIF. The unused output is muted, because both are fed from one stereo stream |
 | Audio buffering | Packed signed PCM records into an 8,192-frame stereo FPGA FIFO |
-| Audio-only display | ARM-rendered planar 720x480 YCbCr 4:2:0, transferred in bounded records to an inactive DDR frame bank and published atomically at a safe frame boundary. The CRT-safe 4:3 layout reserves album art, title/artist/album metadata, playlist, transport and time fields and tracks absolute file-relative progress at one-hertz resolution |
+| Audio-only display | ARM-rendered planar 720x480 YCbCr 4:2:0, transferred in bounded records to an inactive DDR frame bank and published atomically at a safe frame boundary. The CRT-safe 4:3 layout reserves album art, title/artist/album metadata, playlist, transport and time fields and tracks absolute file-relative progress at one-hertz resolution. Audio CDs show their TOC entries as numbered tracks and select the playing track in a six-row scrolling window |
 | Frame storage | Retained planar MiSTer DDR3 I/P banks and separate B scratch storage; native all-I overlap uses a bounded three-region ordinary frame queue |
 | Video output | Native 720x480p at 60000/1001 for supported progressive input, or native 720x480i at 30000/1001 for supported interlaced input. The isolated patched Main also has an experimental NTSC-only direct-HDMI 480i path for HDMI-to-SDI testing |
 
@@ -161,8 +162,12 @@ consume FPGA M10K memory.
 
 For Audio CD, the helper reads the disc table of contents, skips data tracks on
 mixed-mode media and presents all audio tracks as one 44.1 kHz stereo timeline
-in the existing standalone-audio player. No filesystem mount or extracted audio
-files are required. Audio CD image files are not currently supported.
+in the existing standalone-audio player. The playlist shows `TRACK 01`-style
+labels from the physical TOC numbers, follows natural track boundaries and
+updates immediately for previous, next and fixed-time seeks. It keeps the
+playing entry on the fourth of six visible rows when both list boundaries allow.
+No filesystem mount or extracted audio files are required. Audio CD image files
+are not currently supported.
 
 The current menu provides a `Load Physical Disc` submenu for direct Video DVD
 or Audio CD playback, a `Load Disc Image` submenu whose `Video DVD` choice opens
@@ -413,7 +418,7 @@ for the current workflow.
   offset correction, CD-Text or metadata lookup.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
-- The standalone-audio screen contains a CRT-safe 4:3 composition for album artwork, title/artist/album tags, the current playlist, transport controls, centered elapsed/total/remaining time and a duration-relative progress bar. Track timing, fixed keyboard seeking and absolute progress tracking are active; artwork, metadata, playlist entries, playlist summary fields, arbitrary-position scrubbing and FPGA-aware pause state remain later display boundaries.
+- The standalone-audio screen contains a CRT-safe 4:3 composition for album artwork, title/artist/album tags, the current playlist, transport controls, centered elapsed/total/remaining time and a duration-relative progress bar. Track timing, fixed keyboard seeking, absolute progress tracking and numbered Audio CD playlist entries are active; ordinary audio-file playlist entries, artwork, metadata, playlist summary fields, arbitrary-position scrubbing and FPGA-aware pause state remain later display boundaries.
 - The optional `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` asset is generated with `python3 tools/generate-audio-visualizer.py host/build/MediaPlayer_Visualizer.mmpvis`. Version two contains eight steady grades plus seven rising and seven falling adjacent-grade streams, all aligned as interlaced top-field-first, three-picture closed GOPs rather than malformed decoder input. The helper rejects progressive or otherwise incompatible packs, sends one matching-phase GOP at a time, applies RMS hysteresis and a one-level-per-GOP slew, and uses a dedicated transition GOP to crossfade each rise or fall over three frames. Version-one stepped packs remain accepted. Video admission remains limited to 4 KiB between PCM records. The two-bit player overlay uses a transparent background, a translucent dark panel and opaque text and borders; while it is present, the loop is capped at grade three. The helper clears that overlay after ten playback seconds without input, restores the full zero-through-seven brightness range without changing the GOP cadence, and restores the capped overlay before standalone-audio pause or on seek activity. Pause stops the emitted-audio clock, so the new ten-second interval begins advancing only after resume. The fixed thresholds do not provide per-track automatic gain.
 - Progressive 4:2:0 video is supported through 720x480 and decodes I, P and B
   pictures. v0.9.0 also supports 720x480-at-30000/1001

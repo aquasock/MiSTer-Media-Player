@@ -105,6 +105,9 @@ def main() -> int:
         "MEDIA_PLAYER_CONTROL_SEEK_CONTINUE",
         "cdda_complete_reposition",
         "audio_pause_barrier(output, control->control_fd,",
+        "audio_ui_set_playlist(output->audio_ui, playlist_tracks, track_count,",
+        "audio_ui_set_current_track(",
+        "cdda_reader_track_number(reader, track)",
     )
     for marker in helper_markers:
         require(marker in helper, f"missing helper Audio CD contract: {marker}")

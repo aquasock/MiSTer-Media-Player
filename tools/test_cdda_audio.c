@@ -158,6 +158,13 @@ static int test_disc_layout_and_reads(void)
         return failed | 1;
     failed |= require(cdda_reader_track_count(reader) == 3,
                       "data track was not skipped");
+    failed |= require(cdda_reader_track_number(reader, 0) == 1 &&
+                          cdda_reader_track_number(reader, 1) == 3 &&
+                          cdda_reader_track_number(reader, 2) == 4,
+                      "ordered physical audio-track numbers are wrong");
+    failed |= require(cdda_reader_track_number(reader, 3) == 0 &&
+                          cdda_reader_track_number(NULL, 0) == 0,
+                      "invalid track-number query did not return zero");
     failed |= require(cdda_reader_length_frames(reader) ==
                           900u * CDDA_PCM_FRAMES_PER_SECTOR,
                       "concatenated audio duration is wrong");

@@ -234,6 +234,13 @@ unsigned cdda_reader_track_count(const struct cdda_reader *reader)
     return reader ? reader->track_count : 0;
 }
 
+unsigned cdda_reader_track_number(const struct cdda_reader *reader,
+                                  unsigned index)
+{
+    return reader && index < reader->track_count ?
+           reader->tracks[index].number : 0;
+}
+
 static unsigned track_index_for_sector(const struct cdda_reader *reader,
                                        uint64_t sector)
 {

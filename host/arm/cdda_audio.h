@@ -28,6 +28,8 @@ void cdda_reader_close(struct cdda_reader *reader);
 uint64_t cdda_reader_length_frames(const struct cdda_reader *reader);
 uint64_t cdda_reader_position_frames(const struct cdda_reader *reader);
 unsigned cdda_reader_track_count(const struct cdda_reader *reader);
+unsigned cdda_reader_track_number(const struct cdda_reader *reader,
+                                  unsigned index);
 unsigned cdda_reader_current_track(const struct cdda_reader *reader);
 
 int cdda_reader_seek_frame(struct cdda_reader *reader, uint64_t frame);

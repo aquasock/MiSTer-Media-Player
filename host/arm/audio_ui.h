@@ -10,6 +10,7 @@
     (AUDIO_UI_WIDTH * AUDIO_UI_HEIGHT * 3u / 2u)
 #define AUDIO_UI_DATA_BYTES 4096u
 #define AUDIO_UI_OVERLAY_BYTES ((AUDIO_UI_WIDTH * AUDIO_UI_HEIGHT) / 4u)
+#define AUDIO_UI_MAX_PLAYLIST_TRACKS 99u
 
 struct audio_ui;
 
@@ -22,6 +23,13 @@ void audio_ui_destroy(struct audio_ui *ui);
 int audio_ui_set_track_length(struct audio_ui *ui,
                               uint64_t length_pcm_frames,
                               unsigned rate_hz);
+
+int audio_ui_set_playlist(struct audio_ui *ui,
+                          const unsigned *track_numbers,
+                          unsigned track_count,
+                          unsigned current_track);
+int audio_ui_set_current_track(struct audio_ui *ui,
+                               unsigned current_track);
 
 /*
  * Service at a PCM-record boundary. At most one bounded display record is

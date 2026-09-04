@@ -4630,6 +4630,14 @@ static int cdda_complete_reposition(struct cdda_reader *reader,
         return -1;
     }
     if (state->output->audio_ui &&
+        audio_ui_set_current_track(
+            state->output->audio_ui,
+            cdda_reader_current_track(reader)) < 0) {
+        fprintf(stderr,
+                "media_player_helper: cannot select Audio CD UI track\n");
+        return -1;
+    }
+    if (state->output->audio_ui &&
         audio_ui_seek(state->output->audio_ui,
                       state->output->pcm_emitted_frames,
                       CDDA_SAMPLE_RATE_HZ, target_frame) < 0) {
@@ -4675,6 +4683,9 @@ static int process_cdda_stream(const char *source_specification,
     const char *path = source_specification +
                        strlen(MEDIA_PLAYER_CDDA_PREFIX);
     uint64_t length_frames;
+    unsigned playlist_tracks[AUDIO_UI_MAX_PLAYLIST_TRACKS];
+    unsigned track_count;
+    unsigned track;
     int16_t pcm[2048u * CDDA_CHANNELS];
     char error[192];
     int result = -1;
@@ -4684,6 +4695,18 @@ static int process_cdda_stream(const char *source_specification,
         return -1;
     }
     length_frames = cdda_reader_length_frames(reader);
+    track_count = cdda_reader_track_count(reader);
+    if (track_count > AUDIO_UI_MAX_PLAYLIST_TRACKS)
+        goto done;
+    for (track = 0; track < track_count; ++track)
+        playlist_tracks[track] = cdda_reader_track_number(reader, track);
+    if (output->audio_ui &&
+        audio_ui_set_playlist(output->audio_ui, playlist_tracks, track_count,
+                              cdda_reader_current_track(reader)) < 0) {
+        fprintf(stderr,
+                "media_player_helper: cannot configure Audio CD playlist\n");
+        goto done;
+    }
     output->audio_only_mode = 1;
     output->hold_active = 0;
     output->scheduler_started = 1;
@@ -4701,6 +4724,15 @@ static int process_cdda_stream(const char *source_specification,
         int command = control->control_fd >= 0 ?
                       control_read_command(control->control_fd) : 0;
         int seconds = 0;
+
+        if (output->audio_ui &&
+            audio_ui_set_current_track(
+                output->audio_ui,
+                cdda_reader_current_track(reader)) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: cannot update Audio CD UI track\n");
+            goto done;
+        }
 
         if (command < 0)
             goto done;
