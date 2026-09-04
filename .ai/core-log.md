@@ -1,3 +1,35 @@
+## 973 COMMIT Unreleased ??? 2026-09-04T04:34:35-07:00
+
+#### Coming From:
+
+Unreleased 8a86b77
+
+#### Purpose:
+
+Prevent deferred same-menu DVD activations from deadlocking behind the initial random-access filter and video-queue bound.
+
+#### Outcome:
+
+Implement one helper-only activation boundary that preserves the existing 2 MiB runaway guard and the 8 MiB staging capacity.  A staged activation that remains in menu space and qualifies an independent sequence-header, I-picture and following-reference startup group will retain its established motion-menu decoder barrier, while a staged activation that reaches queue pressure without qualifying that group will be released as a context-preserving continuation through the resident decoder and acknowledged without resetting Main.  A menu-to-title transition will continue to cancel staged menu output and request the existing decoder barrier before title payload.  Main, the H.262 decoder, protocol, visualizer and RBF will remain unchanged.
+
+#### Next Steps:
+
+Add a production-translation-unit regression that starts a real pending activation, feeds more than the queue bound without an independent restart group, proves the bytes and records reach the live continuation path without overflow, and verifies the continuation acknowledgment.  Retain controls for restart-qualified staged motion menus, finite and indefinite stills, overlay-only continuation and title launch; run strict optimized, sanitizer, analyzer, DVD, audio and integration suites, then build and verify one static ARMv7 helper locally for Simpsons and Futurama hardware testing.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 972 COMMIT Unreleased 8a86b77 2026-09-04T04:31:41-07:00
 
 #### Coming From:
@@ -1254,35 +1286,6 @@ Install only `host/build/MediaPlayer_Helper_H262Diag_ac13724` as `/media/fat/lin
 - host/arm/ARCHITECTURE.md
 - host/arm/media_player_helper.c
 - tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 933 COMMIT Unreleased 932dc22 2026-09-02T23:59:04-07:00
-
-#### Coming From:
-
-Unreleased 932dc22
-
-#### Purpose:
-
-Determine whether Root Menu recovers The Big Lebowski's failed startup or independently reproduces its decoder rejection.
-
-#### Outcome:
-
-Root Menu performs a genuine second navigation attempt rather than merely redisplaying the first latched telemetry state.  At 113.253892 seconds Main sends command `0x09`; libdvdnav reports a successful root hop, the helper enters the menu, discards 4,180,090 reserved bytes, returns READY at 113.302508 seconds and releases the reset/GO barrier at 113.313835 seconds.  The destination then reaches its authored 15-second menu still and terminal-finalizes a new group with sequence offset 0, I-picture offset 170 and next reference offset 128,368.  The new checksum-valid schema-21 snapshot nevertheless records the same H.262 syntax flag `0x0001`, only 188 accepted bytes, and zero completed, displayed or reference pictures and swaps; the preceding independent startup snapshot failed at 187 bytes with the same sequence and I-picture offsets.  The helper remains alive, continues publishing menu highlights and has supplied 870,570,274 bytes by the 370.83-second capture endpoint, proving that the reset succeeds but both authored stills share an early H.262 construct rejected by the decoder.  Therefore entry 932's proposed non-menu-only gating could avoid the first failure but cannot make this root menu work and must not be shipped as the complete correction.  The 6,131,013-byte log, 1,451-byte barcode screenshot and 376-byte sidecar have SHA-256 `0334960b4723a0f4559d11ed89d3d660f916d109f574f8a3160896a7b17081e7`, `cd46075c074321026dd213f5514271b5502899e3325397b9f9e37bd0cc6f71a0` and `a720e6a6355b778971f8138b56e9940e55045d21babde553343919f9cb1d6c46`.  No runtime source was changed.
-
-#### Next Steps:
-
-Do not implement the entry-932 gating alone.  After user approval, make one diagnostic helper build that logs a bounded byte-exact prefix and parsed sequence, picture and extension fields for each initial random-access group before publication, without changing the bytes, decoder, Main, RBF, visualizer or timing.  Reproduce Big Lebowski startup and Root Menu once with that helper, identify the exact common construct at the 187/188-byte boundary against the frontend's 22 syntax-source checks, and then propose the narrowest helper-side compatibility normalization that preserves ordinary DVD streams and all accepted Blazing Saddles and Coming to America menu behavior.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
