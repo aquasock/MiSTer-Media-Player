@@ -10,7 +10,9 @@
 
 #define TEST_GOPS 2u
 #define TEST_GOP_BYTES 48u
-#define TEST_ENTRIES (AUDIO_VISUALIZER_LEVELS * TEST_GOPS)
+#define TEST_VARIANTS (AUDIO_VISUALIZER_LEVELS + \
+                       2u * (AUDIO_VISUALIZER_LEVELS - 1u))
+#define TEST_ENTRIES (TEST_VARIANTS * TEST_GOPS)
 #define TEST_FILE_BYTES (32u + TEST_ENTRIES * 8u + \
                          TEST_ENTRIES * TEST_GOP_BYTES)
 
@@ -84,20 +86,23 @@ int main(void)
     char error[128];
     size_t index;
     uint32_t offset = 32u + TEST_ENTRIES * 8u;
-    static const unsigned covered_attack[] = {1, 2, 3, 3, 3, 3, 3, 3};
-    static const unsigned revealed_attack[] = {4, 5, 6, 7};
-    static const unsigned decay[] = {6, 5, 4, 3, 2, 1, 0, 0};
-    static const unsigned rise_to_two[] = {1, 2};
+    static const unsigned covered_attack[] = {8, 9, 10, 3, 3, 3, 3, 3};
+    static const unsigned revealed_attack[] = {11, 12, 13, 14};
+    static const unsigned decay[] = {21, 20, 19, 18, 17, 16, 15, 0};
+    static const unsigned rise_to_two[] = {8, 9};
     static const unsigned level_two[] = {2};
+    static const unsigned rise_to_three[] = {10};
     static const unsigned level_three[] = {3};
-    static const unsigned covered_recovery[] = {3, 3};
+    static const unsigned fall_to_two[] = {17};
+    static const unsigned covered_recovery[] = {10, 3};
+    static const unsigned legacy_attack[] = {1, 2};
     int fd = mkstemp(path);
     FILE *stream;
 
     if (fd < 0)
         return 1;
     memcpy(file, "MMPVIS1\0", 8);
-    put32(file + 8, 1);
+    put32(file + 8, AUDIO_VISUALIZER_PACK_VERSION_CROSSFADE);
     put32(file + 12, AUDIO_VISUALIZER_LEVELS);
     put32(file + 16, TEST_GOPS);
     put32(file + 20, 1); put32(file + 24, 30000); put32(file + 28, 1001);
@@ -150,13 +155,13 @@ int main(void)
     if (expect_levels(visualizer, &capture, 480000, level_two, 1) < 0)
         return 1;
     analyze_many(visualizer, loud, 2048, 1600, 64);
-    if (expect_levels(visualizer, &capture, 480000, level_three, 1) < 0)
+    if (expect_levels(visualizer, &capture, 480000, rise_to_three, 1) < 0)
         return 1;
     analyze_many(visualizer, loud, 2048, 1250, 64);
     if (expect_levels(visualizer, &capture, 480000, level_three, 1) < 0)
         return 1;
     analyze_many(visualizer, loud, 2048, 1200, 64);
-    if (expect_levels(visualizer, &capture, 480000, level_two, 1) < 0)
+    if (expect_levels(visualizer, &capture, 480000, fall_to_two, 1) < 0)
         return 1;
 
     analyze_many(visualizer, loud, 2048, 16000, 2);
@@ -182,6 +187,21 @@ int main(void)
         return 1;
     audio_visualizer_destroy(visualizer);
 
+    put32(file + 8, AUDIO_VISUALIZER_PACK_VERSION_STEPPED);
+    stream = fopen(path, "wb");
+    if (!stream || fwrite(file, 1, sizeof(file), stream) != sizeof(file) ||
+        fclose(stream) != 0 ||
+        audio_visualizer_create(&visualizer, path, error, sizeof(error)) < 0)
+        return 1;
+    capture.writes = 0;
+    analyze_many(visualizer, loud, 2048, 16000, 2);
+    if (expect_levels(visualizer, &capture, 480000, legacy_attack,
+                      sizeof(legacy_attack) / sizeof(legacy_attack[0])) < 0 ||
+        audio_visualizer_level(visualizer) != 2)
+        return 1;
+    audio_visualizer_destroy(visualizer);
+    put32(file + 8, AUDIO_VISUALIZER_PACK_VERSION_CROSSFADE);
+
     file[32u + TEST_ENTRIES * 8u + 13u] |= 0x08u;
     stream = fopen(path, "wb");
     if (!stream || fwrite(file, 1, sizeof(file), stream) != sizeof(file) ||
@@ -192,6 +212,21 @@ int main(void)
     file[32u + TEST_ENTRIES * 8u + 40u] |= 0x80u;
     stream = fopen(path, "wb");
     if (!stream || fwrite(file, 1, sizeof(file), stream) != sizeof(file) ||
+        fclose(stream) != 0 ||
+        audio_visualizer_create(&visualizer, path, error, sizeof(error)) == 0)
+        return 1;
+    file[32u + TEST_ENTRIES * 8u + 40u] &= (uint8_t)~0x80u;
+    put32(file + 8, 99u);
+    stream = fopen(path, "wb");
+    if (!stream || fwrite(file, 1, sizeof(file), stream) != sizeof(file) ||
+        fclose(stream) != 0 ||
+        audio_visualizer_create(&visualizer, path, error, sizeof(error)) == 0)
+        return 1;
+    put32(file + 8, AUDIO_VISUALIZER_PACK_VERSION_CROSSFADE);
+    stream = fopen(path, "wb");
+    if (!stream ||
+        fwrite(file, 1, 32u + TEST_ENTRIES * 8u - 1u, stream) !=
+            32u + TEST_ENTRIES * 8u - 1u ||
         fclose(stream) != 0 ||
         audio_visualizer_create(&visualizer, path, error, sizeof(error)) == 0)
         return 1;

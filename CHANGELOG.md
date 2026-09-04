@@ -8,6 +8,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Replaced whole-GOP audio-visualizer grade steps with version-two transition
+  GOPs. Each adjacent rise or fall now crosses between grades over three
+  frames while preserving the eight-level RMS response, native-interlaced
+  closed-GOP stream safety and compatibility with existing version-one packs.
 - Replaced marker-file optical launching with `Load Physical Disc` and
   `Load Disc Image` submenus. Patched Main now starts physical Video DVD and
   Audio CD media directly, the image submenu exposes only DVD ISO files, and
