@@ -8,6 +8,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Bounded decoded audio during deferred same-menu DVD activations. Low-bitrate
+  menu branches can now commit their resident-context continuation when the
+  existing PCM hold ceiling is reached instead of waiting only for video queue
+  pressure, and automatic-menu sink pacing resumes after the finite activation
+  stage commits.
 - Fixed deferred DVD button activations that remain in menu space and continue
   an existing MPEG-2 sequence without repeating an independently decodable
   startup group. At the existing video-queue guard, the helper now rebases the

@@ -2865,16 +2865,24 @@ static int release_unqualified_menu_activation(
     int control_fd, size_t incoming_size, int incoming_has_record,
     int incoming_has_pts, uint64_t *incoming_pts)
 {
+    int video_pressure;
+    int pcm_pressure;
+    const char *pressure;
     size_t queued;
     size_t staged;
     size_t records;
 
     if (!menu || !menu->activation_pending || !menu->menu_active ||
         !output_stage_active(output->activation_stage) ||
-        !output->iso_start_filter_active ||
-        !video_queue_would_overflow(output, incoming_size,
-                                    incoming_has_record))
+        !output->iso_start_filter_active)
         return 0;
+    video_pressure = video_queue_would_overflow(
+        output, incoming_size, incoming_has_record);
+    pcm_pressure = output->hold_limit &&
+        hold_available(output) >= output->hold_limit;
+    if (!video_pressure && !pcm_pressure)
+        return 0;
+    pressure = pcm_pressure ? "pcm" : "video";
     queued = output->video_queued_bytes;
     if (rebase_unqualified_menu_activation_pts(
             menu, output, incoming_has_pts, incoming_pts) < 0)
@@ -2898,15 +2906,30 @@ static int release_unqualified_menu_activation(
     staged = output_stage_size(output->activation_stage);
     records = output_stage_records(output->activation_stage);
     if (commit_activation_stage(
-            output, "unqualified-random-access-menu-continuation") < 0 ||
-        acknowledge_menu_continuation(
+            output, "unqualified-random-access-menu-continuation") < 0)
+        return -1;
+    /*
+     * Keep fallback pacing out of the finite activation stage.  Once its
+     * exact prefix is live, restore the menu epoch so the existing reserve
+     * drain and hold invariant pace any accumulated PCM against the sink.
+     */
+    if (pcm_pressure && output->hold_active) {
+        output->hold_active = 0;
+        output->scheduler_started = 1;
+        if (hold_emit_frames(output, PCM_INITIAL_RELEASE_FRAMES) < 0)
+            return -1;
+    }
+    output->automatic_menu_epoch = 1;
+    if (acknowledge_menu_continuation(
             menu, control_fd, "unqualified-random-access") < 0)
         return -1;
     fprintf(stderr,
             "media_player_helper: DVD menu activation preserved resident "
-            "decoder context queued=%zu remaining=%zu staged_records=%zu "
-            "staged_bytes=%zu\n",
-            queued, output->video_queued_bytes, records, staged);
+            "decoder context pressure=%s queued=%zu remaining=%zu "
+            "held=%zu hold_limit=%zu staged_records=%zu staged_bytes=%zu\n",
+            pressure,
+            queued, output->video_queued_bytes, hold_available(output),
+            output->hold_limit, records, staged);
     return 1;
 }
 
@@ -3964,6 +3987,8 @@ static int process_pes(struct media_source *input, uint8_t code,
         }
         if (append_audio(audio, output, packet + payload_offset,
                          length - payload_offset) < 0 ||
+            release_unqualified_menu_activation(
+                menu, output, control_fd, 0, 0, 0, NULL) < 0 ||
             (output->scheduler_enabled && scheduler_drain(output, 0) < 0))
             goto done;
     }
@@ -3976,7 +4001,8 @@ done:
 static int process_private_pes(struct media_source *input,
                                struct audio_state *audio,
                                struct output_state *output,
-                               struct dvd_menu_state *menu)
+                               struct dvd_menu_state *menu,
+                               int control_fd)
 {
     uint8_t length_bytes[2];
     uint8_t *packet;
@@ -4107,6 +4133,8 @@ static int process_private_pes(struct media_source *input,
             output->have_audio_pts = 1;
         }
         if (append_audio(audio, output, payload, size) < 0 ||
+            release_unqualified_menu_activation(
+                menu, output, control_fd, 0, 0, 0, NULL) < 0 ||
             (output->scheduler_enabled && scheduler_drain(output, 0) < 0))
             goto done;
         result = 0;
@@ -4166,6 +4194,8 @@ static int process_private_pes(struct media_source *input,
             output->have_audio_pts = 1;
         }
         if (append_audio(audio, output, payload, size) < 0 ||
+            release_unqualified_menu_activation(
+                menu, output, control_fd, 0, 0, 0, NULL) < 0 ||
             (output->scheduler_enabled && scheduler_drain(output, 0) < 0))
             goto done;
         result = 0;
@@ -4556,7 +4586,8 @@ static int process_program_stream(struct media_source *input,
             continue;
         }
         if (code == 0xbd) {
-            if (process_private_pes(input, audio, output, menu) < 0)
+            if (process_private_pes(input, audio, output, menu,
+                                    control_fd) < 0)
                 return -1;
             continue;
         }

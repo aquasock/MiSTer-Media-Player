@@ -794,6 +794,7 @@ static int test_unqualified_menu_activation_continuation(void)
                           !menu.activation_pending &&
                           !menu.activation_prior_pts_valid &&
                           !output.iso_start_filter_active &&
+                          output.automatic_menu_epoch &&
                           !output_stage_active(output.activation_stage) &&
                           output.video_head == NULL &&
                           output.video_queued_bytes == 0 &&
@@ -1046,6 +1047,176 @@ static int compare_fixture_video_and_pcm(FILE *stream,
     return failed ? -1 : 0;
 }
 
+static int test_pcm_pressure_menu_activation_continuation(void)
+{
+    static const uint8_t staged_marker[] = {0x91, 0x82, 0x73, 0x64};
+    static const uint64_t prior_pts = 900000u;
+    static const uint64_t activation_pts = 45000u;
+    static const uint64_t continued_pts = prior_pts + 1u;
+    enum {
+        PAYLOAD_BYTES = 32768,
+        HOLD_LIMIT_FRAMES = 16384,
+        EXTRA_PCM_FRAMES = 4096,
+        TOTAL_PCM_FRAMES = HOLD_LIMIT_FRAMES + EXTRA_PCM_FRAMES,
+        EXPECTED_EMITTED_FRAMES = HOLD_LIMIT_FRAMES -
+            PCM_SCHEDULE_RESERVE_FRAMES + EXTRA_PCM_FRAMES
+    };
+    struct dvd_menu_state menu = {0};
+    struct audio_state audio = {0};
+    struct output_state output = {0};
+    struct media_source input = {0};
+    uint8_t private_pes[] = {
+        0x00, 0x12,
+        0x80, 0x80, 0x05, 0, 0, 0, 0, 0,
+        0x80, 0x00, 0x00, 0x01,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    uint8_t *payload = NULL;
+    uint8_t *expected_video = NULL;
+    int16_t *pcm = NULL;
+    uint8_t event = 0;
+    uint64_t queued_pts = 0;
+    int descriptors[2] = {-1, -1};
+    char input_path[] = "/tmp/mmp-menu-pcm-pressure-XXXXXX";
+    char source_error[128];
+    int input_fd = -1;
+    int input_open = 0;
+    size_t offset;
+    int failed = 0;
+
+    payload = malloc(PAYLOAD_BYTES);
+    expected_video = malloc(sizeof(staged_marker) + 9u + PAYLOAD_BYTES);
+    pcm = malloc((size_t)TOTAL_PCM_FRAMES * 2u * sizeof(*pcm));
+    output.video = tmpfile();
+    failed |= require(payload != NULL && expected_video != NULL &&
+                          pcm != NULL && output.video != NULL &&
+                          pipe(descriptors) == 0,
+                      "could not allocate PCM-pressure activation fixture");
+    if (failed)
+        goto done;
+    memset(payload, 0x55, PAYLOAD_BYTES);
+    for (offset = 0; offset < TOTAL_PCM_FRAMES; ++offset) {
+        pcm[offset * 2u] = (int16_t)(offset * 31u + 7u);
+        pcm[offset * 2u + 1u] = (int16_t)(0x5000u - offset * 19u);
+    }
+    output.hold_limit = HOLD_LIMIT_FRAMES;
+    output.iso_pts_normalization = 1;
+    output.have_iso_video_pts = 1;
+    output.iso_pts_raw_max = prior_pts;
+    output.iso_pts_normalized_max = prior_pts;
+    menu.enabled = 1;
+    menu.menu_active = 1;
+    audio.a52_substream = -1;
+    audio.dts_substream = -1;
+    failed |= require(output_stage_create(&output.activation_stage,
+                                          OUTPUT_ACTIVATION_STAGE_BYTES) == 0 &&
+                          start_pending_menu_activation(
+                              &menu, &audio, &output) == 0,
+                      "could not start PCM-pressure activation stage");
+    failed |= require(write_output_priority(
+                          &output, staged_marker, sizeof(staged_marker),
+                          "PCM-pressure marker") == 0 &&
+                          normalize_video_pts(
+                              &output, activation_pts, &queued_pts) == 0 &&
+                          queue_h262_video(
+                              &output, payload, PAYLOAD_BYTES, 1, 1,
+                              queued_pts) == 0 &&
+                          iso_filter_initial_random_access(&output, 0) == 0 &&
+                          output.iso_start_filter_active &&
+                          !video_queue_would_overflow(&output, 0, 0),
+                      "PCM-pressure fixture reached video pressure");
+    failed |= require(write_pcm(
+                          &output, pcm, HOLD_LIMIT_FRAMES, 2,
+                          PCM_SAMPLE_RATE) == 0 &&
+                          hold_available(&output) == HOLD_LIMIT_FRAMES &&
+                          output.pcm_emitted_frames == 0,
+                      "PCM-pressure fixture did not reach its hold ceiling");
+    encode_pes_pts(private_pes + 5, activation_pts);
+    input_fd = mkstemp(input_path);
+    failed |= require(input_fd >= 0 &&
+                          write(input_fd, private_pes,
+                                sizeof(private_pes)) ==
+                              (ssize_t)sizeof(private_pes) &&
+                          close(input_fd) == 0,
+                      "could not create PCM-pressure AC-3 PES");
+    input_fd = -1;
+    failed |= require(!failed &&
+                          media_source_open(&input, input_path, source_error,
+                                            sizeof(source_error)) ==
+                              MEDIA_SOURCE_OK,
+                      "could not open PCM-pressure AC-3 PES");
+    input_open = !failed;
+    failed |= require(!failed &&
+                          process_private_pes(
+                              &input, &audio, &output, &menu,
+                              descriptors[1]) == 0 &&
+                          !menu.activation_pending &&
+                          !output_stage_active(output.activation_stage) &&
+                          !output.iso_start_filter_active &&
+                          output.automatic_menu_epoch &&
+                          output.scheduler_started && !output.hold_active &&
+                          output.video_head == NULL &&
+                          output.video_queued_bytes == 0 &&
+                          output.max_video_pts == continued_pts &&
+                          output.first_audio_pts == continued_pts &&
+                          output.iso_pts_normalized_max == continued_pts &&
+                          output.iso_pts_epoch_offset ==
+                              continued_pts - activation_pts &&
+                          output.pcm_emitted_frames ==
+                              PCM_INITIAL_RELEASE_FRAMES &&
+                          hold_available(&output) ==
+                              HOLD_LIMIT_FRAMES - PCM_INITIAL_RELEASE_FRAMES,
+                      "PCM pressure did not promptly commit live pacing");
+    failed |= require(read(descriptors[0], &event, sizeof(event)) == 1 &&
+                          event == MEDIA_PLAYER_CONTROL_MENU_CONTINUE,
+                      "PCM-pressure continuation was not acknowledged");
+    failed |= require(write_pcm(
+                          &output,
+                          pcm + (size_t)HOLD_LIMIT_FRAMES * 2u,
+                          EXTRA_PCM_FRAMES, 2, PCM_SAMPLE_RATE) == 0 &&
+                          scheduler_drain(&output, 0) == 0 &&
+                          output.automatic_menu_pcm_fallback &&
+                          output.pcm_emitted_frames ==
+                              EXPECTED_EMITTED_FRAMES &&
+                          hold_available(&output) ==
+                              scheduler_automatic_menu_pcm_watermark(&output) &&
+                          hold_available(&output) < output.hold_limit,
+                      "restored automatic-menu pacing did not bound PCM");
+    failed |= require(flush_h262_video(&output) == 0 &&
+                          scheduler_drain(&output, 0) == 0,
+                      "PCM-pressure continuation did not flush exact video");
+    memcpy(expected_video, staged_marker, sizeof(staged_marker));
+    encode_video_pts(expected_video + sizeof(staged_marker), continued_pts);
+    memcpy(expected_video + sizeof(staged_marker) + 9u,
+           payload, PAYLOAD_BYTES);
+    failed |= require(compare_fixture_video_and_pcm(
+                          output.video, expected_video,
+                          sizeof(staged_marker) + 9u + PAYLOAD_BYTES,
+                          pcm, EXPECTED_EMITTED_FRAMES) == 0,
+                      "PCM-pressure continuation changed output order");
+
+done:
+    if (input_open)
+        media_source_close(&input);
+    if (input_fd >= 0)
+        close(input_fd);
+    unlink(input_path);
+    while (output.video_head)
+        free_video_head(&output);
+    free(output.hold);
+    output_stage_destroy(output.activation_stage);
+    if (output.video)
+        fclose(output.video);
+    if (descriptors[0] >= 0)
+        close(descriptors[0]);
+    if (descriptors[1] >= 0)
+        close(descriptors[1]);
+    free(pcm);
+    free(expected_video);
+    free(payload);
+    return failed;
+}
+
 static int test_automatic_menu_scheduling_epoch(void)
 {
     uint8_t private_pes[] = {
@@ -1193,7 +1364,8 @@ static int test_automatic_menu_scheduling_epoch(void)
     input_open = 1;
     unlink(input_path);
     input_path[0] = '\0';
-    failed |= require(process_private_pes(&input, &audio, &output, NULL) == 0 &&
+    failed |= require(process_private_pes(&input, &audio, &output, NULL,
+                                          -1) == 0 &&
                           audio.codec == AUDIO_CODEC_AC3 &&
                           audio.a52_substream == 0x80 &&
                           audio.size == 6u &&
@@ -1555,6 +1727,8 @@ int main(void)
     if (test_motion_menu_stage_pressure())
         return 1;
     if (test_unqualified_menu_activation_continuation())
+        return 1;
+    if (test_pcm_pressure_menu_activation_continuation())
         return 1;
     if (test_late_audio_after_silent_release())
         return 1;

@@ -82,8 +82,14 @@ without a complete sequence-header, I-picture and following-reference startup
 group, the destination requires the resident decoder context rather than a
 reset. The helper rebases every queued and triggering PTS above the prior live
 epoch, releases the startup filter, drains the exact staged stream through the
-normal audio scheduler, commits it and acknowledges a menu continuation. The
-queue guard and restart-qualified motion-menu barrier remain unchanged. If an
+normal audio scheduler, commits it and acknowledges a menu continuation. A
+low-bitrate branch may reach the existing PCM hold ceiling before that video
+guard; this is an equivalent continuation decision, so the helper commits its
+finite stage first and only then restores the automatic-menu epoch and live
+sink-paced PCM fallback. This prevents drive-speed AC-3 decode from growing the
+hold toward system memory or filling the activation stage while preserving its
+ordered prefix. The queue guard and restart-qualified motion-menu barrier
+remain unchanged. If an
 authored still terminates a sequence-plus-I startup group before a
 later reference picture arrives, the helper uses that explicit end boundary to
 release the independently decodable still picture and appends one H.262
