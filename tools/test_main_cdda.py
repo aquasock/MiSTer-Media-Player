@@ -108,6 +108,7 @@ def main() -> int:
         "audio_ui_set_playlist(output->audio_ui, playlist_tracks, track_count,",
         "audio_ui_set_current_track(",
         "cdda_reader_track_number(reader, track)",
+        "audio_overlay_publish_full(output, current_frame)",
     )
     for marker in helper_markers:
         require(marker in helper, f"missing helper Audio CD contract: {marker}")

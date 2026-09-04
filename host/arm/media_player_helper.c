@@ -4740,6 +4740,13 @@ static int process_cdda_stream(const char *source_specification,
             audio_visualizer_activity(output->visualizer,
                                       output->pcm_emitted_frames);
         } else if (command == MEDIA_PLAYER_CONTROL_PAUSE) {
+            if (output->visualizer &&
+                audio_overlay_publish_full(output, current_frame) < 0) {
+                fprintf(stderr,
+                        "media_player_helper: cannot refresh Audio CD "
+                        "overlay before pause\n");
+                goto done;
+            }
             if (audio_pause_barrier(output, control->control_fd,
                                     CDDA_SAMPLE_RATE_HZ, "Audio CD") < 0)
                 goto done;

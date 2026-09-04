@@ -83,8 +83,10 @@ playback replaces it.
    the beginning or end, where the window must stop at the list boundary.
 4. Exercise the fixed-time keyboard seeks, then let the overlay clear and press
    Space once. Require the player UI to reappear before audio and visualizer
-   stop, with the next press resuming both and restarting the ten-second
-   playback interval. Seeks retain their clean READY/GO reset behavior.
+   stop, with the selected row matching the current track even if the interface
+   had been hidden since an earlier track. The next press must resume both and
+   restart the ten-second playback interval. Seeks retain their clean READY/GO
+   reset behavior.
 5. Let the disc reach the end, press Play to restart it, and confirm that a DVD
    inserted afterward still opens through `Load Physical Disc` then `Video DVD`.
 
