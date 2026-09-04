@@ -1,4 +1,4 @@
-## 969 COMMIT Unreleased ??? 2026-09-04T03:50:52-07:00
+## 969 COMMIT Unreleased 2ab755b 2026-09-04T03:50:52-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Give Audio CD playback track-relative elapsed, remaining and total clocks plus a
 
 #### Outcome:
 
-The user hardware-accepts the source-`04360e9` playlist and requests that the four existing Audio CD time fields stop sharing the concatenated-disc timeline.  This cycle will preserve the helper's absolute CDDA sample cursor for reading and seeking while deriving `ELAPSED`, `REMAIN` and `TOTAL` from the active track's TOC start and length, and will replace the `PLAYLIST --:--` placeholder with the duration of the complete filtered audio program.  Ordinary audio files retain their current file-relative clocks and placeholder playlist summary, and no keyboard, Main, protocol, visualizer-pack, RTL or RBF change is required.
+Source `2ab755b` preserves the absolute concatenated CDDA cursor for reading and seeking but exposes the active audio track's logical start and length from the filtered TOC.  The audio UI atomically carries that window with the selected physical track, so `ELAPSED`, `REMAIN`, the existing `TRACK` total field and the progress bar are track-relative while `PLAYLIST` shows the duration of the complete filtered audio program.  Partial track and album seconds retain the established upward duration rounding, elapsed time retains completed-second truncation, data-track gaps remain excluded, and ordinary audio files retain their file-relative clocks and placeholder playlist summary.  Strict optimized and ASAN/UBSAN reader and pixel tests pass mixed-mode timing, invalid ranges, fractional durations and an exact `00:21` elapsed, `00:41` remaining, `01:02` track, `05:02` playlist and 224-of-652 progress case; GCC analyzer, static Main contracts and native real-helper visualizer/pause integrations pass.  GNU 10.2.1 produced the 978,340-byte static stripped ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `6d13a20e9c4d5fd23f3c71522d1e1be1b23d10b7fd406e757aa2dba55321d4e4`, and that exact artifact passes idle plus MP3, WAV, FLAC, Ogg and pause integration.  Main, protocol, visualizer pack, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Expose the current audio track's logical start and length through the bounded CDDA reader, carry those values atomically with each UI selection update, render track-relative clocks and progress while formatting the existing whole-disc length in the playlist field, and update all four values across natural boundaries, previous or next controls and fixed seeks.  Extend reader and pixel-output tests for fractional-second rounding, middle-track selection and exact track boundaries, run strict optimized, sanitizer, analyzer and real-helper audio regressions, then build one static stripped ARMv7 helper locally for hardware validation.
+Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`2ab755b` artifact, preserving executable mode, then re-enter the core and load a physical Audio CD.  Verify that elapsed and remaining restart at each natural or requested track boundary, `TRACK` remains that track's total length, `PLAYLIST` remains the album's combined audio duration, and the progress bar restarts per track; also spot-check previous, next and fixed seeks plus one ordinary audio file before marking this source hardware-passed.
 
 #### Files Modified:
 
@@ -33,7 +33,7 @@ Expose the current audio track's logical start and length through the bounded CD
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
