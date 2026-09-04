@@ -297,16 +297,20 @@ Publication remains an atomic inactive-bank swap; no duration metadata crosses
 the FPGA protocol because the helper resolves the presentation entirely into
 pixels.
 
-The visualizer pack indexes eight synchronized versions of a two-second loop as
-twenty independently decodable, three-picture closed GOPs per level. Every GOP
-starts with an H.262 interlaced-sequence header and an intra, top-field-first
-frame picture; the helper rejects progressive or otherwise incompatible packs
-so their video cannot bypass the native-480i player overlay. The helper computes
-a stereo RMS envelope with immediate weighted attack and slower decay, applies
-hysteresis to its fixed grade thresholds, slews by at most one adjacent grade
-per GOP, selects one complete GOP at the matching loop phase, and admits at
-most 4 KiB of its ordinary elementary bytes after a PCM record. Two GOPs of
-lead absorb coded-size variation. The native-480i DVD overlay initially presents
+Version two of the visualizer pack indexes eight synchronized steady versions
+of a two-second loop plus seven rising and seven falling adjacent-grade streams.
+Each stream supplies twenty independently decodable, three-picture closed GOPs.
+Every GOP starts with an H.262 interlaced-sequence header and an intra,
+top-field-first frame picture; the helper rejects progressive or otherwise
+incompatible packs so their video cannot bypass the native-480i player overlay.
+The helper computes a stereo RMS envelope with immediate weighted attack and
+slower decay, applies hysteresis to its fixed grade thresholds, and slews by at
+most one adjacent grade per GOP. A steady level selects its matching-phase GOP;
+a rise or fall selects the corresponding transition GOP, whose frame-evaluated
+grade reaches the destination over three pictures, approximately 100 ms.
+Version-one packs retain their stepped steady-stream behavior. Each admission
+still carries at most 4 KiB of ordinary elementary bytes after a PCM record, and
+two GOPs of lead absorb coded-size variation. The native-480i DVD overlay initially presents
 this video through a transparent background and translucent dark player panels
 while retaining opaque borders and text. While that interface is visible, the
 selected visualizer grade is capped at three; after ten seconds of emitted PCM

@@ -28,6 +28,7 @@ struct audio_visualizer {
     uint8_t *file;
     size_t file_size;
     struct visualizer_entry *entries;
+    unsigned version;
     unsigned gop_count;
     unsigned frames_per_gop;
     unsigned fps_num;
@@ -123,6 +124,7 @@ int audio_visualizer_create(struct audio_visualizer **result,
     FILE *stream = NULL;
     long length;
     unsigned levels;
+    unsigned variants;
     size_t entry_count;
     size_t index_bytes;
     size_t index;
@@ -161,9 +163,14 @@ int audio_visualizer_create(struct audio_visualizer **result,
     }
     fclose(stream);
     stream = NULL;
-    if (memcmp(visualizer->file, VISUALIZER_MAGIC, 8u) != 0 ||
-        read_le32(visualizer->file + 8u) != 1u) {
+    if (memcmp(visualizer->file, VISUALIZER_MAGIC, 8u) != 0) {
         set_error(error, error_size, "invalid visualizer signature");
+        goto fail;
+    }
+    visualizer->version = read_le32(visualizer->file + 8u);
+    if (visualizer->version != AUDIO_VISUALIZER_PACK_VERSION_STEPPED &&
+        visualizer->version != AUDIO_VISUALIZER_PACK_VERSION_CROSSFADE) {
+        set_error(error, error_size, "unsupported visualizer version");
         goto fail;
     }
     levels = read_le32(visualizer->file + 12u);
@@ -178,7 +185,15 @@ int audio_visualizer_create(struct audio_visualizer **result,
         set_error(error, error_size, "unsupported visualizer geometry");
         goto fail;
     }
-    entry_count = (size_t)levels * visualizer->gop_count;
+    /*
+     * Version two lays out steady[levels], rise[levels - 1], then
+     * fall[levels - 1], with gop_count phase-aligned entries per variant.
+     * Version one contains only the steady table.
+     */
+    variants = visualizer->version ==
+                       AUDIO_VISUALIZER_PACK_VERSION_CROSSFADE ?
+                   levels + 2u * (levels - 1u) : levels;
+    entry_count = (size_t)variants * visualizer->gop_count;
     index_bytes = entry_count * 8u;
     if (index_bytes > visualizer->file_size - VISUALIZER_HEADER_BYTES) {
         set_error(error, error_size, "truncated visualizer index");
@@ -305,6 +320,7 @@ int audio_visualizer_service(struct audio_visualizer *visualizer,
 {
     const struct visualizer_entry *entry;
     unsigned selected_level;
+    unsigned variant;
     size_t count;
     size_t entry_index;
 
@@ -318,11 +334,26 @@ int audio_visualizer_service(struct audio_visualizer *visualizer,
         if (visualizer->overlay_visible &&
             selected_level > VISUALIZER_COVERED_LEVEL_MAX)
             selected_level = VISUALIZER_COVERED_LEVEL_MAX;
-        if (visualizer->level < selected_level)
+        variant = visualizer->level;
+        if (visualizer->level < selected_level) {
+            if (visualizer->version ==
+                AUDIO_VISUALIZER_PACK_VERSION_CROSSFADE)
+                variant = AUDIO_VISUALIZER_LEVELS + visualizer->level;
             visualizer->level++;
-        else if (visualizer->level > selected_level)
+            if (visualizer->version ==
+                AUDIO_VISUALIZER_PACK_VERSION_STEPPED)
+                variant = visualizer->level;
+        } else if (visualizer->level > selected_level) {
             visualizer->level--;
-        entry_index = (size_t)visualizer->level * visualizer->gop_count +
+            if (visualizer->version ==
+                AUDIO_VISUALIZER_PACK_VERSION_CROSSFADE)
+                variant = AUDIO_VISUALIZER_LEVELS +
+                          (AUDIO_VISUALIZER_LEVELS - 1u) +
+                          visualizer->level;
+            else
+                variant = visualizer->level;
+        }
+        entry_index = (size_t)variant * visualizer->gop_count +
                       (size_t)(visualizer->gops_sent % visualizer->gop_count);
         entry = &visualizer->entries[entry_index];
         visualizer->current = visualizer->file + entry->offset;

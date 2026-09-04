@@ -52,7 +52,9 @@ playback replaces it.
 2. With `MediaPlayer_Visualizer.mmpvis` installed, require the translucent
    interface over the moving visualizer for the first ten playback seconds.
    After ten seconds without input the overlay must clear and reveal the full
-   visualizer. Its color/brightness should change smoothly with loudness.
+   visualizer. Its color/brightness should crossfade over three frames when
+   moving between adjacent loudness grades, without a whole-frame step at the
+   GOP boundary.
 3. Press Space to pause and resume, then exercise any fixed seek. User activity
    must restore the interface immediately and restart the ten-second interval;
    visualizer cadence must remain constant while playing and paused.

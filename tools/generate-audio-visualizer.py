@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the indexed eight-level legal H.262 loop used by audio playback."""
+"""Generate the indexed eight-level H.262 loop and crossfade GOPs."""
 
 import argparse
 import pathlib
@@ -8,11 +8,13 @@ import subprocess
 import tempfile
 
 MAGIC = b"MMPVIS1\0"
+VERSION = 2
 LEVELS = 8
 GOPS = 20
 FRAMES_PER_GOP = 3
 FPS_NUM = 30000
 FPS_DEN = 1001
+VARIANTS = LEVELS + 2 * (LEVELS - 1)
 
 SOURCE = (
     "nullsrc=s=720x480:r=30000/1001:d=2.002," 
@@ -34,6 +36,21 @@ def grade(level: int) -> str:
     saturation = GRADE_LOW[2] + (GRADE_HIGH[2] - GRADE_LOW[2]) * fraction
     return (f"eq=brightness={brightness:.4f}:contrast={contrast:.4f}:"
             f"saturation={saturation:.4f}")
+
+
+def transition_grade(start_level: int, end_level: int) -> str:
+    start_fraction = start_level / (LEVELS - 1)
+    end_fraction = end_level / (LEVELS - 1)
+    expressions = []
+    for low, high in zip(GRADE_LOW, GRADE_HIGH):
+        start = low + (high - low) * start_fraction
+        end = low + (high - low) * end_fraction
+        expressions.append(
+            f"{start:.8f}+({end - start:.8f})*"
+            f"(mod(n\\,{FRAMES_PER_GOP})+1)/{FRAMES_PER_GOP}"
+        )
+    return (f"eq=brightness='{expressions[0]}':contrast='{expressions[1]}':"
+            f"saturation='{expressions[2]}':eval=frame")
 
 
 def start_codes(data: bytes, code: int) -> list[int]:
@@ -111,31 +128,46 @@ def main() -> int:
         root = pathlib.Path(temporary)
         for level in range(LEVELS):
             variants.append(split_gops(encode(args.ffmpeg, grade(level),
-                                              root / f"level-{level}.m2v")))
+                                              root / f"steady-{level}.m2v")))
+        for level in range(LEVELS - 1):
+            variants.append(split_gops(encode(
+                args.ffmpeg, transition_grade(level, level + 1),
+                root / f"rise-{level}-{level + 1}.m2v")))
+        for level in range(LEVELS - 1):
+            variants.append(split_gops(encode(
+                args.ffmpeg, transition_grade(level + 1, level),
+                root / f"fall-{level + 1}-{level}.m2v")))
+        if len(variants) != VARIANTS:
+            raise RuntimeError("incorrect visualizer variant count")
         switched = root / "switched.m2v"
         switched.write_bytes(b"".join(
-            variants[gop % LEVELS][gop] for gop in range(GOPS)
+            variants[gop % VARIANTS][gop] for gop in range(GOPS)
         ) + b"\x00\x00\x01\xb7")
         subprocess.run([
             args.ffmpeg, "-hide_banner", "-loglevel", "error", "-f",
             "mpegvideo", "-i", str(switched), "-f", "null", "-",
         ], check=True)
 
-    header_size = 32 + LEVELS * GOPS * 8
+    header_size = 32 + VARIANTS * GOPS * 8
     offset = header_size
     entries = []
     payload = bytearray()
-    for level in range(LEVELS):
-        for gop in variants[level]:
+    for variant in variants:
+        for gop in variant:
             entries.append((offset, len(gop)))
             payload.extend(gop)
             offset += len(gop)
-    header = MAGIC + struct.pack("<6I", 1, LEVELS, GOPS, FRAMES_PER_GOP,
+    if len(entries) != VARIANTS * GOPS:
+        raise RuntimeError("incorrect visualizer index length")
+    header = MAGIC + struct.pack("<6I", VERSION, LEVELS, GOPS, FRAMES_PER_GOP,
                                  FPS_NUM, FPS_DEN)
     index = b"".join(struct.pack("<2I", *entry) for entry in entries)
+    if len(header) + len(index) + len(payload) != offset:
+        raise RuntimeError("visualizer size accounting mismatch")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(header + index + payload)
-    print(f"wrote {args.output} ({offset} bytes, {LEVELS} levels, {GOPS} GOPs)")
+    print(f"wrote {args.output} ({offset} bytes, {LEVELS} levels, "
+          f"{VARIANTS} variants, {GOPS} GOPs each)")
     return 0
 
 
