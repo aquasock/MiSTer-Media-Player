@@ -1,4 +1,4 @@
-## 961 COMMIT Unreleased ??? 2026-09-04T00:07:31-07:00
+## 961 COMMIT Unreleased 3e4f7ea 2026-09-04T00:07:31-07:00
 
 #### Coming From:
 
@@ -10,15 +10,16 @@ Replace marker-file optical launching with a hierarchical loader menu that start
 
 #### Outcome:
 
-The user reports that source `3b2a0ca` successfully plays a physical Audio CD, accepting the new CDDA path for the tested disc.  The approved follow-on will use MiSTer's numbered menu pages for `Load Physical Disc` and `Load Disc Image`, make the physical `Video DVD` and `Audio CD` choices invoke `dvdmenu:/dev/sr0` and `cdda:/dev/sr0` directly through isolated Main, expose only `Video DVD` under the image submenu with an ISO-filtered browser, and leave `Load MPEG-2 Video File` and `Load Audio File` as immediate filtered browsers.  Standard Audio CD image files are deliberately omitted until a later CUE/BIN or equivalent image backend exists, and the obsolete `.dvd` and `.cd` marker assets will be removed without changing the helper, decoder RTL or media protocol.
+The user reports that source `3b2a0ca` successfully plays a physical Audio CD, accepting the underlying CDDA path for the tested disc.  Source `cde9841` replaces marker-file launching with MiSTer's numbered menu pages for `Load Physical Disc` and `Load Disc Image`; physical `Video DVD` and `Audio CD` now invoke `dvdmenu:/dev/sr0` and `cdda:/dev/sr0` directly through isolated Main, the image submenu exposes an ISO-filtered `Video DVD` browser, and `Load MPEG-2 Video File` and `Load Audio File` remain immediate filtered browsers.  All routes normalize to FPGA stream index one, Audio CD image support remains deliberately omitted pending a CUE/BIN or equivalent backend, and the obsolete `.dvd` and `.cd` marker assets are removed without changing the helper, decoder RTL or media protocol.  The patched Main stack applies cleanly to pinned upstream Main `0a8fb44`, focused direct-loader and retained NTSC-native static contracts pass, and GNU 10.2.1 produced the 1,182,684-byte stripped ARMv7 `host/build/MiSTer_MediaPlayer` with SHA-256 `35ac7ca233bf1cdf074409ed781b6ee0367a63e31f00d394b5e0eced26a5a8e4`; the existing helper remains the accepted 974,244-byte artifact with SHA-256 `35a369ed1c3f30197f0ce663da67a0c171dbf132c34d6c131c859aa626663dd7`.  Seed 25 failed only global setup at negative 0.110 ns while hold, recovery, removal, minimum pulse width, decoder setup and video setup remained positive; the single authorized seed-26 commit `3e4f7ea` passes global setup at positive 0.143 ns, hold at positive 0.146 ns, recovery at positive 3.818 ns, removal at positive 0.470 ns, minimum pulse width at positive 0.925 ns, decoder setup at positive 0.841 ns and video setup at positive 2.541 ns with 38 percent average and 57 percent peak interconnect usage.  The accepted 4,470,016-byte `host/build/MediaPlayer_20260904.rbf` has SHA-256 `4896c2b50345e3f29c72435dce0c4188ae2b502465eeb59c37c25930002103b8`; the new menu integration awaits MiSTer hardware validation.
 
 #### Next Steps:
 
-Implement explicit MediaPlayer loader identities in the core menu and patched Main, remap every resulting helper stream to FPGA download index one, preserve file-path DVD ISO and standalone media routing, and add static contract coverage for submenu syntax, direct physical sources, ISO-only image selection, marker removal and route isolation.  Update current documentation, apply all Main patches cleanly to the pinned upstream source, rebuild and checksum Main locally, then commit and push the exact source before one clean timing-gated Quartus build on build PC `10.10.0.42` with seed 25 and at most one authorized reseed if timing fails; deliver only the replacement RBF and Main unless validation finds a helper dependency.
+Exit MediaPlayer, install `host/build/MediaPlayer_20260904.rbf` as `/media/fat/MediaPlayer_20260904.rbf` and install `host/build/MiSTer_MediaPlayer` as executable `/media/fat/MiSTer_MediaPlayer`, while retaining the existing helper, visualizer and per-core INI.  Remove `/media/fat/games/MediaPlayer/Video DVD.dvd`, `/media/fat/games/MediaPlayer/Audio CD.cd` and any obsolete `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`, then reboot and validate both physical-disc choices, DVD ISO selection, MPEG-2 file loading, audio file loading, DVD menus and playback, Audio CD transport, Bob or Weave output and the experimental native-NTSC path before marking this source hardware-passed.
 
 #### Files Modified:
 
 - CHANGELOG.md
+- MediaPlayer.qsf
 - MediaPlayer.sv
 - README.md
 - assets/Audio CD.cd
@@ -32,7 +33,7 @@ Implement explicit MediaPlayer loader identities in the core menu and patched Ma
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
