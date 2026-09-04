@@ -2012,8 +2012,8 @@ static int hold_emit_frames(struct output_state *output, uint64_t frames)
  * to sink pacing, however, allowing that reserve to absorb decoded PCM turns
  * four MiB into roughly twenty seconds of audio lead.  Drain it before each
  * fallback scheduler batch so the pipe and FPGA credit, rather than reserve
- * capacity, set the delivery rate.  One batch per scheduler pass keeps control
- * handling interleaved with that backpressure.
+ * capacity, set the delivery rate.  Each individual write remains bounded even
+ * when hold pressure requires several writes in one scheduler pass.
  */
 static int scheduler_emit_pcm(struct output_state *output, uint64_t frames)
 {
@@ -2025,6 +2025,15 @@ static int scheduler_emit_pcm(struct output_state *output, uint64_t frames)
         return -1;
     }
     return hold_emit_frames(output, frames);
+}
+
+static size_t scheduler_automatic_menu_pcm_watermark(
+    const struct output_state *output)
+{
+    size_t watermark = output->hold_limit / 2u;
+
+    return watermark > PCM_SCHEDULE_RESERVE_FRAMES ?
+           watermark : PCM_SCHEDULE_RESERVE_FRAMES;
 }
 
 static uint64_t scheduler_pcm_target(const struct output_state *output,
@@ -2448,9 +2457,11 @@ static void scheduler_log_progress(struct output_state *output)
  * Some authored motion menus leave the video horizon at the first audio PTS,
  * repeat one video PTS indefinitely, or stop carrying video timestamps.  Once
  * one of those conditions is established and the normal PTS target is
- * exhausted, keep only the ordinary startup reserve and release excess PCM as
- * bounded batches.  The unchanged output and FPGA FIFO credit pace those
- * writes at the sink clock.  Any later PTS advance disables this fallback
+ * exhausted, release held PCM as bounded batches until half of the configured
+ * hold limit remains, or the ordinary startup reserve when that is larger.
+ * This leaves symmetric safety headroom without draining the complete optical
+ * stall cushion in one pass.  The unchanged output and FPGA FIFO credit pace
+ * those writes at the sink clock.  Any later PTS advance disables this fallback
  * before its new timestamp target is evaluated.
  */
 static int scheduler_automatic_menu_pcm(struct output_state *output,
@@ -2458,6 +2469,7 @@ static int scheduler_automatic_menu_pcm(struct output_state *output,
 {
     uint64_t video_since_pts;
     size_t available;
+    size_t watermark;
     size_t excess;
     size_t emit;
 
@@ -2470,26 +2482,31 @@ static int scheduler_automatic_menu_pcm(struct output_state *output,
         !output->automatic_menu_stalled_pts &&
         video_since_pts < AUTOMATIC_MENU_STALLED_VIDEO_BYTES)
         return 0;
+    watermark = scheduler_automatic_menu_pcm_watermark(output);
     available = hold_available(output);
-    if (available <= PCM_SCHEDULE_RESERVE_FRAMES)
+    if (available <= watermark)
         return 0;
     if (!output->automatic_menu_pcm_fallback) {
         output->automatic_menu_pcm_fallback = 1;
         fprintf(stderr,
                 "media_player_helper: automatic menu PCM fallback "
                 "activated stalled_pts=%llu repeats=%u video_since_pts=%llu "
-                "held=%zu reserve=%u paced_batch=%u\n",
+                "held=%zu watermark=%zu reserve=%u paced_batch=%u\n",
                 (unsigned long long)output->max_video_pts,
                 output->automatic_menu_stalled_pts,
                 (unsigned long long)video_since_pts, available,
-                PCM_SCHEDULE_RESERVE_FRAMES, PCM_SCHEDULE_BATCH_FRAMES);
+                watermark, PCM_SCHEDULE_RESERVE_FRAMES,
+                PCM_SCHEDULE_BATCH_FRAMES);
     }
-    excess = available - PCM_SCHEDULE_RESERVE_FRAMES;
-    emit = excess > PCM_SCHEDULE_BATCH_FRAMES ?
-           PCM_SCHEDULE_BATCH_FRAMES : excess;
-    if (scheduler_emit_pcm(output, emit) < 0)
-        return -1;
-    output->automatic_menu_pcm_fallback_frames += emit;
+    do {
+        excess = available - watermark;
+        emit = excess > PCM_SCHEDULE_BATCH_FRAMES ?
+               PCM_SCHEDULE_BATCH_FRAMES : excess;
+        if (scheduler_emit_pcm(output, emit) < 0)
+            return -1;
+        output->automatic_menu_pcm_fallback_frames += emit;
+        available = hold_available(output);
+    } while (available > watermark);
     return 0;
 }
 

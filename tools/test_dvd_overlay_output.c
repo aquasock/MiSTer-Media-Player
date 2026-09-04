@@ -1029,9 +1029,10 @@ static int test_automatic_menu_scheduling_epoch(void)
     failed |= require(output.automatic_menu_pcm_fallback &&
                           output.automatic_menu_stalled_pts > 0 &&
                           hold_available(&output) ==
-                              PCM_SCHEDULE_RESERVE_FRAMES &&
+                              scheduler_automatic_menu_pcm_watermark(&output) &&
                           output.pcm_emitted_frames ==
-                              100000u - PCM_SCHEDULE_RESERVE_FRAMES &&
+                              100000u -
+                              scheduler_automatic_menu_pcm_watermark(&output) &&
                           output.automatic_menu_pcm_fallback_frames > 0,
                       "nonadvancing menu PTS did not continuously drain PCM");
     failed |= require(flush_h262_video(&output) == 0 &&
@@ -1115,10 +1116,10 @@ static int test_automatic_menu_advancing_pts_schedule(void)
 static int test_automatic_menu_pcm_batch_pacing(void)
 {
     struct output_state output = {0};
-    int16_t pcm[24000u * 2u];
-    size_t expected_frames = 24000u - PCM_SCHEDULE_RESERVE_FRAMES;
+    int16_t pcm[60000u * 2u];
+    size_t watermark;
+    size_t expected_frames;
     size_t i;
-    unsigned passes = 0;
     int failed = 0;
 
     output.video = tmpfile();
@@ -1132,7 +1133,7 @@ static int test_automatic_menu_pcm_batch_pacing(void)
                       "could not create automatic-menu pacing reserve");
     if (failed)
         goto done;
-    for (i = 0; i < 24000u; ++i) {
+    for (i = 0; i < 60000u; ++i) {
         pcm[i * 2u] = (int16_t)(i * 23u + 5u);
         pcm[i * 2u + 1u] = (int16_t)(0x5000u - i * 31u);
     }
@@ -1146,28 +1147,28 @@ static int test_automatic_menu_pcm_batch_pacing(void)
     output.have_video_pts = 1;
     output.max_video_pts = 90000u;
     output.pcm_emitted_frames = PCM_SCHEDULE_RESERVE_FRAMES;
-    failed |= require(hold_push(&output, pcm, 24000) == 0 &&
+    watermark = scheduler_automatic_menu_pcm_watermark(&output);
+    expected_frames = 60000u - watermark;
+    failed |= require(watermark == PCM_SAMPLE_RATE / 2u &&
+                          hold_push(&output, pcm, 48000u) == 0 &&
                           scheduler_drain(&output, 0) == 0 &&
                           output.automatic_menu_pcm_fallback &&
                           output.automatic_menu_pcm_fallback_frames ==
-                              PCM_SCHEDULE_BATCH_FRAMES &&
+                              48000u - watermark &&
                           output.pcm_emitted_frames ==
                               PCM_SCHEDULE_RESERVE_FRAMES +
-                                  PCM_SCHEDULE_BATCH_FRAMES &&
+                                  48000u - watermark &&
                           hold_available(&output) ==
-                              24000u - PCM_SCHEDULE_BATCH_FRAMES,
-                      "one fallback pass emitted more than one PCM batch");
-    while (!failed &&
-           hold_available(&output) > PCM_SCHEDULE_RESERVE_FRAMES &&
-           passes++ < 32u)
-        failed |= require(scheduler_drain(&output, 0) == 0,
-                          "repeated paced fallback pass failed");
-    failed |= require(hold_available(&output) ==
-                          PCM_SCHEDULE_RESERVE_FRAMES &&
+                              watermark,
+                      "fallback pass did not reach its PCM watermark");
+    failed |= require(hold_push(&output, pcm + 48000u * 2u, 12000u) == 0 &&
+                          scheduler_drain(&output, 0) == 0 &&
+                          hold_available(&output) == watermark &&
                           output.automatic_menu_pcm_fallback_frames ==
                               expected_frames &&
-                          output.pcm_emitted_frames == 24000u,
-                      "repeated fallback passes did not reach the reserve");
+                          output.pcm_emitted_frames ==
+                              PCM_SCHEDULE_RESERVE_FRAMES + expected_frames,
+                      "multi-batch fallback did not absorb a later PCM burst");
     if (output.reserve) {
         failed |= require(output_reserve_destroy(output.reserve) == 0,
                           "paced fallback reserve did not drain");

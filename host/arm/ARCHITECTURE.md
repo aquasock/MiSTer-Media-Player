@@ -186,16 +186,19 @@ so the continuing FPGA timeline remains monotonic without changing authored
 A/V timing. If that epoch's video horizon remains at its first audio PTS,
 repeats a timestamped video PTS, or delivers 256 KiB of video without advancing
 it, exhausting the normal timestamp-derived PCM target activates a menu-only
-fallback. It drains the excess above the startup reserve as individually
-bounded ordinary PCM batches. Each scheduler pass admits at most one batch and,
-for a physical DVD, first drains the asynchronous output reserve; the pipe and
-unchanged FPGA FIFO credit therefore pace fallback delivery instead of allowing
-the four-megabyte optical-stall reserve to become roughly twenty seconds of
-decoded-audio lead. Ordinary advancing-timestamp title playback retains that
-reserve unchanged. A later video PTS advance immediately restores the normal
-timestamp scheduler. The existing four-second hold limit is a hard post-drain
-invariant in this fallback domain, so malformed scheduling stops with a
-diagnostic rather than growing the host queue to exhaustion. Explicit
+fallback. It drains held audio as individually bounded ordinary PCM batches
+until half of the configured hold limit remains,
+or the startup reserve when that is larger. For a physical DVD, every batch
+first drains the asynchronous output reserve; the pipe and unchanged FPGA FIFO
+credit therefore pace fallback delivery instead of allowing the four-megabyte
+optical-stall reserve to become roughly twenty seconds of decoded-audio lead.
+The default four-second hold consequently settles at a two-second low watermark
+and retains equal safety headroom for later Program Stream audio bursts.
+Ordinary advancing-timestamp title playback retains its reserve unchanged. A
+later video PTS advance immediately restores the normal timestamp scheduler.
+The hold limit remains a hard post-drain invariant in this fallback domain, so
+malformed scheduling stops with a diagnostic rather than growing the host queue
+to exhaustion. Explicit
 navigation hops and finite still boundaries continue to use the READY/GO reset
 path. Future work may add optical-device
 discovery beyond the explicit `/dev/sr0` launcher. Angles, track selection and
