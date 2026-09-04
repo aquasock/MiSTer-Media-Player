@@ -1,3 +1,32 @@
+## 963 COMMIT Unreleased 8d0ab99 2026-09-04T01:53:01-07:00
+
+#### Coming From:
+
+Unreleased 8d0ab99
+
+#### Purpose:
+
+Evaluate the first idle-visualizer hardware run and diagnose the reported sputtering DVD-menu audio.
+
+#### Outcome:
+
+The user confirms that source `8d0ab99` displays the visualizer while the core is idle and that a physical Coming to America DVD reaches its visible authored menu, establishing idle startup and DVD takeover on hardware.  The fresh helper log proves this playback launched with `audio output spdif`, selected AC-3 private substream `0x80`, and therefore emitted IEC 61937 AC-3 bursts for an external S/PDIF decoder rather than decoded stereo PCM; equipment interpreting those bursts as ordinary audio produces the reported sputtering or noise.  The source change did not alter status bit 126 or its HDMI/S/PDIF mapping, and the checksum-valid schema-21 capture reports 59 displayed pictures, 58 swaps, zero PCM protocol errors, zero audio underruns and zero transport blocks, so it supplies no evidence of an idle-handoff PCM residue or transport starvation.  The menu screenshot and overlay telemetry are valid, with one complete 86,400-byte overlay plane and no overlay protocol error.  The 938,734-byte log, 691,864-byte screenshot and 844-byte sidecar have SHA-256 `3b95414481949f5300d0daad613c87177bd3da30f5b6bbca3483655bfe4d914c`, `435f70170d31f7aebb0d246394c8b452c905b3fa2339096ee712098c1f06c010` and `9b60f83b41228a9c1c9026ad9281de3d78e470624bb6d3ea040e06884c3b21af`; no runtime source was changed.
+
+#### Next Steps:
+
+Set the core menu's `Audio Output` option to `HDMI`, reload the same DVD and capture fresh results while the menu plays; the new helper log must say `audio output hdmi (decoded stereo PCM)`.  If that run is clean, treat the sputtering as expected undecoded S/PDIF passthrough and continue idle-background qualification through DVD, MPEG-2, audio-file and Audio CD takeover and return; if it still sputters with HDMI proven in the log, diagnose the decoded-PCM scheduler from that trace before proposing a source change.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 962 COMMIT Unreleased 8d0ab99 2026-09-04T01:23:00-07:00
 
 #### Coming From:
@@ -1217,35 +1246,6 @@ The user confirms that the checksum-correct helper restores The Big Lebowski sta
 #### Next Steps:
 
 After user approval, preserve the accepted chapter, menu, finite-still and overlay-only behavior while adding a bounded capacity-pressure decision for picture-bearing motion-menu activations: retain 4 MiB as the decision threshold, give the stage sufficient bounded headroom for one deepest scheduler drain, and when a pending menu destination remains in the menu domain with a qualified picture group at that threshold, promote it through the existing staged READY/GO stream-hop path instead of reaching `ENOSPC`.  Add production-path coverage for an over-threshold motion menu with byte-exact post-barrier commit, retain the accepted 3,797,120-byte finite-still case below the threshold and all overlay-only classifications, then run strict native, sanitizer, analyzer, DVD navigation, staging, random-access, overlay, LPCM, audio and seek regressions locally and on the build PC before producing a new static ARM helper for Big Lebowski Scene Selection plus the retained Coming to America, Blazing Saddles and forum-disc routes.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 923 COMMIT Unreleased 6b63c91 2026-09-02T21:16:43-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Diagnose The Big Lebowski's immediate startup failure after installing the source-`6b63c91` chapter-navigation helper.
-
-#### Outcome:
-
-The fresh physical-disc run starts `dvdmenu:/dev/sr0`, forks helper PID 784 and asserts download, but helper stdout reaches EOF at 13.002 seconds and Main reaps the helper with signal 11 at 13.076 seconds after zero reads and zero submitted media bytes.  No libdvdnav title, CSS or chapter diagnostic appears, proving that the new chapter-control path is never reached.  A read-only FTP retrieval of `/media/fat/linux/MediaPlayer_Helper` finds the expected 961,956-byte length but SHA-256 `7d1ab3b073e9b120cdc285110a94c5ed47c78779cf61a21d60d17f0d8773346e`, rather than the released artifact's `556b706c8c8b4fc60a4e11c21adb62ebb40daec4201d3f4c0052d8275b59fabb`.  Bytes 1 through 458,752 exactly match the good artifact, with prefix SHA-256 `abd7f0665e7bdc22dbf3fd395e849efffdffe725a876289ebf2afb68c7fc0007`; the first difference is byte 458,753 and 428,092 bytes differ through byte 961,454.  The installed image also retains the old absolute chapter-control diagnostic and lacks the new active-VM diagnostic.  This is deterministic evidence of an interrupted in-place upload that left a hybrid new-prefix/old-tail ELF, fully explaining the immediate segmentation fault without indicating a source regression.  The supplied 1,940-byte log, 559-byte all-black screenshot and 2,818-byte no-telemetry sidecar have SHA-256 `99c947fd325de9d1f77bd95a0f6fbbfc4e9c596ba150f749cb75227669410f9c`, `d203038ddaadf5db6adf11901b670ba6930afc8dce176332662184b49780d50a` and `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004`.  A fresh exact copy of the good build-PC artifact has been restored locally as `host/build/MediaPlayer_Helper_ChapterVM_6b63c91`.
-
-#### Next Steps:
-
-Exit the core and ensure no MediaPlayer helper process is running, then copy `host/build/MediaPlayer_Helper_ChapterVM_6b63c91` to `/media/fat/linux/MediaPlayer_Helper`, set mode 755 and read the installed file back before launching the core.  Require the read-back SHA-256 to equal `556b706c8c8b4fc60a4e11c21adb62ebb40daec4201d3f4c0052d8275b59fabb`; if it does not, repeat the transfer rather than testing a mixed executable.  Once verified, rerun The Big Lebowski startup and its failing menu-launched chapter route, then provide fresh telemetry-enabled results to qualify source `6b63c91`.
 
 #### Files Modified:
 
