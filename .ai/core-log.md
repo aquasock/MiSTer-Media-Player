@@ -1,4 +1,4 @@
-## 973 COMMIT Unreleased ??? 2026-09-04T04:34:35-07:00
+## 973 COMMIT Unreleased cd484ba 2026-09-04T04:34:35-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Prevent deferred same-menu DVD activations from deadlocking behind the initial r
 
 #### Outcome:
 
-Implement one helper-only activation boundary that preserves the existing 2 MiB runaway guard and the 8 MiB staging capacity.  A staged activation that remains in menu space and qualifies an independent sequence-header, I-picture and following-reference startup group will retain its established motion-menu decoder barrier, while a staged activation that reaches queue pressure without qualifying that group will be released as a context-preserving continuation through the resident decoder and acknowledged without resetting Main.  A menu-to-title transition will continue to cancel staged menu output and request the existing decoder barrier before title payload.  Main, the H.262 decoder, protocol, visualizer and RBF will remain unchanged.
+Source `cd484ba` retains the existing two-megabyte video-queue guard and qualified restart barriers while adding a context-preserving fallback for deferred button activations that remain in menu space without supplying a complete sequence-header, I-picture and following-reference startup group.  At queue pressure the helper rebases all queued, pending, audio and triggering video timestamps above the prior live epoch, releases only the initial random-access filter, drains the exact interleaved stream through the normal scheduler into the existing activation stage, commits it to the resident decoder and acknowledges continuation; actual menu-to-title exits and independently decodable motion-menu restarts keep their established decoder barriers.  The production-translation-unit regression drives this through the real PES, H.262 filter, bounded queue, scheduler, stage and control-event path, verifies two megabytes of byte-exact video and rebased in-band PTS records, and passes optimized, AddressSanitizer plus UndefinedBehaviorSanitizer and twenty repeated runs.  Retained DVD random-access, SPU, menu-hop, overlay, reserve, staging, AC-3, CDDA, audio UI, visualizer and seek tests pass, including one hundred menu-hop runs, static Main contracts and final-ARM real MP3, WAV, FLAC, Ogg, pause-barrier and private-audio integrations.  GNU 10.2.1 produced the 978,340-byte stripped static ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `7cd8427fd955beb81ba35c7fa2ff34e09cd8214f4872f9d8f9695187dcd560e4`; it has no dynamic section and passes its protocol-one capability probe.  Main, protocol, visualizer, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Add a production-translation-unit regression that starts a real pending activation, feeds more than the queue bound without an independent restart group, proves the bytes and records reach the live continuation path without overflow, and verifies the continuation acknowledgment.  Retain controls for restart-qualified staged motion menus, finite and indefinite stills, overlay-only continuation and title launch; run strict optimized, sanitizer, analyzer, DVD, audio and integration suites, then build and verify one static ARMv7 helper locally for Simpsons and Futurama hardware testing.
+Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`cd484ba` artifact and leave the current per-core Main, RBF and visualizer in place.  Reproduce the same Simpsons route through its first-episode menu activation and require `DVD menu activation deferred`, `DVD menu continuation PTS rebased` and `DVD menu activation preserved resident decoder context` without `video lookahead limit exceeded` or helper termination, then select and play the episode.  Retest Futurama root-menu arrival, selector motion, nested episode selection and title playback, spot-check an Audio CD and ordinary audio file, and return the updated result set for hardware qualification.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Add a production-translation-unit regression that starts a real pending activati
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
