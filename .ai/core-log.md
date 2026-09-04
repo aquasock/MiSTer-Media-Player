@@ -1,3 +1,46 @@
+## 960 COMMIT Unreleased ??? 2026-09-03T22:32:01-07:00
+
+#### Coming From:
+
+Unreleased 5fc7a1e
+
+#### Purpose:
+
+Add direct physical Audio CD playback through the existing standalone-audio interface and combine its picker change with the pending naming RBF build.
+
+#### Outcome:
+
+The approved boundary will add an `Audio CD.cd` marker whose `.cd` extension appears in the existing audio picker, map it in isolated Main to `cdda:/dev/sr0`, inventory the disc table of contents through Linux optical-drive controls, skip data tracks, and read audio sectors digitally as 44.1 kHz signed stereo PCM for the existing audio UI, visualizer and in-band PCM transport.  The helper will expose the disc as one continuous audio timeline while accepting the established fixed-time seek controls and previous or next commands as audio-track navigation, with no decoder RTL, transport-record or protocol-version change.
+
+#### Next Steps:
+
+Implement a bounded CDDA reader with injectable table-of-contents and sector-read boundaries for native testing, wire `.cd` handling and controls through Main and the helper, add the launcher plus current documentation, and run strict native, sanitizer, analyzer, Main-patch and retained audio regressions.  Build and checksum the ARM helper and isolated Main locally, commit and push the exact source, then perform one clean timing-gated Quartus build on build PC `10.10.0.42` using the established seed; authorize at most one reseed only if that build fails timing, and deliver the combined RBF, Main, helper, `Video DVD.dvd` and `Audio CD.cd` replacement set for hardware validation.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer.sv
+- README.md
+- assets/Audio CD.cd
+- docs/BUILDING.md
+- docs/TEST_INSTRUCTIONS.md
+- host/arm/ARCHITECTURE.md
+- host/arm/Makefile
+- host/arm/cdda_audio.c
+- host/arm/cdda_audio.h
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_cdda_audio.c
+- tools/test_main_cdda.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 959 COMMIT Unreleased 5fc7a1e 2026-09-03T22:22:02-07:00
 
 #### Coming From:
@@ -1187,40 +1230,6 @@ After user approval, preserve the proven menu synchronization and replacement-st
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 920 COMMIT Unreleased 3689cca 2026-09-02T20:31:21-07:00
-
-#### Coming From:
-
-Unreleased 7186fb4
-
-#### Purpose:
-
-Synchronize every directional DVD menu command with an explicit continuation or stream-hop decision so authored auto-actions cannot deadlock Main and the helper.
-
-#### Outcome:
-
-Source `621dff7` removes Main's highlight-only directional bypass and marks every DVD menu command as a pending navigation decision.  The menu source now classifies ordinary, invalid and library-rejected directional selections as `MEDIA_SOURCE_DVD_MENU_CONTINUE`, causing the helper's existing acknowledgment path to preserve the resident stream, while authored auto-actions retain the existing READY/GO reset, drain and replacement-stream barrier.  The navigation integration driver now sends only one menu action at a time and requires one explicit decision per action, and the modeled Main regression rejects any reintroduction of the directional bypass.  Source `3689cca` corrects only the generated new-file hunk length exposed by the first pinned-Main application attempt and is the final build source.  Strict native helper and modeled Main builds, GCC analyzer, AddressSanitizer and UndefinedBehaviorSanitizer checks, all retained DVD random-access, SPU, overlay, reserve, staging, LPCM-skip, AC-3, Program Stream seek, audio UI, timer and visualizer tests, real MP3, WAV, FLAC and Ogg seek integrations, one hundred menu-hop, Main lifecycle, random-access and staging repetitions, and twenty overlay-output repetitions pass locally.  On build PC `10.10.0.42`, one hundred exact-source menu-hop and Main lifecycle repetitions pass, the live sequence-end Icarus regression reconstructs thirteen stream bytes and the exact overlay payload, and GNU 10.2.1 builds both final ARMv7 binaries against pinned Main `0a8fb44`.  The static stripped 961,956-byte helper `host/build/MediaPlayer_Helper_MenuSync_3689cca` has SHA-256 `88a348aefe8e27dac2adafc613ef4126ae053aaa8375f1b8e1e049cb3a3ab898`; the dynamically linked stripped 1,182,692-byte Main `host/build/MiSTer_MenuSync_3689cca` has SHA-256 `1b3387170083be269831bf4c3a828f1cce6bcb3b93c519d8cde32cb9768bedf9`.  The available small ISO is not DVD-Video, while the scripted Big Lebowski driver issues Root during that disc's initial three-second first-play still and is rejected before entering a menu, so neither fixture substitutes for the required physical route test; decoder RTL, the visualizer asset and the timing-qualified RBF are unchanged.
-
-#### Next Steps:
-
-Install `host/build/MediaPlayer_Helper_MenuSync_3689cca` as `/media/fat/linux/MediaPlayer_Helper` with executable mode and `host/build/MiSTer_MenuSync_3689cca` as `/media/fat/MiSTer`, then reboot while retaining the current visualizer pack and timing-qualified RBF.  On Coming to America, repeat the exact reported route: enter Scene Selection, move among scenes, play one, return to the menu, use Play to resume the saved movie point, enter Scene Selection again, and advance from scene 4 to the next page.  Require ordinary arrows to update highlights without resetting, every authored page action to complete its READY/GO transition without an unexpected `0x81`, and subsequent input to remain responsive.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback and the forum disc's silent LPCM menu followed by supported AC-3 title playback, then provide a fresh log, screenshot and telemetry snapshot.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_source.c
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_dvd_menu_hop.c
-- tools/test_dvd_menu_navigation.py
-- tools/test_main_seek_lifecycle.cpp
 
 #### Status:
 
