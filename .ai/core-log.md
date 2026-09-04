@@ -1,4 +1,4 @@
-## 952 COMMIT Unreleased ??? 2026-09-03T18:36:35-07:00
+## 952 COMMIT Unreleased 5f1cf92 2026-09-03T18:36:35-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Bound automatic-menu PCM scheduling when a repeated video timestamp exhausts the
 
 #### Outcome:
 
-The planned source change will preserve the continuous automatic-menu decoder epoch and all normal advancing-timestamp scheduling, while adding an automatic-menu-only fallback that emits decoded PCM above the established reserve in bounded batches whenever the timestamp target schedules no audio.  FPGA FIFO credit will continue to provide the unchanged transport's real-time backpressure, and an explicit hold-limit invariant will stop the helper with a diagnostic instead of permitting target memory exhaustion.
+Source `5f1cf92` preserves the continuous automatic-menu decoder epoch and normal advancing-PTS scheduler while recognizing three equivalent stalled-horizon conditions confined to that epoch: video remaining at the first audio PTS, a repeated video PTS, or 256 KiB of delivered video without a PTS advance.  After the timestamp-derived target is exhausted, decoded PCM above the existing 8,192-frame reserve drains completely as individually bounded 2,048-frame batches through the unchanged output and FPGA FIFO-credit path; any later PTS advance disables fallback before the new target is evaluated.  A post-drain 48,000-frame hold invariant now reports and rejects an impossible growing queue instead of allowing host memory exhaustion.  The production test delivers 100,000 patterned stereo frames with exact sample reconstruction, an exact terminal reserve and more than 2 MiB of byte-exact continuous menu video under repeated PTS, verifies the advancing-PTS control remains on its original 2,048-frame timestamp batch, and exercises the hard-limit rejection.  Strict optimized, GCC analyzer, AddressSanitizer, UndefinedBehaviorSanitizer, twenty repeated production runs, native helper, DVD random-access, SPU, menu-hop, output reserve and staging, AC-3 resynchronization, unsupported-LPCM, audio UI, visualizer and seek tests pass.  GNU 10.2.1 builds the 970,148-byte stripped static ARMv7 helper `host/build/MediaPlayer_Helper` with SHA-256 `a919e4f202d9de9ce996fdfbacbe11c6da815d21e043af0e1f6a6446e2d591f1`; Main, protocol, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Implement the scoped fallback and diagnostic, document the scheduling invariant, and extend the production regression with repeated or nonadvancing menu PTS and sustained patterned PCM to require exact continuous sample output, bounded held memory and byte-exact video while retaining an advancing-PTS control path.  Rerun strict optimized, analyzer and sanitizer coverage plus the retained DVD and audio suites, then build only the static ARM helper locally for another Futurama test; Main, protocol, RTL and RBF remain unchanged.
+Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`5f1cf92` artifact and retain the current per-core Main and RBF, then rerun Futurama disc one through the complete intro into its moving menu.  Confirm one `automatic menu PCM fallback activated` diagnostic, continuous intelligible audio without periodic bursts, a responsive selector, held PCM remaining near the 8,192-frame reserve rather than growing by millions of frames, no hold-limit diagnostic and no signal-nine termination; return the updated helper/Main log, screenshot and telemetry for hardware qualification.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Implement the scoped fallback and diagnostic, document the scheduling invariant,
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
