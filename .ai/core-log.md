@@ -6,23 +6,20 @@ Unreleased ae533a1
 
 #### Purpose:
 
-Release a completed finite DVD still boundary without treating its implementation-only drain suffix as undecoded media.
+Submit the final odd byte of an autonomous DVD boundary after nonblocking pipe quiescence instead of returning before the existing transport path.
 
 #### Outcome:
 
-The approved change will split the autonomous boundary protocol into a strict ordinary form and a terminal-still form carrying the existing five-zero-byte drain-tail contract.  The helper will select the terminal form only after finite still finalization has appended that exact suffix; Main will continue normal verified submission while credit exists, establish that the old pipe is quiescent, and permit only an all-zero remainder no larger than the declared tail before resetting download and sending GO.  Unexpected residue, nonzero bytes, excess bytes and any residue at an ordinary automatic-menu boundary will stop playback with an explicit diagnostic instead of being discarded silently.  Decoder logic, RBF, overlay state and libdvdnav policy remain unchanged.
+The revised approved change will correct the single Main control-flow defect demonstrated by the physical trace.  While no boundary is pending, a lone pipe byte must continue waiting for its partner so an ordinary short read is never padded in the middle of the stream.  Once the helper has sent the autonomous boundary event, a nonblocking `EAGAIN` proves that no more old-epoch bytes remain in the pipe; when one buffered byte exists, Main will preserve it and fall through to the existing verified transport routine, which packs that final byte with zero in one 16-bit FPGA word and accounts only the real source byte.  A later empty-pipe observation then permits the existing reset and GO handshake.  No byte is discarded, the control protocol and helper remain unchanged, and the behavior applies equally to finite-still and automatic silent-menu boundaries.
 
 #### Next Steps:
 
-Implement the helper/Main protocol distinction and strict quiescent-tail validator, extend the production helper and Main lifecycle regressions with the physical one-byte no-credit case plus complete, partial, oversized, nonzero and ordinary-boundary residue cases, and rerun strict native, sanitizer, analyzer, navigation, reserve, stage, audio and seek coverage.  Apply the Main patch to its pinned upstream source, build the patched per-core Main and static ARM helper locally, package the matched pair with the existing merge-only INI fragment, then retest Futurama through every finite first-play still into its visible moving menu with synchronized AC-3 and responsive activation.
+Implement the boundary-only `EAGAIN` fallthrough in Main and document that quiescence rule.  Extend the Main lifecycle regression with the exact physical state of one buffered byte, a quiescent helper pipe and no transfer call before the correction, proving that the corrected path submits exactly that byte before one reset and GO; retain the ordinary non-boundary lone-byte hold and zero-byte boundary completion cases.  Reapply the patch to pinned upstream Main, run the focused lifecycle suite and helper regressions, build the patched per-core Main locally, verify the unchanged static ARM helper, package the matched pair with the existing merge-only INI fragment, then retest Futurama through every finite first-play still into its visible moving menu with synchronized AC-3 and responsive activation.
 
 #### Files Modified:
 
 - host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_dvd_overlay_output.c
 - tools/test_main_seek_lifecycle.cpp
 
 #### Status:
