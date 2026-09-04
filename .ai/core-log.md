@@ -1,3 +1,32 @@
+## 955 COMMIT Unreleased 67ce19d 2026-09-03T20:28:11-07:00
+
+#### Coming From:
+
+Unreleased 67ce19d
+
+#### Purpose:
+
+Qualify source `67ce19d` on Futurama's automatic root-menu transition and isolate its failure before menu playback.
+
+#### Outcome:
+
+The physical source-`67ce19d` run rejects the one-batch fallback admission policy while validating its sink-pacing boundary.  All three finite intro boundaries complete, the silent-video lookahead classifies and releases, the automatic menu inherits the continuous scheduling epoch at 41.085422 seconds, the first translated audio and video horizon remains fixed at PTS 647,273, and a valid 86,400-byte overlay plane commits without ordering error.  Fallback activates at 41.376416 seconds with 183,808 held PCM frames and no timestamp-derived audio due; draining the output reserve before each scheduled run succeeds, but admitting only one 2,048-frame batch per Program Stream scheduler pass is slightly slower than the disc's decoded AC-3 bursts.  Held PCM consequently rises to 193,024 frames, crosses the unchanged 192,000-frame safety ceiling about 4.37 seconds later, and deliberately terminates the helper with exit status one at 45.764969 seconds before the menu can play.  Main reports `helper-error`; there is no reserve-pacing failure, audio underrun, PCM protocol error, decoder error or overlay ordering error.  The checksum-valid schema-21 snapshot is an earlier settled-overlay capture with 127 displayed pictures, 126 swaps, zero decoder and PCM errors, zero underruns and one valid visible menu overlay; the later screenshot shows the black post-exit diagnostic display.  The 1,083,151-byte log, 11,711-byte screenshot and 844-byte telemetry sidecar have SHA-256 `c74ffb51e544a2ab233fc66164d2ec00694e6c14fba86c4b3c4757e3a842add0`, `915763d7b660d4b82ef007c02f78f655c43c59c3dff4eccea59c6769a9c1b4f8` and `335b0923d031579f9cfb03c19d8320563c5089243b762857569ca1a72ad05f46`.
+
+#### Next Steps:
+
+Retain the source-`67ce19d` reserve-drain pacing boundary but replace its fixed one-batch ceiling after user approval with a pressure-driven bounded burst that emits sink-paced 2,048-frame runs until held PCM reaches a safe low watermark below the four-second ceiling.  Bound each admission interval so menu input remains responsive, add production regressions in which a single Program Stream packet decodes more PCM than one batch and verify that held audio falls rather than grows under a stalled timestamp, then rerun strict native, analyzer, sanitizer and retained DVD/audio suites and build only a new static ARM helper for Futurama plus the broader physical-disc menu test.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 954 COMMIT Unreleased 67ce19d 2026-09-03T20:08:11-07:00
 
 #### Coming From:
@@ -1179,38 +1208,6 @@ Install only `host/build/MediaPlayer_Helper_SceneDrain_101aa4a` as `/media/fat/l
 #### Files Modified:
 
 - tools/test_dvd_overlay_metadata.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 915 COMMIT Unreleased a0cdd43 2026-09-02T19:41:21-07:00
-
-#### Coming From:
-
-Unreleased d75327e
-
-#### Purpose:
-
-Drain the complete terminal DVD still sequence-end marker through the live transport lookahead so the decoder can publish the authored menu background.
-
-#### Outcome:
-
-Source `a0cdd43` replaces the terminal still's isolated four-byte sequence-end write with one exact nine-byte tail containing the unchanged standard `00 00 01 b7` marker followed by five zero-valued implementation drain bytes.  The drain applies only after terminal random-access filtering qualifies and stages an authored sequence-plus-I still; ordinary random access, overlay-only continuation, decoder interpretation, Main, protocol, visualizer, RTL and RBF remain unchanged.  The production-path regression requires byte-identical authored video, the exact nine-byte tail, two staged records, one emitted picture mark and picture-bearing hop classification, while the metadata regression requires the complete sequence end to emerge before `input_end` during a live session.  Strict native and GNU 10.2.1 ARM builds pass, as do AddressSanitizer and UndefinedBehaviorSanitizer coverage, the helper analyzer apart from its suppressed pre-existing audio-overlay allocation false positive, focused AC-3, audio-seek, audio-UI, visualizer, DVD random-access, SPU, reserve, stage, menu-hop and Program Stream seek tests, twenty terminal-overlay repetitions, one hundred random-access, staging and menu-hop repetitions, twenty unsupported-LPCM integrations, and real MP3, WAV, FLAC and Ogg seek integrations.  The Raspberry Pi has no installed RTL simulator, so the new metadata regression is source-reviewed but was not executed locally.  The 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_SceneDrain_a0cdd43` has SHA-256 `9cde18ced068f6b39865a24f79ade13a3c07810324c185d1df6cf3d54a422d33`.
-
-#### Next Steps:
-
-Install only `host/build/MediaPlayer_Helper_SceneDrain_a0cdd43` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  On Coming to America, enter Scene Selection and require its authored background plus selector to appear, remain responsive and launch a selected scene; return to the root menu and repeat the transition.  With telemetry enabled, a captured failure or success should now show at least 224,828 decoder-accepted bytes for this still, sequence-end recognition, one completed reference picture and one displayed picture.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback and the forum disc's silent LPCM menu followed by supported AC-3 title playback; a simulation-capable run should execute the added metadata regression before any future RBF boundary.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_metadata.sv
-- tools/test_dvd_overlay_output.c
 
 #### Status:
 
