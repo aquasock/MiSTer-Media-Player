@@ -26,10 +26,13 @@ every Main poll.
 Main optionally passes `--control-fd FD`, a private version-one
 `SOCK_SEQPACKET` channel separate from standard output.  Player-one Left and
 Right request previous or next chapter and a ready/go barrier prevents any
-pre-jump byte from crossing the reset download session. Start pause/resume is
-owned by Main as a stdout transport hold, so no pause byte enters the FPGA
-protocol. Keyboard P/N use the same previous/next actions and Space uses the
-same pause action while the MiSTer OSD is closed.
+pre-jump byte from crossing the reset download session. DVD and MPEG-2 Start
+pause/resume remain immediate Main-side stdout transport holds. Standalone
+audio instead uses a `PAUSE`/`PAUSE_READY` barrier: the helper reveals and
+flushes the existing overlay style, waits for `GO`, and Main holds only after
+that finite output is drained. No pause byte enters the FPGA protocol.
+Keyboard P/N use the same previous/next actions and Space uses the same pause
+action while the MiSTer OSD is closed.
 
 DVD chapter commands use libdvdnav's relative previous- and next-program
 operations against the currently playing VM path. This is intentionally not an
@@ -360,8 +363,9 @@ mono or multichannel Vorbis to signed 16-bit stereo, and emits at 44.1 or
 runtime-library dependency.
 
 Previous and next chapter, fixed ordinary-Program-Stream and standalone-audio
-jumps, and authored-menu commands use the private control protocol while Start
-pause/resume is a Main-side transport hold. Arbitrary scrubbing, DVD seek, title, angle,
+jumps, authored-menu commands and the standalone-audio overlay-first pause
+barrier use the private control protocol, while other Start pause/resume paths
+remain Main-side transport holds. Arbitrary scrubbing, DVD seek, title, angle,
 audio-track and subtitle-track commands remain deferred. The ARM-only pause
 does not suppress the FPGA audio FIFO underrun after its existing reserve
 drains; that product polish requires an explicit future core pause state.

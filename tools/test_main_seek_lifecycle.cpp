@@ -26,6 +26,9 @@ struct MainLifecycle {
     bool chapter_barrier = false;
     bool stream_boundary_pending = false;
     bool playback_paused = false;
+    bool pause_pending = false;
+    bool pause_ready = false;
+    bool pause_pipe_empty = false;
     bool replay_ready = false;
     std::uint64_t submitted = 0;
     unsigned resets = 0;
@@ -35,6 +38,7 @@ struct MainLifecycle {
     unsigned releases = 0;
     unsigned buffered_bytes = 0;
     unsigned transfer_calls = 0;
+    unsigned pause_commands = 0;
     bool stream_boundary_pipe_empty = false;
 
     void submit(std::uint64_t bytes)
@@ -131,6 +135,56 @@ struct MainLifecycle {
         stream_boundary_pipe_empty = false;
     }
 
+    void request_audio_pause()
+    {
+        if (playback_paused || pause_pending)
+            throw "overlapping audio pause";
+        pause_pending = true;
+        pause_ready = false;
+        pause_pipe_empty = false;
+        ++pause_commands;
+    }
+
+    void pause_helper_ready()
+    {
+        if (!pause_pending)
+            throw "pause ready without request";
+        pause_ready = true;
+    }
+
+    void pause_read(unsigned bytes)
+    {
+        if (!pause_pending)
+            throw "pause drain without request";
+        pause_pipe_empty = false;
+        submit(bytes);
+    }
+
+    void pause_pipe_quiescent()
+    {
+        if (!pause_pending)
+            throw "pause quiescence without request";
+        pause_pipe_empty = true;
+    }
+
+    void pause_finish()
+    {
+        if (!pause_pending || !pause_ready || !pause_pipe_empty)
+            return;
+        pause_pending = false;
+        pause_ready = false;
+        pause_pipe_empty = false;
+        playback_paused = true;
+    }
+
+    void resume_audio()
+    {
+        if (!playback_paused || pause_pending)
+            throw "audio resume outside paused state";
+        playback_paused = false;
+        ++go_commands;
+    }
+
     void helper_eof(bool clean, bool file_source)
     {
         if (clean && file_source) {
@@ -153,6 +207,9 @@ struct MainLifecycle {
         download_active = true;
         replay_ready = false;
         playback_paused = false;
+        pause_pending = false;
+        pause_ready = false;
+        pause_pipe_empty = false;
         ++replay_launches;
     }
 
@@ -164,6 +221,9 @@ struct MainLifecycle {
         }
         replay_ready = false;
         playback_paused = false;
+        pause_pending = false;
+        pause_ready = false;
+        pause_pipe_empty = false;
     }
 };
 
@@ -228,6 +288,8 @@ static int require_patch_markers(const char *path)
         "MEDIA_CONTROL_SEEK_CONTINUE = 0x85",
         "MEDIA_CONTROL_STREAM_BOUNDARY = 0x86",
         "MEDIA_CONTROL_USER_ACTIVITY = 0x10",
+        "MEDIA_CONTROL_PAUSE = 0x11",
+        "MEDIA_CONTROL_PAUSE_READY = 0x87",
         "seek_pending = true;",
         "seek continued without reset",
         "seek target ready; download reset",
@@ -238,16 +300,19 @@ static int require_patch_markers(const char *path)
         "input != MEDIAPLAYER_INPUT_PLAY_PAUSE || !replay_ready",
         "retain ? \"eof-replay-ready\" : \"eof\"",
         "replay ready and paused; press Play to restart",
-        "audio_visualizer_controls &&",
-        "activity-command-error",
+        "if (audio_visualizer_controls)",
+        "audio pause requested submitted=%llu",
+        "audio pause helper ready submitted=%llu buffered=%u",
+        "audio playback paused submitted=%llu",
+        "pause_barrier_finish();",
         "if (helper_fd < 0 || chapter_barrier) return;",
         "navigation_pending = true;\n+\t\tif (!send_control(command))",
         "read_errno == EINTR)\n+\t\t\t\treturn;",
-        "if (!stream_boundary_pending ||\n+\t\t\t\t    pending_size == pending_offset)",
-        "DVD stream boundary pipe quiescent odd_tail=%u",
+        "if ((!stream_boundary_pending && !pause_pending) ||",
+        "stream_boundary_pending ?\n+\t\t\t\t                     \"DVD stream boundary\" : \"audio pause\"",
         "DVD stream boundary released after drain",
         "if (playback_paused && !stream_boundary_pending) return;",
-        "if (!pending_eof && !stream_boundary_pending) available &= ~1u;",
+        "if (!pending_eof && !stream_boundary_pending && !pause_pending)",
         "return mediaplayer_start_session(\"idle:\", MEDIAPLAYER_STREAM_INDEX, true);",
         "telemetry_enabled = !idle && user_io_status_get(\"[125]\");",
         "if (idle_session)",
@@ -386,6 +451,29 @@ int main(int argc, char **argv)
                           automatic_boundary.submitted == 9260304,
                       "automatic boundary did not drain, reset once, and resume");
 
+    MainLifecycle audio_pause;
+    audio_pause.submit(4096);
+    audio_pause.request_audio_pause();
+    audio_pause.pause_read(8192);
+    audio_pause.pause_pipe_quiescent();
+    audio_pause.pause_finish();
+    failed |= require(audio_pause.pause_pending &&
+                          !audio_pause.playback_paused,
+                      "audio pause completed before helper readiness");
+    audio_pause.pause_helper_ready();
+    audio_pause.pause_finish();
+    failed |= require(!audio_pause.pause_pending &&
+                          audio_pause.playback_paused &&
+                          audio_pause.pause_commands == 1 &&
+                          audio_pause.submitted == 12288,
+                      "audio pause did not drain through ready and quiescence");
+    audio_pause.resume_audio();
+    audio_pause.submit(16384);
+    failed |= require(!audio_pause.playback_paused &&
+                          audio_pause.go_commands == 1 &&
+                          audio_pause.submitted == 28672,
+                      "audio resume did not release with one GO");
+
     boundary.helper_eof(true, true);
     failed |= require(boundary.download_active && boundary.replay_ready &&
                           boundary.playback_paused,
@@ -461,6 +549,7 @@ int main(int argc, char **argv)
     std::cout << "main seek lifecycle PASS no-op_resets=0 valid_resets=1 "
                  "directional_navigation=continue-or-ready "
                  "automatic_boundary=drain-reset-go "
+                 "audio_pause=reveal-drain-hold-go "
                  "clean_eof=replay-ready play=relaunch "
                  "failed_eof=released idle=takeover-restart-guarded\n";
     return 0;
