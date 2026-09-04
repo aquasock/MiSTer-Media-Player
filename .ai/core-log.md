@@ -1,3 +1,32 @@
+## 970 COMMIT Unreleased 2ab755b 2026-09-04T04:08:26-07:00
+
+#### Coming From:
+
+Unreleased 2ab755b
+
+#### Purpose:
+
+Record hardware acceptance of Audio CD track-relative timing and define the requested metadata alignment and default-art boundary.
+
+#### Outcome:
+
+The user reports that source `2ab755b` looks good on the test MiSTer, accepting active-track elapsed, remaining, total and progress plus the complete album-duration playlist clock delivered by entry 969.  The next requested Audio CD presentation boundary is to mirror the selected `TRACK nn` playlist label in the title field, retain `---` placeholders for artist and album, align the title, artist and album colons on one vertical axis, and replace the empty artwork placeholder with a built-in default Audio CD image.  Existing CDDA transport, timing, selector behavior, visualizer lifecycle and ordinary audio-file presentation remain unchanged.
+
+#### Next Steps:
+
+Proceed with a separate approved helper-only proposal that gives the renderer an Audio CD presentation mode, derives the title from the same selected physical TOC track used by the playlist, aligns the metadata labels without changing their established scale, draws a deterministic default disc image inside the existing artwork viewport, and validates both CD and ordinary-file frames without rebuilding Main or the RBF.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 969 COMMIT Unreleased 2ab755b 2026-09-04T03:50:52-07:00
 
 #### Coming From:
@@ -1259,34 +1288,5 @@ Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with `ho
 
 - [x] Built
 - [x] Passed
-
----
-
-## 930 COMMIT Unreleased 366a227 2026-09-02T23:10:33-07:00
-
-#### Coming From:
-
-Unreleased 366a227
-
-#### Purpose:
-
-Record the first native-interlaced visualizer result and localize the striped player interface visible during its ten-second cover interval.
-
-#### Outcome:
-
-The user confirms that source `366a227` now preserves the intended state transition: during the first ten seconds the player overlay is selected, and at the timer boundary it clears completely to the accepted visualizer with normal audio.  Hardware rejects the covered presentation because the 423,052-byte screenshot at SHA-256 `00e3908c7dbd9095a8cc7c5400d2d91d2cf68d5b54203b5b640b76481d83fdd5` shows the interface broken into horizontal stripes with the moving visualizer visible between them.  The matching 150,175-byte log at SHA-256 `faf3d160f2e2441ef95773365f4d83111afc30604b4c8334fa2c2f7247384bf4` proves that the helper loads the new pack, publishes one complete 86,400-byte opaque overlay by 0.329255 seconds, keeps it visible through the 5.850755-second capture and starts valid timed refreshes without an early clear or protocol error.  The checksum-valid schema-21 snapshot at SHA-256 `06d2baf746d976507f2de88d1475c2fa59986af06e4a4b371e9db26dc464846f` reports one successful plane and video-domain publication with zero bad commits, but only 14,302 returned overlay row tags and 7,732,126 matched active pixels; at this elapsed native-480i cadence a continuously available plane would have approximately 79,000 row opportunities and 57 million active pixels.  Static localization explains that shortfall: the DDR arbiter grants every simultaneous presentation read ahead of the overlay line-cache reader, so continuous decoded-video readout starves most one-row-ahead overlay fetches, the two parity request slots collapse obsolete rows, and every unmatched row deliberately falls through to base video.  The prior progressive pack merely hid this pre-existing full-motion overlay bandwidth boundary by leaving native overlay composition disabled.
-
-#### Next Steps:
-
-After user approval, preserve source `366a227`, the helper, asset, decoder behavior and ten-second timing while making one bounded RBF-only arbitration correction: allow a pending overlay line-cache read to win one descriptor grant ahead of a simultaneous presentation request, after which the overlay engine must receive its fixed 23-word row and cannot request another until that response completes.  Extend the arbiter regression to prove the single bounded overlay grant and exact response ownership under a continuously asserted display reader, add an integrated native-raster stress test requiring every visible row tag and opaque sample to match while full-motion presentation reads continue, run the retained decoder, DDR, overlay and audio simulations on the build PC, perform a clean timing-qualified Quartus build, then repeat the first-ten-second audio test and require a solid interface with no base-video stripes before the normal clear reveals the visualizer.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
