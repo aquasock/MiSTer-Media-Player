@@ -1,3 +1,32 @@
+## 982 COMMIT Unreleased d007afd 2026-09-04T07:29:00-07:00
+
+#### Coming From:
+
+Unreleased d007afd
+
+#### Purpose:
+
+Evaluate the physical-DVD title PCM wall-clock floor against the user's repeat Simpsons run and verify that the returned capture belongs to the tested helper.
+
+#### Outcome:
+
+The user's direct listening result rejects source `d007afd`: episode audio is worse, runs ahead and progressively loses synchronization with video.  This is the failure mode expected when `CLOCK_MONOTONIC` is treated as a lower bound for PCM delivery but the DVD video presentation or shared FPGA transport advances more slowly than host wall time; the floor can admit audio that the presentation timeline has not earned.  The apparent starvation interval in the prior source-`715ff18` log therefore did not justify an independent title clock and may instead reflect deliberate synchronization to the slower presentation timeline, while the brief cutout remains a separate boundary or refill problem.  The files presently in `.ai/current_results` are not the new source-`d007afd` run: their timestamps remain 06:31:47 through 06:31:49, their three SHA-256 values exactly match entry 979's pre-fix source-`715ff18` capture, and the log contains no `DVD title PCM clock started` marker.  Consequently the new drift cannot be quantified from the current folder, but the audible progressive desynchronization is sufficient to fail the wall-clock correction.  No source or returned artifact was changed.
+
+#### Next Steps:
+
+Stop using the source-`d007afd` helper for normal playback and restore the prior source-`715ff18` helper if immediate usability is required.  Replace the three files in `.ai/current_results` with the actual source-`d007afd` run so its clock start, scheduling slope and telemetry can be measured.  After explicit user approval, revert the physical-DVD title wall-clock floor while retaining the accepted automatic-menu work, then instrument and address the brief title-boundary cutout without advancing audio independently of the presentation clock; repeat the Simpsons route before the remaining Futurama, Audio CD and ordinary-audio checks.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 981 COMMIT Unreleased d007afd 2026-09-04T07:11:42-07:00
 
 #### Coming From:
@@ -1251,34 +1280,5 @@ Replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 942 COMMIT Unreleased 401148e 2026-09-03T05:40:29-07:00
-
-#### Coming From:
-
-Unreleased 401148e
-
-#### Purpose:
-
-Use the source-`401148e` Futurama diagnostic to distinguish a safely future late-audio packet from stale silent-video state crossing an automatic DVD menu transition.
-
-#### Outcome:
-
-The fresh `FUTURAMA_S1D1` run reproduces the expected helper exit and supplies both bounded diagnostic records.  Before libdvdnav reports entry into the authored menu, the helper classifies the active DVD session as silent at the 2 MiB queue boundary, releasing 2,096,723 queued bytes at 2,321,525 total video bytes with two picture marks and a maximum video PTS of 151,777.  It then remains in permanent silent mode across the automatic menu-domain transition and emits 8,636,808 total video bytes before encountering the menu's valid AC-3 substream `0x80`.  That first audio packet has PTS 45,045, which is 106,732 90 kHz ticks, approximately 1.186 seconds, behind the retained video horizon; accepting it at the existing rejection point would therefore start audio late rather than restore synchronization.  The checksum-valid schema-21 snapshot again reports one completed and displayed I picture, sequence-end and presentation completion, zero decoder errors, zero transport blocks and zero audio underruns.  Main observes the expected exit-code-one helper EOF only after draining reserved output.  The 1,078,836-byte log, 637,394-byte screenshot and 441-byte sidecar have SHA-256 `5ee82e04ed9e510db88dffcafd2a70f28b3f68f341925048a3039f7e9a707ba3`, `a6a8c0694187aa92fde5509c54b4785a498276d33d785dccccb8e40cbeffe205` and `3c852112765d9bf2b432454813449353e9c66b02cf828fa31aef1acd92f408bf`.  The diagnostic succeeds and local source remains unchanged.
-
-#### Next Steps:
-
-After user approval, preserve the 2 MiB bound and the late-audio fail-fast guard while treating an automatic DVD transition from first-play/title space into menu space during silent-video mode as a new scheduling epoch.  Refresh the DVD menu state immediately after source reads expose the transition and before processing that payload, then rearm bounded video lookahead, the initial random-access filter, PTS state and PCM startup hold without clearing the resident frame, resetting Main or changing libdvdnav navigation.  Add a production-path regression that begins with more than 2 MiB of silent first-play video, enters a menu, and then supplies synchronized video plus AC-3, proving that the old source-`401148e` path rejects it while the corrected epoch accepts and schedules it; retain genuinely silent Program Stream completion, out-of-epoch late-audio rejection, automatic menu exit, authored still, overlay, staging, navigation, audio and sanitizer coverage.  Build only a new static ARM helper locally for Futurama menu, selector, title launch and return-to-menu testing while retaining the accepted v0.9.0 Main, RBF and visualizer.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
