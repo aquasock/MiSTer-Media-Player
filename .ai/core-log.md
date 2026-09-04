@@ -1,3 +1,32 @@
+## 978 COMMIT Unreleased 715ff18 2026-09-04T06:24:37-07:00
+
+#### Coming From:
+
+Unreleased 715ff18
+
+#### Purpose:
+
+Evaluate the source-`715ff18` real-time PCM fallback and provisional continuation on the physical Simpsons first-episode route.
+
+#### Outcome:
+
+The fresh physical capture partially accepts source `715ff18` while leaving the title transition untested.  Main sends the capture's only Activate command at 112.214420 seconds, libdvdnav accepts button one but remains in menu space, and PCM pressure promptly rebases PTS 45,045 above prior PTS 647,273, commits the exact 193,064-byte stage, preserves the resident decoder with 183,808 held frames and acknowledges the provisional continuation at 112.388301 seconds.  The new fallback reports `rate=48000`; over the following 30.442892 seconds Main submission grows by 9,701,232 bytes at a mean 318,670 bytes per second instead of the prior source-rate runaway, the helper remains alive, and there is no hold-limit failure, signal-nine termination, helper error or overlay ordering error.  The destination publishes distinct overlay geometry and valid commits at 112.829373 and 135.179779 seconds while the screenshot continues to show the episode-selection menu.  No second navigation command, menu leave, delayed provisional stream boundary or title payload occurs before capture, so the reported static picture is an unresolved same-menu authored state rather than evidence that the host path stopped; the checksum-valid schema-21 snapshot is the earlier root-menu capture with 4,885,648 accepted bytes, 124 displayed pictures, 123 swaps and zero decoder, presentation, PCM, underrun, transport or overlay errors, and therefore does not independently characterize the post-activation decoder interval.  The 4,824,330-byte log, 600,183-byte screenshot and 844-byte sidecar have SHA-256 `39be84978ce3767aa5e51f3f1ab591d52491ff0b230d3a9a73a85e66d13f784d`, `f67cd7c2741b84f166fcbb90df3afd1943cd177210091af6202dc77c4dd69228` and `8468f22cbff5cfbae5ccc869779dc7e922f911144bd717358509df2bc6d01a74`.
+
+#### Next Steps:
+
+Retain source `715ff18` and repeat the same route, but after the destination episode menu and its new highlight settle, press Space a second time and keep the capture running through either title playback or a bounded failure.  Require a second `DVD navigation command=0x08`, a later menu leave followed by `DVD delayed activation provisional stream boundary`, one drained decoder boundary and sustained episode video with advancing PTS; if the second command is recorded but menu state still never leaves or the title still does not start, use that evidence to propose a consumer-synchronous DVD domain, PGC or title-transition discriminator rather than weakening the now-proven real-time PCM pacing.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 977 COMMIT Unreleased 715ff18 2026-09-04T05:49:51-07:00
 
 #### Coming From:
@@ -1255,38 +1284,6 @@ Complete the user's functional and regression matrix, then perform the required 
 - docs/MEDIA_CONVERSION.md
 - docs/RELEASE_NOTES_v0.9.0.md
 - docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 938 COMMIT Unreleased 0f1165c 2026-09-03T02:28:26-07:00
-
-#### Coming From:
-
-Unreleased 490dc02
-
-#### Purpose:
-
-Normalize each qualifying malformed DVD H.262 sequence boundary across PES fragmentation instead of correcting only the session's initial random-access group.
-
-#### Outcome:
-
-Source `0f1165c` replaces the startup-only correction boundary with a DVD/ISO elementary-video compatibility filter that carries sequence, picture and extension syntax state across PES payloads and delays exactly one byte.  That lookahead validates `progressive_frame` before conditionally setting the preceding zero `chroma_420_type` bit on only the first valid complete-frame I picture after a 4:2:0 sequence header; stream length, byte order, offsets and timestamp-record order remain exact, navigation reset discards the old held suffix, and authored-still or ordinary stream completion flushes it.  Every correction logs its cumulative elementary-stream offset and before/after byte.  The focused C regression joins two captured malformed Big Lebowski prefixes and proves exactly offsets 185 and 380 change from `0xc0` to `0xc1` under every possible single split and one-byte fragmentation, while conforming, non-4:2:0, non-I, field and interlaced controls remain byte-identical.  Icarus reproduces source 21 on the original prefix and admits two consecutive corrected stills with supported film fields and no syntax error.  Strict native and ARM helper builds, ASan/UBSan, focused GCC analyzer, one hundred random-access, menu-hop, reserve and staging repetitions, twenty overlay and SPU repetitions, Program Stream seek, audio seek/UI/visualizer and unsupported-LPCM tests pass.  The exact ARM helper passes its capability probe and real MP3/WAV/FLAC/Ogg integration with 378 or 381 pictures and one clear record per file.  The static stripped ARMv7 EABI5 artifact `host/build/MediaPlayer_Helper_H262Stream_0f1165c` is 966052 bytes with SHA-256 `613d35de5ace0622584ae14b4540423c2c56b1f923c02c599f47b55722e21e56`; Main, RBF and visualizer are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_H262Stream_0f1165c`, preserve executable mode and retain the installed Main, visualizer and timing-qualified RBF.  With telemetry enabled, start The Big Lebowski and require correction one at elementary offset 185, a second correction when the following seven-second still begins, accepted bytes advancing beyond the former 5,670-byte failure boundary, error flags remaining zero and normal title playback beginning.  Press `m`, exercise the Root Menu and Scene Selection repeatedly, return to the title and reopen both paths, then verify each new malformed authored sequence is corrected without a helper exit or decoder latch.  Spot-check Blazing Saddles and Coming to America title, menu and chapter navigation before returning the fresh log, screenshot and telemetry sidecar.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
-- tools/test_h262_restart_normalization.sv
 
 #### Status:
 
