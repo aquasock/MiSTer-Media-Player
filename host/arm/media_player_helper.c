@@ -53,7 +53,7 @@
 #define PCM_RECORD_FRAMES           16u
 #define VIDEO_SLICE_BYTES           256u
 #define AUTOMATIC_MENU_STALLED_VIDEO_BYTES (256u * 1024u)
-#define PCM_PACE_SLEEP_NS            (2u * 1000u * 1000u)
+#define AUTOMATIC_MENU_PACE_SLEEP_NS (2u * 1000u * 1000u)
 #define H262_RESTART_DIAGNOSTIC_PREFIX_BYTES 256u
 #define MP3_PROBE_BYTES             (64u * 1024u)
 #define ID3V2_TAG_LIMIT             (64u * 1024u * 1024u)
@@ -256,12 +256,6 @@ struct output_state {
     int pcm_non_audio;       /* IEC 61937 burst records, never decoded PCM */
     int scheduler_enabled;
     int scheduler_started;
-    int physical_dvd;
-    int dvd_menu_active;
-    int dvd_title_pcm_clock_active;
-    int dvd_title_pcm_clock_rate_hz;
-    uint64_t dvd_title_pcm_clock_start_us;
-    uint64_t dvd_title_pcm_clock_start_frames;
     int automatic_menu_epoch;
     unsigned automatic_menu_stalled_pts;
     int automatic_menu_pcm_fallback;
@@ -1134,7 +1128,6 @@ static int refresh_dvd_menu_state(struct media_source *input,
 
     if (!menu->enabled || !media_source_dvd_state(input, &state))
         return 0;
-    output->dvd_menu_active = state.menu_active;
     if (state.menu_changed || state.menu_active != menu->menu_active) {
         menu_entered = state.menu_active && !menu->menu_active;
         menu->menu_active = state.menu_active;
@@ -2267,7 +2260,6 @@ static void reset_output_for_navigation(struct output_state *output,
     FILE *pcm = output->pcm;
     struct output_reserve *reserve = output->reserve;
     struct output_stage *activation_stage = output->activation_stage;
-    int physical_dvd = output->physical_dvd;
 
     free(output->hold);
     output->hold = NULL;
@@ -2278,7 +2270,6 @@ static void reset_output_for_navigation(struct output_state *output,
     output->pcm = pcm;
     output->reserve = reserve;
     output->activation_stage = activation_stage;
-    output->physical_dvd = physical_dvd;
     output->hold_limit = hold_limit;
     output->hold_active = hold_limit != 0;
     output->scheduler_started = !output->hold_active;
@@ -2324,7 +2315,6 @@ static int rearm_for_automatic_menu(struct audio_state *audio,
     reset_audio_for_navigation(audio);
     reset_output_for_navigation(output, hold_limit, 1);
     output->automatic_menu_epoch = 1;
-    output->dvd_menu_active = 1;
     output->iso_start_filter_active = 0;
     if (have_prior_pts) {
         output->iso_pts_normalized_max = prior_pts;
@@ -2354,7 +2344,6 @@ static int start_pending_menu_activation(struct dvd_menu_state *menu,
         return -1;
     reset_audio_for_navigation(audio);
     reset_output_for_navigation(output, hold_limit, 1);
-    output->dvd_menu_active = 1;
     menu->activation_pending = 1;
     menu->activation_followup_pending = 0;
     menu->activation_payloads = 0;
@@ -2621,8 +2610,8 @@ static void scheduler_log_progress(struct output_state *output)
  * the hard ceiling until the next clock budget is due.  Any later PTS advance
  * disables this fallback before its new timestamp target is evaluated.
  */
-static uint64_t scheduler_elapsed_frames(uint64_t elapsed_us,
-                                         unsigned rate_hz)
+static uint64_t automatic_menu_elapsed_frames(uint64_t elapsed_us,
+                                              unsigned rate_hz)
 {
     uint64_t seconds = elapsed_us / 1000000u;
     uint64_t fraction = elapsed_us % 1000000u;
@@ -2635,80 +2624,20 @@ static uint64_t scheduler_elapsed_frames(uint64_t elapsed_us,
     return frames > UINT64_MAX - fraction ? UINT64_MAX : frames + fraction;
 }
 
-static int scheduler_pace_wait(const char *domain)
+static int automatic_menu_pace_wait(void)
 {
     struct timespec remaining = {
-        0, (long)PCM_PACE_SLEEP_NS
+        0, (long)AUTOMATIC_MENU_PACE_SLEEP_NS
     };
 
     while (nanosleep(&remaining, &remaining) < 0) {
         if (errno != EINTR) {
             fprintf(stderr,
-                    "media_player_helper: %s PCM pacing wait failed: %s\n",
-                    domain, strerror(errno));
+                    "media_player_helper: automatic menu PCM pacing wait "
+                    "failed: %s\n", strerror(errno));
             return -1;
         }
     }
-    return 0;
-}
-
-/*
- * Video PTS remains the primary DVD title clock, but an authored cell may
- * carry megabytes of mux payload while advancing that clock by only a fraction
- * of wall time.  The sink still consumes PCM at the selected sample rate.  A
- * monotonic lower bound, anchored after startup release, prevents such a
- * sparse-PTS interval from exhausting the fixed FPGA lead.  Rounding down to
- * the established refill size ensures this path never emits audio before the
- * sample clock earns it.  Menu epochs retain their separate stalled-PTS
- * fallback, and non-physical sources never enter this clock domain.
- */
-static int scheduler_dvd_title_pcm_target(struct output_state *output,
-                                          uint64_t *target_out)
-{
-    uint64_t now;
-    uint64_t elapsed_frames;
-    uint64_t target;
-
-    *target_out = 0;
-    if (!output->physical_dvd || output->dvd_menu_active ||
-        output->automatic_menu_epoch ||
-        !output->scheduler_started || output->hold_active ||
-        !output->have_audio_pts || output->hold_rate_hz <= 0)
-        return 0;
-    now = monotonic_us();
-    if (!now) {
-        fprintf(stderr,
-                "media_player_helper: DVD title PCM clock unavailable\n");
-        return -1;
-    }
-    if (!output->dvd_title_pcm_clock_active ||
-        output->dvd_title_pcm_clock_rate_hz != output->hold_rate_hz) {
-        output->dvd_title_pcm_clock_active = 1;
-        output->dvd_title_pcm_clock_rate_hz = output->hold_rate_hz;
-        output->dvd_title_pcm_clock_start_us = now;
-        output->dvd_title_pcm_clock_start_frames =
-            output->pcm_emitted_frames;
-        fprintf(stderr,
-                "media_player_helper: DVD title PCM clock started "
-                "base_frames=%llu refill=%u rate=%d\n",
-                (unsigned long long)
-                    output->dvd_title_pcm_clock_start_frames,
-                PCM_REFILL_FRAMES, output->hold_rate_hz);
-    }
-    if (now < output->dvd_title_pcm_clock_start_us) {
-        fprintf(stderr,
-                "media_player_helper: DVD title PCM clock failed\n");
-        return -1;
-    }
-    elapsed_frames = scheduler_elapsed_frames(
-        now - output->dvd_title_pcm_clock_start_us,
-        (unsigned)output->dvd_title_pcm_clock_rate_hz);
-    if (elapsed_frames > UINT64_MAX -
-            output->dvd_title_pcm_clock_start_frames)
-        target = UINT64_MAX;
-    else
-        target = output->dvd_title_pcm_clock_start_frames + elapsed_frames;
-    *target_out = target - target % PCM_REFILL_FRAMES;
     return 0;
 }
 
@@ -2777,7 +2706,7 @@ static int scheduler_automatic_menu_pcm(struct output_state *output,
                     "failed\n");
             return -1;
         }
-        elapsed_frames = scheduler_elapsed_frames(
+        elapsed_frames = automatic_menu_elapsed_frames(
             now - output->automatic_menu_pcm_clock_start_us,
             (unsigned)output->hold_rate_hz);
         if (elapsed_frames > UINT64_MAX -
@@ -2792,7 +2721,7 @@ static int scheduler_automatic_menu_pcm(struct output_state *output,
         if (available <= watermark || !due) {
             if (available <= ceiling)
                 return 0;
-            if (scheduler_pace_wait("automatic menu") < 0)
+            if (automatic_menu_pace_wait() < 0)
                 return -1;
             continue;
         }
@@ -2839,43 +2768,6 @@ static int scheduler_check_automatic_menu_hold(struct output_state *output)
     return -1;
 }
 
-/* Stop a fast physical source at the configured decoded-audio ceiling. */
-static int scheduler_pace_dvd_title_hold(struct output_state *output)
-{
-    if (!output->physical_dvd || output->dvd_menu_active ||
-        output->automatic_menu_epoch ||
-        !output->scheduler_started || output->hold_active ||
-        !output->hold_limit || !output->have_audio_pts ||
-        output->hold_rate_hz <= 0)
-        return 0;
-    while (hold_available(output) > output->hold_limit) {
-        uint64_t target;
-        uint64_t due;
-
-        if (scheduler_dvd_title_pcm_target(output, &target) < 0)
-            return -1;
-        {
-            uint64_t pts_target = scheduler_pcm_delivery_target(
-                output, output->max_video_pts);
-
-            if (pts_target > target)
-                target = pts_target;
-        }
-        due = target > output->pcm_emitted_frames ?
-              target - output->pcm_emitted_frames : 0;
-        if (!due) {
-            if (scheduler_pace_wait("DVD title") < 0)
-                return -1;
-            continue;
-        }
-        if (due > PCM_SCHEDULE_BATCH_FRAMES)
-            due = PCM_SCHEDULE_BATCH_FRAMES;
-        if (scheduler_emit_pcm(output, due) < 0)
-            return -1;
-    }
-    return 0;
-}
-
 /*
  * Program Stream packet order is not a delivery schedule: a mux may place
  * several pictures between audio PES packets.  Once startup is released, keep
@@ -2897,7 +2789,6 @@ static int scheduler_drain(struct output_state *output, int at_eof)
     while (output->video_head) {
         struct video_chunk *chunk = output->video_head;
         uint64_t target;
-        uint64_t title_target;
         uint64_t due;
         uint64_t available_total;
         size_t remaining = chunk->size - chunk->offset;
@@ -2932,10 +2823,6 @@ static int scheduler_drain(struct output_state *output, int at_eof)
         slice = remaining > VIDEO_SLICE_BYTES ? VIDEO_SLICE_BYTES : remaining;
         target = scheduler_pcm_delivery_target(
             output, scheduler_video_horizon(output, slice));
-        if (scheduler_dvd_title_pcm_target(output, &title_target) < 0)
-            return -1;
-        if (title_target > target)
-            target = title_target;
         due = target > output->pcm_emitted_frames ?
               target - output->pcm_emitted_frames : 0;
         if (due > PCM_SCHEDULE_BATCH_FRAMES)
@@ -2968,18 +2855,9 @@ static int scheduler_drain(struct output_state *output, int at_eof)
     if (output->scheduler_started && !output->hold_active && !output->video_head) {
         uint64_t target = scheduler_pcm_delivery_target(
             output, output->max_video_pts);
-        uint64_t title_target;
         uint64_t due = target > output->pcm_emitted_frames ?
                        target - output->pcm_emitted_frames : 0;
         uint64_t timestamp_due = due;
-
-        if (scheduler_dvd_title_pcm_target(output, &title_target) < 0)
-            return -1;
-        if (title_target > target) {
-            target = title_target;
-            due = target > output->pcm_emitted_frames ?
-                  target - output->pcm_emitted_frames : 0;
-        }
 
         if (due > PCM_SCHEDULE_BATCH_FRAMES)
             due = PCM_SCHEDULE_BATCH_FRAMES;
@@ -2989,8 +2867,6 @@ static int scheduler_drain(struct output_state *output, int at_eof)
             return -1;
     }
     if (scheduler_check_automatic_menu_hold(output) < 0)
-        return -1;
-    if (scheduler_pace_dvd_title_hold(output) < 0)
         return -1;
     if (output->scheduler_started && !output->hold_active)
         scheduler_log_progress(output);
@@ -5620,7 +5496,6 @@ int main(int argc, char **argv)
                 output_reserve_priority_capacity(output.reserve));
     }
     output.scheduler_enabled = is_program_stream && !output.pcm;
-    output.physical_dvd = input.kind == MEDIA_SOURCE_DVD;
     output.iso_pts_normalization =
         input.kind == MEDIA_SOURCE_ISO || input.kind == MEDIA_SOURCE_DVD;
     output.iso_start_filter_active =

@@ -242,17 +242,8 @@ ceiling. For a physical DVD, every admitted batch also drains the asynchronous
 output reserve. The default four-second hold consequently settles at a
 two-second low watermark, retains equal safety headroom for later Program
 Stream audio bursts and cannot run at optical-drive or SPI acceptance speed.
-Physical-DVD title playback retains that reserve and the normal PTS scheduler,
-but also anchors a monotonic PCM floor when its startup hold is released. Each
-scheduling decision takes the greater of the PTS target and the elapsed
-sample-clock target, rounded down to the existing refill unit. Normal PTS
-advancement therefore remains authoritative, while a cell that moves several
-megabytes with sparse timestamps cannot exhaust the FPGA's audio lead when
-decoded PCM is already available. A fast source waits at the existing decoded-
-audio hold ceiling until wall time earns another batch. The title clock is
-excluded from every menu epoch and non-physical source and is reset with each
-navigation or stream boundary. A later menu video PTS advance immediately
-restores the normal menu timestamp scheduler.
+Ordinary advancing-timestamp title playback retains its reserve unchanged. A
+later video PTS advance immediately restores the normal timestamp scheduler.
 The hold limit remains a hard post-drain invariant in this fallback domain, so
 malformed scheduling stops with a diagnostic rather than growing the host queue
 to exhaustion. Explicit
