@@ -1,3 +1,32 @@
+## 979 COMMIT Unreleased 715ff18 2026-09-04T06:34:19-07:00
+
+#### Coming From:
+
+Unreleased 715ff18
+
+#### Purpose:
+
+Complete the source-`715ff18` Simpsons title-launch test and distinguish the apparent freeze from the disc's authored navigation path.
+
+#### Outcome:
+
+The updated physical capture proves that the first Space press did not skip a menu or freeze the decoder: it activated button one in a six-button menu at PCI LBN 367 and entered a distinct five-button authored submenu at PCI LBN 966 while deliberately retaining the resident decoder frame.  The similar static background made that intermediate state appear frozen, but its changed highlight geometry and repeated valid overlay commits identify a live submenu.  Source `715ff18` then sustains that state for 406.508705 seconds until the second Space press while holding PCM near the 96,000-frame watermark; Main submits 124,486,314 bytes at a bounded mean 306,233 bytes per second with no helper error, hold-limit failure or memory runaway.  The second Activate command at 518.723125 seconds selects button one in the five-button submenu, libdvdnav reports a menu hop and leaves menu space at 518.797622 seconds, Main releases the ordinary navigation barrier at 518.805154 seconds, and the helper qualifies a fresh sequence, I picture and following reference before starting the episode.  The screenshot visibly shows episode playback, and the capture continues for 295.724162 seconds with 301,806,776 more submitted bytes, advancing video PTS and no decoder, presentation, overlay, PCM-protocol or transport error.  The checksum-valid schema-21 title snapshot records 25,271,780 accepted bytes, 220 displayed pictures, 219 swaps and no transport block, but it latches one PCM underrun with a zero FIFO floor and error flag `0x0400`; this is the only remaining anomaly and was not reported audibly by the user.  The 15,107,244-byte log, 1,519,205-byte screenshot and 779-byte sidecar have SHA-256 `55e5dd122ebffb333984e816010ce003b081e89be10f3fe617ed3fdc6cbd3178`, `325109c827a903d90d35bd8e5400ebe0862f6446346c958542ea8e4fad74fb0f` and `8427ea7911dec9ddd19b44651a0bd5d3670174a3e6195968c2972107cc5280e2`.
+
+#### Next Steps:
+
+Retain source `715ff18` and its two-step menu behavior.  Confirm whether any brief audio dropout was audible when the episode began, then repeat one fresh Simpsons title launch with telemetry to determine whether the single startup underrun is reproducible; require zero underruns before final acceptance, or isolate the title-boundary PCM refill if it repeats.  Complete the planned Futurama root and nested-menu check plus Audio CD and ordinary-audio spot checks without changing the proven real-time fallback or DVD navigation classification from this successful title launch.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 978 COMMIT Unreleased 715ff18 2026-09-04T06:24:37-07:00
 
 #### Coming From:
@@ -1254,40 +1283,5 @@ The repository and package are ready for the project owner to create annotated t
 
 - [x] Built
 - [x] Passed
-
----
-
-## 939 COMMIT Unreleased 7759f87 2026-09-03T03:19:43-07:00
-
-#### Coming From:
-
-Unreleased 0f1165c
-
-#### Purpose:
-
-Prepare the repository documentation and release-candidate notes for the v0.9.0 capability set accumulated since v0.8.0.
-
-#### Outcome:
-
-The user reports that the source-`0f1165c` candidate looks good and is conducting the final functional and regression pass independently.  Source `7759f87` reconciles the README, changelog, architecture, build and hardware-test documentation with the complete v0.9.0 candidate: native 480p and expanded native-480i decoding, Program Stream seeking and replay-ready EOF, standalone consumer audio and its timed visualizer overlay, encrypted ISO and direct-optical DVD playback, authored menus and scene selection, unsupported LPCM behavior, telemetry and current limitations.  It adds dedicated v0.9.0 release-candidate notes with the tested component identities, exact candidate artifact hashes and established timing/resources while explicitly reserving publication provenance for the clean release build.  It also adds a focused media-preparation guide and promotes the user's 720-by-480 exact-24-fps MPEG-2 Program Stream FFmpeg command as the project recipe.  That command produces the documented Main Profile, 4:2:0, 32:27-SAR output with a 48 kHz 320-kilobit MP2 track and also succeeds without an input audio stream; local links, code fences, whitespace and staged-diff checks pass.  No runtime source or artifact changed.
-
-#### Next Steps:
-
-Complete the user's functional and regression matrix, then perform the required clean/from-scratch Quartus, helper, Main and visualizer release build from the exact accepted source.  Once those artifacts reproduce and pass the final hardware gate, update the changelog from Unreleased to the dated v0.9.0 boundary, replace candidate language with final package filenames and hashes, and have the user create the annotated tag and pre-release from that exact documentation commit.  Do not tag or publish v0.9.0 before those gates close.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- README.md
-- docs/ARCHITECTURE.md
-- docs/BUILDING.md
-- docs/MEDIA_CONVERSION.md
-- docs/RELEASE_NOTES_v0.9.0.md
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
