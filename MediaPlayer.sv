@@ -592,6 +592,52 @@ audio_pcm_output_adapter audio_pcm_output_adapter
 	.playback_complete(audio_pcm_playback_complete)
 );
 
+// Schema 22: count the samples actually dequeued by the audio-domain sink,
+// not merely the PCM records extracted in clk_mpeg2. Cross the free-running
+// diagnostic counter as Gray code so a snapshot can compare audio progress to
+// presentation progress without feeding any value back into playback.
+reg [31:0] audio_pcm_dequeue_count_audio;
+wire [31:0] audio_pcm_dequeue_gray_audio =
+	audio_pcm_dequeue_count_audio ^ (audio_pcm_dequeue_count_audio >> 1);
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [31:0] audio_pcm_dequeue_gray_sync0;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [31:0] audio_pcm_dequeue_gray_sync1;
+
+function automatic [31:0] audio_gray_to_binary32;
+	input [31:0] gray;
+	integer bit_index;
+	begin
+		audio_gray_to_binary32[31] = gray[31];
+		for (bit_index = 30; bit_index >= 0; bit_index = bit_index - 1)
+			audio_gray_to_binary32[bit_index] =
+				audio_gray_to_binary32[bit_index + 1] ^ gray[bit_index];
+	end
+endfunction
+
+always @(posedge CLK_AUDIO) begin
+	if (reset_audio_out)
+		audio_pcm_dequeue_count_audio <= 32'd0;
+	else if (audio_pcm_fifo_rd && !audio_pcm_fifo_empty &&
+	         !audio_pcm_fifo_data[34])
+		audio_pcm_dequeue_count_audio <=
+			audio_pcm_dequeue_count_audio + 32'd1;
+end
+
+always @(posedge clk_mpeg2) begin
+	if (reset_mpeg2) begin
+		audio_pcm_dequeue_gray_sync0 <= 32'd0;
+		audio_pcm_dequeue_gray_sync1 <= 32'd0;
+	end
+	else begin
+		audio_pcm_dequeue_gray_sync0 <= audio_pcm_dequeue_gray_audio;
+		audio_pcm_dequeue_gray_sync1 <= audio_pcm_dequeue_gray_sync0;
+	end
+end
+
+wire [31:0] audio_pcm_dequeue_count_mpeg2 =
+	audio_gray_to_binary32(audio_pcm_dequeue_gray_sync1);
+
 reg [6:0] audio_pcm_fifo_peak;
 reg [1:0] audio_pcm_underrun_sync;
 
@@ -2504,8 +2550,14 @@ mpeg2_h262_hardware_cadence_profiler
     .cadence_slot              (mpeg2_new_b_cadence_slot_debug),
     .decoder_byte_accepted     (mpeg2_new_decode_stream_valid),
     .stc_seconds               (mpeg2_new_stc_seconds),
+    .presentation_stc_valid    (mpeg2_new_pts_timeline_anchored),
+    .presentation_stc_90k      (mpeg2_new_pts_timeline_stc),
     .associated_count          (mpeg2_new_associated_count),
     .display_pts               (mpeg2_new_display_pts),
+    .display_pts_valid         (mpeg2_new_display_pts_valid),
+    .candidate_pts             (mpeg2_new_candidate_pts),
+    .candidate_pts_valid       (mpeg2_new_candidate_pts_valid),
+    .audio_pcm_dequeue_count   (audio_pcm_dequeue_count_mpeg2),
     .pcm_sample_count          (mpeg2_new_inband_pcm_sample_count),
     .pcm_fifo_peak             (audio_pcm_fifo_peak),
     .transport_block_longest   (transport_block_longest),

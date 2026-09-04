@@ -8,6 +8,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Extended the default-off hardware telemetry to schema 22. Five previously
+  unused words now report full display progress, audio-domain PCM consumption,
+  displayed and pending PTS lateness against the audio-derived STC, and
+  categorized presentation-window gating without affecting playback logic.
 - Clocked the DVD automatic-menu PCM fallback explicitly at its selected sample
   rate after the existing bounded initial release. A fast optical source now
   waits at the decoded-audio ceiling instead of flooding Main at source/SPI

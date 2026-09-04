@@ -155,6 +155,34 @@ class HardwareTelemetryTest(unittest.TestCase):
         # themselves a parser validation failure.
         self.assertEqual(TELEMETRY.validate(result), [])
 
+    def test_schema22_av_progress_semantics(self) -> None:
+        words = snapshot(22)
+        words[6] = 1_800_000_000
+        words[37] = 0x4F564C31
+        words[58] = (900 << 16) | 899
+        words[59] = 1_440_000
+        words[60] = 9_000
+        words[61] = (-4_500) & 0xFFFFFFFF
+        words[62] = (1 << 31) | (1 << 30) | (7 << 20) | (11 << 10) | 13
+
+        result = TELEMETRY.parse_words(words)
+        self.assertEqual(result["schema_version"], 22)
+        self.assertTrue(result["overlay_debug_magic_valid"])
+        self.assertEqual(result["display_pictures"], 900)
+        self.assertEqual(result["display_swaps"], 899)
+        self.assertAlmostEqual(result["delivered_fps"], 899 / 30)
+        self.assertEqual(result["audio_pcm_dequeue_count"], 1_440_000)
+        self.assertTrue(result["display_pts_lateness_valid"])
+        self.assertEqual(result["display_pts_lateness_ticks"], 9_000)
+        self.assertAlmostEqual(result["display_pts_lateness_seconds"], 0.1)
+        self.assertTrue(result["candidate_pts_lateness_valid"])
+        self.assertEqual(result["candidate_pts_lateness_ticks"], -4_500)
+        self.assertAlmostEqual(result["candidate_pts_lateness_seconds"], -0.05)
+        self.assertEqual(result["candidate_unavailable_windows"], 7)
+        self.assertEqual(result["cadence_blocked_windows"], 11)
+        self.assertEqual(result["timestamp_blocked_windows"], 13)
+        self.assertEqual(TELEMETRY.validate(result), [])
+
     def test_schema20_deadline_layout_remains_unchanged(self) -> None:
         words = snapshot(20)
         words[6] = 120000000

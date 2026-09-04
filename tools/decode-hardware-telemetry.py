@@ -152,7 +152,7 @@ def decode_words(path: Path | str) -> list[int]:
 def parse_words(words: list[int]) -> dict[str, Any]:
     format_word = words[1]
     schema_version = (format_word >> 24) & 0xFF
-    if schema_version > 21:
+    if schema_version > 22:
         raise TelemetryDecodeError(f"unsupported telemetry schema {schema_version}")
     clock_hz = (format_word & 0xFFFF) * 1000
     counts = words[17]
@@ -588,10 +588,11 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         result["display_pictures_8bit"] = result["display_pictures"]
         result["display_swaps_8bit"] = result["display_swaps"]
 
-        if schema_version == 21:
-            # Entry 884: schema 21 overlays words 37..54 with authored-menu
+        if schema_version >= 21:
+            # Entry 884: schemas 21 and 22 overlay words 37..54 with authored-menu
             # pipeline telemetry. The exact full-width display counters and
-            # deadline records are therefore unavailable in this schema.
+            # deadline records are therefore unavailable in schema 21. Schema
+            # 22 restores the display counters in word 58 below.
             overlay_counts = words[38]
             overlay_commits = words[39]
             overlay_publications = words[43]
@@ -689,6 +690,16 @@ def parse_words(words: list[int]) -> dict[str, Any]:
                     (overlay_capture & 0x0FFFFFFF) / clock_hz
                     if clock_hz else None
                 ),
+                "audio_pcm_dequeue_count": None,
+                "display_pts_lateness_valid": None,
+                "display_pts_lateness_ticks": None,
+                "display_pts_lateness_seconds": None,
+                "candidate_pts_lateness_valid": None,
+                "candidate_pts_lateness_ticks": None,
+                "candidate_pts_lateness_seconds": None,
+                "candidate_unavailable_windows": None,
+                "cadence_blocked_windows": None,
+                "timestamp_blocked_windows": None,
             })
         else:
             result["display_pictures"] = words[37] >> 16
@@ -724,7 +735,54 @@ def parse_words(words: list[int]) -> dict[str, Any]:
                 "audio_fifo_floor", "audio_fifo_floor_ms",
             ):
                 result[key] = None
-        if schema_version == 21:
+        if schema_version >= 22:
+            display_progress = words[58]
+            result["display_pictures"] = display_progress >> 16
+            result["display_swaps"] = display_progress & 0xFFFF
+            result["display_counts_saturated"] = (
+                result["display_pictures"] == 0xFFFF or
+                result["display_swaps"] == 0xFFFF
+            )
+            result["delivered_fps"] = (
+                result["display_swaps"] / cadence_seconds
+                if cadence_seconds and not result["display_counts_saturated"]
+                else None
+            )
+            result["audio_pcm_dequeue_count"] = words[59]
+
+            def signed_word(value: int) -> int:
+                return value - (1 << 32) if value & 0x80000000 else value
+
+            progress_flags = words[62]
+            display_lateness_valid = bool(progress_flags & (1 << 31))
+            candidate_lateness_valid = bool(progress_flags & (1 << 30))
+            display_lateness = signed_word(words[60])
+            candidate_lateness = signed_word(words[61])
+            result.update({
+                "display_pts_lateness_valid": display_lateness_valid,
+                "display_pts_lateness_ticks": (
+                    display_lateness if display_lateness_valid else None
+                ),
+                "display_pts_lateness_seconds": (
+                    display_lateness / 90000.0
+                    if display_lateness_valid else None
+                ),
+                "candidate_pts_lateness_valid": candidate_lateness_valid,
+                "candidate_pts_lateness_ticks": (
+                    candidate_lateness if candidate_lateness_valid else None
+                ),
+                "candidate_pts_lateness_seconds": (
+                    candidate_lateness / 90000.0
+                    if candidate_lateness_valid else None
+                ),
+                "candidate_unavailable_windows": (
+                    progress_flags >> 20
+                ) & 0x3FF,
+                "cadence_blocked_windows": (progress_flags >> 10) & 0x3FF,
+                "timestamp_blocked_windows": progress_flags & 0x3FF,
+            })
+
+        if schema_version >= 21:
             return result
 
         result["deadline_scope"] = "native_30000_1001_after_first_swap"
@@ -1127,6 +1185,19 @@ def main() -> int:
                     result["audio_fifo_floor_ms"],
                 )
             )
+        if result["schema_version"] >= 22:
+            print(
+                "A/V progress: audio_dequeues={audio_pcm_dequeue_count} "
+                "display={display_pictures}/{display_swaps}; "
+                "lateness display={display_pts_lateness_ticks} ticks/"
+                "{display_pts_lateness_seconds}s "
+                "candidate={candidate_pts_lateness_ticks} ticks/"
+                "{candidate_pts_lateness_seconds}s; "
+                "blocked unavailable/cadence/timestamp="
+                "{candidate_unavailable_windows}/{cadence_blocked_windows}/"
+                "{timestamp_blocked_windows}".format(**result)
+            )
+        if result.get("audio_underrun_count") is not None:
             for record in result["deadline_records"]:
                 print("deadline: " + json.dumps(record, sort_keys=True))
         print(

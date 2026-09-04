@@ -92,6 +92,7 @@ module mpeg2_h262_hardware_cadence_profiler #(
     // counted in this domain from a single-bit 1 Hz pulse crossed from the
     // 24.576 MHz audio domain, so no multi-bit counter crosses domains.
     input wire [13:0] stc_seconds,
+    input wire presentation_stc_valid,input wire [32:0] presentation_stc_90k,
     // Entry 369: in-band record telemetry.  The low PTS bits are carried so
     // an injected timestamp can be matched exactly rather than merely seen
     // to be non-zero.
@@ -100,6 +101,8 @@ module mpeg2_h262_hardware_cadence_profiler #(
     // Association implies extraction, so the extractor's own count is no
     // longer carried; entry 371 records its validation.
     input wire [7:0] associated_count,input wire [32:0] display_pts,
+    input wire display_pts_valid,input wire [32:0] candidate_pts,
+    input wire candidate_pts_valid,input wire [31:0] audio_pcm_dequeue_count,
     input wire [13:0] pcm_sample_count,input wire [6:0] pcm_fifo_peak,
     // Entry 693: the shared transport byte path halts while the clean video
     // queue is full and audio behind the held byte halts with it, so the
@@ -129,7 +132,7 @@ localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
 localparam [31:0] SNAPSHOT_FORMAT=
-    {OVERLAY_DIAGNOSTICS ? 8'd21 :
+    {OVERLAY_DIAGNOSTICS ? 8'd22 :
      DEADLINE_DIAGNOSTICS ? 8'd20 : 8'd18,8'd64,16'd60000};
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
@@ -162,6 +165,12 @@ reg [15:0] error_flags_q;
 reg [13:0] stc_seconds_q;
 reg [7:0] associated_count_q;
 reg [32:0] display_pts_q;
+reg presentation_stc_valid_q;
+reg [32:0] presentation_stc_90k_q;
+reg display_pts_valid_q;
+reg [32:0] candidate_pts_q;
+reg candidate_pts_valid_q;
+reg [31:0] audio_pcm_dequeue_count_q;
 reg [13:0] pcm_sample_count_q;
 reg [6:0] pcm_fifo_peak_q;
 reg [31:0] transport_block_longest_q;
@@ -384,6 +393,9 @@ wire [31:0] completed_gap_state=current_gap_context_valid?
 reg native_decode_active_q,decoder_input_pending_q,writer_capacity_blocked_q;
 reg [15:0] display_picture_count_full,display_swap_count_full;
 reg [15:0] reference_count_full,deadline_gap_count;
+reg [9:0] candidate_unavailable_window_count;
+reg [9:0] cadence_blocked_window_count;
+reg [9:0] timestamp_blocked_window_count;
 reg [31:0] last_reference_cycle;
 reg [31:0] interval_input_starve,interval_writer_blocked;
 reg deadline_window_d,deadline_pending;
@@ -412,6 +424,8 @@ always @(posedge clk_mpeg2)begin
         writer_capacity_blocked_q<=0;
         display_picture_count_full<=0;display_swap_count_full<=0;
         reference_count_full<=0;deadline_gap_count<=0;last_reference_cycle<=0;
+        candidate_unavailable_window_count<=0;
+        cadence_blocked_window_count<=0;timestamp_blocked_window_count<=0;
         interval_input_starve<=0;interval_writer_blocked<=0;
         deadline_window_d<=0;deadline_pending<=0;
         for(deadline_i=0;deadline_i<8;deadline_i=deadline_i+1)begin
@@ -437,6 +451,22 @@ always @(posedge clk_mpeg2)begin
                     display_swap_count_full<=display_swap_count_full+1'b1;
                 if(display_picture_count_full!=16'hffff)
                     display_picture_count_full<=display_picture_count_full+1'b1;
+            end
+            if(OVERLAY_DIAGNOSTICS&&swap_window_pulse_q&&
+               profile_first_present_valid)begin
+                if(!candidate_presentable_q)begin
+                    if(candidate_unavailable_window_count!=10'h3ff)
+                        candidate_unavailable_window_count<=
+                            candidate_unavailable_window_count+1'b1;
+                end else if(!cadence_slot_q)begin
+                    if(cadence_blocked_window_count!=10'h3ff)
+                        cadence_blocked_window_count<=
+                            cadence_blocked_window_count+1'b1;
+                end else if(timestamp_candidate_active_q&&
+                            !timestamp_candidate_due_q&&
+                            timestamp_blocked_window_count!=10'h3ff)
+                    timestamp_blocked_window_count<=
+                        timestamp_blocked_window_count+1'b1;
             end
             if(DEADLINE_DIAGNOSTICS&&deadline_scope)begin
                 if(display_swap_now)begin
@@ -623,7 +653,7 @@ wire [31:0] legacy_snapshot_word_61={last_first_cache_writes,
     last_second_cache_writes};
 wire [31:0] legacy_snapshot_word_62={last_first_cache_addr_sum,
     last_second_cache_addr_sum};
-// Schema 21 overlays words 37..54 with the authored-menu pipeline:
+// Schemas 21 and 22 overlay words 37..54 with the authored-menu pipeline:
 // 37 magic "OVL1"; 38 config/data/commit/style record counts; 39 clear,
 // rejected commit, accepted commit and plane-publication counts; 40 accepted
 // record bytes; 41 plane bytes; 42 DDR writes and cache-row fills; 43 memory
@@ -631,7 +661,8 @@ wire [31:0] legacy_snapshot_word_62={last_first_cache_addr_sum,
 // state; 45..46 published rectangle; 47 highlight index-one ABGR; 48 received
 // plane bytes; 49 video row-tag arrivals; 50 row-tag-matched samples; 51
 // highlighted samples; 52 nonzero-alpha samples; 53 opaque-magenta samples;
-// 54 capture reason, armed/commit bits and settle clocks.
+// 54 capture reason, armed/commit bits and settle clocks. Schema 22 assigns
+// the previously zero words 58..62 to passive A/V progress diagnostics.
 //
 // Schema 19 reuses the retired framebuffer-detail payload. Schema 18 stays
 // selectable for the established regression; no framebuffer control changes.
@@ -700,16 +731,32 @@ wire [31:0] snapshot_word_56=DEADLINE_DIAGNOSTICS ?
     legacy_snapshot_word_56;
 wire [31:0] snapshot_word_57=DEADLINE_DIAGNOSTICS ?
     {18'd0,audio_fifo_floor_q} : legacy_snapshot_word_57;
+wire [32:0] display_pts_lateness=
+    presentation_stc_90k_q-display_pts_q;
+wire [32:0] candidate_pts_lateness=
+    presentation_stc_90k_q-candidate_pts_q;
+wire display_pts_lateness_valid=
+    presentation_stc_valid_q&&display_pts_valid_q;
+wire candidate_pts_lateness_valid=
+    presentation_stc_valid_q&&candidate_pts_valid_q;
 wire [31:0] snapshot_word_58=DEADLINE_DIAGNOSTICS ?
-    32'd0 : legacy_snapshot_word_58;
+    (OVERLAY_DIAGNOSTICS ?
+     {display_picture_count_full,display_swap_count_full} : 32'd0) :
+    legacy_snapshot_word_58;
 wire [31:0] snapshot_word_59=DEADLINE_DIAGNOSTICS ?
-    32'd0 : legacy_snapshot_word_59;
+    (OVERLAY_DIAGNOSTICS ? audio_pcm_dequeue_count_q : 32'd0) :
+    legacy_snapshot_word_59;
 wire [31:0] snapshot_word_60=DEADLINE_DIAGNOSTICS ?
-    32'd0 : legacy_snapshot_word_60;
+    (OVERLAY_DIAGNOSTICS&&display_pts_lateness_valid ?
+     display_pts_lateness[31:0] : 32'd0) : legacy_snapshot_word_60;
 wire [31:0] snapshot_word_61=DEADLINE_DIAGNOSTICS ?
-    32'd0 : legacy_snapshot_word_61;
+    (OVERLAY_DIAGNOSTICS&&candidate_pts_lateness_valid ?
+     candidate_pts_lateness[31:0] : 32'd0) : legacy_snapshot_word_61;
 wire [31:0] snapshot_word_62=DEADLINE_DIAGNOSTICS ?
-    32'd0 : legacy_snapshot_word_62;
+    (OVERLAY_DIAGNOSTICS ?
+     {display_pts_lateness_valid,candidate_pts_lateness_valid,
+      candidate_unavailable_window_count,cadence_blocked_window_count,
+      timestamp_blocked_window_count} : 32'd0) : legacy_snapshot_word_62;
 wire [31:0] snapshot_word_63=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
     snapshot_word_06^snapshot_word_07^snapshot_word_08^snapshot_word_09^
@@ -773,6 +820,9 @@ always @(posedge clk_mpeg2) begin
         session_quiet_q<=0;terminal_defer_q<=0;error_flags_q<=0;
         stc_seconds_q<=0;top_field_first_q<=0;repeat_first_field_q<=0;
         associated_count_q<=0;display_pts_q<=0;
+        presentation_stc_valid_q<=0;presentation_stc_90k_q<=0;
+        display_pts_valid_q<=0;candidate_pts_q<=0;candidate_pts_valid_q<=0;
+        audio_pcm_dequeue_count_q<=0;
         pcm_sample_count_q<=0;pcm_fifo_peak_q<=0;
         transport_block_longest_q<=0;transport_block_count_q<=0;
         audio_underrun_count_q<=0;audio_fifo_floor_q<=0;
@@ -898,8 +948,14 @@ always @(posedge clk_mpeg2) begin
         terminal_defer_q<=terminal_defer;
         error_flags_q<=error_flags;
         stc_seconds_q<=stc_seconds;
+        presentation_stc_valid_q<=presentation_stc_valid;
+        presentation_stc_90k_q<=presentation_stc_90k;
         associated_count_q<=associated_count;
         display_pts_q<=display_pts;
+        display_pts_valid_q<=display_pts_valid;
+        candidate_pts_q<=candidate_pts;
+        candidate_pts_valid_q<=candidate_pts_valid;
+        audio_pcm_dequeue_count_q<=audio_pcm_dequeue_count;
         pcm_sample_count_q<=pcm_sample_count;
         pcm_fifo_peak_q<=pcm_fifo_peak;
         transport_block_longest_q<=transport_block_longest;
@@ -1288,7 +1344,7 @@ always @(posedge clk_mpeg2) begin
             end
         end
 
-        // Schema 21 is intentionally independent of the ordinary first-error
+        // Schemas 21 and 22 are independent of the ordinary first-error
         // latch: the audio FIFO may underrun before a DVD menu emits its first
         // overlay.  Capture one second after any commit reaches the engine, or
         // use the trigger's bounded fallback when no commit is observed.
