@@ -1,3 +1,43 @@
+## 967 COMMIT Unreleased ??? 2026-09-04T03:25:13-07:00
+
+#### Coming From:
+
+Unreleased e0f6f9a
+
+#### Purpose:
+
+Populate the Audio CD playlist with the disc track sequence and keep the playing track selected near the vertical center without changing transport controls.
+
+#### Outcome:
+
+The user requests that a commercial Red Book Audio CD use the existing player interface's playlist rather than its static placeholder rows, with the currently playing track visibly selected while existing previous, next and pause controls retain their behavior.  Red Book TOC data guarantees physical track numbers and boundaries but not human-readable titles, so this cycle will display stable `TRACK 01`-style names from the drive's filtered audio-track inventory and preserve physical numbering on mixed-mode discs; CD-Text or network metadata lookup remains a separate optional enhancement.  The change is scoped to the ARM helper and its tests and documentation, with no Main, protocol, visualizer-pack, RTL or RBF change.
+
+#### Next Steps:
+
+Inspect the inserted disc on the test MiSTer for available TOC and CD-Text evidence, expose the helper reader's ordered physical track numbers to the UI, render up to six playlist rows at the existing text scale with the active row selected and centered when list boundaries allow, and update selection on natural boundaries plus existing seeks and track skips.  Add focused reader and pixel-output regressions for ordinary, mixed-numbered and edge-position playlists, run the strict native and sanitizer suites plus CDDA and audio integrations, build one static stripped ARMv7 helper locally, and provide that file for hardware validation without rebuilding Main or the RBF.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_ui.c
+- host/arm/audio_ui.h
+- host/arm/cdda_audio.c
+- host/arm/cdda_audio.h
+- host/arm/media_player_helper.c
+- tools/test_audio_ui_output.c
+- tools/test_cdda_audio.c
+- tools/test_main_cdda.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 966 COMMIT Unreleased e0f6f9a 2026-09-04T03:16:49-07:00
 
 #### Coming From:
@@ -1238,35 +1278,6 @@ Exit MediaPlayer and install only `host/build/MediaPlayer_Helper_MenuTransitions
 - host/arm/ARCHITECTURE.md
 - host/arm/media_player_helper.c
 - tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 927 COMMIT Unreleased 6b63c91 2026-09-02T22:16:01-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Diagnose Blazing Saddles' reproducible black decoder state after returning from long-running title playback to its root menu.
-
-#### Outcome:
-
-The fresh telemetry-enabled trace disproves a helper crash: after approximately 619.78 seconds of healthy playback, Root Menu succeeds, enters the menu domain, discards the old reserve and completes READY/GO in about 29 milliseconds; Main then receives and publishes a complete 86,400-byte selector overlay, while the helper remains alive and continues polling through the 679.72-second capture endpoint.  The new root destination reaches an authored indefinite still, but produces no `random access`, scheduler-progress or terminal-finalizer diagnostic after the barrier even though its overlay changes repeatedly.  This uniquely matches a single-picture menu stream retained by the helper's initial random-access filter: `wait_dvd_still()` calls `iso_finalize_terminal_random_access()` only when `activation_pending` is true, whereas Root Menu is classified immediately as `MEDIA_SOURCE_DVD_STREAM_HOP`, clears that flag and resets the decoder before reaching the still.  Consequently the queued picture receives neither the valid H.262 sequence end nor its five transport-drain bytes, no menu video crosses to Main and the screen remains black with the independently valid selector state unable to make a visible composite.  The 15,514,884-byte log, 559-byte all-black screenshot and 2,818-byte no-matrix sidecar have SHA-256 `2e25ec68e38676f4d221b37ca24c9365a5aa2ed4b25bb1ae51c28c3063ac595e`, `1fa718e5c800529417461bd164f5afadd65ec82288dd97ce9c34c334f65a91b1` and `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004`.  No runtime source was changed.
-
-#### Next Steps:
-
-After user approval, make one helper-only commit containing both diagnosed boundaries.  Generalize terminal DVD-still finalization so any active initial random-access filter with queued video, including a direct Root Menu hop, receives the existing sequence-end and transport-drain tail before waiting; retain activation staging only as the destination publication policy.  Separately give picture-bearing deferred motion-menu staging bounded headroom beyond the existing 4 MiB decision watermark and promote such a destination through the existing staged READY/GO stream-hop path before `ENOSPC`.  Add exact production-path regressions for an unstaged Root Menu one-picture indefinite still, the existing staged terminal still, an over-watermark motion menu with byte-exact post-barrier commit, the accepted 3,797,120-byte finite-still route below the watermark and overlay-only continuation, then run strict native, sanitizer, analyzer, DVD navigation, staging, random-access, overlay, LPCM, audio and seek suites locally and on the build PC before producing one static ARM helper for the specified Big Lebowski and Blazing Saddles hardware routes.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
