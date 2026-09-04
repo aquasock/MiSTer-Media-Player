@@ -1,3 +1,32 @@
+## 951 COMMIT Unreleased 0df8570 2026-09-03T18:32:13-07:00
+
+#### Coming From:
+
+Unreleased 0df8570
+
+#### Purpose:
+
+Qualify the continuous automatic-menu epoch on Futurama disc one and isolate its remaining burst-audio failure.
+
+#### Outcome:
+
+The physical source-`0df8570` run validates the continuous decoder correction but rejects its audio scheduling.  All three finite intro boundaries complete, automatic menu entry at 43.904862 seconds produces the new helper-only scheduling and PTS epochs without a fourth Main decoder reset, the menu becomes visible and animated, and the user confirms its selector responds.  The checksum-valid schema-21 capture reports 128 displayed pictures and 127 swaps in 4.423730 seconds, zero decoder flags, zero PCM protocol errors and a valid overlay; Main records eighty-two complete overlay commits with no ordering error and no video lookahead failure.  At menu entry the first raw PTS 45,045 is translated to 647,273, equal to the later maximum video horizon, so the audio target remains fixed at the 8,192-frame reserve for the entire run.  The scheduler consequently emits only its 128-frame safety refill per 4,096 video bytes, averaging about 4,270 frames per second instead of 48,000 and matching the reported periodic distorted bursts, while AC-3 decode accumulates unchecked: the final progress record has emitted 591,360 frames but holds 118,129,152 frames, approximately 472.5 MiB of stereo PCM.  Linux then kills the helper with signal nine at 187.177284 seconds, consistent with exhausting the target's approximately 492 MiB visible RAM.  The 4,060,455-byte log, 637,658-byte screenshot and 844-byte telemetry sidecar have SHA-256 `f22b5b1808ac1bb94b8c19440e4c19079410d7c3fed86b5dff1f06925148dbba`, `1bdd9d344bb5b18584c6f04b258b7397b9285806ae4c0f995fcf986c11ed86dc` and `1322af6836d63a481d2fbab7b4815c84a6c95a6a38792eaeba79a139f3a47f19`.
+
+#### Next Steps:
+
+After user approval, preserve the source-`0df8570` continuous decoder/menu transition and normal advancing-PTS scheduler, but add an automatic-menu-only PCM fallback for an exhausted timestamp target: after startup, when decoded audio exceeds the existing reserve and the video horizon schedules nothing, emit the excess in bounded batches through the unchanged PCM transport so FPGA FIFO credit supplies the real-time 48 kHz backpressure instead of allowing an unbounded host queue.  Add a hard bounded-hold invariant and diagnostics, extend the production regression with repeated or nonadvancing menu video PTS plus sustained decoded PCM to prove continuous exact sample delivery, bounded memory, byte-exact video and unchanged advancing-PTS behavior, rerun strict native, analyzer, sanitizer and retained DVD/audio suites, then build only a new static ARM helper for another Futurama menu test; Main, protocol, RTL and RBF should remain unchanged.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 950 COMMIT Unreleased 0df8570 2026-09-03T17:53:57-07:00
 
 #### Coming From:
@@ -1180,40 +1209,6 @@ Preserve terminal sequence-plus-I qualification, ordinary open-ended random acce
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 911 COMMIT Unreleased efe2a76 2026-09-02T18:46:53-07:00
-
-#### Coming From:
-
-Unreleased 338c4d5
-
-#### Purpose:
-
-Release an independently decodable single-picture DVD menu background when its authored still boundary completes the startup group.
-
-#### Outcome:
-
-Source `efe2a76` adds an explicit terminal mode to DVD random-access filtering so an authored still bounds a complete sequence-plus-I group without inventing the later I/P reference required during open-ended streaming.  Terminal filtering retains the sequence and I picture, neutralizes contextless pictures before it and unsafe trailing B pictures, and leaves a sequence without an I picture pending; the helper invokes it only for a pending DVD menu activation at an actual still event, drains a qualified picture into the existing activation stage, and reuses the established picture-bearing READY/GO barrier.  Ordinary open-ended filtering still refuses the same I-only group, and source `338c4d5` overlay-only continuation remains selected when no video is queued or no sequence/I group qualifies.  Strict native and GNU 10.2.1 ARM builds pass along with the random-access analyzer and sanitizer checks, production-path terminal-still staging, output-stage and reserve sanitizers, AC-3 recovery, DVD SPU, menu-hop, Program Stream seek, audio UI/timer/visualizer units, all four real standalone-audio seek integrations, 100 random-access repetitions, 20 overlay/still repetitions, 100 stage repetitions, 100 menu-hop repetitions and 20 unsupported-LPCM repetitions.  The resulting 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_SceneStill_efe2a76` has SHA-256 `c0dd48b3926a58b9425e708acd7fb02f964e4936f2acb71f1aa05dc8e1706731`; Main, decoder, visualizer, protocol, RTL and RBF are unchanged.
-
-#### Next Steps:
-
-Install only `host/build/MediaPlayer_Helper_SceneStill_efe2a76` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  On Coming to America, enter Scene Selection and require its authored background to replace the root-menu frame while its selector remains responsive; activate a scene, return to the root menu and repeat entry to exercise both picture-bearing and overlay-only transitions.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback, and the forum disc's silent LPCM menu followed by supported AC-3 title playback; for any failure collect a fresh helper/Main log, screenshot and schema-21 telemetry without reusing prior captures.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/dvd_random_access.c
-- host/arm/dvd_random_access.h
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
-- tools/test_dvd_random_access.c
 
 #### Status:
 
