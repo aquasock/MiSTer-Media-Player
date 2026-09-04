@@ -1,4 +1,4 @@
-## 977 COMMIT Unreleased ??? 2026-09-04T05:49:51-07:00
+## 977 COMMIT Unreleased 715ff18 2026-09-04T05:49:51-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Clock the source-`36dc0ac` automatic-menu PCM fallback in real time while retain
 
 #### Outcome:
 
-The approved helper-only boundary will replace the fallback's source-rate drain with a monotonic sample budget at the selected 48 kHz PCM rate, preserve the existing finite startup release, and throttle source progress whenever held PCM reaches its established ceiling.  A PCM-pressure continuation will become provisional: it may acknowledge Main after committing the context-dependent prefix, but the DVD state machine will keep a separate follow-up flag until libdvdnav proves a later menu exit, at which point it will use the existing asynchronous stream-boundary handshake to drain the bounded live prefix and reset the decoder without requiring a Main or protocol change.  Ordinary command continuations, qualified staged restarts, finite stills, video-pressure continuations and non-menu timestamp scheduling will retain their existing semantics.
+Source `715ff18` replaces automatic-menu fallback's source/SPI-rate drain with an explicit monotonic sample budget at the selected PCM rate.  It retains one bounded initial release to the established low watermark, admits later batches only as real elapsed time earns them, drains the physical-DVD output reserve before each admitted batch so it reaches Main promptly, and waits in interrupt-safe two-millisecond intervals only when fast decode exceeds the hard hold ceiling.  Any advancing video PTS clears the fallback and restores the ordinary timestamp scheduler.  A PCM-only deferred-activation release is now provisional: Main receives the committed resident-context prefix immediately, while a separate DVD follow-up flag survives until libdvdnav reports a later menu exit and then requests the existing asynchronous stream-boundary handshake; video pressure remains a final continuation and a later navigation command supersedes stale provisional state.  The production regression proves a fast burst cannot drain without clock budget, exact backdated 48 kHz allowance drains to the watermark, the hard ceiling stays bounded, and a provisional continuation later selects `STREAM_BOUNDARY`; strict optimized and ASAN/UBSAN runs pass, GCC analysis reports only the established audio-overlay allocation false positive, and twenty production repetitions, one hundred menu-hop repetitions, retained reserve/stage/DVD/audio unit tests, static Main contracts, twenty private-LPCM integrations and real MP3, WAV, FLAC, Ogg, pause-barrier and idle-visualizer integrations pass.  GNU 10.2.1 produced the 982,436-byte stripped static hard-float ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `5bfcd9e13d87f1e0683c64e3d55bd9c54e997261ce89405f6614c614dc0cd62d`; it has no dynamic section and retains the protocol-one capability surface.  Main, protocol, decoder, visualizer, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Implement the sample-clock origin and emitted-budget state with overflow-safe elapsed-time arithmetic, bounded batch writes and short interrupt-safe waits only when the decoded hold exceeds its hard limit; clear that state whenever advancing video PTS restores normal scheduling.  Add production-translation-unit regressions that force input faster than real time, backdate the clock deterministically to prove exact permitted PCM without a long test sleep, verify that an unadvanced clock cannot drain a new burst, enforce the hold ceiling, and prove a provisional continuation later requests the existing stream boundary while a superseding command cancels its follow-up.  Run strict optimized, sanitizer, analyzer, repeated DVD/menu/overlay/staging/reserve suites and retained audio integrations, then build and verify only the local static ARM helper for physical Simpsons testing.
+Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`715ff18` artifact, preserving executable mode; Main, RBF and visualizer remain installed as-is.  Repeat the same Simpsons root-menu and first-episode selection and require `pressure=pcm ... provisional=1`, one fallback activation containing `rate=48000`, bounded rather than source-rate PCM progress, and—if that authored branch later leaves menu space—a `DVD delayed activation provisional stream boundary` record before episode payload.  Require the episode to start and continue without the previous frozen frame, runaway Main submission, signal-nine termination or helper error, then spot-check Futurama root/nested menus, Audio CD and one ordinary audio file and return the updated results before marking this source hardware-passed.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Implement the sample-clock origin and emitted-budget state with overflow-safe el
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
