@@ -67,6 +67,10 @@ def main() -> int:
         'track_controls = !strncasecmp(requested_source.c_str(), "cdda:", 5)',
         'seek_controls = track_controls ||',
         'audio_visualizer_controls = track_controls ||',
+        'MEDIA_CONTROL_PAUSE = 0x11',
+        'MEDIA_CONTROL_PAUSE_READY = 0x87',
+        'pause_pending = true;',
+        'pause_barrier_finish();',
         'if (track_controls)',
         'seek_pending = true;',
         'Audio CD track command=%s',
@@ -100,11 +104,14 @@ def main() -> int:
         "idle playback must not emit silent PCM",
         "MEDIA_PLAYER_CONTROL_SEEK_CONTINUE",
         "cdda_complete_reposition",
+        "audio_pause_barrier(output, control->control_fd,",
     )
     for marker in helper_markers:
         require(marker in helper, f"missing helper Audio CD contract: {marker}")
     require('#define MEDIA_PLAYER_IDLE_PREFIX "idle:"' in protocol and
-            'sources=file,iso,dvd,isomenu,dvdmenu,cdda,idle' in protocol,
+            'sources=file,iso,dvd,isomenu,dvdmenu,cdda,idle' in protocol and
+            '#define MEDIA_PLAYER_CONTROL_PAUSE             0x11' in protocol and
+            '#define MEDIA_PLAYER_CONTROL_PAUSE_READY       0x87' in protocol,
             "missing idle visualizer protocol capability")
 
     print("MediaPlayer loader menu/Main/helper contract: PASS")

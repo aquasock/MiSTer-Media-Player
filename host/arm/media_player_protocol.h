@@ -28,12 +28,14 @@
 #define MEDIA_PLAYER_CONTROL_SEEK_BACK_300     0x0e
 #define MEDIA_PLAYER_CONTROL_SEEK_FORWARD_300  0x0f
 #define MEDIA_PLAYER_CONTROL_USER_ACTIVITY     0x10
+#define MEDIA_PLAYER_CONTROL_PAUSE             0x11
 #define MEDIA_PLAYER_CONTROL_READY            0x81
 #define MEDIA_PLAYER_CONTROL_MENU_ENTER       0x82
 #define MEDIA_PLAYER_CONTROL_MENU_LEAVE       0x83
 #define MEDIA_PLAYER_CONTROL_MENU_CONTINUE    0x84
 #define MEDIA_PLAYER_CONTROL_SEEK_CONTINUE    0x85
 #define MEDIA_PLAYER_CONTROL_STREAM_BOUNDARY  0x86
+#define MEDIA_PLAYER_CONTROL_PAUSE_READY       0x87
 #define MEDIA_PLAYER_CONTROL_ERROR            0xff
 
 #define MEDIA_PLAYER_PTS_MARKER_CODE 0xb0
@@ -64,6 +66,7 @@
     "cdda-s16le-stereo-44100 " \
     "transport=inband-pcm-v1,inband-dvd-overlay-v1,inband-audio-ui-v1 " \
     "controls=chapter-v1,pause-hold-v1,dvd-menu-v1,mpeg-ps-seek-v1," \
-    "audio-file-seek-v2,audio-visualizer-v1,cdda-track-v1"
+    "audio-file-seek-v2,audio-visualizer-v1,cdda-track-v1," \
+    "audio-pause-barrier-v1"
 
 #endif

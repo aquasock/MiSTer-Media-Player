@@ -934,6 +934,44 @@ static int audio_overlay_publish_full(struct output_state *output,
     return 0;
 }
 
+static int audio_pause_barrier(struct output_state *output, int control_fd,
+                               unsigned rate_hz, const char *source_name)
+{
+    int action;
+
+    audio_visualizer_activity(output->visualizer,
+                              output->pcm_emitted_frames);
+    action = audio_visualizer_take_overlay_action(
+        output->visualizer, output->pcm_emitted_frames, rate_hz);
+    if (action > 0) {
+        output->audio_overlay.state = AUDIO_OVERLAY_IDLE;
+        output->audio_overlay.visible = 1;
+        if (audio_overlay_style(output, MEDIA_PLAYER_OVERLAY_STYLE, 1) < 0)
+            return -1;
+    }
+    if (flush_output(output, "audio pause overlay") < 0 ||
+        control_send(control_fd, MEDIA_PLAYER_CONTROL_PAUSE_READY) < 0) {
+        fprintf(stderr,
+                "media_player_helper: %s pause barrier publication failed\n",
+                source_name);
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: %s pause ready frame=%llu overlay=%s\n",
+            source_name, (unsigned long long)output->pcm_emitted_frames,
+            action > 0 ? "revealed" : "visible");
+    if (control_wait_for_go(control_fd) < 0) {
+        fprintf(stderr,
+                "media_player_helper: %s pause barrier GO failed\n",
+                source_name);
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: %s pause resumed frame=%llu\n",
+            source_name, (unsigned long long)output->pcm_emitted_frames);
+    return 0;
+}
+
 static uint64_t audio_overlay_position(const struct output_state *output,
                                        uint64_t emitted_pcm_frames)
 {
@@ -4419,6 +4457,9 @@ static int audio_file_request_seek(void *opaque, uint64_t current_frame,
                                   state->output->pcm_emitted_frames);
         return 0;
     }
+    if (command == MEDIA_PLAYER_CONTROL_PAUSE)
+        return audio_pause_barrier(state->output, state->control_fd, rate_hz,
+                                   "audio file");
     if (!seek_command_seconds(command, seconds)) {
         if (command)
             fprintf(stderr,
@@ -4666,6 +4707,10 @@ static int process_cdda_stream(const char *source_specification,
         if (command == MEDIA_PLAYER_CONTROL_USER_ACTIVITY) {
             audio_visualizer_activity(output->visualizer,
                                       output->pcm_emitted_frames);
+        } else if (command == MEDIA_PLAYER_CONTROL_PAUSE) {
+            if (audio_pause_barrier(output, control->control_fd,
+                                    CDDA_SAMPLE_RATE_HZ, "Audio CD") < 0)
+                goto done;
         } else if (seek_command_seconds(command, &seconds)) {
             uint64_t target_frame = audio_file_seek_target(
                 current_frame, length_frames, CDDA_SAMPLE_RATE_HZ, seconds);

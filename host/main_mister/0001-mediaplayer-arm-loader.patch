@@ -317,7 +317,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,1157 @@
+@@ -0,0 +1,1225 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -353,6 +353,9 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +static uint64_t download_assert_us = 0;
 +static int first_byte_seen = 0;
 +static bool playback_paused = false;
++static bool pause_pending = false;
++static bool pause_ready = false;
++static bool pause_pipe_empty = false;
 +static bool chapter_barrier = false;
 +static bool chapter_download_rearmed = false;
 +static bool navigation_pending = false;
@@ -390,12 +393,14 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	MEDIA_CONTROL_SEEK_BACK_300 = 0x0e,
 +	MEDIA_CONTROL_SEEK_FORWARD_300 = 0x0f,
 +	MEDIA_CONTROL_USER_ACTIVITY = 0x10,
++	MEDIA_CONTROL_PAUSE = 0x11,
 +	MEDIA_CONTROL_READY = 0x81,
 +	MEDIA_CONTROL_MENU_ENTER = 0x82,
 +	MEDIA_CONTROL_MENU_LEAVE = 0x83,
 +	MEDIA_CONTROL_MENU_CONTINUE = 0x84,
 +	MEDIA_CONTROL_SEEK_CONTINUE = 0x85,
 +	MEDIA_CONTROL_STREAM_BOUNDARY = 0x86,
++	MEDIA_CONTROL_PAUSE_READY = 0x87,
 +	MEDIA_CONTROL_ERROR = 0xff
 +};
 +
@@ -598,6 +603,9 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +		diagnostic_write("clean EOF resident presentation retained replay_ready=%d\n",
 +		                 arm_replay);
 +	playback_paused = arm_replay;
++	pause_pending = false;
++	pause_ready = false;
++	pause_pipe_empty = false;
 +	chapter_barrier = false;
 +	chapter_download_rearmed = false;
 +	navigation_pending = false;
@@ -815,6 +823,9 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	if (!idle) idle_retry_blocked = false;
 +	playback_index = index;
 +	playback_paused = false;
++	pause_pending = false;
++	pause_ready = false;
++	pause_pipe_empty = false;
 +	chapter_barrier = false;
 +	chapter_download_rearmed = false;
 +	navigation_pending = false;
@@ -904,6 +915,20 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +
 +static int handle_control_event(uint8_t event)
 +{
++	if (event == MEDIA_CONTROL_PAUSE_READY)
++	{
++		if (!pause_pending)
++		{
++			diagnostic_write("unexpected audio pause ready\n");
++			stop_with_reason("pause-ready-unexpected");
++			return 0;
++		}
++		pause_ready = true;
++		diagnostic_write("audio pause helper ready submitted=%llu buffered=%u\n",
++		                 (unsigned long long)submitted_bytes,
++		                 pending_size - pending_offset);
++		return 1;
++	}
 +	if (event == MEDIA_CONTROL_MENU_ENTER || event == MEDIA_CONTROL_MENU_LEAVE)
 +	{
 +		menu_active = event == MEDIA_CONTROL_MENU_ENTER;
@@ -946,7 +971,8 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +			if (!handle_control_event(event)) return;
 +			if (event != MEDIA_CONTROL_MENU_ENTER &&
 +			    event != MEDIA_CONTROL_MENU_LEAVE &&
-+			    event != MEDIA_CONTROL_STREAM_BOUNDARY)
++			    event != MEDIA_CONTROL_STREAM_BOUNDARY &&
++			    event != MEDIA_CONTROL_PAUSE_READY)
 +				diagnostic_write("unexpected control event=0x%02x\n", event);
 +			continue;
 +		}
@@ -1113,6 +1139,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	if (input >= MEDIAPLAYER_INPUT_SEEK_BACK_10 &&
 +	    input <= MEDIAPLAYER_INPUT_SEEK_FORWARD_300 && !seek_controls) return 0;
 +	if (!pressed) return 1;
++	if (pause_pending) return 1;
 +
 +	if (input == MEDIAPLAYER_INPUT_PLAY_PAUSE && menu_active)
 +		input = MEDIAPLAYER_INPUT_MENU_ACTIVATE;
@@ -1121,10 +1148,31 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	{
 +		if (chapter_barrier || navigation_pending || seek_pending ||
 +		    stream_boundary_pending) return 1;
-+		if (audio_visualizer_controls &&
-+		    !send_control(MEDIA_CONTROL_USER_ACTIVITY))
++		if (audio_visualizer_controls)
 +		{
-+			stop_with_reason("activity-command-error");
++			if (playback_paused)
++			{
++				if (!send_control(MEDIA_CONTROL_GO))
++				{
++					stop_with_reason("pause-resume-go-error");
++					return 1;
++				}
++				playback_paused = false;
++				diagnostic_write("audio playback resumed submitted=%llu\n",
++				                 (unsigned long long)submitted_bytes);
++				printf("MediaPlayer: resumed\n");
++				return 1;
++			}
++			pause_pending = true;
++			pause_ready = false;
++			pause_pipe_empty = false;
++			if (!send_control(MEDIA_CONTROL_PAUSE))
++			{
++				stop_with_reason("pause-command-error");
++				return 1;
++			}
++			diagnostic_write("audio pause requested submitted=%llu\n",
++			                 (unsigned long long)submitted_bytes);
 +			return 1;
 +		}
 +		playback_paused = !playback_paused;
@@ -1298,6 +1346,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +			if (diagnostic_fd >= 0) { ++transfer_profile.read_calls; transfer_profile.read_us += read_elapsed; }
 +			if (count > 0)
 +			{
++				pause_pipe_empty = false;
 +				pending_size += (uint32_t)count; ++read_events;
 +				diagnostic_write("pipe_read event=%u count=%d read_us=%llu buffered=%u\n",
 +				                 read_events, (int)count, (unsigned long long)read_elapsed, pending_size);
@@ -1310,14 +1359,18 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +				++would_block_events;
 +				if (would_block_events <= 4 || !(would_block_events & (would_block_events - 1)))
 +					diagnostic_write("would_block count=%u submitted=%llu\n", would_block_events, (unsigned long long)submitted_bytes);
-+				if (!stream_boundary_pending ||
++				if ((!stream_boundary_pending && !pause_pending) ||
 +				    pending_size == pending_offset)
 +				{
 +					if (stream_boundary_pending)
 +						stream_boundary_pipe_empty = true;
++					if (pause_pending)
++						pause_pipe_empty = true;
 +					return;
 +				}
-+				diagnostic_write("DVD stream boundary pipe quiescent odd_tail=%u\n",
++				diagnostic_write("%s pipe quiescent odd_tail=%u\n",
++				                 stream_boundary_pending ?
++				                     "DVD stream boundary" : "audio pause",
 +				                 pending_size - pending_offset);
 +			}
 +			else
@@ -1360,7 +1413,8 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +			return;
 +		}
 +		uint32_t available = pending_size - pending_offset;
-+		if (!pending_eof && !stream_boundary_pending) available &= ~1u;
++		if (!pending_eof && !stream_boundary_pending && !pause_pending)
++			available &= ~1u;
 +		if (!available) return;
 +		const bool sampled = diagnostic_fd >= 0 && !((transfer_events + 1) % 64);
 +		fpga_spi_profile ack = {};
@@ -1431,6 +1485,19 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	                 (unsigned long long)submitted_bytes);
 +}
 +
++static void pause_barrier_finish()
++{
++	if (!pause_pending || !pause_ready || !pause_pipe_empty ||
++	    pending_size != pending_offset || helper_fd < 0) return;
++	pause_pending = false;
++	pause_ready = false;
++	pause_pipe_empty = false;
++	playback_paused = true;
++	diagnostic_write("audio playback paused submitted=%llu\n",
++	                 (unsigned long long)submitted_bytes);
++	printf("MediaPlayer: paused\n");
++}
++
 +void mediaplayer_poll()
 +{
 +	if (!mediaplayer_is_core())
@@ -1474,6 +1541,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	mediaplayer_poll_inner();
 +	profile_poll_finish();
 +	stream_boundary_finish();
++	pause_barrier_finish();
 +}
 diff --git a/support/mediaplayer/mediaplayer.h b/support/mediaplayer/mediaplayer.h
 new file mode 100644

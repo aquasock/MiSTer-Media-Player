@@ -17,6 +17,8 @@ import time
 
 READY = 0x81
 GO = 0x03
+PAUSE = 0x11
+PAUSE_READY = 0x87
 SEEK_BACK_10 = 0x0A
 SEEK_FORWARD_10 = 0x0B
 SEEK_FORWARD_60 = 0x0D
@@ -43,6 +45,8 @@ OVERLAY_CLEAR = 0x00
 OVERLAY_CONFIG = 0x01
 OVERLAY_DATA = 0x02
 OVERLAY_COMMIT = 0x03
+OVERLAY_CLEAR_RECORD = b"\x00\x00\x01\xb9\x00\x01\x00"
+OVERLAY_STYLE_RECORD = b"\x00\x00\x01\xb9\x00\x2a\x04"
 
 
 TIME_GLYPHS = {
@@ -465,6 +469,107 @@ def run_fixture(helper: Path, fixture: Path,
     )
 
 
+def run_pause_fixture(helper: Path, fixture: Path, visualizer: Path) -> None:
+    parent, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+    environment = os.environ.copy()
+    environment["MMP_VISUALIZER_PATH"] = str(visualizer)
+    process = subprocess.Popen(
+        [str(helper), "--protocol", "1", "--source", f"file:{fixture}",
+         "--control-fd", str(child.fileno())],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        pass_fds=(child.fileno(),), env=environment,
+    )
+    child.close()
+    assert process.stdout is not None
+    assert process.stderr is not None
+    os.set_blocking(process.stdout.fileno(), False)
+    os.set_blocking(process.stderr.fileno(), False)
+    parent.setblocking(False)
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ, "stdout")
+    selector.register(process.stderr, selectors.EVENT_READ, "stderr")
+    selector.register(parent, selectors.EVENT_READ, "control")
+    stream = bytearray()
+    errors = bytearray()
+    pause_offset = -1
+    resume_offset = -1
+    ready_count = 0
+    deadline = time.monotonic() + 20.0
+
+    try:
+        while process.poll() is None and time.monotonic() < deadline:
+            for key, _ in selector.select(0.05):
+                if key.data == "stdout":
+                    drain_fd(process.stdout.fileno(), stream)
+                elif key.data == "stderr":
+                    drain_fd(process.stderr.fileno(), errors)
+                else:
+                    try:
+                        event = parent.recv(1)
+                    except BlockingIOError:
+                        event = b""
+                    if event == bytes((PAUSE_READY,)):
+                        ready_count += 1
+                        drain_fd(process.stdout.fileno(), stream)
+                        if (pause_offset < 0 or
+                                OVERLAY_STYLE_RECORD not in stream[pause_offset:]):
+                            raise RuntimeError(
+                                "pause became ready before the overlay STYLE record"
+                            )
+                        held_size = len(stream)
+                        time.sleep(0.05)
+                        drain_fd(process.stdout.fileno(), stream)
+                        if len(stream) != held_size:
+                            raise RuntimeError(
+                                "helper advanced output while waiting for pause GO"
+                            )
+                        resume_offset = len(stream)
+                        parent.send(bytes((GO,)))
+                    elif event:
+                        raise RuntimeError(
+                            f"pause fixture unexpected control {event.hex()}"
+                        )
+            if (pause_offset < 0 and
+                    OVERLAY_CLEAR_RECORD in stream):
+                pause_offset = len(stream)
+                parent.send(bytes((PAUSE,)))
+
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+            raise RuntimeError("audio pause helper timed out")
+        drain_fd(process.stdout.fileno(), stream)
+        drain_fd(process.stderr.fileno(), errors)
+    finally:
+        selector.close()
+        parent.close()
+
+    if process.returncode != 0:
+        raise RuntimeError(
+            f"audio pause helper exited {process.returncode}:\n"
+            + errors.decode(errors="replace")
+        )
+    ready_match = re.search(
+        rb"audio file pause ready frame=([0-9]+) overlay=revealed", errors
+    )
+    resumed_match = re.search(
+        rb"audio file pause resumed frame=([0-9]+)", errors
+    )
+    if (pause_offset < 0 or resume_offset < 0 or ready_count != 1 or
+            not ready_match or not resumed_match or
+            ready_match.group(1) != resumed_match.group(1) or
+            len(stream) - resume_offset < 4096):
+        raise RuntimeError(
+            "audio pause barrier did not reveal-hold-resume exactly once:\n"
+            + errors.decode(errors="replace")
+        )
+    print(
+        "audio pause barrier: PASS "
+        f"frame={ready_match.group(1).decode()} "
+        f"held={resume_offset - pause_offset} resumed={len(stream) - resume_offset}"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("helper", type=Path)
@@ -490,8 +595,10 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="mmp-audio-seek-") as temporary:
         directory = Path(temporary)
         for extension, rate, codec in formats:
-            run_fixture(helper, make_fixture(directory, extension, rate, codec),
-                        visualizer)
+            fixture = make_fixture(directory, extension, rate, codec)
+            run_fixture(helper, fixture, visualizer)
+            if visualizer is not None and extension == "wav":
+                run_pause_fixture(helper, fixture, visualizer)
     return 0
 
 

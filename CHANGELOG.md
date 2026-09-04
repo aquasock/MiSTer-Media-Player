@@ -8,6 +8,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Changed standalone-audio pause ordering so the first Space or Start press
+  reveals the player overlay, drains that in-band style update, and only then
+  holds audio and visualizer transport at a helper/Main pause barrier. Resume
+  releases the held helper with the existing `GO`; DVD and MPEG-2 pause remain
+  the original immediate Main-side transport hold.
 - Replaced whole-GOP audio-visualizer grade steps with version-two transition
   GOPs. Each adjacent rise or fall now crosses between grades over three
   frames while preserving the eight-level RMS response, native-interlaced

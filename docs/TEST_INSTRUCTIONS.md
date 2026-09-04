@@ -55,9 +55,11 @@ playback replaces it.
    visualizer. Its color/brightness should crossfade over three frames when
    moving between adjacent loudness grades, without a whole-frame step at the
    GOP boundary.
-3. Press Space to pause and resume, then exercise any fixed seek. User activity
-   must restore the interface immediately and restart the ten-second interval;
-   visualizer cadence must remain constant while playing and paused.
+3. After the interface clears, press Space once. The interface must reappear on
+   that first press, then music and visualizer motion must both stop. Press
+   Space again and require both to resume; the interface must remain visible
+   for ten resumed playback seconds. Then exercise any fixed seek and require
+   the same immediate interface restoration.
 4. Let one track reach EOF. The last valid presentation may remain visible, but
    the player must enter its paused replay-ready state. Press Space or
    player-one Start and require a restart from the beginning.
@@ -74,8 +76,10 @@ playback replaces it.
 3. Press P/N or player-one Left/Right to move between audio tracks. Previous
    restarts the current track after three seconds or selects the preceding
    audio track near its start; Next selects the following audio track.
-4. Exercise the fixed-time keyboard seeks, pause/resume and visualizer overlay.
-   Require the same clean READY/GO reset behavior as file-backed audio.
+4. Exercise the fixed-time keyboard seeks, then let the overlay clear and press
+   Space once. Require the player UI to reappear before audio and visualizer
+   stop, with the next press resuming both and restarting the ten-second
+   playback interval. Seeks retain their clean READY/GO reset behavior.
 5. Let the disc reach the end, press Play to restart it, and confirm that a DVD
    inserted afterward still opens through `Load Physical Disc` then `Video DVD`.
 
