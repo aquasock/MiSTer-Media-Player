@@ -1,3 +1,32 @@
+## 972 COMMIT Unreleased 8a86b77 2026-09-04T04:31:41-07:00
+
+#### Coming From:
+
+Unreleased 8a86b77
+
+#### Purpose:
+
+Accept the completed Audio CD presentation and localize The Simpsons first-episode stall without changing runtime source.
+
+#### Outcome:
+
+The user reports that source `8a86b77`'s Audio CD title, aligned metadata, placeholders and default artwork look good, completing the current audio-player work.  The fresh physical Simpsons DVD run independently rejects the button-activation path: Main sends menu activate at 171.246404 seconds, libdvdnav accepts button one and remains in menu space, and the helper begins its 8 MiB deferred activation stage before resetting navigation scheduling with the initial random-access filter active.  The destination then supplies 2,097,152 bytes without a complete sequence-header, I-picture and following-reference startup group, so `scheduler_drain()` admits none of that queued video to the stage and the helper deliberately exits at 207.840268 seconds on its 2 MiB lookahead guard.  Main reports helper-error with exit code one after 33,710,172 submitted bytes; this is a helper state-machine deadlock rather than an RTL syntax stall or frozen process.  The stage's 4 MiB motion-menu decision is unreachable while the filter holds all video behind the smaller queue bound, and the existing motion-stage regression bypasses both the filter and queue.  The checksum-valid schema-21 snapshot covers an earlier healthy 30-second epoch with 5,107,715 accepted bytes, 128 displayed pictures, 127 swaps and zero decoder, presentation, PCM, underrun or transport errors, so it does not contradict the later host-side failure.  The 8,503,411-byte log, 350,644-byte screenshot and 766-byte sidecar have SHA-256 `f8fabeea0079268de9da7a8facc2f7be8a3231d2bef4b22c58c3ff83265fe45c`, `90c77634fcbb8bc143df68bc306016d8de895bf73b7d28212d2c451fd5cd4187` and `a3f2e0eae728a1d7e12b67712b2f3492074b0c7b02f4158fb103723ca887ba8d`.  No runtime source was changed.
+
+#### Next Steps:
+
+After user approval, keep the 2 MiB runaway guard and distinguish restart-qualified staged activations from menu continuations that require the resident decoder context.  When an activation remains in menu space but cannot form an independent random-access group before the queue bound, release that activation through a context-preserving continuation path and acknowledge it without resetting Main; retain the existing barrier for a qualified staged restart or an actual menu-to-title exit.  Add a production-path regression that reaches this bound through the real filter and queue, plus controls for Futurama staged stills, qualified motion-menu hops, overlay-only continuation and title launch, then build only a local static ARM helper.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 971 COMMIT Unreleased 8a86b77 2026-09-04T04:09:25-07:00
 
 #### Coming From:
@@ -1250,35 +1279,6 @@ Root Menu performs a genuine second navigation attempt rather than merely redisp
 #### Next Steps:
 
 Do not implement the entry-932 gating alone.  After user approval, make one diagnostic helper build that logs a bounded byte-exact prefix and parsed sequence, picture and extension fields for each initial random-access group before publication, without changing the bytes, decoder, Main, RBF, visualizer or timing.  Reproduce Big Lebowski startup and Root Menu once with that helper, identify the exact common construct at the 187/188-byte boundary against the frontend's 22 syntax-source checks, and then propose the narrowest helper-side compatibility normalization that preserves ordinary DVD streams and all accepted Blazing Saddles and Coming to America menu behavior.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 932 COMMIT Unreleased 932dc22 2026-09-02T23:55:22-07:00
-
-#### Coming From:
-
-Unreleased 932dc22
-
-#### Purpose:
-
-Accept the helper-only visualizer blend and localize The Big Lebowski's fresh failure to its initial non-menu authored still.
-
-#### Outcome:
-
-The user accepts source `932dc22`'s visualizer presentation.  The matched Big Lebowski capture instead isolates an independent DVD startup failure: after CSS setup and title inventory, the disc remains outside a menu and reaches a three-second authored still; the generalized terminal finalizer releases its 5,482-byte one-picture H.262 payload at sequence offset 0 and I-picture offset 170, appends sequence end plus drain, and Main submits the resulting 5,490 bytes.  The checksum-valid schema-21 snapshot records H.262 syntax error flag `0x0001` after only 187 accepted video bytes, zero completed or displayed pictures and zero swaps.  The helper neither crashes nor stalls: it proceeds through the following seven-second still and continues generating title video and audio, while Main has submitted 183,236,608 bytes by the 92.55-second capture endpoint with no transport block or audio underrun.  Source `9c00a20` broadened terminal still finalization from pending menu activations to every initial-filter still to repair direct Root Menu one-picture backgrounds; that now exposes this decoder-rejected non-menu first-play picture instead of retaining it behind the startup filter until a later complete random-access group supersedes it.  The 1,519,541-byte log, 1,445-byte telemetry barcode screenshot and 337-byte decoded sidecar have SHA-256 `8be2813b811564546c1ce79e4bf444fede5ff4cafac48f00ebb7bcda1cbeabc5`, `da9debc380f82fdfe9a656d5b8786310764e9582cd11f75a27ab6bf83337c067` and `4192d812816d56e8f24e2e7750c021efff272c61b614082df942fc9445b1811a`.  No runtime source was changed.
-
-#### Next Steps:
-
-After user approval, keep terminal finalization for an active DVD menu or pending authored menu activation, but leave an initial non-menu finite still queued under the existing random-access filter so a later complete sequence/I/reference group can replace its decoder entry point.  Add production-path regressions proving that a non-menu first-play still does not release or clear the filter, a direct Root Menu one-picture still still receives the terminal tail, and pending finite and indefinite menu activations retain their current staged policies.  Run strict random-access, overlay, navigation, staging, LPCM, audio and sanitizer suites, build one static ARMv7 helper without changing Main, the decoder, RBF, visualizer asset or accepted visualizer cadence, then retest Big Lebowski startup plus Blazing Saddles and Coming to America menu entry.
 
 #### Files Modified:
 
