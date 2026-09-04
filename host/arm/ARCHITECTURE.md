@@ -132,8 +132,11 @@ adjacent fields straddle PES payloads without guessing; it is flushed at an
 authored still or ordinary stream end and discarded with the old stream at a
 navigation-reset barrier. Conforming, interlaced, field, non-I and non-4:2:0
 pictures remain byte-identical, as do stream length, offsets and timestamp
-record order. Every correction logs its elementary-stream byte offset and
-before/after value. The initial random-access filter retains its independent
+record order. Silent-video classification flushes this one-byte lookahead into
+the bounded queue before releasing it, so the transition to immediate output
+does not lose or reorder the terminal byte. Every correction logs its
+elementary-stream byte offset and before/after value. The initial random-access
+filter retains its independent
 post-filter 256-byte prefix and parsed sequence, picture and coding-extension
 diagnostic. This delegates CSS
 access to libdvdcss and is not a claim of CSS conformance.
@@ -175,13 +178,13 @@ helper drains that epoch to Main, sends an autonomous stream-boundary event and
 waits; Main submits through pipe-empty, toggles download exactly once and sends
 GO before the helper resets demux, audio, PTS, random-access and bounded
 scheduling state. Automatic entry into a menu from an already-silent epoch uses
-the same handshake and saves the consumed Program Stream start code for the new
-epoch. An ordinary one-byte pipe read remains held for its partner, but after
-the boundary event a nonblocking empty read proves the old epoch is quiescent;
-Main then submits any retained final byte through its existing zero-padded
-16-bit transport word and waits for a subsequent empty read before GO. Unlike
-an explicit navigation hop, this boundary discards no old media
-and does not clear the menu overlay. Future work may add optical-device
+no Main handshake: the helper preserves the live FPGA H.262 decoder, rearms
+only its audio and bounded scheduling state, and does not re-enable the initial
+sequence/I/reference filter. The first menu video timestamp is rebased above
+the last emitted DVD timestamp, and the same offset is applied to menu audio,
+so the continuing FPGA timeline remains monotonic without changing authored
+A/V timing. Explicit navigation hops and finite still boundaries continue to
+use the READY/GO reset path. Future work may add optical-device
 discovery beyond the explicit `/dev/sr0` launcher. Angles, track selection and
 general seeking remain separate work.
 

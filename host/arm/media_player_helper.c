@@ -265,6 +265,8 @@ struct output_state {
     uint64_t iso_pts_raw_max;
     uint64_t iso_pts_normalized_max;
     unsigned iso_pts_discontinuities;
+    uint64_t iso_pts_rebase_floor;
+    int iso_pts_rebase_pending;
     uint32_t pts_window;      /* start-code scanner across queued payloads */
     unsigned pictures_since_pts;
     int pts_boundary_seen;    /* sequence or group header since last record */
@@ -1201,6 +1203,30 @@ static uint64_t decode_pts(const uint8_t *p)
  * by one 90 kHz tick; encoded cadence still supplies the minimum picture
  * interval.
  */
+static int establish_forced_pts_epoch(struct output_state *output,
+                                      uint64_t raw_pts)
+{
+    uint64_t next;
+
+    if (!output->iso_pts_rebase_pending)
+        return 0;
+    if (output->iso_pts_rebase_floor == UINT64_MAX) {
+        fprintf(stderr,
+                "media_player_helper: DVD automatic menu PTS epoch overflow\n");
+        return -1;
+    }
+    next = output->iso_pts_rebase_floor + 1u;
+    output->iso_pts_epoch_offset = raw_pts < next ? next - raw_pts : 0;
+    output->iso_pts_rebase_pending = 0;
+    fprintf(stderr,
+            "media_player_helper: DVD automatic menu PTS epoch raw=%llu "
+            "normalized=%llu offset=%llu\n",
+            (unsigned long long)raw_pts,
+            (unsigned long long)(raw_pts + output->iso_pts_epoch_offset),
+            (unsigned long long)output->iso_pts_epoch_offset);
+    return 0;
+}
+
 static int normalize_video_pts(struct output_state *output, uint64_t raw_pts,
                                uint64_t *normalized_pts)
 {
@@ -1210,11 +1236,20 @@ static int normalize_video_pts(struct output_state *output, uint64_t raw_pts,
         *normalized_pts = raw_pts;
         return 0;
     }
+    if (establish_forced_pts_epoch(output, raw_pts) < 0)
+        return -1;
     if (!output->have_iso_video_pts) {
+        if (raw_pts > UINT64_MAX - output->iso_pts_epoch_offset) {
+            fprintf(stderr,
+                    "media_player_helper: normalized DVD PTS overflow\n");
+            return -1;
+        }
+        normalized = raw_pts + output->iso_pts_epoch_offset;
         output->have_iso_video_pts = 1;
         output->iso_pts_raw_max = raw_pts;
-        output->iso_pts_normalized_max = raw_pts;
-        *normalized_pts = raw_pts;
+        if (normalized > output->iso_pts_normalized_max)
+            output->iso_pts_normalized_max = normalized;
+        *normalized_pts = normalized;
         return 0;
     }
     if (raw_pts < output->iso_pts_raw_max &&
@@ -1254,6 +1289,24 @@ static int normalize_video_pts(struct output_state *output, uint64_t raw_pts,
     if (normalized > output->iso_pts_normalized_max)
         output->iso_pts_normalized_max = normalized;
     *normalized_pts = normalized;
+    return 0;
+}
+
+static int normalize_audio_pts(struct output_state *output, uint64_t raw_pts,
+                               uint64_t *normalized_pts)
+{
+    if (!output->iso_pts_normalization) {
+        *normalized_pts = raw_pts;
+        return 0;
+    }
+    if (establish_forced_pts_epoch(output, raw_pts) < 0)
+        return -1;
+    if (raw_pts > UINT64_MAX - output->iso_pts_epoch_offset) {
+        fprintf(stderr,
+                "media_player_helper: normalized DVD audio PTS overflow\n");
+        return -1;
+    }
+    *normalized_pts = raw_pts + output->iso_pts_epoch_offset;
     return 0;
 }
 
@@ -1367,9 +1420,17 @@ static int video_queue_would_overflow(const struct output_state *output,
                                       size_t size, int has_record)
 {
     size_t prefix = has_record ? 9u : 0u;
+    size_t pending = output->h262_chroma_normalization &&
+                     output->h262_chroma.have_pending ? 1u : 0u;
+    size_t incoming;
 
-    return size > VIDEO_QUEUE_LIMIT - prefix ||
-           output->video_queued_bytes > VIDEO_QUEUE_LIMIT - (size + prefix);
+    if (size > VIDEO_QUEUE_LIMIT - prefix)
+        return 1;
+    incoming = size + prefix;
+    if (pending > VIDEO_QUEUE_LIMIT - incoming)
+        return 1;
+    incoming += pending;
+    return output->video_queued_bytes > VIDEO_QUEUE_LIMIT - incoming;
 }
 
 static int queue_video(struct output_state *output, const uint8_t *data,
@@ -2096,6 +2157,45 @@ static void reset_for_stream_boundary(struct audio_state *audio,
     reset_output_for_navigation(output, hold_limit, 1);
 }
 
+/*
+ * A title-to-menu domain change does not itself end the elementary video
+ * sequence.  Once silent-video lookahead has released, keep that live FPGA
+ * decoder context and start only a fresh helper scheduling epoch.  The first
+ * menu timestamp is explicitly rebased above the last emitted DVD timestamp;
+ * the same offset is applied to video and audio so their authored relation is
+ * unchanged while the continuing FPGA timeline never moves backward.
+ */
+static int rearm_for_automatic_menu(struct audio_state *audio,
+                                    struct output_state *output)
+{
+    size_t hold_limit = output->hold_limit;
+    uint64_t prior_video_bytes = output->video_bytes;
+    uint64_t prior_pts = output->iso_pts_normalized_max;
+    int have_prior_pts = output->have_iso_video_pts;
+
+    if (output->video_head || output->video_queued_bytes ||
+        output->h262_chroma.have_pending) {
+        fprintf(stderr,
+                "media_player_helper: automatic menu reached with pending "
+                "silent-video output\n");
+        return -1;
+    }
+    reset_audio_for_navigation(audio);
+    reset_output_for_navigation(output, hold_limit, 1);
+    output->iso_start_filter_active = 0;
+    if (have_prior_pts) {
+        output->iso_pts_normalized_max = prior_pts;
+        output->iso_pts_rebase_floor = prior_pts;
+        output->iso_pts_rebase_pending = 1;
+    }
+    fprintf(stderr,
+            "media_player_helper: DVD automatic menu scheduling epoch "
+            "continued prior_video=%llu prior_pts_valid=%d prior_pts=%llu\n",
+            (unsigned long long)prior_video_bytes, have_prior_pts,
+            (unsigned long long)prior_pts);
+    return 0;
+}
+
 static int start_pending_menu_activation(struct dvd_menu_state *menu,
                                          struct audio_state *audio,
                                          struct output_state *output)
@@ -2138,7 +2238,7 @@ static int cancel_pending_menu_activation(struct dvd_menu_state *menu,
  */
 static int scheduler_release_silent_video(struct output_state *output)
 {
-    size_t queued_bytes = output->video_queued_bytes;
+    size_t queued_bytes;
     uint64_t video_bytes_before = output->video_bytes;
 
     if (output->iso_start_filter_active) {
@@ -2147,6 +2247,9 @@ static int scheduler_release_silent_video(struct output_state *output)
                 "initial random-access group\n");
         return -1;
     }
+    if (flush_h262_video(output) < 0)
+        return -1;
+    queued_bytes = output->video_queued_bytes;
     output->hold_active = 0;
     output->scheduler_started = 1;
     output->scheduler_enabled = 0;
@@ -3431,6 +3534,8 @@ static int process_pes(struct media_source *input, uint8_t code,
             result = 0;
             goto done;
         }
+        if (has_pts && normalize_audio_pts(output, pts, &pts) < 0)
+            goto done;
         if (output->silent_video_mode &&
             reject_late_audio(output, "MPEG Layer II", has_pts, pts) < 0)
             goto done;
@@ -3553,6 +3658,8 @@ static int process_private_pes(struct media_source *input,
             result = 0;
             goto done;
         }
+        if (has_pts && normalize_audio_pts(output, pts, &pts) < 0)
+            goto done;
         if (output->silent_video_mode &&
             reject_late_audio(output, "AC-3", has_pts, pts) < 0)
             goto done;
@@ -3615,6 +3722,8 @@ static int process_private_pes(struct media_source *input,
             result = 0;
             goto done;
         }
+        if (has_pts && normalize_audio_pts(output, pts, &pts) < 0)
+            goto done;
         if (output->silent_video_mode &&
             reject_late_audio(output, "DTS", has_pts, pts) < 0)
             goto done;
@@ -3860,14 +3969,6 @@ static int activation_stage_motion_hop(struct dvd_menu_state *menu,
     return 1;
 }
 
-static void request_stream_boundary_before_code(
-    struct dvd_menu_state *menu, int *control_command, uint8_t code)
-{
-    menu->resume_code = code;
-    menu->resume_code_valid = 1;
-    *control_command = MEDIA_PLAYER_CONTROL_STREAM_BOUNDARY;
-}
-
 static int process_program_stream(struct media_source *input,
                                   struct audio_state *audio,
                                   struct output_state *output,
@@ -3885,8 +3986,16 @@ static int process_program_stream(struct media_source *input,
 
         if (command < 0)
             return -1;
-        if (refresh_dvd_menu_state(input, menu, output, control_fd) < 0)
-            return -1;
+        {
+            int menu_refresh = refresh_dvd_menu_state(
+                input, menu, output, control_fd);
+
+            if (menu_refresh < 0)
+                return -1;
+            if (menu_refresh > 0 && output->silent_video_mode &&
+                rearm_for_automatic_menu(audio, output) < 0)
+                return -1;
+        }
         if (command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
             command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER) {
             if (cancel_pending_menu_activation(menu, output,
@@ -3971,15 +4080,9 @@ static int process_program_stream(struct media_source *input,
 
             if (menu_refresh < 0)
                 return -1;
-            if (menu_refresh > 0 && output->silent_video_mode) {
-                request_stream_boundary_before_code(
-                    menu, control_command, code);
-                fprintf(stderr,
-                        "media_player_helper: DVD automatic menu requests "
-                        "decoder stream boundary before code=0x%02x\n",
-                        code);
-                return 1;
-            }
+            if (menu_refresh > 0 && output->silent_video_mode &&
+                rearm_for_automatic_menu(audio, output) < 0)
+                return -1;
         }
         if (seek_index && media_source_position(input, &pes_offset) < 0) {
             fprintf(stderr,
