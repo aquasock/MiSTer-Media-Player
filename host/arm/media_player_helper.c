@@ -10,6 +10,7 @@
 #include "consumer_audio.h"
 #include "audio_ui.h"
 #include "audio_visualizer.h"
+#include "cdda_audio.h"
 #include "dvd_random_access.h"
 #include "dvd_spu.h"
 #include "media_player_protocol.h"
@@ -4517,6 +4518,176 @@ static int process_ogg_stream(struct media_source *input,
     return 0;
 }
 
+static int cdda_complete_reposition(struct cdda_reader *reader,
+                                    struct audio_file_control_state *state,
+                                    uint64_t current_frame,
+                                    uint64_t target_frame,
+                                    const char *action)
+{
+    if (flush_output(state->output, "Audio CD seek barrier") < 0)
+        return -1;
+    if (cdda_reader_seek_frame(reader, target_frame) < 0) {
+        fprintf(stderr, "media_player_helper: cannot seek Audio CD: %s\n",
+                strerror(errno));
+        return -1;
+    }
+    if (state->output->audio_ui &&
+        audio_ui_seek(state->output->audio_ui,
+                      state->output->pcm_emitted_frames,
+                      CDDA_SAMPLE_RATE_HZ, target_frame) < 0) {
+        fprintf(stderr,
+                "media_player_helper: cannot reset Audio CD UI for seek\n");
+        return -1;
+    }
+    audio_visualizer_seek(state->output->visualizer,
+                          state->output->pcm_emitted_frames);
+    state->output->audio_position_base = target_frame;
+    state->output->audio_emitted_base =
+        state->output->pcm_emitted_frames;
+    if (control_send(state->control_fd, MEDIA_PLAYER_CONTROL_READY) < 0 ||
+        control_wait_for_go(state->control_fd) < 0) {
+        fprintf(stderr,
+                "media_player_helper: Audio CD seek barrier failed\n");
+        return -1;
+    }
+    if (state->output->visualizer &&
+        audio_overlay_publish_full(state->output, target_frame) < 0) {
+        fprintf(stderr,
+                "media_player_helper: cannot republish Audio CD overlay\n");
+        return -1;
+    }
+    state->output->audio_overlay.next_update =
+        state->output->pcm_emitted_frames + CDDA_SAMPLE_RATE_HZ;
+    fprintf(stderr,
+            "media_player_helper: Audio CD %s current=%llu target=%llu "
+            "track=%u/%u\n",
+            action, (unsigned long long)current_frame,
+            (unsigned long long)target_frame,
+            cdda_reader_current_track(reader),
+            cdda_reader_track_count(reader));
+    state->seek_pending = 0;
+    return 0;
+}
+
+static int process_cdda_stream(const char *source_specification,
+                               struct output_state *output,
+                               struct audio_file_control_state *control)
+{
+    struct cdda_reader *reader = NULL;
+    const char *path = source_specification +
+                       strlen(MEDIA_PLAYER_CDDA_PREFIX);
+    uint64_t length_frames;
+    int16_t pcm[2048u * CDDA_CHANNELS];
+    char error[192];
+    int result = -1;
+
+    if (cdda_reader_open(&reader, path, error, sizeof(error)) < 0) {
+        fprintf(stderr, "media_player_helper: %s\n", error);
+        return -1;
+    }
+    length_frames = cdda_reader_length_frames(reader);
+    output->audio_only_mode = 1;
+    output->hold_active = 0;
+    output->scheduler_started = 1;
+    if (audio_file_configure_timeline(control, length_frames,
+                                      CDDA_SAMPLE_RATE_HZ) < 0)
+        goto done;
+    fprintf(stderr,
+            "media_player_helper: Audio CD tracks=%u frames=%llu "
+            "rate=%u device=%s\n",
+            cdda_reader_track_count(reader),
+            (unsigned long long)length_frames,
+            CDDA_SAMPLE_RATE_HZ, path);
+    for (;;) {
+        uint64_t current_frame = cdda_reader_position_frames(reader);
+        int command = control->control_fd >= 0 ?
+                      control_read_command(control->control_fd) : 0;
+        int seconds = 0;
+
+        if (command < 0)
+            goto done;
+        if (command == MEDIA_PLAYER_CONTROL_USER_ACTIVITY) {
+            audio_visualizer_activity(output->visualizer,
+                                      output->pcm_emitted_frames);
+        } else if (seek_command_seconds(command, &seconds)) {
+            uint64_t target_frame = audio_file_seek_target(
+                current_frame, length_frames, CDDA_SAMPLE_RATE_HZ, seconds);
+
+            audio_visualizer_activity(output->visualizer,
+                                      output->pcm_emitted_frames);
+            if (target_frame == current_frame) {
+                if (control_send(control->control_fd,
+                                 MEDIA_PLAYER_CONTROL_SEEK_CONTINUE) < 0)
+                    goto done;
+                fprintf(stderr,
+                        "media_player_helper: ignoring Audio CD seek %+d "
+                        "seconds at boundary frame=%llu\n",
+                        seconds, (unsigned long long)current_frame);
+            } else {
+                char action[48];
+
+                snprintf(action, sizeof(action), "seek %+d seconds", seconds);
+                control->seek_pending = 1;
+                control->seek_seconds = seconds;
+                if (cdda_complete_reposition(reader, control, current_frame,
+                                             target_frame, action) < 0)
+                    goto done;
+            }
+        } else if (command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
+                   command == MEDIA_PLAYER_CONTROL_NEXT_CHAPTER) {
+            int direction = command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ?
+                            -1 : 1;
+            uint64_t target_frame =
+                cdda_reader_track_target(reader, direction);
+
+            audio_visualizer_activity(output->visualizer,
+                                      output->pcm_emitted_frames);
+            if (target_frame == current_frame) {
+                if (control_send(control->control_fd,
+                                 MEDIA_PLAYER_CONTROL_SEEK_CONTINUE) < 0)
+                    goto done;
+                fprintf(stderr,
+                        "media_player_helper: ignoring Audio CD %s track "
+                        "at boundary track=%u/%u\n",
+                        direction < 0 ? "previous" : "next",
+                        cdda_reader_current_track(reader),
+                        cdda_reader_track_count(reader));
+            } else {
+                control->seek_pending = 1;
+                control->seek_seconds = 0;
+                if (cdda_complete_reposition(
+                        reader, control, current_frame, target_frame,
+                        direction < 0 ? "previous track" : "next track") < 0)
+                    goto done;
+            }
+        } else if (command) {
+            fprintf(stderr,
+                    "media_player_helper: ignoring unexpected Audio CD "
+                    "control 0x%02x\n", command);
+        }
+        {
+            ssize_t frames = cdda_reader_read_frames(reader, pcm, 2048u);
+
+            if (frames < 0) {
+                fprintf(stderr,
+                        "media_player_helper: Audio CD read failed: %s\n",
+                        strerror(cdda_reader_error(reader)));
+                goto done;
+            }
+            if (!frames)
+                break;
+            if (write_consumer_pcm(output, pcm, (size_t)frames,
+                                   CDDA_SAMPLE_RATE_HZ) < 0)
+                goto done;
+        }
+    }
+    result = 0;
+
+done:
+    cdda_reader_close(reader);
+    return result;
+}
+
 static int finish_output(struct output_state *output, int success)
 {
     int reserve_owned_video = output->reserve != NULL;
@@ -4572,6 +4743,7 @@ int main(int argc, char **argv)
     int is_wav;
     int is_flac;
     int is_ogg;
+    int is_cdda;
     int is_audio_file;
     int dvd_menu_mode;
     int seekable_program_stream = 0;
@@ -4655,6 +4827,8 @@ int main(int argc, char **argv)
         usage(argv[0]);
         return 2;
     }
+    is_cdda = !strncmp(source_specification, MEDIA_PLAYER_CDDA_PREFIX,
+                       strlen(MEDIA_PLAYER_CDDA_PREFIX));
     dvd_menu_mode = !strncmp(source_specification,
                              MEDIA_PLAYER_DVD_MENU_PREFIX,
                              strlen(MEDIA_PLAYER_DVD_MENU_PREFIX)) ||
@@ -4675,7 +4849,8 @@ int main(int argc, char **argv)
                 MEDIA_PLAYER_CONTROL_PROTOCOL_VERSION, control_fd);
     }
     audio_file_control_state.control_fd = control_fd;
-    if (media_source_open(&input, source_specification, source_error,
+    if (!is_cdda &&
+        media_source_open(&input, source_specification, source_error,
                           sizeof(source_error)) != MEDIA_SOURCE_OK) {
         fprintf(stderr, "media_player_helper: %s\n", source_error);
         return 1;
@@ -4729,8 +4904,9 @@ int main(int argc, char **argv)
             audio.output == AUDIO_OUT_SPDIF
                 ? "spdif (decoded PCM; IEC 61937 for AC-3/DTS)"
                 : "hdmi (decoded stereo PCM)");
-    if (read_exact(&input, signature, sizeof(signature)) < 0 ||
-        media_source_rewind(&input) < 0) {
+    if (!is_cdda &&
+        (read_exact(&input, signature, sizeof(signature)) < 0 ||
+         media_source_rewind(&input) < 0)) {
         fprintf(stderr, "media_player_helper: input is too short\n");
         goto done;
     }
@@ -4738,7 +4914,7 @@ int main(int argc, char **argv)
     is_wav = has_suffix_case(source_specification, ".wav");
     is_flac = has_suffix_case(source_specification, ".flac");
     is_ogg = has_suffix_case(source_specification, ".ogg");
-    is_audio_file = is_mp3 || is_wav || is_flac || is_ogg;
+    is_audio_file = is_mp3 || is_wav || is_flac || is_ogg || is_cdda;
     is_program_stream = !is_audio_file &&
                         !memcmp(signature, "\x00\x00\x01\xba", 4);
     seekable_program_stream = is_program_stream &&
@@ -4748,11 +4924,11 @@ int main(int argc, char **argv)
     if (is_mp3) {
         if (preflight_mp3(&input) < 0)
             goto done;
-    } else if (!is_wav && !is_flac && !is_ogg &&
+    } else if (!is_cdda && !is_wav && !is_flac && !is_ogg &&
                preflight_input(&input, is_program_stream) < 0) {
         goto done;
     }
-    if (media_source_prepare(&input) < 0) {
+    if (!is_cdda && media_source_prepare(&input) < 0) {
         fprintf(stderr,
                 "media_player_helper: cannot prepare %s source for playback\n",
                 media_source_kind_name(input.kind));
@@ -4806,7 +4982,11 @@ int main(int argc, char **argv)
         fprintf(stderr, "media_player_helper: audio UI 720x480p %s enabled\n",
                 output.visualizer ? "two-bit overlay" : "BT.601 frame");
     }
-    if (is_mp3) {
+    if (is_cdda) {
+        if (process_cdda_stream(source_specification, &output,
+                                &audio_file_control_state) < 0)
+            goto done;
+    } else if (is_mp3) {
         if (process_mp3_stream(&input, &output, &audio_file_control) < 0)
             goto done;
     } else if (is_wav) {

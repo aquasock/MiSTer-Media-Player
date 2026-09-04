@@ -286,7 +286,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,1030 @@
+@@ -0,0 +1,1059 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -329,6 +329,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +static bool stream_boundary_pending = false;
 +static bool stream_boundary_pipe_empty = false;
 +static bool chapter_controls = false;
++static bool track_controls = false;
 +static bool seek_controls = false;
 +static bool audio_visualizer_controls = false;
 +static bool menu_controls = false;
@@ -518,7 +519,8 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	                     !strcasecmp(extension, ".mp3") ||
 +	                     !strcasecmp(extension, ".wav") ||
 +	                     !strcasecmp(extension, ".flac") ||
-+	                     !strcasecmp(extension, ".ogg"));
++	                     !strcasecmp(extension, ".ogg") ||
++	                     !strcasecmp(extension, ".cd"));
 +}
 +
 +static void finish_download(const char *reason, bool release_download)
@@ -558,6 +560,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	stream_boundary_pending = false;
 +	stream_boundary_pipe_empty = false;
 +	chapter_controls = false;
++	track_controls = false;
 +	seek_controls = false;
 +	audio_visualizer_controls = false;
 +	menu_controls = false;
@@ -600,6 +603,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	const char *extension = strrchr(path, '.');
 +	std::string source_spec;
 +	if (!strcasecmp(extension, ".dvd")) source_spec = "dvdmenu:/dev/sr0";
++	else if (!strcasecmp(extension, ".cd")) source_spec = "cdda:/dev/sr0";
 +	else
 +	{
 +		source_spec = !strcasecmp(extension, ".iso") ? "isomenu:" : "file:";
@@ -726,21 +730,24 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	chapter_controls = menu_controls ||
 +	                   !strncasecmp(requested_source.c_str(), "dvd:", 4) ||
 +	                   !strncasecmp(requested_source.c_str(), "iso:", 4);
++	track_controls = !strncasecmp(requested_source.c_str(), "cdda:", 5);
 +	const char *source_extension = strrchr(requested_source.c_str(), '.');
-+	seek_controls = !strncasecmp(requested_source.c_str(), "file:", 5) &&
-+	                source_extension &&
-+	                (!strcasecmp(source_extension, ".mpg") ||
-+	                 !strcasecmp(source_extension, ".mpeg") ||
-+	                 !strcasecmp(source_extension, ".mp3") ||
-+	                 !strcasecmp(source_extension, ".wav") ||
-+	                 !strcasecmp(source_extension, ".flac") ||
-+	                 !strcasecmp(source_extension, ".ogg"));
-+	audio_visualizer_controls = !strncasecmp(requested_source.c_str(), "file:", 5) &&
-+	                            source_extension &&
-+	                            (!strcasecmp(source_extension, ".mp3") ||
-+	                             !strcasecmp(source_extension, ".wav") ||
-+	                             !strcasecmp(source_extension, ".flac") ||
-+	                             !strcasecmp(source_extension, ".ogg"));
++	seek_controls = track_controls ||
++	                (!strncasecmp(requested_source.c_str(), "file:", 5) &&
++	                 source_extension &&
++	                 (!strcasecmp(source_extension, ".mpg") ||
++	                  !strcasecmp(source_extension, ".mpeg") ||
++	                  !strcasecmp(source_extension, ".mp3") ||
++	                  !strcasecmp(source_extension, ".wav") ||
++	                  !strcasecmp(source_extension, ".flac") ||
++	                  !strcasecmp(source_extension, ".ogg")));
++	audio_visualizer_controls = track_controls ||
++	                            (!strncasecmp(requested_source.c_str(), "file:", 5) &&
++	                             source_extension &&
++	                             (!strcasecmp(source_extension, ".mp3") ||
++	                              !strcasecmp(source_extension, ".wav") ||
++	                              !strcasecmp(source_extension, ".flac") ||
++	                              !strcasecmp(source_extension, ".ogg")));
 +	retain_clean_eof = seek_controls;
 +	playback_source_spec = requested_source;
 +	user_io_set_index(index);
@@ -1061,6 +1068,28 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	if (input != MEDIAPLAYER_INPUT_PREVIOUS &&
 +	    input != MEDIAPLAYER_INPUT_NEXT)
 +		return 0;
++	if (track_controls)
++	{
++		if (chapter_barrier || navigation_pending || seek_pending ||
++		    stream_boundary_pending || playback_paused) return 1;
++		uint8_t command = input == MEDIAPLAYER_INPUT_PREVIOUS ?
++		                  MEDIA_CONTROL_PREVIOUS_CHAPTER :
++		                  MEDIA_CONTROL_NEXT_CHAPTER;
++		seek_pending = true;
++		if (!send_control(command))
++		{
++			stop_with_reason("track-command-error");
++			return 1;
++		}
++		diagnostic_write("Audio CD track command=%s submitted=%llu\n",
++		                 command == MEDIA_CONTROL_PREVIOUS_CHAPTER ?
++		                     "previous" : "next",
++		                 (unsigned long long)submitted_bytes);
++		printf("MediaPlayer: %s Audio CD track\n",
++		       command == MEDIA_CONTROL_PREVIOUS_CHAPTER ?
++		           "previous" : "next");
++		return 1;
++	}
 +	if (chapter_barrier || navigation_pending || seek_pending ||
 +	    stream_boundary_pending || playback_paused ||
 +	    !chapter_controls) return 1;

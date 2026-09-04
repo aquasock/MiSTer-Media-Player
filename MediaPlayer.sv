@@ -80,7 +80,7 @@ localparam CONF_STR = {
 	"MediaPlayer;;",
 	"F1,DVD,Load Disk;",
 	"F1,M2VMPGMPEVOBISO,Open MPEG-2 Video;",
-	"F1,WAVMP3FLCOGG,Open WAV, MP3, FLAC, OGG;",
+	"F1,WAVMP3FLCOGGCD,Open WAV, MP3, FLAC, OGG;",
 	"-;",
 	"O[121],Aspect Ratio,16:9,4:3;",
 	"O[124],Deinterlacer Mode:,Bob,Weave;",

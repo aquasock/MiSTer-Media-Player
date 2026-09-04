@@ -97,6 +97,10 @@ path `/media/fat/games/MediaPlayer/Video DVD.dvd`. Patched Main maps that
 file to `dvdmenu:/dev/sr0`; the helper requires the source path to be absolute and
 opens the block device directly through libdvdnav. A filesystem mount is not a
 prerequisite. Verify `/dev/sr0` exists and is readable before testing.
+Audio CD playback uses the separate
+`/media/fat/games/MediaPlayer/Audio CD.cd` marker and maps it to
+`cdda:/dev/sr0`; its Linux CD-ROM control path also requires a readable device
+but does not require a mounted filesystem.
 Direct-disc playback reuses the authenticated navigation session across
 preflight and then starts an 8 MiB asynchronous RAM ring with a 4 MiB initial
 reserve. `MMP_DVD_TEST_STALL_AFTER_BYTES` and `MMP_DVD_TEST_STALL_MS` are

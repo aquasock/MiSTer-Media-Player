@@ -7,7 +7,9 @@ Keep the official `/media/fat/MiSTer`, install the patched executable as
 Make both custom executables executable and reboot. For direct optical testing,
 install `Video DVD.dvd` at
 `/media/fat/games/MediaPlayer/Video DVD.dvd` and confirm the drive is
-present as readable `/dev/sr0`. The disc does not need to be mounted.
+present as readable `/dev/sr0`. Also install `Audio CD.cd` at
+`/media/fat/games/MediaPlayer/Audio CD.cd`. Neither disc type needs to be
+mounted.
 
 Run normal playback first with `Telemetry` Off. Turn it On only for a fresh
 diagnostic run; the next playback creates `/tmp/MediaPlayer_ARM.log`, and later
@@ -44,6 +46,21 @@ playback replaces it.
    player-one Start and require a restart from the beginning.
 5. Temporarily omit the visualizer pack and confirm audio still plays using the
    ordinary full-frame interface.
+
+## Audio CD
+
+1. Insert a standard Audio CD, choose `Open WAV, MP3, FLAC, OGG`, and select
+   `games/MediaPlayer/Audio CD.cd`. Require the audio UI and clean 44.1 kHz
+   stereo playback from the first audio track.
+2. Test a mixed-mode disc where available. Data tracks must be skipped and must
+   never be emitted as noise.
+3. Press P/N or player-one Left/Right to move between audio tracks. Previous
+   restarts the current track after three seconds or selects the preceding
+   audio track near its start; Next selects the following audio track.
+4. Exercise the fixed-time keyboard seeks, pause/resume and visualizer overlay.
+   Require the same clean READY/GO reset behavior as file-backed audio.
+5. Let the disc reach the end, press Play to restart it, and confirm that a
+   DVD inserted afterward still opens through `Video DVD.dvd`.
 
 ## DVD ISO and direct optical playback
 

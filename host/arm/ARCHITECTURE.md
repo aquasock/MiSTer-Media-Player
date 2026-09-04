@@ -15,7 +15,8 @@ MediaPlayer_Helper --protocol 1 --source file:/absolute/path/movie.mpg
 `--capabilities` prints the implemented and reserved source types. Bare paths
 remain accepted for transition and local verification, but Main uses the
 versioned form. Menu-capable launches use `isomenu:` or `dvdmenu:`; the
-corresponding `iso:` and `dvd:` routes retain longest-title playback.
+corresponding `iso:` and `dvd:` routes retain longest-title playback. Physical
+Audio CD playback uses `cdda:/dev/sr0`.
 
 Main optionally passes `--control-fd FD`, a private version-one
 `SOCK_SEQPACKET` channel separate from standard output.  Player-one Left and
@@ -51,7 +52,10 @@ drains the old boundary and sends GO; the helper then restarts the
 audio-interface publisher at the absolute target. A forward target at or beyond
 the exact end returns an explicit continuation event with no reset or output
 discard, preserving the current decoder and display session. Raw `.m2v`, ISO, and
-optical-disc routes reject these seek commands in this boundary.
+DVD optical-disc routes reject these seek commands in this boundary. The
+`cdda:/dev/sr0` route applies the same fixed seeks to one concatenated
+audio-track timeline and maps previous/next to track starts through the
+seek-style READY/GO barrier rather than the eager DVD chapter reset.
 
 Menu-mode sources use the same channel for directional, activate and root-menu
 commands. Root calls and button activations that enter a title use the ready/go
@@ -141,6 +145,15 @@ post-filter 256-byte prefix and parsed sequence, picture and coding-extension
 diagnostic. This delegates CSS
 access to libdvdcss and is not a claim of CSS conformance.
 
+The `cdda:` route is separate from `media_source` because an Audio CD is not a
+mounted byte-stream file. It opens the absolute optical-device path with
+`O_NONBLOCK`, inventories track and lead-out LBAs with the Linux CD-ROM TOC
+controls, drops data-track spans, and concatenates the remaining audio spans
+into one sample-frame timeline. Bounded `CDROMREADAUDIO` requests fetch up to
+eight 2,352-byte sectors and retry one sector when a drive rejects the larger
+request. Each sector contributes 588 interleaved 16-bit stereo frames at
+44.1 kHz to the existing PCM writer; no MPEG or FPGA audio decoder is involved.
+
 The non-menu direct optical backend retains one authenticated libdvdnav session
 across signature and stream preflight rewinds. Only after preflight, a producer
 thread fills an 8 MiB HPS-RAM byte ring and playback starts with at least 4 MiB
@@ -201,8 +214,8 @@ malformed scheduling stops with a diagnostic rather than growing the host queue
 to exhaustion. Explicit
 navigation hops and finite still boundaries continue to use the READY/GO reset
 path. Future work may add optical-device
-discovery beyond the explicit `/dev/sr0` launcher. Angles, track selection and
-general seeking remain separate work.
+discovery beyond the explicit `/dev/sr0` launcher. DVD angles,
+title/audio/subtitle selection and general DVD seeking remain separate work.
 
 ## Pipeline boundaries
 

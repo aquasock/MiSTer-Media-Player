@@ -14,6 +14,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Added direct Audio CD playback from `/dev/sr0` through an `Audio CD.cd`
+  launcher. The helper inventories audio tracks, skips data tracks, reads CDDA
+  sectors as 44.1 kHz stereo PCM, and reuses the standalone-audio interface,
+  visualizer, fixed seeking, pause/replay lifecycle and previous/next controls.
 - Added an experimental MediaPlayer-only NTSC 480i direct-HDMI mode to the
   isolated patched Main. With `direct_video=1` in the `[MediaPlayer]` INI
   section, the ADV7513 consumes the core's proven native 525-line raster at a

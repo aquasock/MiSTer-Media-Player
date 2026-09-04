@@ -6,10 +6,10 @@ DEPS_DIR ?= .deps
 A52_DIR ?= $(DEPS_DIR)/liba52
 DVD_PREFIX ?= $(DEPS_DIR)/dvd-install-native
 OUTPUT ?= media_player_helper
-SOURCES := media_player_helper.c media_source.c dvd_random_access.c dvd_spu.c \
+SOURCES := media_player_helper.c media_source.c cdda_audio.c dvd_random_access.c dvd_spu.c \
 	audio_ui.c audio_visualizer.c audio_file_seek.c program_stream_seek.c \
 	output_reserve.c output_stage.c
-HEADERS := media_source.h media_player_protocol.h consumer_audio.h audio_ui.h \
+HEADERS := media_source.h media_player_protocol.h consumer_audio.h cdda_audio.h audio_ui.h \
 	audio_visualizer.h \
 	audio_file_seek.h ac3_resync.h dvd_random_access.h dvd_spu.h \
 	program_stream_seek.h \

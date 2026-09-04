@@ -8,6 +8,7 @@
 #define MEDIA_PLAYER_ISO_PREFIX "iso:"
 #define MEDIA_PLAYER_DVD_MENU_PREFIX "dvdmenu:"
 #define MEDIA_PLAYER_ISO_MENU_PREFIX "isomenu:"
+#define MEDIA_PLAYER_CDDA_PREFIX "cdda:"
 
 /* Private SOCK_SEQPACKET channel between MiSTer Main and the ARM helper. */
 #define MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER 0x01
@@ -53,14 +54,15 @@
     (MEDIA_PLAYER_PCM_MODE_48K | MEDIA_PLAYER_PCM_MODE_STEREO)
 
 #define MEDIA_PLAYER_CAPABILITIES \
-    "protocol=1 sources=file,iso,dvd,isomenu,dvdmenu " \
-    "containers=m2v,mpeg-ps,mp3,wav,flac,ogg-vorbis video=h262 " \
+    "protocol=1 sources=file,iso,dvd,isomenu,dvdmenu,cdda " \
+    "containers=m2v,mpeg-ps,mp3,wav,flac,ogg-vorbis,cdda video=h262 " \
     "audio=mp2-s16le-44100,mp2-s16le-48000," \
     "mp3-s16le-44100,mp3-s16le-48000,wav-s16le-stereo-44100,wav-s16le-stereo-48000," \
     "flac-s16le-stereo-44100,flac-s16le-stereo-48000," \
-    "ogg-vorbis-s16le-stereo-44100,ogg-vorbis-s16le-stereo-48000 " \
+    "ogg-vorbis-s16le-stereo-44100,ogg-vorbis-s16le-stereo-48000," \
+    "cdda-s16le-stereo-44100 " \
     "transport=inband-pcm-v1,inband-dvd-overlay-v1,inband-audio-ui-v1 " \
     "controls=chapter-v1,pause-hold-v1,dvd-menu-v1,mpeg-ps-seek-v1," \
-    "audio-file-seek-v2,audio-visualizer-v1"
+    "audio-file-seek-v2,audio-visualizer-v1,cdda-track-v1"
 
 #endif

@@ -1,0 +1,3 @@
+MiSTer MediaPlayer Audio CD launcher.
+
+Patched Main ignores this file's contents and opens cdda:/dev/sr0.

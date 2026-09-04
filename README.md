@@ -53,7 +53,7 @@ The supported subset is intentionally bounded while the architecture is being pr
 | Presentation rates | H.262 frame-rate codes 1..5; codes 6..8 are rejected before transport |
 | Program Stream timing | Picture PTS on a 33-bit / 90 kHz FPGA timeline with cadence-floor enforcement |
 | Raw-stream timing | Synthetic 33-bit / 90 kHz cadence derived from H.262 frame-rate metadata |
-| Audio | MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV, FLAC and Ogg Vorbis converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. The AC-3 stereo downmix discards LFE |
+| Audio | MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV, FLAC and Ogg Vorbis converted to stereo at 44.1 or 48 kHz, Audio CD at native 44.1 kHz stereo, and AC-3 at 48 kHz. The AC-3 stereo downmix discards LFE |
 | Audio passthrough | AC-3 and DTS carried to S/PDIF as IEC 61937 bursts for an external decoder. DTS is passthrough only; there is no DTS decoder |
 | Audio output | A menu option selects HDMI or S/PDIF. The unused output is muted, because both are fed from one stereo stream |
 | Audio buffering | Packed signed PCM records into an 8,192-frame stereo FPGA FIFO |
@@ -139,12 +139,13 @@ audio interface are not qualified with it. Remove or comment out
 do not accept 480i over HDMI may show no picture even when the SDI converter
 locks correctly.
 
-The visualizer and optical-drive launcher have these roles:
+The visualizer and optical-drive launchers have these roles:
 
 | Release file | MiSTer destination | Required for |
 | --- | --- | --- |
 | `linux/MediaPlayer_Visualizer.mmpvis` | `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` | Standalone-audio visualizer; audio still works if omitted |
 | `games/MediaPlayer/Video DVD.dvd` | `/media/fat/games/MediaPlayer/Video DVD.dvd` | Direct playback from `/dev/sr0` |
+| `games/MediaPlayer/Audio CD.cd` | `/media/fat/games/MediaPlayer/Audio CD.cd` | Direct Audio CD playback from `/dev/sr0` |
 
 The launcher is tracked as `assets/Video DVD.dvd` and is installed at the
 absolute path `/media/fat/games/MediaPlayer/Video DVD.dvd`. Selecting that
@@ -154,6 +155,12 @@ The helper authenticates and selects the title once, reuses that navigation
 session during preflight, then fills a 4 MiB launch reserve inside an 8 MiB
 HPS-RAM ring before playback begins. The ring is direct-disc-only and does not
 consume FPGA M10K memory.
+
+The Audio CD launcher is tracked as `assets/Audio CD.cd` and maps to
+`cdda:/dev/sr0`. The helper reads the disc table of contents, skips data tracks
+on mixed-mode media and presents all audio tracks as one 44.1 kHz stereo
+timeline in the existing standalone-audio player. The launcher is also only a
+marker; no filesystem mount or extracted audio files are required.
 
 The current menu separates `Load Disk`, `Open MPEG-2 Video`, and
 `Open WAV, MP3, FLAC, OGG` so each picker exposes only its relevant files.
@@ -168,24 +175,32 @@ Output choices are unchanged.
 - To play an ISO or file, choose `Open MPEG-2 Video` and select `.iso`, `.m2v`,
   `.mpg`, `.mpeg` or `.vob`.
 - To play standalone audio, choose `Open WAV, MP3, FLAC, OGG`.
+- To play an inserted Audio CD, choose `Open WAV, MP3, FLAC, OGG` and select
+  `games/MediaPlayer/Audio CD.cd`.
 
-The `.dvd` launcher is required for direct optical playback. Merely installing
-the RBF, Main and helper does not add `/dev/sr0` to MiSTer's file browser.
+The `.dvd` and `.cd` launchers are required for direct optical playback. Merely
+installing the RBF, Main and helper does not add `/dev/sr0` to MiSTer's file
+browser.
 
 For `.iso` and `.dvd` playback, player-one Left and Right select the previous
 or next chapter and Start toggles pause/resume while the MiSTer OSD is closed.
 On a keyboard, P and N select the previous and next chapter, and Space toggles
 pause/resume under the same OSD-closed guard.
 
+For `Audio CD.cd`, the same Left/Right or P/N controls select audio tracks.
+Previous restarts the current track after three seconds or selects the prior
+audio track near its beginning; Next selects the following audio track.
+
 For ordinary file-backed `.mpg`, `.mpeg`, `.mp3`, `.wav`, `.flac` and `.ogg`
-playback, Alt+Left/Right jumps backward or forward 10 seconds,
+playback and for `Audio CD.cd`, Alt+Left/Right jumps backward or forward 10 seconds,
 Ctrl+Left/Right jumps 1 minute, and Ctrl+Alt+Left/Right jumps 5 minutes. Program
 Streams use a sparse video-PTS index; standalone audio uses the decoder's PCM
-sample timeline. Main leaves the active presentation running while the helper
+sample timeline, and CDDA uses the concatenated audio-track timeline. Main
+leaves the active presentation running while the helper
 decides each request; only a valid target's READY response enters the clean
 download reset and GO barrier, so no pre-jump bytes or partial audio-interface
 frame crosses that reset. These
-controls do not apply to raw `.m2v`, DVD ISO images, or optical discs. A
+controls do not apply to raw `.m2v`, DVD ISO images, or DVD-Video discs. A
 standalone-audio forward jump that would reach or pass the exact end is ignored
 with an explicit continuation response and no download reset. At clean EOF,
 Main keeps the final valid MPG frame or standalone-audio interface resident and
@@ -283,6 +298,7 @@ by the `Audio output` menu option together:
 | WAV PCM, 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
 | FLAC, 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
 | Ogg Vorbis, converted to 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
+| Audio CD, 44.1 kHz stereo | read digitally and sent as stereo PCM | read digitally and sent as stereo PCM |
 | AC-3, 48 kHz | decoded to stereo, LFE discarded | passed through as IEC 61937 for your receiver to decode |
 | DTS | refused, with a message in the helper log | passed through as IEC 61937 |
 
@@ -384,6 +400,9 @@ for the current workflow.
 
 - Program Stream support is bounded; MPEG Transport Stream, DVD LPCM, subtitle-track presentation, angles and arbitrary systems-layer layouts are not supported. Authored DVD menus use DVD subpictures only for their button overlay and run in native 480i; ISO and direct `/dev/sr0` playback use statically linked libdvdcss for encrypted sectors. DVD private stream 1 supports AC-3 decode/passthrough and DTS passthrough.
 - Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV, FLAC and Ogg Vorbis converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III remain rejected; AAC is not enabled. Only the first Program Stream audio track is played; chapter changes retain that identity, while deliberate track switching needs a control channel that protocol one does not implement.
+- Audio CD playback uses bounded Linux digital-audio reads and the drive's own
+  error reporting; it does not yet add cdparanoia-style damaged-disc recovery,
+  offset correction, CD-Text or metadata lookup.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
 - The standalone-audio screen contains a CRT-safe 4:3 composition for album artwork, title/artist/album tags, the current playlist, transport controls, centered elapsed/total/remaining time and a duration-relative progress bar. Track timing, fixed keyboard seeking and absolute progress tracking are active; artwork, metadata, playlist entries, playlist summary fields, arbitrary-position scrubbing and FPGA-aware pause state remain later display boundaries.
@@ -400,8 +419,8 @@ for the current workflow.
 - The framework scaler has little timing margin: seed 16 missed setup by 0.070 ns after audio routing changed; the seed-17 release has +0.243 ns worst setup. Future logic changes may expose the path again, and 93% M10K usage limits buffering headroom.
 - H.262 frame-rate codes 6 through 8 (50, 59.94, and 60 fps) are rejected.
 - Arbitrary-position scrubbing and seeking in raw `.m2v`, DVD ISO, and
-  optical-disc playback are not implemented; ordinary `.mpg`/`.mpeg` and
-  supported standalone-audio files provide only the fixed keyboard jumps
+  DVD optical-disc playback are not implemented; ordinary `.mpg`/`.mpeg`,
+  supported standalone-audio files and Audio CD provide only fixed keyboard jumps
   documented above. DVD
   title/angle/audio/subtitle-track selection, drive discovery beyond
   `/dev/sr0`, and software-controlled ejection are also not implemented.
