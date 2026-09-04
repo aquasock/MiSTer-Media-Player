@@ -1,4 +1,4 @@
-## 960 COMMIT Unreleased ??? 2026-09-03T22:32:01-07:00
+## 960 COMMIT Unreleased 3b2a0ca 2026-09-03T22:32:01-07:00
 
 #### Coming From:
 
@@ -10,15 +10,16 @@ Add direct physical Audio CD playback through the existing standalone-audio inte
 
 #### Outcome:
 
-The approved boundary will add an `Audio CD.cd` marker whose `.cd` extension appears in the existing audio picker, map it in isolated Main to `cdda:/dev/sr0`, inventory the disc table of contents through Linux optical-drive controls, skip data tracks, and read audio sectors digitally as 44.1 kHz signed stereo PCM for the existing audio UI, visualizer and in-band PCM transport.  The helper will expose the disc as one continuous audio timeline while accepting the established fixed-time seek controls and previous or next commands as audio-track navigation, with no decoder RTL, transport-record or protocol-version change.
+Source `184b2fa` adds the `Audio CD.cd` marker to the existing audio picker, maps it in isolated Main to `cdda:/dev/sr0`, inventories the disc table of contents through Linux optical-drive controls, skips data tracks and reads audio sectors digitally as native 44.1 kHz signed stereo PCM for the existing audio UI, visualizer and in-band transport.  The helper exposes playable tracks as one continuous timeline, retains fixed-time seeking and maps previous or next commands to audio-track boundaries through the established READY/GO lifecycle; the decoder RTL and transport protocol are unchanged.  Focused CDDA optimized, AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer coverage passes, as do strict native compilation, the isolated Main CDDA contract and retained AC-3, file-audio, UI, visualizer, DVD random-access, SPU, reserve, staging, Program Stream seek, Main seek, LPCM-skip and real MP3, WAV, FLAC and Ogg integrations.  GNU 10.2.1 produced the 974,244-byte static stripped ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `35a369ed1c3f30197f0ce663da67a0c171dbf132c34d6c131c859aa626663dd7` and the 1,182,684-byte stripped ARMv7 `host/build/MiSTer_MediaPlayer` with SHA-256 `06339d6b5ac2fa216c2be47062ba7e5d8b178c0bd4aa950562c25ea3fedfdc3f`.  The initial seed-24 Quartus build failed only global setup at negative 0.606 ns while decoder and video setup passed at positive 0.984 ns and positive 1.097 ns; the single authorized source-`3b2a0ca` seed-25 retry passes global setup at positive 0.118 ns, hold at positive 0.247 ns, recovery at positive 3.578 ns, removal at positive 0.580 ns, minimum pulse width at positive 0.925 ns, decoder setup at positive 0.250 ns and video setup at positive 1.662 ns, with peak interconnect reduced from 67 percent to 60 percent.  Its worst path is the pre-existing `ascal` vertical-accept-to-address DSP calculation, whose 6.596 ns data delay is 78 percent cell delay and 22 percent routing rather than a general interconnect failure.  The resulting 4,477,416-byte `host/build/MediaPlayer_20260903.rbf` has SHA-256 `686957247693c1556aee9018ff4be19e08e1969225fe35e1063ffb67c597d74e`; no physical Audio CD was available for local hardware acceptance.
 
 #### Next Steps:
 
-Implement a bounded CDDA reader with injectable table-of-contents and sector-read boundaries for native testing, wire `.cd` handling and controls through Main and the helper, add the launcher plus current documentation, and run strict native, sanitizer, analyzer, Main-patch and retained audio regressions.  Build and checksum the ARM helper and isolated Main locally, commit and push the exact source, then perform one clean timing-gated Quartus build on build PC `10.10.0.42` using the established seed; authorize at most one reseed only if that build fails timing, and deliver the combined RBF, Main, helper, `Video DVD.dvd` and `Audio CD.cd` replacement set for hardware validation.
+Exit MediaPlayer, install `host/build/MediaPlayer_20260903.rbf` as `/media/fat/MediaPlayer_20260903.rbf`, `host/build/MiSTer_MediaPlayer` as executable `/media/fat/MiSTer_MediaPlayer`, `host/build/MediaPlayer_Helper` as executable `/media/fat/linux/MediaPlayer_Helper`, `assets/Video DVD.dvd` as `/media/fat/games/MediaPlayer/Video DVD.dvd` and `assets/Audio CD.cd` as `/media/fat/games/MediaPlayer/Audio CD.cd`, remove the obsolete `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`, preserve the current visualizer and per-core INI, then reboot.  Load an Audio CD through the audio picker and require clean first-track playback, UI and visualization, previous and next track selection, fixed-time seeking, pause and end-of-disc behavior, including a mixed-mode disc if available; then confirm ordinary DVD loading, menus, chapter controls, Bob or Weave output and the retained experimental native-NTSC mode before marking this source hardware-passed.  Treat a future scaler timing-improvement cycle separately by investigating the registered `ascal` address-DSP path rather than weakening the timing gate.
 
 #### Files Modified:
 
 - CHANGELOG.md
+- MediaPlayer.qsf
 - MediaPlayer.sv
 - README.md
 - assets/Audio CD.cd
@@ -36,7 +37,7 @@ Implement a bounded CDDA reader with injectable table-of-contents and sector-rea
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
