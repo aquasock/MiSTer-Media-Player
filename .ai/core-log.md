@@ -1,3 +1,32 @@
+## 949 COMMIT Unreleased d7d5ab2 2026-09-03T17:49:51-07:00
+
+#### Coming From:
+
+Unreleased d7d5ab2
+
+#### Purpose:
+
+Qualify the boundary odd-byte correction on Futurama disc one and isolate the later black failure during its 20th Century transition.
+
+#### Outcome:
+
+The physical source-`d7d5ab2` run validates the corrected Main boundary path but rejects the complete host behavior.  All three finite first-play stills now finish and cross one decoder boundary each, the first two observed odd tails each log `pipe quiescent odd_tail=1` and submit their final byte, and every boundary reaches `released after drain`; the third session then qualifies a normal sequence/I/P restart group, releases 2,096,389 queued silent-video bytes and visibly advances into the 20th Century animation.  At 40.445047 seconds libdvdnav enters menu space while that live video session is still progressing, and the helper requests a fourth decoder boundary; Main drains 76,372 remaining bytes, resets the healthy decoder at 41.727776 seconds and leaves a black display.  The fresh menu epoch emits no H.262 restart diagnostic because its next 2,097,152 bytes never contain the sequence-header/I/reference combination required only after a decoder reset, although the helper accepts AC-3, publishes nine complete 86,400-byte overlay planes and remains responsive to an Up command that changes button one to four.  At 85.968714 seconds the queued video reaches the implementation guard and `video lookahead limit exceeded` deliberately exits the helper with code one.  Checksum-valid schema-21 telemetry confirms zero pictures and swaps in the reset session, nine valid overlay commits with no protocol error, and no audio underrun or transport block; the black 1,920-by-1,080 screenshot retains only the telemetry raster.  The 1,707,301-byte log, 1,557-byte screenshot and 480-byte telemetry sidecar have SHA-256 `9ec5ac166630067398f71e8226ed2c2b7a49f0cc68639ce43effc59bd3101789`, `5b3b2acf3c879c741b48e7d7a9c6c89b2ffc73f65b7ad1af633f7903491c421b` and `c5c1c9ba9f37749c4f0fa08b16d9ad56761fc12579b5b63b3739cd0509618f`.
+
+#### Next Steps:
+
+After user approval, preserve all finite-still decoder boundaries and the source-`d7d5ab2` Main correction, but stop resetting the already-live FPGA decoder solely because the continuous first-play video enters menu space.  Replace that automatic boundary with a helper-only audio and scheduling epoch transition that drains any pending H.262 normalization byte in original order, retains continuous decoder context and the resident picture, does not re-enable the initial random-access filter, and keeps the new menu's audio/video PTS relationship valid without a backward FPGA timestamp.  Add a production-path regression whose post-transition video exceeds 2 MiB without a new sequence header, proving byte-exact continuous delivery, bounded scheduling, synchronized AC-3 admission, overlay continuation and no Main READY/GO; retain finite-still boundaries, explicit navigation hops, late-audio rejection and sanitizer coverage, then build only a new ARM helper and retest Futurama through the complete animation into its moving menu.  Main, protocol, RTL and RBF should remain unchanged.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 948 COMMIT Unreleased d7d5ab2 2026-09-03T16:51:15-07:00
 
 #### Coming From:
@@ -1183,39 +1212,6 @@ Preserve source `338c4d5` overlay-only continuation, genuine multi-picture activ
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 909 COMMIT Unreleased 338c4d5 2026-09-02T17:54:21-07:00
-
-#### Coming From:
-
-Unreleased 8c90e2d
-
-#### Purpose:
-
-Preserve the resident DVD picture when an authored indefinite submenu activation produces only a replacement overlay.
-
-#### Outcome:
-
-Source `338c4d5` replaces the ambiguous raw Program Stream start-code count with destination evidence from the bounded output stage and the helper's emitted H.262 picture scanner.  A nonempty indefinite activation containing no emitted picture now commits its staged overlay through the live session and acknowledges `MENU_CONTINUE` without stale-reserve discard, READY/GO or decoder reset; finite, empty and genuine picture-bearing destinations retain their prior commit, cancel and staged-hop behavior.  The focused regression reconstructs the Coming to America transaction as exactly 26 priority records and 86,664 bytes and proves byte-exact continuation, while 100 staging repetitions, 100 menu-hop repetitions, 20 overlay reconstructions, 20 unsupported-LPCM runs, strict native builds, GCC analyzer, AddressSanitizer and UndefinedBehaviorSanitizer checks, DVD random-access and SPU tests, AC-3 recovery, Program Stream seek, audio UI, timer, visualizer and all four real standalone-audio integrations pass.  GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_SceneContinue_338c4d5` at SHA-256 `6af407d0d0b8abfba1d9302ca6eb8f51ab7319bd729ff9fa98f300e7dc817a25`; the source-`8c90e2d` redundant-root and unsupported-LPCM behavior, Main, RBF, decoder, visualizer and protocol remain unchanged.
-
-#### Next Steps:
-
-Install only `host/build/MediaPlayer_Helper_SceneContinue_338c4d5` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  On Coming to America, enter Scene Selections and require the existing background plus replacement selector to remain visible and responsive without a navigation reset; then activate a scene to prove a genuine video-bearing destination still uses the decoder barrier.  Retest Blazing Saddles at its already-active root menu, The Big Lebowski menu and title playback, and the forum disc's silent LPCM menu followed by supported AC-3 title playback before accepting the helper on hardware.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- host/arm/output_stage.c
-- host/arm/output_stage.h
-- tools/test_output_stage.c
 
 #### Status:
 
