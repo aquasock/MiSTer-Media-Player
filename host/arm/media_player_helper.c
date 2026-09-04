@@ -2006,6 +2006,27 @@ static int hold_emit_frames(struct output_state *output, uint64_t frames)
     return hold_flush(output, available - emit);
 }
 
+/*
+ * The physical-DVD reserve is intentionally large enough to bridge optical
+ * stalls during ordinary playback.  Once a timestamp-stalled menu falls back
+ * to sink pacing, however, allowing that reserve to absorb decoded PCM turns
+ * four MiB into roughly twenty seconds of audio lead.  Drain it before each
+ * fallback scheduler batch so the pipe and FPGA credit, rather than reserve
+ * capacity, set the delivery rate.  One batch per scheduler pass keeps control
+ * handling interleaved with that backpressure.
+ */
+static int scheduler_emit_pcm(struct output_state *output, uint64_t frames)
+{
+    if (output->automatic_menu_pcm_fallback && output->reserve &&
+        output_reserve_drain(output->reserve) < 0) {
+        fprintf(stderr,
+                "media_player_helper: automatic menu PCM pacing failed: %s\n",
+                strerror(errno));
+        return -1;
+    }
+    return hold_emit_frames(output, frames);
+}
+
 static uint64_t scheduler_pcm_target(const struct output_state *output,
                                      uint64_t video_pts)
 {
@@ -2457,21 +2478,18 @@ static int scheduler_automatic_menu_pcm(struct output_state *output,
         fprintf(stderr,
                 "media_player_helper: automatic menu PCM fallback "
                 "activated stalled_pts=%llu repeats=%u video_since_pts=%llu "
-                "held=%zu reserve=%u\n",
+                "held=%zu reserve=%u paced_batch=%u\n",
                 (unsigned long long)output->max_video_pts,
                 output->automatic_menu_stalled_pts,
                 (unsigned long long)video_since_pts, available,
-                PCM_SCHEDULE_RESERVE_FRAMES);
+                PCM_SCHEDULE_RESERVE_FRAMES, PCM_SCHEDULE_BATCH_FRAMES);
     }
-    do {
-        excess = available - PCM_SCHEDULE_RESERVE_FRAMES;
-        emit = excess > PCM_SCHEDULE_BATCH_FRAMES ?
-               PCM_SCHEDULE_BATCH_FRAMES : excess;
-        if (hold_emit_frames(output, emit) < 0)
-            return -1;
-        output->automatic_menu_pcm_fallback_frames += emit;
-        available = hold_available(output);
-    } while (available > PCM_SCHEDULE_RESERVE_FRAMES);
+    excess = available - PCM_SCHEDULE_RESERVE_FRAMES;
+    emit = excess > PCM_SCHEDULE_BATCH_FRAMES ?
+           PCM_SCHEDULE_BATCH_FRAMES : excess;
+    if (scheduler_emit_pcm(output, emit) < 0)
+        return -1;
+    output->automatic_menu_pcm_fallback_frames += emit;
     return 0;
 }
 
@@ -2562,7 +2580,7 @@ static int scheduler_drain(struct output_state *output, int at_eof)
                           (uint64_t)hold_available(output);
         if (!at_eof && available_total < output->pcm_emitted_frames + due)
             break;
-        if (due && hold_emit_frames(output, due) < 0)
+        if (due && scheduler_emit_pcm(output, due) < 0)
             return -1;
         if (write_video_immediate(output, chunk->data + chunk->offset, slice,
                                   "scheduled video") < 0)
@@ -2589,7 +2607,7 @@ static int scheduler_drain(struct output_state *output, int at_eof)
 
         if (due > PCM_SCHEDULE_BATCH_FRAMES)
             due = PCM_SCHEDULE_BATCH_FRAMES;
-        if (due && hold_emit_frames(output, due) < 0)
+        if (due && scheduler_emit_pcm(output, due) < 0)
             return -1;
         if (scheduler_automatic_menu_pcm(output, timestamp_due) < 0)
             return -1;

@@ -1112,6 +1112,82 @@ static int test_automatic_menu_advancing_pts_schedule(void)
     return failed ? -1 : 0;
 }
 
+static int test_automatic_menu_pcm_batch_pacing(void)
+{
+    struct output_state output = {0};
+    int16_t pcm[24000u * 2u];
+    size_t expected_frames = 24000u - PCM_SCHEDULE_RESERVE_FRAMES;
+    size_t i;
+    unsigned passes = 0;
+    int failed = 0;
+
+    output.video = tmpfile();
+    failed |= require(output.video != NULL,
+                      "could not create automatic-menu pacing output");
+    if (failed)
+        return -1;
+    failed |= require(output_reserve_create(&output.reserve,
+                                            fileno(output.video),
+                                            OUTPUT_RESERVE_BYTES) == 0,
+                      "could not create automatic-menu pacing reserve");
+    if (failed)
+        goto done;
+    for (i = 0; i < 24000u; ++i) {
+        pcm[i * 2u] = (int16_t)(i * 23u + 5u);
+        pcm[i * 2u + 1u] = (int16_t)(0x5000u - i * 31u);
+    }
+    output.scheduler_enabled = 1;
+    output.scheduler_started = 1;
+    output.automatic_menu_epoch = 1;
+    output.hold_rate_hz = PCM_SAMPLE_RATE;
+    output.hold_limit = PCM_SAMPLE_RATE;
+    output.have_audio_pts = 1;
+    output.first_audio_pts = 90000u;
+    output.have_video_pts = 1;
+    output.max_video_pts = 90000u;
+    output.pcm_emitted_frames = PCM_SCHEDULE_RESERVE_FRAMES;
+    failed |= require(hold_push(&output, pcm, 24000) == 0 &&
+                          scheduler_drain(&output, 0) == 0 &&
+                          output.automatic_menu_pcm_fallback &&
+                          output.automatic_menu_pcm_fallback_frames ==
+                              PCM_SCHEDULE_BATCH_FRAMES &&
+                          output.pcm_emitted_frames ==
+                              PCM_SCHEDULE_RESERVE_FRAMES +
+                                  PCM_SCHEDULE_BATCH_FRAMES &&
+                          hold_available(&output) ==
+                              24000u - PCM_SCHEDULE_BATCH_FRAMES,
+                      "one fallback pass emitted more than one PCM batch");
+    while (!failed &&
+           hold_available(&output) > PCM_SCHEDULE_RESERVE_FRAMES &&
+           passes++ < 32u)
+        failed |= require(scheduler_drain(&output, 0) == 0,
+                          "repeated paced fallback pass failed");
+    failed |= require(hold_available(&output) ==
+                          PCM_SCHEDULE_RESERVE_FRAMES &&
+                          output.automatic_menu_pcm_fallback_frames ==
+                              expected_frames &&
+                          output.pcm_emitted_frames == 24000u,
+                      "repeated fallback passes did not reach the reserve");
+    if (output.reserve) {
+        failed |= require(output_reserve_destroy(output.reserve) == 0,
+                          "paced fallback reserve did not drain");
+        output.reserve = NULL;
+    }
+    failed |= require(compare_fixture_video_and_pcm(
+                          output.video, NULL, 0, pcm,
+                          expected_frames) == 0,
+                      "paced fallback changed PCM samples or framing");
+
+done:
+    if (output.reserve) {
+        (void)output_reserve_destroy(output.reserve);
+        output.reserve = NULL;
+    }
+    free(output.hold);
+    fclose(output.video);
+    return failed ? -1 : 0;
+}
+
 static int test_automatic_menu_pcm_hold_limit(void)
 {
     struct output_state output = {0};
@@ -1269,6 +1345,8 @@ int main(void)
     if (test_automatic_menu_scheduling_epoch())
         return 1;
     if (test_automatic_menu_advancing_pts_schedule())
+        return 1;
+    if (test_automatic_menu_pcm_batch_pacing())
         return 1;
     if (test_automatic_menu_pcm_hold_limit())
         return 1;
