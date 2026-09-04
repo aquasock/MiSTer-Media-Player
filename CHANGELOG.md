@@ -8,14 +8,16 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
-- Renamed the DVD picker from `Run DVD-Video` to `Load Disk` and the direct
-  optical-drive launcher from `USB DVD Drive.dvd` to `Video DVD.dvd`. The
-  launcher's extension-based `/dev/sr0` routing is unchanged.
+- Replaced marker-file optical launching with `Load Physical Disc` and
+  `Load Disc Image` submenus. Patched Main now starts physical Video DVD and
+  Audio CD media directly, the image submenu exposes only DVD ISO files, and
+  separate MPEG-2 video and audio choices open their filtered browsers
+  immediately.
 
 ### Added
 
-- Added direct Audio CD playback from `/dev/sr0` through an `Audio CD.cd`
-  launcher. The helper inventories audio tracks, skips data tracks, reads CDDA
+- Added direct Audio CD playback from `/dev/sr0`. The helper inventories audio
+  tracks, skips data tracks, reads CDDA
   sectors as 44.1 kHz stereo PCM, and reuses the standalone-audio interface,
   visualizer, fixed seeking, pause/replay lifecycle and previous/next controls.
 - Added an experimental MediaPlayer-only NTSC 480i direct-HDMI mode to the

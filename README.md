@@ -139,60 +139,54 @@ audio interface are not qualified with it. Remove or comment out
 do not accept 480i over HDMI may show no picture even when the SDI converter
 locks correctly.
 
-The visualizer and optical-drive launchers have these roles:
+The standalone-audio visualizer has this role:
 
 | Release file | MiSTer destination | Required for |
 | --- | --- | --- |
 | `linux/MediaPlayer_Visualizer.mmpvis` | `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` | Standalone-audio visualizer; audio still works if omitted |
-| `games/MediaPlayer/Video DVD.dvd` | `/media/fat/games/MediaPlayer/Video DVD.dvd` | Direct playback from `/dev/sr0` |
-| `games/MediaPlayer/Audio CD.cd` | `/media/fat/games/MediaPlayer/Audio CD.cd` | Direct Audio CD playback from `/dev/sr0` |
 
-The launcher is tracked as `assets/Video DVD.dvd` and is installed at the
-absolute path `/media/fat/games/MediaPlayer/Video DVD.dvd`. Selecting that
-launcher opens the inserted optical disc through `dvdmenu:/dev/sr0`; the marker's
-contents are not media data. The drive does not need to be mounted.
+The `Load Physical Disc` submenu starts an inserted Video DVD through
+`dvdmenu:/dev/sr0` or an Audio CD through `cdda:/dev/sr0` directly. Patched Main
+handles both choices without a marker file, and the drive does not need to be
+mounted.
 The helper authenticates and selects the title once, reuses that navigation
 session during preflight, then fills a 4 MiB launch reserve inside an 8 MiB
 HPS-RAM ring before playback begins. The ring is direct-disc-only and does not
 consume FPGA M10K memory.
 
-The Audio CD launcher is tracked as `assets/Audio CD.cd` and maps to
-`cdda:/dev/sr0`. The helper reads the disc table of contents, skips data tracks
-on mixed-mode media and presents all audio tracks as one 44.1 kHz stereo
-timeline in the existing standalone-audio player. The launcher is also only a
-marker; no filesystem mount or extracted audio files are required.
+For Audio CD, the helper reads the disc table of contents, skips data tracks on
+mixed-mode media and presents all audio tracks as one 44.1 kHz stereo timeline
+in the existing standalone-audio player. No filesystem mount or extracted audio
+files are required. Audio CD image files are not currently supported.
 
-The current menu separates `Load Disk`, `Open MPEG-2 Video`, and
-`Open WAV, MP3, FLAC, OGG` so each picker exposes only its relevant files.
+The current menu provides a `Load Physical Disc` submenu for direct Video DVD
+or Audio CD playback, a `Load Disc Image` submenu whose `Video DVD` choice opens
+an ISO-only browser, and immediate `Load MPEG-2 Video File` and `Load Audio File`
+browsers. Each picker exposes only its relevant formats.
 Aspect Ratio defaults to 16:9 with 4:3 as the alternate; Deinterlacer Mode
 offers Bob and Weave. Telemetry defaults to Off for normal playback; turning it
 On reveals the internally captured hardware snapshot and enables the combined
 Main/helper diagnostic log on the next playback start. The Audio Test and Audio
 Output choices are unchanged.
 
-- To play a disc in the USB drive, choose `Load Disk` and select
-  `games/MediaPlayer/Video DVD.dvd`.
-- To play an ISO or file, choose `Open MPEG-2 Video` and select `.iso`, `.m2v`,
-  `.mpg`, `.mpeg` or `.vob`.
-- To play standalone audio, choose `Open WAV, MP3, FLAC, OGG`.
-- To play an inserted Audio CD, choose `Open WAV, MP3, FLAC, OGG` and select
-  `games/MediaPlayer/Audio CD.cd`.
+- To play a Video DVD or Audio CD in the USB drive, choose the matching item
+  under `Load Physical Disc`.
+- To play a DVD ISO, choose `Load Disc Image`, then `Video DVD`.
+- To play `.m2v`, `.mpg`, `.mpeg` or `.vob`, choose
+  `Load MPEG-2 Video File`.
+- To play `.mp3`, `.wav`, `.flac` or `.ogg`, choose `Load Audio File`.
 
-The `.dvd` and `.cd` launchers are required for direct optical playback. Merely
-installing the RBF, Main and helper does not add `/dev/sr0` to MiSTer's file
-browser.
-
-For `.iso` and `.dvd` playback, player-one Left and Right select the previous
-or next chapter and Start toggles pause/resume while the MiSTer OSD is closed.
+For DVD ISO and physical DVD playback, player-one Left and Right select the
+previous or next chapter and Start toggles pause/resume while the MiSTer OSD is closed.
 On a keyboard, P and N select the previous and next chapter, and Space toggles
 pause/resume under the same OSD-closed guard.
 
-For `Audio CD.cd`, the same Left/Right or P/N controls select audio tracks.
+For a physical Audio CD, the same Left/Right or P/N controls select audio tracks.
 Previous restarts the current track after three seconds or selects the prior
 audio track near its beginning; Next selects the following audio track.
 
 For ordinary file-backed `.mpg`, `.mpeg`, `.mp3`, `.wav`, `.flac` and `.ogg`
-playback and for `Audio CD.cd`, Alt+Left/Right jumps backward or forward 10 seconds,
+playback and for a physical Audio CD, Alt+Left/Right jumps backward or forward 10 seconds,
 Ctrl+Left/Right jumps 1 minute, and Ctrl+Alt+Left/Right jumps 5 minutes. Program
 Streams use a sparse video-PTS index; standalone audio uses the decoder's PCM
 sample timeline, and CDDA uses the concatenated audio-track timeline. Main

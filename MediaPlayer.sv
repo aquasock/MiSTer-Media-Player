@@ -78,9 +78,13 @@ assign VIDEO_ARY = widescreen ? 12'd9  : 12'd3;
 `include "build_id.v"
 localparam CONF_STR = {
 	"MediaPlayer;;",
-	"F1,DVD,Load Disk;",
-	"F1,M2VMPGMPEVOBISO,Open MPEG-2 Video;",
-	"F1,WAVMP3FLCOGGCD,Open WAV, MP3, FLAC, OGG;",
+	"P1,Load Physical Disc;",
+	"P1F1,DVD,Video DVD;",
+	"P1F2,CD,Audio CD;",
+	"P2,Load Disc Image;",
+	"P2F3,ISO,Video DVD;",
+	"F4,M2VMPGMPEVOB,Load MPEG-2 Video File;",
+	"F5,WAVMP3FLCOGG,Load Audio File;",
 	"-;",
 	"O[121],Aspect Ratio,16:9,4:3;",
 	"O[124],Deinterlacer Mode:,Bob,Weave;",

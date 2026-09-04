@@ -214,7 +214,7 @@ malformed scheduling stops with a diagnostic rather than growing the host queue
 to exhaustion. Explicit
 navigation hops and finite still boundaries continue to use the READY/GO reset
 path. Future work may add optical-device
-discovery beyond the explicit `/dev/sr0` launcher. DVD angles,
+discovery beyond the explicit `/dev/sr0` menu actions. DVD angles,
 title/audio/subtitle selection and general DVD seeking remain separate work.
 
 ## Pipeline boundaries

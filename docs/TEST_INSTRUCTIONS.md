@@ -5,11 +5,9 @@ Keep the official `/media/fat/MiSTer`, install the patched executable as
 `/media/fat/MiSTer_MediaPlayer`, and merge the `[MediaPlayer]` section from
 `assets/MiSTer_MediaPlayer.ini.fragment` at the end of `/media/fat/MiSTer.ini`.
 Make both custom executables executable and reboot. For direct optical testing,
-install `Video DVD.dvd` at
-`/media/fat/games/MediaPlayer/Video DVD.dvd` and confirm the drive is
-present as readable `/dev/sr0`. Also install `Audio CD.cd` at
-`/media/fat/games/MediaPlayer/Audio CD.cd`. Neither disc type needs to be
-mounted.
+confirm the drive is present as readable `/dev/sr0`. Patched Main launches both
+disc types directly from the `Load Physical Disc` submenu; no marker file or
+filesystem mount is required.
 
 Run normal playback first with `Telemetry` Off. Turn it On only for a fresh
 diagnostic run; the next playback creates `/tmp/MediaPlayer_ARM.log`, and later
@@ -49,9 +47,9 @@ playback replaces it.
 
 ## Audio CD
 
-1. Insert a standard Audio CD, choose `Open WAV, MP3, FLAC, OGG`, and select
-   `games/MediaPlayer/Audio CD.cd`. Require the audio UI and clean 44.1 kHz
-   stereo playback from the first audio track.
+1. Insert a standard Audio CD, choose `Load Physical Disc`, then `Audio CD`.
+   Require the audio UI and clean 44.1 kHz stereo playback from the first audio
+   track.
 2. Test a mixed-mode disc where available. Data tracks must be skipped and must
    never be emitted as noise.
 3. Press P/N or player-one Left/Right to move between audio tracks. Previous
@@ -59,8 +57,8 @@ playback replaces it.
    audio track near its start; Next selects the following audio track.
 4. Exercise the fixed-time keyboard seeks, pause/resume and visualizer overlay.
    Require the same clean READY/GO reset behavior as file-backed audio.
-5. Let the disc reach the end, press Play to restart it, and confirm that a
-   DVD inserted afterward still opens through `Video DVD.dvd`.
+5. Let the disc reach the end, press Play to restart it, and confirm that a DVD
+   inserted afterward still opens through `Load Physical Disc` then `Video DVD`.
 
 ## DVD ISO and direct optical playback
 
@@ -68,7 +66,8 @@ Use multiple authored commercial DVDs where legally permitted, including discs
 with scene-selection pages, finite or indefinite still menus, picture-bearing
 menu transitions and different supported audio layouts.
 
-For both one `.iso` and the `/dev/sr0` launcher:
+For both one `.iso` selected through `Load Disc Image` then `Video DVD` and the
+physical `Video DVD` menu action:
 
 1. Start from a clean core launch and require first-play/title startup without
    a helper exit, decoder latch or indefinite black screen.

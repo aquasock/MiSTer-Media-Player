@@ -239,7 +239,38 @@ index 0c74e211154aa6e8faf8ba1e875548cec42edd6f..ceb3743efb2fa3bca934d3b7ef0b5b9a
  		home_dir = strrchr(home, '/');
  		if (home_dir) home_dir++;
  		else home_dir = home;
-@@ -2443,7 +2447,9 @@ void HandleUI(void)
+@@ -2033,7 +2037,12 @@ void HandleUI(void)
+ 							int num = (p[idx] >= '0' && p[idx] <= '9') ? p[idx] - '0' : 0;
+ 							if (!mgl->done && num == mgl->item[mgl->current].index && (p[0] == mgl->item[mgl->current].type)) mgl->item[mgl->current].submenu = selentry;
+ 
+-							if (is_x86() && x86_get_image_name(num))
++							if (mediaplayer_is_core() && mediaplayer_is_physical_loader(num))
++							{
++								strcpy(s, " ");
++								substrcpy(s + 1, p, 2);
++							}
++							else if (is_x86() && x86_get_image_name(num))
+ 							{
+ 								strcpy(s, " ");
+ 								substrcpy(s + 1, p, 2);
+@@ -2425,6 +2434,16 @@ void HandleUI(void)
+ 						substrcpy(ext, p, 1);
+ 						if (is_gba() && FileExists(user_io_make_filepath(HomeDir(), "goomba.rom"))) strcat(ext, "GB GBC");
+ 						while (strlen(ext) % 3) strcat(ext, " ");
++						if (mediaplayer_is_core() && mediaplayer_is_physical_loader(ioctl_index))
++						{
++							if (select)
++							{
++								MenuHide();
++								if (!mediaplayer_start_physical(ioctl_index))
++									Info("MediaPlayer physical disc failed to start");
++							}
++							break;
++						}
+ 
+ 						fs_Options = SCANO_DIR | (is_neogeo() ? SCANO_NEOGEO | SCANO_NOENTER : 0) | (store_name ? SCANO_CLEAR : 0) | (is_atari5200() || (is_atari800() && (ioctl_index == 8 || ioctl_index == 9)) ? SCANO_UMOUNT : 0);
+ 						fs_MenuSelect = MENU_GENERIC_FILE_SELECTED;
+@@ -2443,7 +2462,9 @@ void HandleUI(void)
  						}
  
  						if (!mgl->done) menustate = MENU_GENERIC_FILE_SELECTED;
@@ -286,7 +317,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,1059 @@
+@@ -0,0 +1,1094 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -508,19 +539,30 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	       has_core_prefix(user_io_get_core_name(1));
 +}
 +
++static unsigned char loader_index(unsigned char index)
++{
++	return index & 0x3f;
++}
++
++int mediaplayer_is_physical_loader(unsigned char index)
++{
++	index = loader_index(index);
++	return index == MEDIAPLAYER_LOADER_PHYSICAL_DVD ||
++	       index == MEDIAPLAYER_LOADER_PHYSICAL_CD;
++}
++
 +int mediaplayer_handles_file(const char *path)
 +{
 +	const char *extension = path ? strrchr(path, '.') : NULL;
 +	return extension && (!strcasecmp(extension, ".m2v") ||
 +	                     !strcasecmp(extension, ".mpg") ||
 +	                     !strcasecmp(extension, ".mpeg") ||
-+	                     !strcasecmp(extension, ".vob") || !strcasecmp(extension, ".iso") ||
-+	                     !strcasecmp(extension, ".dvd") ||
++	                     !strcasecmp(extension, ".vob") ||
++	                     !strcasecmp(extension, ".iso") ||
 +	                     !strcasecmp(extension, ".mp3") ||
 +	                     !strcasecmp(extension, ".wav") ||
 +	                     !strcasecmp(extension, ".flac") ||
-+	                     !strcasecmp(extension, ".ogg") ||
-+	                     !strcasecmp(extension, ".cd"));
++	                     !strcasecmp(extension, ".ogg"));
 +}
 +
 +static void finish_download(const char *reason, bool release_download)
@@ -601,15 +643,39 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +{
 +	if (!mediaplayer_handles_file(path)) return 0;
 +	const char *extension = strrchr(path, '.');
++	const unsigned char loader = loader_index(index);
 +	std::string source_spec;
-+	if (!strcasecmp(extension, ".dvd")) source_spec = "dvdmenu:/dev/sr0";
-+	else if (!strcasecmp(extension, ".cd")) source_spec = "cdda:/dev/sr0";
++	if (!strcasecmp(extension, ".iso"))
++	{
++		if (loader != MEDIAPLAYER_LOADER_DVD_ISO) return 0;
++		source_spec = "isomenu:";
++	}
++	else if (!strcasecmp(extension, ".m2v") ||
++	         !strcasecmp(extension, ".mpg") ||
++	         !strcasecmp(extension, ".mpeg") ||
++	         !strcasecmp(extension, ".vob"))
++	{
++		if (loader != MEDIAPLAYER_LOADER_VIDEO_FILE) return 0;
++		source_spec = "file:";
++	}
 +	else
 +	{
-+		source_spec = !strcasecmp(extension, ".iso") ? "isomenu:" : "file:";
-+		source_spec += getFullPath(path);
++		if (loader != MEDIAPLAYER_LOADER_AUDIO_FILE) return 0;
++		source_spec = "file:";
 +	}
-+	return mediaplayer_start_source(source_spec.c_str(), index);
++	source_spec += getFullPath(path);
++	return mediaplayer_start_source(source_spec.c_str(), MEDIAPLAYER_STREAM_INDEX);
++}
++
++int mediaplayer_start_physical(unsigned char index)
++{
++	const unsigned char loader = loader_index(index);
++	const char *source_spec = loader == MEDIAPLAYER_LOADER_PHYSICAL_DVD ?
++	                          "dvdmenu:/dev/sr0" :
++	                          loader == MEDIAPLAYER_LOADER_PHYSICAL_CD ?
++	                          "cdda:/dev/sr0" : NULL;
++	return source_spec &&
++	       mediaplayer_start_source(source_spec, MEDIAPLAYER_STREAM_INDEX);
 +}
 +
 +int mediaplayer_start_source(const char *source_spec, unsigned char index)
@@ -1351,15 +1417,27 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..6c7f447a5dac27d98e8879f9290aa3d93b4bc846
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.h
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,47 @@
 +#ifndef MEDIAPLAYER_ARM_LOADER_H
 +#define MEDIAPLAYER_ARM_LOADER_H
 +
 +#include <stdint.h>
 +
++enum
++{
++	MEDIAPLAYER_STREAM_INDEX = 1,
++	MEDIAPLAYER_LOADER_PHYSICAL_DVD = 1,
++	MEDIAPLAYER_LOADER_PHYSICAL_CD = 2,
++	MEDIAPLAYER_LOADER_DVD_ISO = 3,
++	MEDIAPLAYER_LOADER_VIDEO_FILE = 4,
++	MEDIAPLAYER_LOADER_AUDIO_FILE = 5
++};
++
 +int mediaplayer_is_core();
++int mediaplayer_is_physical_loader(unsigned char index);
 +int mediaplayer_handles_file(const char *path);
 +int mediaplayer_start(const char *path, unsigned char index);
++int mediaplayer_start_physical(unsigned char index);
 +int mediaplayer_start_source(const char *source_spec, unsigned char index);
 +void mediaplayer_poll();
 +void mediaplayer_stop();
