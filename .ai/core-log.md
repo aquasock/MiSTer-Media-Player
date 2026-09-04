@@ -1,4 +1,4 @@
-## 965 COMMIT Unreleased ??? 2026-09-04T02:52:38-07:00
+## 965 COMMIT Unreleased e0f6f9a 2026-09-04T02:52:38-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make the first Play/Pause press reveal the standalone-audio player UI before hol
 
 #### Outcome:
 
-The user hardware-accepts source `889f4ea` as visibly smoothing the eight-level visualizer transitions, then reports that after the audio-player overlay has timed out the first Space press pauses music and the visualizer without revealing the UI, while the second Space resumes both and makes the UI appear.  Inspection identifies an ordering defect rather than an overlay-rendering defect: isolated Main submits `USER_ACTIVITY`, immediately sets `playback_paused` and stops draining the helper pipe, so the helper's in-band overlay-style record remains behind the pause until resume.  The approved correction will add an audio-only pause barrier in which the helper reveals the existing overlay, flushes output, acknowledges readiness and waits for the existing `GO`; Main will continue draining only through that acknowledgment and pipe quiescence, then hold playback, while the next Play/Pause press sends `GO` and resumes.  DVD and MPEG-2 pause behavior, the ten-second emitted-audio timer, visualizer selection, audio decoding, RTL and RBF remain outside this boundary.
+The user hardware-accepts source `889f4ea` as visibly smoothing the eight-level visualizer transitions, then reports that after the audio-player overlay has timed out the first Space press pauses music and the visualizer without revealing the UI, while the second Space resumes both and makes the UI appear.  Source `e0f6f9a` fixes the diagnosed ordering defect with an audio-only `PAUSE` and `PAUSE_READY` barrier: the helper reveals the resident overlay style, flushes all preceding in-band output, acknowledges and waits for the existing `GO`, while isolated Main drains through acknowledgment and pipe quiescence before setting the transport hold.  The next Play/Pause press releases the same emitted-audio frame with `GO`, so the visualizer and music remain stopped during pause and the ten-second overlay interval advances only after resume.  The optimized and AddressSanitizer plus UndefinedBehaviorSanitizer production-path integrations prove that `STYLE` precedes readiness, output remains byte-stable while held and all MP3, WAV, FLAC and Ogg paths resume; focused audio UI, visualizer, seek, CDDA, Main lifecycle, native-480i and static routing tests pass, the complete Main patch stack applies and compiles against pinned upstream `0a8fb44`, and the visualizer analyzer test remains clean.  GNU 10.2.1 produced the 974,244-byte static stripped ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `34227d89d11c28bb7d0a2206e87462d9c17315f0dd521c34e0c8bc2e4fbc7ae7` and the 1,186,780-byte stripped ARMv7 `host/build/MiSTer_MediaPlayer` with SHA-256 `1a333b83f43e71789922befcc828fc705480d7dafe85022b7591d0b18028b4f8`; the accepted visualizer pack and RBF remain byte-identical.
 
 #### Next Steps:
 
-Implement the paired control command and acknowledgment in the shared protocol, standalone audio-file and Audio CD helper paths, and isolated Main state machine; extend production-path helper and Main lifecycle regressions to prove that the overlay record precedes pause readiness, no bytes advance while held, and `GO` resumes playback.  Update user and architecture documentation, run strict native, sanitizer, analyzer, audio-file, Audio CD, visualizer and full pinned-Main patch-stack tests, commit and push the source, then build only `MediaPlayer_Helper` and `MiSTer_MediaPlayer` locally for hardware validation without rebuilding the visualizer asset or RBF.
+Exit the MediaPlayer core, replace `/media/fat/linux/MediaPlayer_Helper` and `/media/fat/MiSTer_MediaPlayer` with the two source-`e0f6f9a` artifacts, preserve executable mode and reboot because Main changed; retain `MediaPlayer_Visualizer.mmpvis` and `MediaPlayer_20260904.rbf`.  Play an audio file past the ten-second overlay timeout, press Space once and require the UI to appear before music and visualizer motion both stop, press Space again and require both to resume with the UI clearing after ten resumed playback seconds, then repeat with an Audio CD and spot-check DVD and MPEG-2 takeover before marking this source hardware-passed.
 
 #### Files Modified:
 
@@ -31,7 +31,7 @@ Implement the paired control command and acknowledgment in the shared protocol, 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
