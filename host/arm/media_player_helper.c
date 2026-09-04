@@ -2415,6 +2415,63 @@ static uint64_t monotonic_us(void)
     return (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u;
 }
 
+/*
+ * Keep the visualizer's closed GOP loop moving while no media source owns the
+ * decoder.  Reuse the audio visualizer's sample-domain scheduler, but derive
+ * that domain from monotonic time: idle playback must not emit silent PCM just
+ * to obtain a clock.  Main terminates this process when a real source starts.
+ */
+static int process_idle_visualizer(struct output_state *output)
+{
+    const unsigned virtual_rate_hz = 48000u;
+    const struct timespec delay = {0, 2 * 1000 * 1000};
+    uint64_t origin_us = monotonic_us();
+
+    if (!origin_us) {
+        fprintf(stderr,
+                "media_player_helper: idle visualizer clock unavailable\n");
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: idle visualizer started rate=%u Hz\n",
+            virtual_rate_hz);
+    for (;;) {
+        uint64_t now_us = monotonic_us();
+        uint64_t elapsed_us;
+        uint64_t virtual_frames;
+        int emitted;
+
+        if (!now_us || now_us < origin_us) {
+            fprintf(stderr,
+                    "media_player_helper: idle visualizer clock failed\n");
+            return -1;
+        }
+        elapsed_us = now_us - origin_us;
+        virtual_frames = elapsed_us / 1000000u * virtual_rate_hz +
+                         elapsed_us % 1000000u * virtual_rate_hz / 1000000u;
+        emitted = audio_visualizer_service(output->visualizer, virtual_frames,
+                                            virtual_rate_hz,
+                                            write_visualizer_video, output);
+        if (emitted < 0) {
+            fprintf(stderr,
+                    "media_player_helper: idle visualizer output failed\n");
+            return -1;
+        }
+        if (!emitted) {
+            struct timespec remaining = delay;
+
+            while (nanosleep(&remaining, &remaining) < 0) {
+                if (errno != EINTR) {
+                    fprintf(stderr,
+                            "media_player_helper: idle visualizer sleep "
+                            "failed: %s\n", strerror(errno));
+                    return -1;
+                }
+            }
+        }
+    }
+}
+
 static void scheduler_log_progress(struct output_state *output)
 {
     uint64_t now;
@@ -4745,6 +4802,7 @@ int main(int argc, char **argv)
     int is_ogg;
     int is_cdda;
     int is_audio_file;
+    int is_idle_visualizer;
     int dvd_menu_mode;
     int seekable_program_stream = 0;
     int program_video_code = -1;
@@ -4827,6 +4885,8 @@ int main(int argc, char **argv)
         usage(argv[0]);
         return 2;
     }
+    is_idle_visualizer =
+        !strcmp(source_specification, MEDIA_PLAYER_IDLE_PREFIX);
     is_cdda = !strncmp(source_specification, MEDIA_PLAYER_CDDA_PREFIX,
                        strlen(MEDIA_PLAYER_CDDA_PREFIX));
     dvd_menu_mode = !strncmp(source_specification,
@@ -4849,7 +4909,7 @@ int main(int argc, char **argv)
                 MEDIA_PLAYER_CONTROL_PROTOCOL_VERSION, control_fd);
     }
     audio_file_control_state.control_fd = control_fd;
-    if (!is_cdda &&
+    if (!is_cdda && !is_idle_visualizer &&
         media_source_open(&input, source_specification, source_error,
                           sizeof(source_error)) != MEDIA_SOURCE_OK) {
         fprintf(stderr, "media_player_helper: %s\n", source_error);
@@ -4904,7 +4964,7 @@ int main(int argc, char **argv)
             audio.output == AUDIO_OUT_SPDIF
                 ? "spdif (decoded PCM; IEC 61937 for AC-3/DTS)"
                 : "hdmi (decoded stereo PCM)");
-    if (!is_cdda &&
+    if (!is_cdda && !is_idle_visualizer &&
         (read_exact(&input, signature, sizeof(signature)) < 0 ||
          media_source_rewind(&input) < 0)) {
         fprintf(stderr, "media_player_helper: input is too short\n");
@@ -4915,7 +4975,7 @@ int main(int argc, char **argv)
     is_flac = has_suffix_case(source_specification, ".flac");
     is_ogg = has_suffix_case(source_specification, ".ogg");
     is_audio_file = is_mp3 || is_wav || is_flac || is_ogg || is_cdda;
-    is_program_stream = !is_audio_file &&
+    is_program_stream = !is_idle_visualizer && !is_audio_file &&
                         !memcmp(signature, "\x00\x00\x01\xba", 4);
     seekable_program_stream = is_program_stream &&
                               input.kind == MEDIA_SOURCE_FILE &&
@@ -4924,11 +4984,13 @@ int main(int argc, char **argv)
     if (is_mp3) {
         if (preflight_mp3(&input) < 0)
             goto done;
-    } else if (!is_cdda && !is_wav && !is_flac && !is_ogg &&
+    } else if (!is_cdda && !is_idle_visualizer && !is_wav && !is_flac &&
+               !is_ogg &&
                preflight_input(&input, is_program_stream) < 0) {
         goto done;
     }
-    if (!is_cdda && media_source_prepare(&input) < 0) {
+    if (!is_cdda && !is_idle_visualizer &&
+        media_source_prepare(&input) < 0) {
         fprintf(stderr,
                 "media_player_helper: cannot prepare %s source for playback\n",
                 media_source_kind_name(input.kind));
@@ -4957,7 +5019,7 @@ int main(int argc, char **argv)
         output.scheduler_enabled;
     output.h262_chroma_normalization =
         output.iso_pts_normalization && output.scheduler_enabled;
-    if (is_audio_file && !output.pcm) {
+    if ((is_audio_file || is_idle_visualizer) && !output.pcm) {
         const char *visualizer_path = getenv("MMP_VISUALIZER_PATH");
         char visualizer_error[192];
 
@@ -4972,8 +5034,14 @@ int main(int argc, char **argv)
         } else {
             fprintf(stderr,
                     "media_player_helper: audio visualizer unavailable (%s); "
-                    "using framebuffer UI\n", visualizer_error);
+                    "%s\n", visualizer_error,
+                    is_idle_visualizer ? "idle background disabled" :
+                                         "using framebuffer UI");
+            if (is_idle_visualizer)
+                goto done;
         }
+    }
+    if (is_audio_file && !output.pcm) {
         if (audio_ui_create(&output.audio_ui) < 0) {
             fprintf(stderr,
                     "media_player_helper: cannot allocate audio UI\n");
@@ -4982,7 +5050,10 @@ int main(int argc, char **argv)
         fprintf(stderr, "media_player_helper: audio UI 720x480p %s enabled\n",
                 output.visualizer ? "two-bit overlay" : "BT.601 frame");
     }
-    if (is_cdda) {
+    if (is_idle_visualizer) {
+        if (process_idle_visualizer(&output) < 0)
+            goto done;
+    } else if (is_cdda) {
         if (process_cdda_stream(source_specification, &output,
                                 &audio_file_control_state) < 0)
             goto done;
@@ -5147,7 +5218,7 @@ int main(int argc, char **argv)
     } else if (process_elementary_stream(&input, &output) < 0) {
         goto done;
     }
-    if (!is_audio_file && !output.video_bytes) {
+    if (!is_audio_file && !is_idle_visualizer && !output.video_bytes) {
         fprintf(stderr, "media_player_helper: no H.262 video stream found\n");
         goto done;
     }

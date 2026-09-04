@@ -167,6 +167,53 @@ struct MainLifecycle {
     }
 };
 
+struct IdleLifecycle {
+    bool core_active = false;
+    bool helper_active = false;
+    bool idle_session = false;
+    bool idle_retry_blocked = false;
+    unsigned idle_launches = 0;
+    unsigned media_takeovers = 0;
+
+    void poll()
+    {
+        if (!core_active) {
+            helper_active = false;
+            idle_session = false;
+            idle_retry_blocked = false;
+            return;
+        }
+        if (!helper_active && !idle_retry_blocked) {
+            helper_active = true;
+            idle_session = true;
+            ++idle_launches;
+        }
+    }
+
+    void start_media()
+    {
+        helper_active = true;
+        idle_session = false;
+        idle_retry_blocked = false;
+        ++media_takeovers;
+    }
+
+    void playback_eof()
+    {
+        helper_active = false;
+        idle_session = false;
+    }
+
+    void idle_error()
+    {
+        if (!idle_session)
+            throw "idle error outside idle session";
+        helper_active = false;
+        idle_session = false;
+        idle_retry_blocked = true;
+    }
+};
+
 static int require(bool condition, const char *message)
 {
     if (condition)
@@ -184,10 +231,10 @@ static int require_patch_markers(const char *path)
         "seek_pending = true;",
         "seek continued without reset",
         "seek target ready; download reset",
-        "retain_clean_eof = seek_controls;",
-        "playback_source_spec = requested_source;",
+        "retain_clean_eof = !idle && seek_controls;",
+        "if (!idle) playback_source_spec = requested_source;",
         "bool retain = clean && retain_clean_eof;",
-        "replay_ready = arm_replay;",
+        "if (!was_idle) replay_ready = arm_replay;",
         "input != MEDIAPLAYER_INPUT_PLAY_PAUSE || !replay_ready",
         "retain ? \"eof-replay-ready\" : \"eof\"",
         "replay ready and paused; press Play to restart",
@@ -200,7 +247,13 @@ static int require_patch_markers(const char *path)
         "DVD stream boundary pipe quiescent odd_tail=%u",
         "DVD stream boundary released after drain",
         "if (playback_paused && !stream_boundary_pending) return;",
-        "if (!pending_eof && !stream_boundary_pending) available &= ~1u;"
+        "if (!pending_eof && !stream_boundary_pending) available &= ~1u;",
+        "return mediaplayer_start_session(\"idle:\", MEDIAPLAYER_STREAM_INDEX, true);",
+        "telemetry_enabled = !idle && user_io_status_get(\"[125]\");",
+        "if (idle_session)",
+        "if (was_idle) idle_retry_blocked = true;",
+        "if (block_idle_retry) idle_retry_blocked = true;",
+        "if (!idle_retry_blocked && !mediaplayer_start_idle())"
     };
     std::ifstream input(path);
 
@@ -369,6 +422,39 @@ int main(int argc, char **argv)
     failed |= require(!failed_boundary.download_active &&
                           !failed_boundary.replay_ready,
                       "failed EOF retained presentation");
+
+    IdleLifecycle idle;
+    idle.core_active = true;
+    idle.poll();
+    idle.poll();
+    failed |= require(idle.helper_active && idle.idle_session &&
+                          idle.idle_launches == 1,
+                      "core entry did not launch exactly one idle session");
+    idle.start_media();
+    failed |= require(idle.helper_active && !idle.idle_session &&
+                          idle.media_takeovers == 1,
+                      "media did not replace the idle session");
+    idle.playback_eof();
+    idle.poll();
+    failed |= require(idle.idle_session && idle.idle_launches == 2,
+                      "playback EOF did not restore the idle session");
+    idle.idle_error();
+    idle.poll();
+    idle.poll();
+    failed |= require(!idle.helper_active && idle.idle_retry_blocked &&
+                          idle.idle_launches == 2,
+                      "failed idle session entered a restart loop");
+    idle.start_media();
+    idle.playback_eof();
+    idle.poll();
+    failed |= require(idle.idle_session && !idle.idle_retry_blocked &&
+                          idle.idle_launches == 3,
+                      "successful media cycle did not rearm idle startup");
+    idle.core_active = false;
+    idle.poll();
+    failed |= require(!idle.helper_active && !idle.idle_session &&
+                          !idle.idle_retry_blocked,
+                      "core exit retained idle lifecycle state");
     failed |= require_patch_markers(argv[1]);
     if (failed)
         return 1;
@@ -376,6 +462,6 @@ int main(int argc, char **argv)
                  "directional_navigation=continue-or-ready "
                  "automatic_boundary=drain-reset-go "
                  "clean_eof=replay-ready play=relaunch "
-                 "failed_eof=released\n";
+                 "failed_eof=released idle=takeover-restart-guarded\n";
     return 0;
 }
