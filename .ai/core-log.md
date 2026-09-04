@@ -1,4 +1,4 @@
-## 948 COMMIT Unreleased ??? 2026-09-03T16:51:15-07:00
+## 948 COMMIT Unreleased d7d5ab2 2026-09-03T16:51:15-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Submit the final odd byte of an autonomous DVD boundary after nonblocking pipe q
 
 #### Outcome:
 
-The revised approved change will correct the single Main control-flow defect demonstrated by the physical trace.  While no boundary is pending, a lone pipe byte must continue waiting for its partner so an ordinary short read is never padded in the middle of the stream.  Once the helper has sent the autonomous boundary event, a nonblocking `EAGAIN` proves that no more old-epoch bytes remain in the pipe; when one buffered byte exists, Main will preserve it and fall through to the existing verified transport routine, which packs that final byte with zero in one 16-bit FPGA word and accounts only the real source byte.  A later empty-pipe observation then permits the existing reset and GO handshake.  No byte is discarded, the control protocol and helper remain unchanged, and the behavior applies equally to finite-still and automatic silent-menu boundaries.
+Source `d7d5ab2` corrects the single Main control-flow defect demonstrated by the Futurama trace: after an autonomous boundary, nonblocking pipe quiescence with one buffered byte now falls through to the existing transport routine, which submits that real byte in a zero-padded 16-bit word, while ordinary non-boundary lone bytes remain held and `EINTR` remains nonterminal.  A later empty-pipe observation permits the existing reset and GO handshake, so no media byte is discarded and the control protocol, helper, RTL and RBF are unchanged.  The lifecycle regression covers ordinary hold, interrupted read, boundary odd-byte submission, empty-pipe release, exact byte accounting and a single reset/GO; optimized, AddressSanitizer plus UndefinedBehaviorSanitizer and GCC analyzer runs pass.  The production overlay-output regression passes optimized, AddressSanitizer and UndefinedBehaviorSanitizer runs, the patch applies cleanly to pinned Main `0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f`, and two local GNU 10.2.1 ARM builds are byte-identical.  The resulting 1,182,692-byte ARMv7 executable `host/build/MiSTer_MediaPlayer` has SHA-256 `250f065859f30150a4b8226072b254ff81f76e27e1b926d1c63ede0ef48bc121`; the unchanged 966,052-byte helper has SHA-256 `32c9a5846aac94f4c1ce2c1bb36a752b5a1c71bfa4ab0bcf304170ef58645e72`.  The 1,335,713-byte archive `host/build/MiSTer_MediaPlayer_BoundaryByte_d7d5ab2.zip` has SHA-256 `0ef5a03055e39a52ea185064ca32b1a74c53f67fe0309200f72d0f38d6086783`; ZIP integrity, fresh extraction, executable modes and its five-file manifest verify.
 
 #### Next Steps:
 
-Implement the boundary-only `EAGAIN` fallthrough in Main and document that quiescence rule.  Extend the Main lifecycle regression with the exact physical state of one buffered byte, a quiescent helper pipe and no transfer call before the correction, proving that the corrected path submits exactly that byte before one reset and GO; retain the ordinary non-boundary lone-byte hold and zero-byte boundary completion cases.  Reapply the patch to pinned upstream Main, run the focused lifecycle suite and helper regressions, build the patched per-core Main locally, verify the unchanged static ARM helper, package the matched pair with the existing merge-only INI fragment, then retest Futurama through every finite first-play still into its visible moving menu with synchronized AC-3 and responsive activation.
+Leave `/media/fat/MiSTer` untouched, install the archive's `MiSTer_MediaPlayer` and `linux/MediaPlayer_Helper` at the paths documented in `INSTALL.txt`, merge only its `[MediaPlayer]` fragment, set both executables to mode 755 and reboot.  Retest Futurama through every finite first-play still into its visible moving menu with synchronized AC-3 and responsive activation.  The log should show the helper boundary request and Main boundary pending; when an odd tail exists it should then show `DVD stream boundary pipe quiescent odd_tail=1`, a one-byte transfer, `DVD stream boundary released after drain`, and helper release rather than repeated would-block polling.  Collect a fresh Main/helper log, screenshot and telemetry for acceptance or further isolation.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Implement the boundary-only `EAGAIN` fallthrough in Main and document that quies
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
