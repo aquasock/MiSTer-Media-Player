@@ -1,3 +1,34 @@
+## 954 COMMIT Unreleased ??? 2026-09-03T20:08:11-07:00
+
+#### Coming From:
+
+Unreleased 5f1cf92
+
+#### Purpose:
+
+Bound automatic-menu fallback output latency across physical DVDs without weakening normal title buffering.
+
+#### Outcome:
+
+The approved helper-only design addresses the shared mechanism behind the delays seen on multiple discs.  In-band stereo PCM uses 69 output bytes per sixteen frames, so the existing four-megabyte asynchronous DVD reserve can absorb approximately twenty seconds of audio when a stalled-timestamp menu fallback drains decoded PCM faster than the sink consumes it, matching Futurama's measured 24-to-25-second scheduling lead after downstream buffering.  Once that fallback is active, scheduled PCM will first pace against the existing reserve drain and the fallback will admit at most one 2,048-frame batch per scheduler pass, preventing one call from filling the reserve with a long audio-only run while allowing Main and FPGA credit to establish the real delivery rate.  Ordinary advancing-timestamp scheduling, normal title use of the four-megabyte optical-stall reserve, overlay priority, byte order, Main, protocol, RTL and RBF remain unchanged.
+
+#### Next Steps:
+
+Implement the fallback-only pacing wrapper and one-batch admission, document the boundary, and extend the production regression with a large held backlog that proves one scheduler pass emits only one batch while repeated passes preserve exact PCM and video and a later timestamp restores the unchanged scheduler.  Run strict optimized, analyzer, AddressSanitizer, UndefinedBehaviorSanitizer and retained DVD, output-reserve, overlay, audio, visualizer and seek suites, then build one static ARMv7 helper locally.  Hardware acceptance should cover Futurama and several other affected physical DVDs, requiring moving menus and usable selectors without the prior long apparent freeze, continuous intelligible audio, no underrun or helper termination, and unchanged title and chapter playback.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 953 COMMIT Unreleased 5f1cf92 2026-09-03T19:51:25-07:00
 
 #### Coming From:
@@ -1180,35 +1211,6 @@ Install only `host/build/MediaPlayer_Helper_SceneDrain_a0cdd43` as `/media/fat/l
 - host/arm/media_player_helper.c
 - tools/test_dvd_overlay_metadata.sv
 - tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 914 COMMIT Unreleased d75327e 2026-09-02T19:23:06-07:00
-
-#### Coming From:
-
-Unreleased d75327e
-
-#### Purpose:
-
-Qualify source `d75327e` on Coming to America's Scene Selection submenu and isolate why its authored background remains black.
-
-#### Outcome:
-
-The user's physical source-`d75327e` run reproduces the black authored background with the correct green Scene Selection selector visible and responsive.  Terminal random-access filtering again qualifies a sequence at offset zero and one I picture at offset 106 in 224,824 authored bytes, then stages 139 records totaling 311,501 bytes after appending the four-byte H.262 sequence-end marker; the prior build staged 138 records and 311,497 bytes, proving the exact terminator reached the helper's bounded activation transaction.  The checksum-valid schema-21 snapshot nevertheless reports only 224,823 decoder-accepted bytes, exactly five fewer than the 224,828 authored-plus-terminator bytes sent, while sequence-end recognition, completed reference pictures, displayed pictures and swaps all remain zero and 209,739 stall cycles remain inside the unfinished I picture with no decoder error flags.  The replacement overlay independently completes one clear, configuration and commit with twenty-two data records and 86,400 plane bytes, no protocol error and the expected visible rectangle.  The hardware count and RTL source agree that the terminator is retained behind the in-band extractor and downstream delivery lookahead because `input_end` cannot assert while the live indefinite DVD-menu session remains open; the 1,834,541-byte log, 5,456-byte screenshot and 571-byte telemetry report have SHA-256 `dd40b250b253492d83c6254254dc70001e82fdc47d25303ce63c17ceeb1141b2`, `4c69b6424bee7b913cb7cf0e7c16db2607fbad595f63eaab006adc0649701c04` and `f34038759b19fa823ad3e2f458dad2c86f62a0c62ba0d334e75c41d3c799e671`.
-
-#### Next Steps:
-
-After user approval, preserve the qualified authored bytes and append five zero-valued transport drain bytes after the sequence-end marker only for a terminal DVD still activation, allowing the complete four-byte marker to cross the observed five-byte lookahead while leaving the session alive for overlay and navigation commands.  Extend the production-path regression to require the exact nine-byte terminal tail and add focused metadata-path coverage proving sequence-end delivery before `input_end`, then rerun strict native, GNU 10.2.1 ARM, sanitizer, analyzer, staging, random-access, overlay, menu-hop, audio and seek suites and build only a new static ARMv7 helper.  Retest Coming to America Scene Selection for its authored background, responsive selector and scene launch, followed by Blazing Saddles, The Big Lebowski and the forum disc; Main, protocol, decoder interpretation, RTL, visualizer and RBF remain unchanged.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
