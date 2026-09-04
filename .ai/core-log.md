@@ -1,3 +1,34 @@
+## 950 COMMIT Unreleased ??? 2026-09-03T17:53:57-07:00
+
+#### Coming From:
+
+Unreleased d7d5ab2
+
+#### Purpose:
+
+Carry a live silent-video decoder session continuously into an automatic DVD menu while starting a fresh synchronized helper scheduling epoch.
+
+#### Outcome:
+
+The approved change will retain every finite-still and explicit-navigation decoder boundary but replace the automatic silent-video menu boundary with a helper-only transition.  The helper will drain its one-byte H.262 compatibility lookahead at the point silent video becomes immediate so byte order remains exact, preserve the live FPGA decoder and resident picture when libdvdnav enters menu space, and reset only audio plus bounded scheduling state without re-enabling the initial random-access filter.  The new epoch will translate menu video and audio timestamps together against the continuing presentation timeline, preventing both the observed 2 MiB startup-queue failure and a backward FPGA timestamp while requiring no Main, protocol, RTL or RBF change.
+
+#### Next Steps:
+
+Implement and document the continuous automatic-menu epoch, including explicit timestamp translation shared by the new video and first audio PTS.  Extend the production helper regression with a silent first-play session followed by more than 2 MiB of menu video that deliberately contains pictures but no new sequence header, synchronized AC-3 and overlay traffic; require byte-exact output, bounded queue release, no initial random-access filter, no Main boundary command and no late-audio rejection.  Retain finite-still boundary, explicit menu-hop, random-access, reserve, staging, overlay, audio and seek coverage under strict native, analyzer and sanitizer builds, then compile only the static ARM helper locally for Futurama testing with source-`d7d5ab2` Main and the existing RBF.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 949 COMMIT Unreleased d7d5ab2 2026-09-03T17:49:51-07:00
 
 #### Coming From:
@@ -1183,35 +1214,6 @@ Install only `host/build/MediaPlayer_Helper_SceneStill_efe2a76` as `/media/fat/l
 - host/arm/media_player_helper.c
 - tools/test_dvd_overlay_output.c
 - tools/test_dvd_random_access.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 910 COMMIT Unreleased 338c4d5 2026-09-02T18:42:42-07:00
-
-#### Coming From:
-
-Unreleased 338c4d5
-
-#### Purpose:
-
-Qualify source `338c4d5` on Coming to America's authored Scene Selection submenu and isolate its retained stale background.
-
-#### Outcome:
-
-The user's physical run partially validates source `338c4d5`: Coming to America's root menu remains responsive, three Right commands select button four, activation succeeds at 20.903318 seconds, and the helper enters Scene Selection without the prior black reset or freeze.  The destination again reaches an indefinite still after 249 generic Program Stream start codes with zero emitted pictures and exactly 26 staged overlay records totaling 86,664 bytes; the new path commits those records, reports `overlay-indefinite-still`, and Main preserves the resident frame at 21.449442 seconds without READY/GO, a reserve discard, a fatal error, an audio underrun or an overlay protocol error.  The 726,845-byte screenshot visibly retains the root-menu background behind the newly selected submenu state, matching the user's report that Scene Selection backgrounds do not update.  Source inspection identifies the remaining boundary: every DVD navigation reset enables the initial random-access filter, that filter deliberately waits for an I picture plus a later I/P reference, and an authored single-picture still can reach its terminal still event with the complete sequence and I frame still queued rather than emitted or staged.  The 1,274,033-byte log, screenshot and 844-byte checksum-valid schema-21 telemetry report have SHA-256 `9b690188ccaad68ae7680fcc65843b03b6c6b7aca192884f2e6413f8c16061b0`, `238fb6333307a29408d98f76f32cdd3583de061e010305d8d29ae5bdc42359fb` and `aa1db16a7eb1c8fc76a9cbd67d3b4ba123a8ea0649087c27188af33e5353c8ed`.
-
-#### Next Steps:
-
-Preserve source `338c4d5` overlay-only continuation, genuine multi-picture activation hops, Main, RBF, decoder and protocol.  After user approval, extend DVD random-access filtering with an explicit authored-end finalization that accepts a complete sequence-plus-I still picture without requiring a later reference, neutralizes unsafe pre-context and trailing B pictures, and remains unavailable during ordinary streaming; invoke that finalization only when a DVD activation reaches its authored still boundary, drain the qualified queued video into the existing stage, and let its real picture mark select the established decoder barrier.  Add focused incomplete-stream, finalized-I-only, trailing-B, overlay-only and ordinary I/P regressions, rerun the complete helper and sanitizer suites, and build only a new ARM helper for Coming to America plus retained Blazing Saddles, The Big Lebowski and forum-disc testing.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
