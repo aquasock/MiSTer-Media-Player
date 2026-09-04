@@ -1,3 +1,37 @@
+## 985 COMMIT Unreleased ??? 2026-09-04T16:42:49-07:00
+
+#### Coming From:
+
+Unreleased 0a2e2af
+
+#### Purpose:
+
+Add passive schema-22 A/V progress telemetry that distinguishes decoder availability, cadence gating and timestamp gating without changing playback behavior.
+
+#### Outcome:
+
+The approved diagnostic will preserve every schema-21 overlay and deadline word while assigning the five currently zero words 58 through 62 to A/V synchronization evidence.  Word 58 will carry a full-width displayed-picture count, word 59 a Gray-synchronized full-width audio-domain PCM dequeue count, words 60 and 61 the signed audio-derived-STC lateness of the displayed and pending picture PTS, and word 62 saturating counts of presentation windows blocked by unavailable candidate output, cadence gating or a future timestamp plus PTS-valid flags.  The profiler inputs and top-level observation wiring will expand only for these passive signals; no diagnostic output will feed the decoder, presentation scheduler, audio adapter, transport or host protocol.
+
+#### Next Steps:
+
+Implement schema 22 in the hardware cadence profiler and top level, extend the screenshot decoder and its host regression, and extend the telemetry visibility simulation to prove full counters, signed lateness, cause packing, validity and checksum behavior.  Run all retained RTL unit and integrated simulations, the host telemetry tests and static checks, then compile the full Quartus project and confirm timing, fitter and resource reports remain acceptable.  Publish a uniquely named diagnostic RBF while retaining source `0a2e2af` Main and helper; the next 30-second Simpsons title capture must quantify displayed pictures versus consumed PCM and show whether accumulated lateness comes from decoder availability, native-film cadence or timestamp gating before any functional A/V correction is proposed.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/decode-hardware-telemetry.py
+- tools/test_hardware_telemetry.py
+- tools/test_telemetry_visibility.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 984 COMMIT Unreleased 0a2e2af 2026-09-04T16:37:40-07:00
 
 #### Coming From:
@@ -1243,40 +1277,6 @@ Leave `/media/fat/MiSTer` untouched, extract the test archive, copy `MiSTer_Medi
 - docs/BUILDING.md
 - docs/TEST_INSTRUCTIONS.md
 - host/build_arm_stack.sh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 945 COMMIT Unreleased ce5a826 2026-09-03T06:33:43-07:00
-
-#### Coming From:
-
-Unreleased cea2add
-
-#### Purpose:
-
-Reopen the FPGA decoder at autonomous DVD stream boundaries without discarding the completed still or hiding the late-audio synchronization failure.
-
-#### Outcome:
-
-Source `ce5a826` adds control event `0x86` as a coordinated helper/Main stream boundary.  Every expired finite DVD still now drains its intentional sequence-end transport, and an automatic menu transition out of a silent epoch preserves the already-consumed Program Stream start code; in both cases the helper flushes its exclusive reserve, resets demux, audio, PTS, random-access and bounded scheduling state, sends the boundary event and waits for GO.  Main continues submitting through an exact pipe-empty observation, including an odd final byte, then toggles download exactly once and releases the helper without discarding old media or clearing the overlay.  Input polls the control socket before acting and all controls are suppressed during the boundary, while a paused session still drains it.  Static inspection established that `dvdmenu:` and `isomenu:` deliberately bypass the optical prefetch ring, so their libdvdnav state is already consumer-synchronous and `media_source.c` required no change.  The focused production-translation-unit and Main lifecycle regressions pass optimized strict builds, AddressSanitizer and UndefinedBehaviorSanitizer; focused GCC analysis passes with the established audio-overlay leak false positive suppressed.  The updated patch applies to pinned Main `0a8fb44` and both local GNU 10.2.1 ARM builds succeed.  `host/build/MiSTer_StreamBoundary_ce5a826` is 1,182,692 bytes at SHA-256 `99084bc5db9062e2984ec93f40158f4bfd4c265300b314c7a7ddbd6e8081f706`; the static stripped ARMv7 `host/build/MediaPlayer_Helper_StreamBoundary_ce5a826` is 966,052 bytes at SHA-256 `32c9a5846aac94f4c1ce2c1bb36a752b5a1c71bfa4ab0bcf304170ef58645e72` and has no dynamic section.  RTL and the RBF are unchanged.
-
-#### Next Steps:
-
-Install the matched `MiSTer_StreamBoundary_ce5a826` and `MediaPlayer_Helper_StreamBoundary_ce5a826`, preserving the accepted RBF and visualizer, and reboot for Main.  Run Futurama disc one from first-play through all finite intro stills into the automatic menu; require one `DVD stream boundary pending` and `released after drain` pair for each terminal still, fresh accepted-byte progress after every reset, visible menu background and selector movement, synchronized AC-3, overlay records in the active telemetry session, title activation and return-to-menu.  Then recheck Blazing Saddles redundant-root behavior, Coming to America overlay-only Scene Selections, The Big Lebowski navigation and the forum disc's silent LPCM menu before accepting the matched host pair on hardware.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_dvd_overlay_output.c
-- tools/test_main_seek_lifecycle.cpp
 
 #### Status:
 
