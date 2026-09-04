@@ -1,3 +1,40 @@
+## 964 COMMIT Unreleased ??? 2026-09-04T02:17:33-07:00
+
+#### Coming From:
+
+Unreleased 8d0ab99
+
+#### Purpose:
+
+Replace visible whole-GOP visualizer grade steps with deterministic three-frame crossfades while retaining the existing eight-level response and legacy-pack compatibility.
+
+#### Outcome:
+
+The approved helper-and-asset-only change will introduce a version-two visualizer pack containing the eight steady grade streams plus dedicated upward and downward adjacent-grade transition streams.  A level change will select one independently decodable three-picture transition GOP at the matching loop phase so its grade advances across approximately 100 milliseconds instead of changing on one picture boundary; motion phase, closed-GOP safety, native-interlaced syntax, RMS thresholds, hysteresis, one-level slew, overlay cap, transport slicing and idle level zero remain unchanged.  The helper will continue accepting version-one packs with their established stepped behavior, while the new generated asset is expected to grow from approximately 3.7 MiB to approximately 10 MiB and remain under the existing 16 MiB validation ceiling.  Main, the media protocol, RTL and the RBF are outside this change.
+
+#### Next Steps:
+
+Extend the pack index interpretation for version two without weakening all existing GOP validation, teach the generator to encode frame-evaluated grade ramps for every adjacent direction, and add focused tests that distinguish steady, rising and falling entry selection across overlay caps, target reversals, seeks and version-one fallback.  Generate the production pack, independently decode representative steady and alternating transitions, run strict optimized, sanitizer and analyzer coverage plus retained audio integration, then commit and build only `MediaPlayer_Helper` and `MediaPlayer_Visualizer.mmpvis` locally for hardware comparison.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/BUILDING.md
+- docs/TEST_INSTRUCTIONS.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_visualizer.c
+- host/arm/audio_visualizer.h
+- tools/generate-audio-visualizer.py
+- tools/test_audio_visualizer.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 963 COMMIT Unreleased 8d0ab99 2026-09-04T01:53:01-07:00
 
 #### Coming From:
@@ -1217,35 +1254,6 @@ The user reports that Blazing Saddles initially booted, entered its menu, played
 #### Next Steps:
 
 Hold the approved combined-build boundary until a fresh trace identifies the second correction.  Enable telemetry before loading Blazing Saddles, launch the disc, reproduce Root Menu from the black state, capture while it remains hung and verify that `.ai/current_results/MediaPlayer_ARM.log` receives the new run's timestamp rather than retaining the Big Lebowski file; if collection again stops after the screenshot, first confirm that `/tmp/MediaPlayer_ARM.log` exists on MiSTer.  Once fresh evidence is present, classify the exact navigation boundary and combine its narrow helper-side correction with the already-proposed bounded Big Lebowski motion-menu staging promotion, then run both discs plus Coming to America and the forum disc through the full regression and ARM build boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 924 COMMIT Unreleased 6b63c91 2026-09-02T21:28:47-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Qualify the corrected source-`6b63c91` installation on The Big Lebowski and diagnose its Scene Selection failure.
-
-#### Outcome:
-
-The user confirms that the checksum-correct helper restores The Big Lebowski startup, root-menu operation and chapter skipping during movie playback, accepting the active-program chapter correction and disproving a source regression in the prior immediate crash.  The fresh trace then enters the root menu, preserves responsive highlights, selects button one and successfully begins a deferred Scene Selection activation at 102.416959 seconds.  Post-activation output contains a qualified H.262 sequence and reference group, but this authored motion-menu destination produces neither a menu-domain exit nor a DVD still before the 4,194,304-byte atomic activation stage fills; at 107.881250 seconds the helper deliberately exits with `staging scheduled video failed: No space left on device`, after which Main reports a normal exit-code-one helper error.  The message describes the in-memory bounded stage, not filesystem storage.  The screenshot correctly retains the last root-menu picture because no partial destination was published, while its checksum-valid schema-21 snapshot shows a completed overlay plane, no overlay protocol error and the last stable decoder state; the later single audio-underrun flag accompanies the terminated stream rather than identifying the cause.  The 3,054,475-byte log, 564,283-byte screenshot and 844-byte sidecar have SHA-256 `af8f741463cd36f3400e96e186cb4d6e46d7a4bf91b8327af526a7eb4db6003c`, `74a5447d25dbc3fea1bb6d21959be684129b420b9b907ed03878674f65b6a522` and `7fa1f1f937f6a629cd748d9a896815e128aff1b78d39b16770bfeaa72a4ea8f3`.  No runtime source was changed.
-
-#### Next Steps:
-
-After user approval, preserve the accepted chapter, menu, finite-still and overlay-only behavior while adding a bounded capacity-pressure decision for picture-bearing motion-menu activations: retain 4 MiB as the decision threshold, give the stage sufficient bounded headroom for one deepest scheduler drain, and when a pending menu destination remains in the menu domain with a qualified picture group at that threshold, promote it through the existing staged READY/GO stream-hop path instead of reaching `ENOSPC`.  Add production-path coverage for an over-threshold motion menu with byte-exact post-barrier commit, retain the accepted 3,797,120-byte finite-still case below the threshold and all overlay-only classifications, then run strict native, sanitizer, analyzer, DVD navigation, staging, random-access, overlay, LPCM, audio and seek regressions locally and on the build PC before producing a new static ARM helper for Big Lebowski Scene Selection plus the retained Coming to America, Blazing Saddles and forum-disc routes.
 
 #### Files Modified:
 
