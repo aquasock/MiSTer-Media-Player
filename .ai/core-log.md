@@ -1,3 +1,42 @@
+## 961 COMMIT Unreleased ??? 2026-09-04T00:07:31-07:00
+
+#### Coming From:
+
+Unreleased 3b2a0ca
+
+#### Purpose:
+
+Replace marker-file optical launching with a hierarchical loader menu that starts physical DVD and Audio CD media directly while retaining separate DVD ISO, MPEG-2 video and audio file pickers.
+
+#### Outcome:
+
+The user reports that source `3b2a0ca` successfully plays a physical Audio CD, accepting the new CDDA path for the tested disc.  The approved follow-on will use MiSTer's numbered menu pages for `Load Physical Disc` and `Load Disc Image`, make the physical `Video DVD` and `Audio CD` choices invoke `dvdmenu:/dev/sr0` and `cdda:/dev/sr0` directly through isolated Main, expose only `Video DVD` under the image submenu with an ISO-filtered browser, and leave `Load MPEG-2 Video File` and `Load Audio File` as immediate filtered browsers.  Standard Audio CD image files are deliberately omitted until a later CUE/BIN or equivalent image backend exists, and the obsolete `.dvd` and `.cd` marker assets will be removed without changing the helper, decoder RTL or media protocol.
+
+#### Next Steps:
+
+Implement explicit MediaPlayer loader identities in the core menu and patched Main, remap every resulting helper stream to FPGA download index one, preserve file-path DVD ISO and standalone media routing, and add static contract coverage for submenu syntax, direct physical sources, ISO-only image selection, marker removal and route isolation.  Update current documentation, apply all Main patches cleanly to the pinned upstream source, rebuild and checksum Main locally, then commit and push the exact source before one clean timing-gated Quartus build on build PC `10.10.0.42` with seed 25 and at most one authorized reseed if timing fails; deliver only the replacement RBF and Main unless validation finds a helper dependency.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer.sv
+- README.md
+- assets/Audio CD.cd
+- assets/Video DVD.dvd
+- docs/BUILDING.md
+- docs/MEDIA_CONVERSION.md
+- docs/TEST_INSTRUCTIONS.md
+- host/arm/ARCHITECTURE.md
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_main_cdda.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 960 COMMIT Unreleased 3b2a0ca 2026-09-03T22:32:01-07:00
 
 #### Coming From:
@@ -1202,35 +1241,6 @@ Install only `host/build/MediaPlayer_Helper_ChapterVM_6b63c91` as `/media/fat/li
 - host/arm/ARCHITECTURE.md
 - host/arm/media_source.c
 - tools/test_dvd_menu_hop.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 921 COMMIT Unreleased 3689cca 2026-09-02T20:51:04-07:00
-
-#### Coming From:
-
-Unreleased 3689cca
-
-#### Purpose:
-
-Qualify the synchronized Coming to America Scene Selection route and diagnose The Big Lebowski's slow startup, slow menu presentation and fatal chapter-forward request.
-
-#### Outcome:
-
-The user reports that the exact second-visit Coming to America Scene Selection route now works, providing hardware acceptance of source `3689cca` for the directional menu-decision deadlock fixed by entry 920.  The fresh physical-disc Big Lebowski run starts `dvdmenu:/dev/sr0`, identifies title 1 as the 23-chapter longest title and remains alive through normal video, root-menu entry, four directional selections, activation and the resulting stream hop.  Its apparent 21.54-second startup is divided between approximately 10.29 seconds spent by libdvdnav retrieving CSS keys and inventorying titles and approximately 10.26 seconds of authored three- and seven-second first-play stills before the first qualified video byte; the root-menu command itself reaches READY in 55.86 milliseconds and releases its barrier in 68.11 milliseconds, after which the disc declares an authored 15-second menu still.  At 96.566683 seconds, a Next Chapter command discards 112,125 stale bytes, but `iso_change_chapter()` rejects the request and the helper reports `chapter control failed`; Main then correctly records `control-error`, stops the helper and releases download.  Because libdvdnav prints no `dvdnav_part_play()` range or VM error, the evidence is consistent with the preceding guard rejecting a valid current DVD title that differs from the initially inventoried longest title after authored menu navigation.  The current chapter implementation requires `current_title == state->title` and then calls absolute `dvdnav_part_play(state->title, target)`, so it cannot navigate an alternate title or program chain launched by a DVD menu.  The all-black 1,920-by-1,080 screenshot contains no telemetry matrix and the sidecar contains the decoder's expected no-telemetry error.  The 2,630,142-byte log, 559-byte screenshot and 2,818-byte sidecar have SHA-256 `d114fa9c24227738fd69c8dba96b59247f40af032546e4ada2ae36654838f89d`, `12c8ca81f403f6edaecb60d88b1c580ddbb0353ce8b9d16f349164fb4f724f19` and `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004`.
-
-#### Next Steps:
-
-After user approval, preserve the proven menu synchronization and replacement-stream barrier but change physical-DVD and ISO chapter requests to libdvdnav's relative previous/next-program navigation against the current program chain instead of requiring and replaying the initially selected longest title.  Log the current title and part before the request plus libdvdnav's diagnostic string on failure, reset and restart the direct-device buffer only after a successful hop, and add focused tests covering the original longest title, a menu-launched alternate title, boundary failure and both directions.  Rebuild the static ARM helper, run strict native, sanitizer, analyzer, DVD navigation, random-access, staging, overlay, audio and seek regressions, exercise the equivalent transition in the build-PC simulator where its fixture permits, and then retest Big Lebowski title and chapter navigation on hardware while retaining Coming to America, Blazing Saddles and forum-disc menu regressions.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
