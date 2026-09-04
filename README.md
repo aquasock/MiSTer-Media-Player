@@ -144,18 +144,18 @@ The visualizer and optical-drive launcher have these roles:
 | Release file | MiSTer destination | Required for |
 | --- | --- | --- |
 | `linux/MediaPlayer_Visualizer.mmpvis` | `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` | Standalone-audio visualizer; audio still works if omitted |
-| `games/MediaPlayer/USB DVD Drive.dvd` | `/media/fat/games/MediaPlayer/USB DVD Drive.dvd` | Direct playback from `/dev/sr0` |
+| `games/MediaPlayer/Video DVD.dvd` | `/media/fat/games/MediaPlayer/Video DVD.dvd` | Direct playback from `/dev/sr0` |
 
-The launcher is tracked as `assets/USB DVD Drive.dvd` and is installed at the
-absolute path `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`. Selecting that
-launcher opens the inserted optical disc through `dvd:/dev/sr0`; the marker's
+The launcher is tracked as `assets/Video DVD.dvd` and is installed at the
+absolute path `/media/fat/games/MediaPlayer/Video DVD.dvd`. Selecting that
+launcher opens the inserted optical disc through `dvdmenu:/dev/sr0`; the marker's
 contents are not media data. The drive does not need to be mounted.
 The helper authenticates and selects the title once, reuses that navigation
 session during preflight, then fills a 4 MiB launch reserve inside an 8 MiB
 HPS-RAM ring before playback begins. The ring is direct-disc-only and does not
 consume FPGA M10K memory.
 
-The v0.9.0 menu separates `Run DVD-Video`, `Open MPEG-2 Video`, and
+The current menu separates `Load Disk`, `Open MPEG-2 Video`, and
 `Open WAV, MP3, FLAC, OGG` so each picker exposes only its relevant files.
 Aspect Ratio defaults to 16:9 with 4:3 as the alternate; Deinterlacer Mode
 offers Bob and Weave. Telemetry defaults to Off for normal playback; turning it
@@ -163,8 +163,8 @@ On reveals the internally captured hardware snapshot and enables the combined
 Main/helper diagnostic log on the next playback start. The Audio Test and Audio
 Output choices are unchanged.
 
-- To play a disc in the USB drive, choose `Run DVD-Video` and select
-  `games/MediaPlayer/USB DVD Drive.dvd`.
+- To play a disc in the USB drive, choose `Load Disk` and select
+  `games/MediaPlayer/Video DVD.dvd`.
 - To play an ISO or file, choose `Open MPEG-2 Video` and select `.iso`, `.m2v`,
   `.mpg`, `.mpeg` or `.vob`.
 - To play standalone audio, choose `Open WAV, MP3, FLAC, OGG`.

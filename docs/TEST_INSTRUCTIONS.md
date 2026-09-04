@@ -5,8 +5,8 @@ Keep the official `/media/fat/MiSTer`, install the patched executable as
 `/media/fat/MiSTer_MediaPlayer`, and merge the `[MediaPlayer]` section from
 `assets/MiSTer_MediaPlayer.ini.fragment` at the end of `/media/fat/MiSTer.ini`.
 Make both custom executables executable and reboot. For direct optical testing,
-install `USB DVD Drive.dvd` at
-`/media/fat/games/MediaPlayer/USB DVD Drive.dvd` and confirm the drive is
+install `Video DVD.dvd` at
+`/media/fat/games/MediaPlayer/Video DVD.dvd` and confirm the drive is
 present as readable `/dev/sr0`. The disc does not need to be mounted.
 
 Run normal playback first with `Telemetry` Off. Turn it On only for a fresh

@@ -6,6 +6,12 @@ This project is still in active pre-release development. Published milestone rel
 
 ## Unreleased
 
+### Changed
+
+- Renamed the DVD picker from `Run DVD-Video` to `Load Disk` and the direct
+  optical-drive launcher from `USB DVD Drive.dvd` to `Video DVD.dvd`. The
+  launcher's extension-based `/dev/sr0` routing is unchanged.
+
 ### Added
 
 - Added an experimental MediaPlayer-only NTSC 480i direct-HDMI mode to the

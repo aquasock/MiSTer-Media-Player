@@ -93,8 +93,8 @@ real first-play/root navigation, highlight motion, activation, ready/go
 barriers and complete overlay-plane transport without accessing the MiSTer.
 
 Direct optical playback additionally requires the launcher at the exact target
-path `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`. Patched Main maps that
-file to `dvd:/dev/sr0`; the helper requires the source path to be absolute and
+path `/media/fat/games/MediaPlayer/Video DVD.dvd`. Patched Main maps that
+file to `dvdmenu:/dev/sr0`; the helper requires the source path to be absolute and
 opens the block device directly through libdvdnav. A filesystem mount is not a
 prerequisite. Verify `/dev/sr0` exists and is readable before testing.
 Direct-disc playback reuses the authenticated navigation session across

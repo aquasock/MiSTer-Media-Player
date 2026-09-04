@@ -55,7 +55,7 @@ At minimum, verify that the result is an MPEG Program Stream containing
 - Existing compatible MPEG Program Streams may be opened as `.mpg`, `.mpeg` or
   `.vob`. Renaming another container does not convert it.
 - DVD-Video should normally be opened from an `.iso` image or through the
-  supplied `USB DVD Drive.dvd` launcher instead of transcoding individual VOBs.
+  supplied `Video DVD.dvd` launcher instead of transcoding individual VOBs.
 - Standalone `.mp3`, `.wav`, `.flac` and `.ogg` files use the consumer-audio
   path and do not need conversion to MPEG-2 video.
 
