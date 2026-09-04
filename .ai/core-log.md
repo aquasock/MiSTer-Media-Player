@@ -1,3 +1,35 @@
+## 977 COMMIT Unreleased ??? 2026-09-04T05:49:51-07:00
+
+#### Coming From:
+
+Unreleased 36dc0ac
+
+#### Purpose:
+
+Clock the source-`36dc0ac` automatic-menu PCM fallback in real time while retaining a bounded path from provisional resident-context continuation to a later DVD title barrier.
+
+#### Outcome:
+
+The approved helper-only boundary will replace the fallback's source-rate drain with a monotonic sample budget at the selected 48 kHz PCM rate, preserve the existing finite startup release, and throttle source progress whenever held PCM reaches its established ceiling.  A PCM-pressure continuation will become provisional: it may acknowledge Main after committing the context-dependent prefix, but the DVD state machine will keep a separate follow-up flag until libdvdnav proves a later menu exit, at which point it will use the existing asynchronous stream-boundary handshake to drain the bounded live prefix and reset the decoder without requiring a Main or protocol change.  Ordinary command continuations, qualified staged restarts, finite stills, video-pressure continuations and non-menu timestamp scheduling will retain their existing semantics.
+
+#### Next Steps:
+
+Implement the sample-clock origin and emitted-budget state with overflow-safe elapsed-time arithmetic, bounded batch writes and short interrupt-safe waits only when the decoded hold exceeds its hard limit; clear that state whenever advancing video PTS restores normal scheduling.  Add production-translation-unit regressions that force input faster than real time, backdate the clock deterministically to prove exact permitted PCM without a long test sleep, verify that an unadvanced clock cannot drain a new burst, enforce the hold ceiling, and prove a provisional continuation later requests the existing stream boundary while a superseding command cancels its follow-up.  Run strict optimized, sanitizer, analyzer, repeated DVD/menu/overlay/staging/reserve suites and retained audio integrations, then build and verify only the local static ARM helper for physical Simpsons testing.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 976 COMMIT Unreleased 36dc0ac 2026-09-04T05:41:53-07:00
 
 #### Coming From:
@@ -1248,38 +1280,6 @@ Source `0f1165c` replaces the startup-only correction boundary with a DVD/ISO el
 #### Next Steps:
 
 Exit MediaPlayer, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_H262Stream_0f1165c`, preserve executable mode and retain the installed Main, visualizer and timing-qualified RBF.  With telemetry enabled, start The Big Lebowski and require correction one at elementary offset 185, a second correction when the following seven-second still begins, accepted bytes advancing beyond the former 5,670-byte failure boundary, error flags remaining zero and normal title playback beginning.  Press `m`, exercise the Root Menu and Scene Selection repeatedly, return to the title and reopen both paths, then verify each new malformed authored sequence is corrected without a helper exit or decoder latch.  Spot-check Blazing Saddles and Coming to America title, menu and chapter navigation before returning the fresh log, screenshot and telemetry sidecar.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
-- tools/test_h262_restart_normalization.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 937 COMMIT Unreleased 490dc02 2026-09-03T00:41:17-07:00
-
-#### Coming From:
-
-Unreleased ac13724
-
-#### Purpose:
-
-Normalize The Big Lebowski's nonconforming 4:2:0 progressive-frame chroma flag at the helper's buffered initial I-picture boundary.
-
-#### Outcome:
-
-Implemented the helper-only compatibility normalization approved from entry 936's byte-exact physical evidence.  Immediately after successful random-access filtering, the helper now changes only `chroma_420_type` from zero to one when the buffered restart has a valid 4:2:0 sequence extension and a valid initial complete-frame progressive I-picture coding extension; conforming streams and out-of-scope malformed streams remain byte-identical, stream length and every offset remain unchanged, and the exact offset plus before/after byte are logged.  The captured 191-byte Big Lebowski prefix changes only byte 185 from `0xc0` to `0xc1` and is idempotent.  Its original form raises RTL syntax source 21, while the corrected form reaches the first slice with no syntax error and is accepted as a supported phase-1/native-film picture.  Strict focused C, ASan/UBSan, GCC analyzer, DVD random-access/menu-hop/overlay/SPU/staging/reserve/program-stream, audio seek/UI/visualizer, native static-helper capability and private audio/LPCM tests passed.  The exact ARM release artifact also passed its capability probe and real MP3/WAV/FLAC/Ogg visualizer integration (378/381 pictures and one clear record per file).  No Main, RBF or visualizer change was made.  Built `host/build/MediaPlayer_Helper_ChromaFix_490dc02`, 966052 bytes, SHA-256 `0d99ce70d703eb9486052f8673474aed0b85446e321b73d0d640573f79d3d2c0`.  Physical testing rejects this build for The Big Lebowski while confirming Blazing Saddles remains accepted.  The helper normalizes the first three-second authored still at offset 185 from `0xc0` to `0xc1`; telemetry proves that picture completes, displays and reaches presentation completion with no overlay or presentation fault.  After the still expires, libdvdnav supplies a second seven-second still but `iso_start_filter_active` is already clear, so the normalization is not revisited.  Telemetry then latches H.262 error flag `0x0001` at 5,670 accepted bytes: exactly the first corrected still's 5,473 bytes plus its nine-byte terminal tail plus 188 bytes of the next stream, reproducing the prior source-21 acceptance boundary.  The helper remains alive and continues supplying more than 122 MB, excluding CSS, drive, helper-exit and transport starvation failures.  The 1,178,545-byte log, 1,514-byte screenshot and checksum-valid 441-byte schema-21 sidecar have SHA-256 `9a7607eeeb9ab9030dc8c9d00f1ca03947bc74e91b142374f3cf10c7e347215e`, `3b8e91889e3b2ae78208151f07361f2b540d3f911c330c2916702cb2915d143c` and `4cdc025cc7864ab8449aee283afca0ec433e4e540f04ec8358b3673bae966ad3`.
-
-#### Next Steps:
-
-The next helper-only change should apply the identical narrow normalization at every qualifying DVD elementary-video sequence/I-picture boundary rather than only the session's first random-access group.  Preserve the one-bit 4:2:0/progressive-I gating, byte count, offsets, decoder, RBF and Main; handle start codes and extension fields split across PES payloads with bounded state; and log each correction.  Add regressions containing two consecutive captured malformed stills, deliberately split every relevant header across payload boundaries, plus conforming and out-of-scope controls.  Require both stills to clear source 21 in Icarus before another ARM helper build and physical Big Lebowski startup, title, Root Menu and repeated-menu test, while retaining Blazing Saddles and Coming to America acceptance.
 
 #### Files Modified:
 
