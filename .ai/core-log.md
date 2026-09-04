@@ -1,3 +1,43 @@
+## 969 COMMIT Unreleased ??? 2026-09-04T03:50:52-07:00
+
+#### Coming From:
+
+Unreleased 04360e9
+
+#### Purpose:
+
+Give Audio CD playback track-relative elapsed, remaining and total clocks plus a whole-album playlist-duration clock.
+
+#### Outcome:
+
+The user hardware-accepts the source-`04360e9` playlist and requests that the four existing Audio CD time fields stop sharing the concatenated-disc timeline.  This cycle will preserve the helper's absolute CDDA sample cursor for reading and seeking while deriving `ELAPSED`, `REMAIN` and `TOTAL` from the active track's TOC start and length, and will replace the `PLAYLIST --:--` placeholder with the duration of the complete filtered audio program.  Ordinary audio files retain their current file-relative clocks and placeholder playlist summary, and no keyboard, Main, protocol, visualizer-pack, RTL or RBF change is required.
+
+#### Next Steps:
+
+Expose the current audio track's logical start and length through the bounded CDDA reader, carry those values atomically with each UI selection update, render track-relative clocks and progress while formatting the existing whole-disc length in the playlist field, and update all four values across natural boundaries, previous or next controls and fixed seeks.  Extend reader and pixel-output tests for fractional-second rounding, middle-track selection and exact track boundaries, run strict optimized, sanitizer, analyzer and real-helper audio regressions, then build one static stripped ARMv7 helper locally for hardware validation.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- host/arm/ARCHITECTURE.md
+- host/arm/audio_ui.c
+- host/arm/audio_ui.h
+- host/arm/cdda_audio.c
+- host/arm/cdda_audio.h
+- host/arm/media_player_helper.c
+- tools/test_audio_ui_output.c
+- tools/test_cdda_audio.c
+- tools/test_main_cdda.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 968 COMMIT Unreleased 04360e9 2026-09-04T03:50:04-07:00
 
 #### Coming From:
@@ -1243,39 +1283,6 @@ After user approval, preserve source `366a227`, the helper, asset, decoder behav
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 929 COMMIT Unreleased 366a227 2026-09-02T22:47:52-07:00
-
-#### Coming From:
-
-Unreleased 9c00a20
-
-#### Purpose:
-
-Keep the standalone-audio player interface visible for its intended first ten seconds by making the optional visualizer stream compatible with the existing native-480i overlay path.
-
-#### Outcome:
-
-Fresh hardware evidence accepts audio playback, the radial animation and its loudness response, while the Main trace proves that the helper commits the opaque player overlay near startup and does not clear it until approximately 10.15 seconds.  Source `366a227` makes every generated visualizer GOP declare an interlaced sequence and three top-field-first interlaced frame pictures so the unchanged native-480i compositor displays that initial plane, and the helper now rejects packs that omit those declarations or signal progressive sequence or picture content.  Strict focused, AddressSanitizer and UndefinedBehaviorSanitizer tests accept the interlaced fixture and reject both progressive flag classes; GCC analyzer passes.  The 3,740,562-byte generated pack contains 160 indexed GOPs, and a deliberately level-switched sample decodes as 60 top-field-first interlaced 720-by-480 pictures at 30000/1001 without FFmpeg errors.  Native and final ARMv7 real-helper runs pass MP3, WAV, FLAC and Ogg with 378 through 381 decoded selected pictures and exactly one ten-second overlay clear, while the final ARM helper rejects the former progressive pack and all four formats retain the full-frame interface fallback.  GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_Visualizer480i_366a227` at SHA-256 `ea2004223d160dd2377144b85e311c9e594e541fca2ab856e83ce3f99b1291e2`; `host/build/MediaPlayer_Visualizer_366a227.mmpvis` has SHA-256 `448407cdd7e6c79fbe13cbb435241116127f726aca5af9f99d75b32fc2519f47`.  Main, RTL, RBF, decoder, audio transport, timer and accepted animation are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer, replace `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_Visualizer480i_366a227` using executable mode and replace `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` with `host/build/MediaPlayer_Visualizer_366a227.mmpvis`, while preserving the installed Main and timing-qualified RBF.  Play standalone audio and require the normal interface to remain visible for the first ten playback seconds before the visualizer appears; then pause or seek, require immediate interface restoration, resume and require another complete ten-second delay before the visualizer returns.  Confirm clean audio and the accepted animation and loudness response, then return fresh telemetry-enabled results for hardware acceptance.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/audio_visualizer.c
-- tools/generate-audio-visualizer.py
-- tools/test_audio_visualizer.c
 
 #### Status:
 
