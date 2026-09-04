@@ -1,4 +1,4 @@
-## 954 COMMIT Unreleased ??? 2026-09-03T20:08:11-07:00
+## 954 COMMIT Unreleased 67ce19d 2026-09-03T20:08:11-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Bound automatic-menu fallback output latency across physical DVDs without weaken
 
 #### Outcome:
 
-The approved helper-only design addresses the shared mechanism behind the delays seen on multiple discs.  In-band stereo PCM uses 69 output bytes per sixteen frames, so the existing four-megabyte asynchronous DVD reserve can absorb approximately twenty seconds of audio when a stalled-timestamp menu fallback drains decoded PCM faster than the sink consumes it, matching Futurama's measured 24-to-25-second scheduling lead after downstream buffering.  Once that fallback is active, scheduled PCM will first pace against the existing reserve drain and the fallback will admit at most one 2,048-frame batch per scheduler pass, preventing one call from filling the reserve with a long audio-only run while allowing Main and FPGA credit to establish the real delivery rate.  Ordinary advancing-timestamp scheduling, normal title use of the four-megabyte optical-stall reserve, overlay priority, byte order, Main, protocol, RTL and RBF remain unchanged.
+Source `67ce19d` adds one fallback-aware PCM emission boundary: while a physical DVD's automatic menu is using sink pacing, each scheduled PCM run first drains the asynchronous output reserve, and the fallback itself admits at most one 2,048-frame batch per scheduler pass.  This prevents the four-megabyte normal lane from absorbing approximately twenty seconds of decoded PCM and lets the pipe and unchanged FPGA FIFO credit establish delivery rate, while ordinary advancing-timestamp scheduling, normal title use of the complete optical-stall reserve, overlay priority and byte order remain unchanged.  The production regression starts with 24,000 held frames, proves the first exhausted-target pass emits exactly one batch, repeatedly reaches the exact 8,192-frame reserve and reconstructs all 15,808 emitted stereo frames sample-for-sample through the real reserve; its advancing-PTS control restores the original scheduler.  Strict optimized, AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer checks pass, as do the native helper capability probe, retained DVD random-access, SPU, menu-hop, overlay, stage, output-reserve, AC-3, LPCM-skip, audio UI, visualizer and seek tests, twenty repeated production runs, one hundred menu-hop runs and fifty output-reserve runs.  Real MP3, WAV, FLAC and Ogg seek integrations pass with and without the visualizer.  GNU 10.2.1 builds the 970,148-byte stripped static ARMv7 helper `host/build/MediaPlayer_Helper` with SHA-256 `6b7524f082e81e3b6f9e49064deea7950804438485bed366e7089b1b434b2da7`; Main, protocol, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Implement the fallback-only pacing wrapper and one-batch admission, document the boundary, and extend the production regression with a large held backlog that proves one scheduler pass emits only one batch while repeated passes preserve exact PCM and video and a later timestamp restores the unchanged scheduler.  Run strict optimized, analyzer, AddressSanitizer, UndefinedBehaviorSanitizer and retained DVD, output-reserve, overlay, audio, visualizer and seek suites, then build one static ARMv7 helper locally.  Hardware acceptance should cover Futurama and several other affected physical DVDs, requiring moving menus and usable selectors without the prior long apparent freeze, continuous intelligible audio, no underrun or helper termination, and unchanged title and chapter playback.
+Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`67ce19d` artifact and retain the current per-core Main, RBF and visualizer.  Test Futurama plus several other physical DVDs that previously delayed at automatic menus; each affected route should log one fallback activation containing `paced_batch=2048`, reach moving menu video and a usable selector without the prior long apparent freeze, retain continuous intelligible audio and show no pacing failure, hold-limit diagnostic, underrun or helper termination.  Launch titles and exercise chapter navigation on at least one disc to confirm the unchanged ordinary reserve path, then return the updated log, screenshot and telemetry for hardware qualification.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Implement the fallback-only pacing wrapper and one-batch admission, document the
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
