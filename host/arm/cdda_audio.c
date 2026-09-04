@@ -265,6 +265,24 @@ unsigned cdda_reader_current_track(const struct cdda_reader *reader)
     return reader->tracks[track_index_for_sector(reader, sector)].number;
 }
 
+int cdda_reader_current_track_timing(const struct cdda_reader *reader,
+                                     uint64_t *start_frame,
+                                     uint64_t *length_frames)
+{
+    const struct cdda_track *track;
+    uint64_t sector;
+
+    if (!reader || !reader->track_count || !start_frame || !length_frames) {
+        errno = EINVAL;
+        return -1;
+    }
+    sector = reader->cursor_frame / CDDA_PCM_FRAMES_PER_SECTOR;
+    track = &reader->tracks[track_index_for_sector(reader, sector)];
+    *start_frame = track->first_sector * CDDA_PCM_FRAMES_PER_SECTOR;
+    *length_frames = track->sectors * CDDA_PCM_FRAMES_PER_SECTOR;
+    return 0;
+}
+
 int cdda_reader_seek_frame(struct cdda_reader *reader, uint64_t frame)
 {
     if (!reader || frame > cdda_reader_length_frames(reader)) {

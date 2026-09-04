@@ -107,6 +107,7 @@ def main() -> int:
         "audio_pause_barrier(output, control->control_fd,",
         "audio_ui_set_playlist(output->audio_ui, playlist_tracks, track_count,",
         "audio_ui_set_current_track(",
+        "cdda_reader_current_track_timing(reader, &track_start,",
         "cdda_reader_track_number(reader, track)",
         "audio_overlay_publish_full(output, current_frame)",
     )

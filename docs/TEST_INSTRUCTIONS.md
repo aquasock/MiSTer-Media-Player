@@ -72,6 +72,10 @@ playback replaces it.
    Require the audio UI and clean 44.1 kHz stereo playback from the first audio
    track. Require the playlist to show the disc as `TRACK 01`, `TRACK 02`, and
    so on, with the playing row selected.
+   Require `ELAPSED` to count from the beginning of that track, `REMAIN` to
+   count down to its end, `TRACK` to show its total duration, and `PLAYLIST` to
+   show the combined duration of all audio tracks. The progress bar must also
+   restart for the active track.
 2. Test a mixed-mode disc where available. Data tracks must be skipped and must
    never be emitted as noise.
 3. Press P/N or player-one Left/Right to move between audio tracks. Previous

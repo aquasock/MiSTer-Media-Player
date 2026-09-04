@@ -147,6 +147,8 @@ static int test_disc_layout_and_reads(void)
     int16_t pcm[8];
     uint64_t track_three = 300u * CDDA_PCM_FRAMES_PER_SECTOR;
     uint64_t track_four = 600u * CDDA_PCM_FRAMES_PER_SECTOR;
+    uint64_t track_start = UINT64_MAX;
+    uint64_t track_length = UINT64_MAX;
     char error[160];
     int failed = 0;
 
@@ -170,6 +172,10 @@ static int test_disc_layout_and_reads(void)
                       "concatenated audio duration is wrong");
     failed |= require(cdda_reader_current_track(reader) == 1,
                       "first audio track was not selected");
+    failed |= require(cdda_reader_current_track_timing(
+                          reader, &track_start, &track_length) == 0 &&
+                          track_start == 0 && track_length == track_three,
+                      "first audio track timing is wrong");
     failed |= require(cdda_reader_read_frames(reader, pcm, 4) == 4,
                       "initial Audio CD read failed");
     failed |= require(pcm[0] == 0 && pcm[1] == 0 &&
@@ -190,6 +196,11 @@ static int test_disc_layout_and_reads(void)
                       "logical audio program did not skip the data track");
     failed |= require(cdda_reader_current_track(reader) == 3,
                       "current track number did not cross the data gap");
+    failed |= require(cdda_reader_current_track_timing(
+                          reader, &track_start, &track_length) == 0 &&
+                          track_start == track_three &&
+                          track_length == track_three,
+                      "track timing did not cross the data gap");
 
     failed |= require(cdda_reader_seek_frame(
                           reader, track_three + 4u * CDDA_SAMPLE_RATE_HZ - 1u)
@@ -209,6 +220,15 @@ static int test_disc_layout_and_reads(void)
                           cdda_reader_track_target(reader, 1) ==
                               track_four + CDDA_SAMPLE_RATE_HZ,
                       "next at the final track did not preserve position");
+    failed |= require(cdda_reader_current_track_timing(
+                          reader, &track_start, &track_length) == 0 &&
+                          track_start == track_four &&
+                          track_length == track_three,
+                      "final audio track timing is wrong");
+    failed |= require(cdda_reader_current_track_timing(
+                          NULL, &track_start, &track_length) == -1 &&
+                          errno == EINVAL,
+                      "invalid track timing query was accepted");
 
     cdda_reader_close(reader);
     failed |= require(drive.open_calls == 1 && drive.close_calls == 1,

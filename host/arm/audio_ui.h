@@ -29,7 +29,9 @@ int audio_ui_set_playlist(struct audio_ui *ui,
                           unsigned track_count,
                           unsigned current_track);
 int audio_ui_set_current_track(struct audio_ui *ui,
-                               unsigned current_track);
+                               unsigned current_track,
+                               uint64_t track_start_pcm_frames,
+                               uint64_t track_length_pcm_frames);
 
 /*
  * Service at a PCM-record boundary. At most one bounded display record is

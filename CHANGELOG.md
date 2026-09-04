@@ -8,6 +8,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Changed Audio CD timing from the concatenated-disc clock to the active track:
+  elapsed, remaining, track total and the progress bar now follow the selected
+  TOC span, while the playlist clock reports the total duration of all audio
+  tracks on the disc. Ordinary standalone-audio file timing is unchanged.
 - Populated the Audio CD player playlist from the drive TOC with `TRACK 01`-style
   labels. The playing track is selected across natural boundaries, previous or
   next track changes and fixed seeks, while a six-row window keeps it near the

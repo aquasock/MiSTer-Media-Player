@@ -166,6 +166,9 @@ in the existing standalone-audio player. The playlist shows `TRACK 01`-style
 labels from the physical TOC numbers, follows natural track boundaries and
 updates immediately for previous, next and fixed-time seeks. It keeps the
 playing entry on the fourth of six visible rows when both list boundaries allow.
+Elapsed, remaining, track-total and progress values follow the active track;
+the playlist time is the combined duration of every audio track retained from
+the TOC. Partial final seconds round up for duration and remaining displays.
 No filesystem mount or extracted audio files are required. Audio CD image files
 are not currently supported.
 
@@ -374,7 +377,10 @@ second. The interface lays out a physically square album-art viewport, title,
 artist and album fields, a current-playlist panel, transport controls, time
 fields and a full-width progress bar inside 4:3 CRT-safe margins. The decoder's
 exact output-frame length scales the bar against the current absolute PCM-frame
-position, including after a fixed seek. Elapsed, total track and remaining time
+position, including after a fixed seek. For Audio CD that position is projected
+inside the active TOC track for these three clocks and the progress bar, while
+the playlist field shows the complete filtered audio-program duration. Elapsed,
+total track and remaining time
 occupy three independently centered fields on one baseline. Elapsed time uses
 the absolute completed seconds; total and remaining time round up partial final
 seconds, and remaining reaches `00:00` only on the exact completed frame. Clean
@@ -418,7 +424,7 @@ for the current workflow.
   offset correction, CD-Text or metadata lookup.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
-- The standalone-audio screen contains a CRT-safe 4:3 composition for album artwork, title/artist/album tags, the current playlist, transport controls, centered elapsed/total/remaining time and a duration-relative progress bar. Track timing, fixed keyboard seeking, absolute progress tracking and numbered Audio CD playlist entries are active; ordinary audio-file playlist entries, artwork, metadata, playlist summary fields, arbitrary-position scrubbing and FPGA-aware pause state remain later display boundaries.
+- The standalone-audio screen contains a CRT-safe 4:3 composition for album artwork, title/artist/album tags, the current playlist, transport controls, centered elapsed/total/remaining time and a duration-relative progress bar. Track timing, fixed keyboard seeking, numbered Audio CD playlist entries and Audio CD album-duration summary are active; ordinary audio-file playlist entries and summary, artwork, metadata, arbitrary-position scrubbing and FPGA-aware pause state remain later display boundaries.
 - The optional `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` asset is generated with `python3 tools/generate-audio-visualizer.py host/build/MediaPlayer_Visualizer.mmpvis`. Version two contains eight steady grades plus seven rising and seven falling adjacent-grade streams, all aligned as interlaced top-field-first, three-picture closed GOPs rather than malformed decoder input. The helper rejects progressive or otherwise incompatible packs, sends one matching-phase GOP at a time, applies RMS hysteresis and a one-level-per-GOP slew, and uses a dedicated transition GOP to crossfade each rise or fall over three frames. Version-one stepped packs remain accepted. Video admission remains limited to 4 KiB between PCM records. The two-bit player overlay uses a transparent background, a translucent dark panel and opaque text and borders; while it is present, the loop is capped at grade three. The helper clears that overlay after ten playback seconds without input, restores the full zero-through-seven brightness range without changing the GOP cadence, and restores the capped overlay before standalone-audio pause or on seek activity. Pause stops the emitted-audio clock, so the new ten-second interval begins advancing only after resume. The fixed thresholds do not provide per-track automatic gain.
 - Progressive 4:2:0 video is supported through 720x480 and decodes I, P and B
   pictures. v0.9.0 also supports 720x480-at-30000/1001

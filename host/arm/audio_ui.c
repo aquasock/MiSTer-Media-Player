@@ -42,9 +42,12 @@ struct audio_ui {
     unsigned rate_hz;
     uint64_t position_pcm_frames;
     uint64_t length_pcm_frames;
+    uint64_t playlist_track_start_pcm_frames;
+    uint64_t playlist_track_length_pcm_frames;
     uint64_t frame_start_pcm;
     unsigned playlist_count;
     unsigned playlist_selected;
+    int playlist_timing_set;
     int service_started;
     enum audio_ui_state state;
 };
@@ -214,7 +217,8 @@ static uint64_t projected_position(const struct audio_ui *ui,
            (remaining < ui->rate_hz ? remaining : ui->rate_hz);
 }
 
-static unsigned progress_width(const struct audio_ui *ui)
+static unsigned progress_width(uint64_t position_pcm_frames,
+                               uint64_t length_pcm_frames)
 {
     const unsigned width = 652u;
     uint64_t quotient;
@@ -222,9 +226,9 @@ static unsigned progress_width(const struct audio_ui *ui)
     unsigned low = 0;
     unsigned high = width;
 
-    if (!ui->length_pcm_frames)
+    if (!length_pcm_frames)
         return 0;
-    if (ui->position_pcm_frames >= ui->length_pcm_frames)
+    if (position_pcm_frames >= length_pcm_frames)
         return width;
 
     /*
@@ -232,14 +236,14 @@ static unsigned progress_width(const struct audio_ui *ui)
      * 64-bit PCM-frame value.  ceil(length * pixel / width) is decomposed
      * before multiplication; pixel never exceeds width.
      */
-    quotient = ui->length_pcm_frames / width;
-    remainder = ui->length_pcm_frames % width;
+    quotient = length_pcm_frames / width;
+    remainder = length_pcm_frames % width;
     while (low < high) {
         unsigned pixel = (low + high + 1u) / 2u;
         uint64_t threshold = quotient * pixel +
             (remainder * pixel + width - 1u) / width;
 
-        if (ui->position_pcm_frames >= threshold)
+        if (position_pcm_frames >= threshold)
             low = pixel;
         else
             high = pixel - 1u;
@@ -271,20 +275,37 @@ static void render_frame(struct audio_ui *ui)
     char elapsed[32];
     char total[32];
     char remaining[32];
+    char playlist[32];
     char elapsed_timing[64];
     char total_timing[64];
     char remaining_timing[64];
-    unsigned filled_width = progress_width(ui);
+    uint64_t display_position = ui->position_pcm_frames;
+    uint64_t display_length = ui->length_pcm_frames;
+    unsigned filled_width;
     unsigned row;
-    uint64_t elapsed_seconds = ui->rate_hz ?
-        ui->position_pcm_frames / ui->rate_hz : 0;
-    uint64_t remaining_frames =
-        ui->length_pcm_frames > ui->position_pcm_frames ?
-        ui->length_pcm_frames - ui->position_pcm_frames : 0;
+    uint64_t elapsed_seconds;
+    uint64_t remaining_frames;
+
+    if (ui->playlist_timing_set) {
+        display_length = ui->playlist_track_length_pcm_frames;
+        if (ui->position_pcm_frames <=
+            ui->playlist_track_start_pcm_frames) {
+            display_position = 0;
+        } else {
+            display_position = ui->position_pcm_frames -
+                               ui->playlist_track_start_pcm_frames;
+            if (display_position > display_length)
+                display_position = display_length;
+        }
+    }
+    filled_width = progress_width(display_position, display_length);
+    elapsed_seconds = ui->rate_hz ? display_position / ui->rate_hz : 0;
+    remaining_frames = display_length > display_position ?
+                       display_length - display_position : 0;
 
     format_time(elapsed, sizeof(elapsed), elapsed_seconds);
     format_time(total, sizeof(total),
-                rounded_up_seconds(ui->length_pcm_frames, ui->rate_hz));
+                rounded_up_seconds(display_length, ui->rate_hz));
     format_time(remaining, sizeof(remaining),
                 rounded_up_seconds(remaining_frames, ui->rate_hz));
     (void)snprintf(elapsed_timing, sizeof(elapsed_timing),
@@ -293,6 +314,10 @@ static void render_frame(struct audio_ui *ui)
                    "TRACK %s", total);
     (void)snprintf(remaining_timing, sizeof(remaining_timing),
                    "REMAIN %s", remaining);
+    if (ui->playlist_timing_set) {
+        format_time(playlist, sizeof(playlist),
+                    rounded_up_seconds(ui->length_pcm_frames, ui->rate_hz));
+    }
 
     /* Full 4:3 composition, inset for consumer-CRT overscan. */
     fill_rect(ui, 0, 0, AUDIO_UI_WIDTH, AUDIO_UI_HEIGHT,
@@ -384,12 +409,20 @@ static void render_frame(struct audio_ui *ui)
                 UI_ACCENT_Y, UI_ACCENT_CB, UI_ACCENT_CR);
     draw_centered_text(ui, 440, 378, 94, "NEXT", 1, UI_TEXT_Y);
 
-    draw_text(ui, 576, 378, "PLAYLIST --:--", 1, UI_MUTED_Y);
+    if (ui->playlist_timing_set) {
+        char playlist_timing[64];
+
+        (void)snprintf(playlist_timing, sizeof(playlist_timing),
+                       "PLAYLIST %s", playlist);
+        draw_text(ui, 576, 378, playlist_timing, 1, UI_MUTED_Y);
+    } else {
+        draw_text(ui, 576, 378, "PLAYLIST --:--", 1, UI_MUTED_Y);
+    }
     draw_centered_text(ui, 32, 412, 218, elapsed_timing, 1, UI_TEXT_Y);
     draw_centered_text(ui, 250, 412, 220, total_timing, 1, UI_TEXT_Y);
     draw_centered_text(ui, 470, 412, 218, remaining_timing, 1, UI_TEXT_Y);
 
-    /* Absolute decoder-frame position scaled across the track duration. */
+    /* Decoder-frame position scaled across the displayed track duration. */
     fill_rect(ui, 32, 438, 656, 14, UI_TRACK_Y, UI_CB, UI_CR);
     if (filled_width)
         fill_rect(ui, 34, 441, filled_width, 8,
@@ -430,7 +463,11 @@ int audio_ui_set_track_length(struct audio_ui *ui,
 {
     if (!ui || !length_pcm_frames ||
         (rate_hz != 44100u && rate_hz != 48000u) ||
-        (ui->rate_hz && ui->rate_hz != rate_hz))
+        (ui->rate_hz && ui->rate_hz != rate_hz) ||
+        (ui->playlist_timing_set &&
+         (ui->playlist_track_start_pcm_frames > length_pcm_frames ||
+          ui->playlist_track_length_pcm_frames >
+              length_pcm_frames - ui->playlist_track_start_pcm_frames)))
         return -1;
     ui->rate_hz = rate_hz;
     ui->length_pcm_frames = length_pcm_frames;
@@ -463,24 +500,37 @@ int audio_ui_set_playlist(struct audio_ui *ui,
         ui->playlist_tracks[index] = (uint8_t)track_numbers[index];
     ui->playlist_count = track_count;
     ui->playlist_selected = selected;
+    ui->playlist_timing_set = 0;
     if (ui->state == AUDIO_UI_BEGIN)
         render_frame(ui);
     return 0;
 }
 
 int audio_ui_set_current_track(struct audio_ui *ui,
-                               unsigned current_track)
+                               unsigned current_track,
+                               uint64_t track_start_pcm_frames,
+                               uint64_t track_length_pcm_frames)
 {
     unsigned index;
 
-    if (!ui || !ui->playlist_count)
+    if (!ui || !ui->playlist_count || !track_length_pcm_frames ||
+        track_start_pcm_frames > UINT64_MAX - track_length_pcm_frames ||
+        (ui->length_pcm_frames &&
+         (track_start_pcm_frames > ui->length_pcm_frames ||
+          track_length_pcm_frames >
+              ui->length_pcm_frames - track_start_pcm_frames)))
         return -1;
     for (index = 0; index < ui->playlist_count; ++index) {
         if (ui->playlist_tracks[index] != current_track)
             continue;
-        if (ui->playlist_selected == index)
+        if (ui->playlist_selected == index && ui->playlist_timing_set &&
+            ui->playlist_track_start_pcm_frames == track_start_pcm_frames &&
+            ui->playlist_track_length_pcm_frames == track_length_pcm_frames)
             return 0;
         ui->playlist_selected = index;
+        ui->playlist_track_start_pcm_frames = track_start_pcm_frames;
+        ui->playlist_track_length_pcm_frames = track_length_pcm_frames;
+        ui->playlist_timing_set = 1;
         if (ui->state == AUDIO_UI_BEGIN)
             render_frame(ui);
         return 0;

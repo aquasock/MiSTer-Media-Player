@@ -158,7 +158,11 @@ mounted byte-stream file. It opens the absolute optical-device path with
 `O_NONBLOCK`, inventories track and lead-out LBAs with the Linux CD-ROM TOC
 controls, drops data-track spans, and concatenates the remaining audio spans
 into one sample-frame timeline. The same filtered inventory supplies physical
-track numbers to the audio UI. Its six-row window selects the current track,
+track numbers and each current track's logical start and length to the audio UI.
+Transport and seeks remain on the concatenated timeline; the renderer subtracts
+the active track start for its elapsed, remaining, total and progress fields,
+and uses the full filtered length only for the playlist-duration clock. Its
+six-row window selects the current track,
 targets the fourth row when there is room on both sides, clamps at either list
 boundary and refreshes after natural playback crossings or existing clean
 reposition barriers. Bounded `CDROMREADAUDIO` requests fetch up to eight
@@ -293,9 +297,12 @@ not parse tags, artwork or file playlists. Audio CD playback separately gives
 it the filtered TOC track numbers and active physical track, which it renders as
 `TRACK 01`-style rows at the existing scale. Once miniaudio or CDDA has
 established the exact output-frame length, a one-time consumer callback
-configures that length in the renderer. The bar and elapsed/remaining counters
-use the absolute output-frame position, project it to the next one-hertz
-publication and rescale together after every fixed seek. Elapsed, total track
+configures that length in the renderer. Ordinary file playback scales the bar
+and elapsed/remaining counters against the absolute output-frame position.
+Audio CD retains that absolute position for transport but atomically updates a
+per-track display window at natural and requested track boundaries. Both modes
+project to the next one-hertz publication and rescale after every fixed seek.
+Elapsed, total track
 and remaining time occupy three independently centered fields on the same
 baseline. Elapsed time truncates completed seconds; the fixed total and changing
 remaining time round a partial second up. At successful track completion the helper

@@ -18,8 +18,10 @@ struct capture {
     unsigned expected_elapsed[3];
     unsigned expected_total[3];
     unsigned expected_remaining[3];
+    unsigned expected_playlist[3];
     int check_layout_enabled;
     int check_time_enabled;
+    int check_playlist_time_enabled;
     int failed;
     int layout_failed;
 };
@@ -64,8 +66,9 @@ static const uint8_t *time_glyph_rows(char character)
     return character == ':' ? colon : NULL;
 }
 
-static int check_time_value(const uint8_t *frame, unsigned x, unsigned y,
-                            unsigned seconds)
+static int check_time_value_luma(const uint8_t *frame, unsigned x, unsigned y,
+                                 unsigned seconds, uint8_t foreground,
+                                 uint8_t background)
 {
     char text[32];
     unsigned index;
@@ -83,7 +86,7 @@ static int check_time_value(const uint8_t *frame, unsigned x, unsigned y,
 
             for (column = 0; column < 5u; ++column) {
                 uint8_t expected = rows[row] & (1u << (4u - column)) ?
-                                   220u : 16u;
+                                   foreground : background;
 
                 if (frame_y(frame, x + index * 6u + column,
                             y + row) != expected)
@@ -92,6 +95,12 @@ static int check_time_value(const uint8_t *frame, unsigned x, unsigned y,
         }
     }
     return 0;
+}
+
+static int check_time_value(const uint8_t *frame, unsigned x, unsigned y,
+                            unsigned seconds)
+{
+    return check_time_value_luma(frame, x, y, seconds, 220u, 16u);
 }
 
 static unsigned centered_time_x(unsigned region_x, unsigned region_width,
@@ -134,24 +143,42 @@ static void check_layout(struct capture *capture)
     if (progress <= 652u)
         failed |= frame_y(frame, 34u + progress, 444) != 42u;
     if (capture->check_time_enabled) {
-        failed |= check_time_value(
+        int elapsed_failed = check_time_value(
             frame,
             centered_time_x(32u, 218u, "ELAPSED",
                             capture->expected_elapsed[capture->commits]),
             412u,
             capture->expected_elapsed[capture->commits]);
-        failed |= check_time_value(
+        int total_failed = check_time_value(
             frame,
             centered_time_x(250u, 220u, "TRACK",
                             capture->expected_total[capture->commits]),
             412u,
             capture->expected_total[capture->commits]);
-        failed |= check_time_value(
+        int remaining_failed = check_time_value(
             frame,
             centered_time_x(470u, 218u, "REMAIN",
                             capture->expected_remaining[capture->commits]),
             412u,
             capture->expected_remaining[capture->commits]);
+
+        failed |= elapsed_failed | total_failed | remaining_failed;
+        if (capture->check_playlist_time_enabled &&
+            (elapsed_failed || total_failed || remaining_failed)) {
+            fprintf(stderr,
+                    "audio UI playlist clock check elapsed=%d total=%d "
+                    "remaining=%d\n",
+                    elapsed_failed, total_failed, remaining_failed);
+        }
+    }
+    if (capture->check_playlist_time_enabled) {
+        int playlist_failed = check_time_value_luma(
+            frame, 630u, 378u,
+            capture->expected_playlist[capture->commits], 116u, 16u);
+
+        failed |= playlist_failed;
+        if (playlist_failed)
+            fputs("audio UI playlist duration check failed\n", stderr);
     }
     capture->layout_checks++;
     capture->layout_failed |= failed;
@@ -478,7 +505,7 @@ static int run_playlist_window(void)
     failed |= !overlay_digit_matches(plane, 366u, 214u, '0', 3u);
     failed |= !overlay_digit_matches(plane, 378u, 214u, '9', 3u);
 
-    if (audio_ui_set_current_track(ui, 1u) < 0 ||
+    if (audio_ui_set_current_track(ui, 1u, 0u, 10u * 44100u) < 0 ||
         audio_ui_render_overlay(ui, 0, plane, AUDIO_UI_OVERLAY_BYTES) < 0)
         failed = 1;
     failed |= !overlay_digit_matches(plane, 366u, 88u, '0', 3u);
@@ -486,7 +513,8 @@ static int run_playlist_window(void)
     failed |= !overlay_digit_matches(plane, 366u, 130u, '0', 2u);
     failed |= !overlay_digit_matches(plane, 378u, 130u, '3', 2u);
 
-    if (audio_ui_set_current_track(ui, 18u) < 0 ||
+    if (audio_ui_set_current_track(ui, 18u, 90u * 44100u,
+                                   10u * 44100u) < 0 ||
         audio_ui_render_overlay(ui, 0, plane, AUDIO_UI_OVERLAY_BYTES) < 0)
         failed = 1;
     failed |= !overlay_digit_matches(plane, 366u, 88u, '0', 2u);
@@ -494,7 +522,8 @@ static int run_playlist_window(void)
     failed |= !overlay_digit_matches(plane, 366u, 298u, '1', 3u);
     failed |= !overlay_digit_matches(plane, 378u, 298u, '8', 3u);
 
-    failed |= audio_ui_set_current_track(ui, 2u) == 0;
+    failed |= audio_ui_set_current_track(ui, 2u, 0u, 44100u) == 0;
+    failed |= audio_ui_set_current_track(ui, 1u, UINT64_MAX, 2u) == 0;
     failed |= audio_ui_set_playlist(ui, invalid_tracks, 3u, 1u) == 0;
     free(plane);
     audio_ui_destroy(ui);
@@ -503,6 +532,57 @@ static int run_playlist_window(void)
         return 1;
     }
     puts("audio UI playlist PASS labels=physical selection=live window=6");
+    return 0;
+}
+
+static int run_playlist_timing(void)
+{
+    static const unsigned tracks[] = {1u, 2u, 3u};
+    const uint64_t rate = 44100u;
+    struct audio_ui *ui = NULL;
+    struct capture capture = {
+        .expected_progress = {224u, 0u, 0u},
+        .expected_elapsed = {21u, 0u, 0u},
+        .expected_total = {62u, 0u, 0u},
+        .expected_remaining = {41u, 0u, 0u},
+        .expected_playlist = {302u, 0u, 0u},
+        .check_layout_enabled = 1,
+        .check_time_enabled = 1,
+        .check_playlist_time_enabled = 1
+    };
+    uint64_t emitted = 0;
+
+    if (audio_ui_create(&ui) < 0 ||
+        audio_ui_set_track_length(ui, 301u * rate + 1u,
+                                  (unsigned)rate) < 0 ||
+        audio_ui_set_playlist(ui, tracks, 3u, 1u) < 0 ||
+        audio_ui_set_current_track(ui, 1u, 100u * rate,
+                                   61u * rate + 1u) < 0 ||
+        audio_ui_seek(ui, 0, (unsigned)rate, 120u * rate) < 0) {
+        audio_ui_destroy(ui);
+        return 1;
+    }
+    while (!capture.commits) {
+        emitted += 16u;
+        if (audio_ui_service(ui, emitted, (unsigned)rate,
+                             capture_record, &capture) < 0) {
+            audio_ui_destroy(ui);
+            return 1;
+        }
+    }
+    if (capture.failed || capture.layout_failed ||
+        capture.layout_checks != 1u || capture.commits != 1u) {
+        fprintf(stderr,
+                "audio UI playlist timing mismatch commits=%u "
+                "layout=%u/%d\n",
+                capture.commits, capture.layout_checks,
+                capture.layout_failed);
+        audio_ui_destroy(ui);
+        return 1;
+    }
+    puts("audio UI playlist timing PASS elapsed=00:21 remain=00:41 "
+         "track=01:02 playlist=05:02 progress=224/652");
+    audio_ui_destroy(ui);
     return 0;
 }
 
@@ -555,6 +635,8 @@ int main(int argc, char **argv)
     if (run_overlay_quantization() != 0)
         return 1;
     if (run_playlist_window() != 0)
+        return 1;
+    if (run_playlist_timing() != 0)
         return 1;
     return 0;
 }
