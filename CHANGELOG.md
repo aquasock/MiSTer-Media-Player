@@ -8,6 +8,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Filled the Audio CD metadata panel from the existing TOC selection: title now
+  mirrors the active `TRACK nn` playlist row, artist and album retain `---`, and
+  all three colons align. Audio CDs also receive a built-in aspect-corrected
+  disc image in the artwork viewport without adding an external asset.
 - Changed Audio CD timing from the concatenated-disc clock to the active track:
   elapsed, remaining, track total and the progress bar now follow the selected
   TOC span, while the playlist clock reports the total duration of all audio

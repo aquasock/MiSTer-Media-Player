@@ -76,6 +76,9 @@ playback replaces it.
    count down to its end, `TRACK` to show its total duration, and `PLAYLIST` to
    show the combined duration of all audio tracks. The progress bar must also
    restart for the active track.
+   Require `TITLE` to match that selected `TRACK nn` label, `ARTIST` and
+   `ALBUM` to remain `---`, and all three colons to align vertically. The album
+   art box must show the default disc image with no pixels outside its border.
 2. Test a mixed-mode disc where available. Data tracks must be skipped and must
    never be emitted as noise.
 3. Press P/N or player-one Left/Right to move between audio tracks. Previous
@@ -85,6 +88,7 @@ playback replaces it.
    existing key behavior. On a disc with more than six tracks, require the list
    to scroll and keep the playing track on the fourth visible row except near
    the beginning or end, where the window must stop at the list boundary.
+   Require the title field to follow the same selection at every boundary.
 4. Exercise the fixed-time keyboard seeks, then let the overlay clear and press
    Space once. Require the player UI to reappear before audio and visualizer
    stop, with the selected row matching the current track even if the interface

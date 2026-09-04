@@ -293,9 +293,13 @@ its 224-by-200-raster-pixel artwork box is physically square at the mode's 8:9
 pixel aspect, and every album, metadata, playlist, transport, time and progress
 placeholder remains inside a 32-pixel horizontal and approximately 24-pixel
 vertical CRT-safe margin. A fixed bitmap font is part of the renderer; it does
-not parse tags, artwork or file playlists. Audio CD playback separately gives
-it the filtered TOC track numbers and active physical track, which it renders as
-`TRACK 01`-style rows at the existing scale. Once miniaudio or CDDA has
+not parse tags, external artwork or file playlists. Audio CD playback separately
+gives it the filtered TOC track numbers and active physical track, which it
+renders as `TRACK 01`-style playlist and title values at the existing scale.
+The three metadata labels use one fixed colon column, artist and album remain
+`---`, and a bounded helper-rendered elliptical disc fills the existing artwork
+viewport with horizontal compensation for the mode's 8:9 pixel aspect. Once
+miniaudio or CDDA has
 established the exact output-frame length, a one-time consumer callback
 configures that length in the renderer. Ordinary file playback scales the bar
 and elapsed/remaining counters against the absolute output-frame position.

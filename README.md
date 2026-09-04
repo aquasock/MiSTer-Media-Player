@@ -169,6 +169,9 @@ playing entry on the fourth of six visible rows when both list boundaries allow.
 Elapsed, remaining, track-total and progress values follow the active track;
 the playlist time is the combined duration of every audio track retained from
 the TOC. Partial final seconds round up for duration and remaining displays.
+The title mirrors the selected `TRACK nn` row, the artist and album values stay
+at `---`, their label colons align, and the artwork viewport shows a built-in
+default Audio CD image.
 No filesystem mount or extracted audio files are required. Audio CD image files
 are not currently supported.
 
@@ -379,14 +382,15 @@ fields and a full-width progress bar inside 4:3 CRT-safe margins. The decoder's
 exact output-frame length scales the bar against the current absolute PCM-frame
 position, including after a fixed seek. For Audio CD that position is projected
 inside the active TOC track for these three clocks and the progress bar, while
-the playlist field shows the complete filtered audio-program duration. Elapsed,
-total track and remaining time
-occupy three independently centered fields on one baseline. Elapsed time uses
+the playlist field shows the complete filtered audio-program duration. Its title
+also mirrors the active TOC track, with aligned metadata labels and built-in
+default disc art. Elapsed, total track and remaining time occupy three
+independently centered fields on one baseline. Elapsed time uses
 the absolute completed seconds; total and remaining time round up partial final
 seconds, and remaining reaches `00:00` only on the exact completed frame. Clean
 helper EOF retains that final interface instead of replacing it with black,
-then the next Play input restarts the file from the beginning. Artwork, tags,
-playlist entries, playlist/track summary fields and arbitrary-position
+then the next Play input restarts the file from the beginning. External artwork,
+parsed tags, ordinary-file playlist entries and summary, and arbitrary-position
 scrubbing remain later boundaries.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`host/arm/ARCHITECTURE.md`](host/arm/ARCHITECTURE.md) for design details.

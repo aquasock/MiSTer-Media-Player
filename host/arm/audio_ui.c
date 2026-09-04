@@ -90,6 +90,41 @@ static void border_rect(struct audio_ui *ui, unsigned x, unsigned y,
     fill_rect(ui, x + width - thickness, y, thickness, height, luma, cb, cr);
 }
 
+static void fill_ellipse(struct audio_ui *ui, unsigned center_x,
+                         unsigned center_y, unsigned radius_x,
+                         unsigned radius_y, uint8_t luma,
+                         uint8_t cb, uint8_t cr)
+{
+    uint64_t radius_x_squared;
+    uint64_t radius_y_squared;
+    uint64_t limit;
+    int row;
+
+    if (!radius_x || !radius_y || center_x < radius_x ||
+        center_y < radius_y)
+        return;
+    radius_x_squared = (uint64_t)radius_x * radius_x;
+    radius_y_squared = (uint64_t)radius_y * radius_y;
+    limit = radius_x_squared * radius_y_squared;
+    for (row = -(int)radius_y; row <= (int)radius_y; ++row) {
+        uint64_t row_squared = (uint64_t)(row * row);
+        unsigned half_width = 0;
+
+        while (half_width < radius_x) {
+            uint64_t candidate = (uint64_t)(half_width + 1u) *
+                                 (half_width + 1u);
+
+            if (candidate * radius_y_squared +
+                row_squared * radius_x_squared > limit)
+                break;
+            ++half_width;
+        }
+        fill_rect(ui, center_x - half_width,
+                  (unsigned)((int)center_y + row),
+                  half_width * 2u + 1u, 1u, luma, cb, cr);
+    }
+}
+
 struct audio_ui_glyph {
     char character;
     uint8_t rows[7];
@@ -190,6 +225,35 @@ static void draw_centered_text(struct audio_ui *ui, unsigned x, unsigned y,
               y, text, scale, luma);
 }
 
+static void draw_metadata_row(struct audio_ui *ui, unsigned y,
+                              const char *label, const char *value)
+{
+    const unsigned colon_x = 130u;
+    const unsigned value_x = 154u;
+    unsigned label_width = text_width(label, 2u);
+    unsigned label_x = colon_x > label_width + 6u ?
+                       colon_x - label_width - 6u : 0u;
+
+    draw_text(ui, label_x, y, label, 2, UI_TEXT_Y);
+    draw_text(ui, colon_x, y, ":", 2, UI_TEXT_Y);
+    draw_text(ui, value_x, y, value, 2, UI_TEXT_Y);
+}
+
+static void draw_audio_cd_art(struct audio_ui *ui)
+{
+    /* Compensate the 8:9 NTSC pixel aspect so the disc appears circular. */
+    fill_rect(ui, 50, 68, 188, 134, UI_PANEL_ALT_Y, UI_CB, UI_CR);
+    fill_ellipse(ui, 144, 127, 54, 48,
+                 UI_TEXT_Y, UI_CB, UI_CR);
+    fill_ellipse(ui, 144, 127, 51, 45,
+                 UI_MUTED_Y, UI_CB, UI_CR);
+    fill_ellipse(ui, 144, 127, 18, 16,
+                 UI_ACCENT_Y, UI_ACCENT_CB, UI_ACCENT_CR);
+    fill_ellipse(ui, 144, 127, 6, 5,
+                 UI_PANEL_ALT_Y, UI_CB, UI_CR);
+    draw_centered_text(ui, 48, 184, 192, "AUDIO CD", 1, UI_TEXT_Y);
+}
+
 static void draw_play(struct audio_ui *ui, unsigned x, unsigned y,
                       unsigned size, uint8_t luma, uint8_t cb, uint8_t cr)
 {
@@ -279,6 +343,7 @@ static void render_frame(struct audio_ui *ui)
     char elapsed_timing[64];
     char total_timing[64];
     char remaining_timing[64];
+    char title[24] = "---";
     uint64_t display_position = ui->position_pcm_frames;
     uint64_t display_length = ui->length_pcm_frames;
     unsigned filled_width;
@@ -318,6 +383,10 @@ static void render_frame(struct audio_ui *ui)
         format_time(playlist, sizeof(playlist),
                     rounded_up_seconds(ui->length_pcm_frames, ui->rate_hz));
     }
+    if (ui->playlist_count) {
+        (void)snprintf(title, sizeof(title), "TRACK %02u",
+                       (unsigned)ui->playlist_tracks[ui->playlist_selected]);
+    }
 
     /* Full 4:3 composition, inset for consumer-CRT overscan. */
     fill_rect(ui, 0, 0, AUDIO_UI_WIDTH, AUDIO_UI_HEIGHT,
@@ -331,14 +400,17 @@ static void render_frame(struct audio_ui *ui)
     draw_centered_text(ui, 32, 40, 224, "ALBUM ART", 2, UI_TEXT_Y);
     border_rect(ui, 48, 66, 192, 138, 2,
                 UI_MUTED_Y, UI_CB, UI_CR);
-    draw_centered_text(ui, 48, 124, 192, "ARTWORK", 2, UI_MUTED_Y);
+    if (ui->playlist_count)
+        draw_audio_cd_art(ui);
+    else
+        draw_centered_text(ui, 48, 124, 192, "ARTWORK", 2, UI_MUTED_Y);
 
     fill_rect(ui, 32, 236, 224, 116, UI_PANEL_Y, UI_CB, UI_CR);
     border_rect(ui, 32, 236, 224, 116, 2,
                 UI_ACCENT_Y, UI_ACCENT_CB, UI_ACCENT_CR);
-    draw_text(ui, 46, 250, "TITLE: ---", 2, UI_TEXT_Y);
-    draw_text(ui, 46, 280, "ARTIST: ---", 2, UI_TEXT_Y);
-    draw_text(ui, 46, 310, "ALBUM: ---", 2, UI_TEXT_Y);
+    draw_metadata_row(ui, 250, "TITLE", title);
+    draw_metadata_row(ui, 280, "ARTIST", "---");
+    draw_metadata_row(ui, 310, "ALBUM", "---");
 
     /* Right column: six visible playlist rows at the established text scale. */
     fill_rect(ui, 272, 24, 416, 328, UI_PANEL_Y, UI_CB, UI_CR);

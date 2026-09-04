@@ -60,10 +60,13 @@ static const uint8_t *time_glyph_rows(char character)
         {14, 17, 17, 15, 1, 1, 14}
     };
     static const uint8_t colon[7] = {0, 4, 4, 0, 4, 4, 0};
+    static const uint8_t dash[7] = {0, 0, 0, 31, 0, 0, 0};
 
     if (character >= '0' && character <= '9')
         return digits[(unsigned)(character - '0')];
-    return character == ':' ? colon : NULL;
+    if (character == ':')
+        return colon;
+    return character == '-' ? dash : NULL;
 }
 
 static int check_time_value_luma(const uint8_t *frame, unsigned x, unsigned y,
@@ -449,10 +452,10 @@ static unsigned overlay_pixel(const uint8_t *plane, unsigned x, unsigned y)
     return (plane[pixel >> 2] >> (6u - (pixel & 3u) * 2u)) & 3u;
 }
 
-static int overlay_digit_matches(const uint8_t *plane, unsigned x, unsigned y,
-                                 char digit, unsigned foreground)
+static int overlay_glyph_matches(const uint8_t *plane, unsigned x, unsigned y,
+                                 char character, unsigned foreground)
 {
-    const uint8_t *rows = time_glyph_rows(digit);
+    const uint8_t *rows = time_glyph_rows(character);
     unsigned row;
 
     if (!rows)
@@ -500,27 +503,43 @@ static int run_playlist_window(void)
     }
 
     /* Track 09 is row three, with Track 04 at the top of the window. */
-    failed |= !overlay_digit_matches(plane, 366u, 88u, '0', 2u);
-    failed |= !overlay_digit_matches(plane, 378u, 88u, '4', 2u);
-    failed |= !overlay_digit_matches(plane, 366u, 214u, '0', 3u);
-    failed |= !overlay_digit_matches(plane, 378u, 214u, '9', 3u);
+    failed |= !overlay_glyph_matches(plane, 366u, 88u, '0', 2u);
+    failed |= !overlay_glyph_matches(plane, 378u, 88u, '4', 2u);
+    failed |= !overlay_glyph_matches(plane, 366u, 214u, '0', 3u);
+    failed |= !overlay_glyph_matches(plane, 378u, 214u, '9', 3u);
+    failed |= !overlay_glyph_matches(plane, 226u, 250u, '0', 3u);
+    failed |= !overlay_glyph_matches(plane, 238u, 250u, '9', 3u);
+    failed |= !overlay_glyph_matches(plane, 130u, 250u, ':', 3u);
+    failed |= !overlay_glyph_matches(plane, 130u, 280u, ':', 3u);
+    failed |= !overlay_glyph_matches(plane, 130u, 310u, ':', 3u);
+    failed |= !overlay_glyph_matches(plane, 154u, 280u, '-', 3u);
+    failed |= !overlay_glyph_matches(plane, 154u, 310u, '-', 3u);
+    failed |= overlay_pixel(plane, 144u, 80u) != 3u;
+    failed |= overlay_pixel(plane, 144u, 90u) != 2u;
+    failed |= overlay_pixel(plane, 144u, 127u) != 1u;
+    failed |= overlay_pixel(plane, 49u, 100u) != 2u;
+    failed |= overlay_pixel(plane, 50u, 70u) != 1u;
 
     if (audio_ui_set_current_track(ui, 1u, 0u, 10u * 44100u) < 0 ||
         audio_ui_render_overlay(ui, 0, plane, AUDIO_UI_OVERLAY_BYTES) < 0)
         failed = 1;
-    failed |= !overlay_digit_matches(plane, 366u, 88u, '0', 3u);
-    failed |= !overlay_digit_matches(plane, 378u, 88u, '1', 3u);
-    failed |= !overlay_digit_matches(plane, 366u, 130u, '0', 2u);
-    failed |= !overlay_digit_matches(plane, 378u, 130u, '3', 2u);
+    failed |= !overlay_glyph_matches(plane, 366u, 88u, '0', 3u);
+    failed |= !overlay_glyph_matches(plane, 378u, 88u, '1', 3u);
+    failed |= !overlay_glyph_matches(plane, 366u, 130u, '0', 2u);
+    failed |= !overlay_glyph_matches(plane, 378u, 130u, '3', 2u);
+    failed |= !overlay_glyph_matches(plane, 226u, 250u, '0', 3u);
+    failed |= !overlay_glyph_matches(plane, 238u, 250u, '1', 3u);
 
     if (audio_ui_set_current_track(ui, 18u, 90u * 44100u,
                                    10u * 44100u) < 0 ||
         audio_ui_render_overlay(ui, 0, plane, AUDIO_UI_OVERLAY_BYTES) < 0)
         failed = 1;
-    failed |= !overlay_digit_matches(plane, 366u, 88u, '0', 2u);
-    failed |= !overlay_digit_matches(plane, 378u, 88u, '7', 2u);
-    failed |= !overlay_digit_matches(plane, 366u, 298u, '1', 3u);
-    failed |= !overlay_digit_matches(plane, 378u, 298u, '8', 3u);
+    failed |= !overlay_glyph_matches(plane, 366u, 88u, '0', 2u);
+    failed |= !overlay_glyph_matches(plane, 378u, 88u, '7', 2u);
+    failed |= !overlay_glyph_matches(plane, 366u, 298u, '1', 3u);
+    failed |= !overlay_glyph_matches(plane, 378u, 298u, '8', 3u);
+    failed |= !overlay_glyph_matches(plane, 226u, 250u, '1', 3u);
+    failed |= !overlay_glyph_matches(plane, 238u, 250u, '8', 3u);
 
     failed |= audio_ui_set_current_track(ui, 2u, 0u, 44100u) == 0;
     failed |= audio_ui_set_current_track(ui, 1u, UINT64_MAX, 2u) == 0;
@@ -531,7 +550,8 @@ static int run_playlist_window(void)
         fputs("audio UI playlist window mismatch\n", stderr);
         return 1;
     }
-    puts("audio UI playlist PASS labels=physical selection=live window=6");
+    puts("audio UI playlist PASS labels=physical title=mirrored "
+         "metadata=aligned art=default window=6");
     return 0;
 }
 
@@ -603,7 +623,9 @@ static int run_overlay_quantization(void)
     failed = overlay_pixel(plane, 0, 0) != 0u ||
              overlay_pixel(plane, 36, 28) != 1u ||
              overlay_pixel(plane, 32, 24) != 2u ||
-             overlay_pixel(plane, 93, 40) != 3u;
+             overlay_pixel(plane, 93, 40) != 3u ||
+             !overlay_glyph_matches(plane, 154u, 250u, '-', 3u) ||
+             overlay_pixel(plane, 60u, 80u) != 1u;
     free(plane);
     audio_ui_destroy(ui);
     if (failed) {
