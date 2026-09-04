@@ -1,4 +1,4 @@
-## 967 COMMIT Unreleased ??? 2026-09-04T03:25:13-07:00
+## 967 COMMIT Unreleased 04360e9 2026-09-04T03:25:13-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Populate the Audio CD playlist with the disc track sequence and keep the playing
 
 #### Outcome:
 
-The user requests that a commercial Red Book Audio CD use the existing player interface's playlist rather than its static placeholder rows, with the currently playing track visibly selected while existing previous, next and pause controls retain their behavior.  Red Book TOC data guarantees physical track numbers and boundaries but not human-readable titles, so this cycle will display stable `TRACK 01`-style names from the drive's filtered audio-track inventory and preserve physical numbering on mixed-mode discs; CD-Text or network metadata lookup remains a separate optional enhancement.  The change is scoped to the ARM helper and its tests and documentation, with no Main, protocol, visualizer-pack, RTL or RBF change.
+The test MiSTer reports `/dev/cdrom` linked to `/dev/sr0` and a drive with Audio CD playback support; its existing source-`e0f6f9a` helper was actively consuming the inserted disc, so no competing live-drive process was started.  Final source `04360e9` exposes ordered physical audio-track numbers from the already filtered Red Book TOC and configures the audio UI with stable `TRACK 01`-style rows.  The six-row window selects the playing entry, targets the fourth visible row when both sides permit, clamps cleanly at the first and last tracks, preserves gaps when mixed-mode data tracks are excluded, and follows natural playback, fixed seeks and existing previous or next track changes without altering controls.  Before an Audio CD pause barrier, the current overlay is republished so revealing a UI that timed out on an earlier track cannot show a stale selector.  Strict optimized pixel and reader tests cover middle, beginning and end windows plus mixed-number numbering and invalid inputs; AddressSanitizer and UndefinedBehaviorSanitizer pass with leak detection disabled because LeakSanitizer is unavailable under the local ptrace wrapper, GCC analyzer passes, the complete native helper compiles with the established host-only `-Wno-attributes` exception, static Main routing and NTSC checks pass, and real-helper idle plus MP3, WAV, FLAC and Ogg visualizer, seek and pause integrations remain clean.  GNU 10.2.1 produced the 974,244-byte static stripped ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `cb06ef1bd73e12f47741c723ad88aaa2485f1df48be9ff2ccbad06a11382661a`; Main, protocol, visualizer pack, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Inspect the inserted disc on the test MiSTer for available TOC and CD-Text evidence, expose the helper reader's ordered physical track numbers to the UI, render up to six playlist rows at the existing text scale with the active row selected and centered when list boundaries allow, and update selection on natural boundaries plus existing seeks and track skips.  Add focused reader and pixel-output regressions for ordinary, mixed-numbered and edge-position playlists, run the strict native and sanitizer suites plus CDDA and audio integrations, build one static stripped ARMv7 helper locally, and provide that file for hardware validation without rebuilding Main or the RBF.
+Exit the MediaPlayer core, replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`04360e9` artifact and preserve executable mode, then re-enter the core and load the inserted Audio CD.  Require every TOC entry to appear as `TRACK nn`, the playing row to move on P/N or player-one Left/Right and on a natural track boundary, and a disc with more than six tracks to keep middle selections on the fourth row while clamping the window near either end.  After the overlay has timed out on a later track, press Space once and require the refreshed UI to identify that current track before audio and visualizer hold, then resume and spot-check fixed seeks, ordinary audio playback and Video DVD startup before marking this source hardware-passed.
 
 #### Files Modified:
 
@@ -33,7 +33,7 @@ Inspect the inserted disc on the test MiSTer for available TOC and CD-Text evide
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
