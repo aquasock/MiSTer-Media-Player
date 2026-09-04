@@ -1,3 +1,32 @@
+## 958 COMMIT Unreleased d34c292 2026-09-03T21:59:59-07:00
+
+#### Coming From:
+
+Unreleased d34c292
+
+#### Purpose:
+
+Package the source-`d34c292` native NTSC output boundary for controlled HDMI, HDMI-to-SDI and analog forum testing.
+
+#### Outcome:
+
+The 1,378,292-byte forum archive `host/build/MiSTer_MediaPlayer_NTSC480i_d34c292.zip` has SHA-256 `621cf865c1561f6f87a3ded01bc3c95f00416acd508f2b561e5c4a7dc4aaefdc` and passes ZIP integrity plus every internal SHA-256 check.  It contains the source-`d34c292` 1,182,684-byte `MiSTer_MediaPlayer`, the source-`f93c6ba` 970,148-byte static helper needed for the latest automatic-menu pacing behavior, the per-core INI fragment, source provenance, project and dependency licences, and a dedicated installation, rollback and reporting guide.  The guide separates ordinary Bob/Weave HDMI as the control, native 525i59.94 direct HDMI for sinks that explicitly accept 480i, HDMI-to-SDI through the Decimator MD-LX with downstream external processing, and native 15 kHz RGB or YPbPr analog output; it warns that a blank unsupported HDMI monitor is inconclusive and that scaled screenshots are not a reliable Direct Video capture.  The unchanged RBF, visualizer and USB DVD launcher are intentionally absent so testers retain their installed matched v0.9.0 set, and the official `/media/fat/MiSTer` is never replaced.
+
+#### Next Steps:
+
+Distribute `MiSTer_MediaPlayer_NTSC480i_d34c292.zip` as an unreleased forum hardware test and have each tester verify the archive manifest, preserve the official Main, install the two isolated executables and report the exact display, converter and processor models.  Require a normal Bob/Weave HDMI control first, then record whether direct HDMI or the MD-LX identifies and locks 480i or 525i at 59.94 Hz, whether menus, titles and audio remain continuous, whether 4:3 and 16:9 are identified correctly, and whether field motion reaches the external processor intact; compare with a 15 kHz analog CRT where available and return the results before changing the ADV7513 policy.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 957 COMMIT Unreleased d34c292 2026-09-03T21:18:06-07:00
 
 #### Coming From:
@@ -1185,37 +1214,6 @@ After user approval, make every accepted DVD menu direction a pending navigation
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 918 COMMIT Unreleased 7186fb4 2026-09-02T20:06:39-07:00
-
-#### Coming From:
-
-Unreleased 101aa4a
-
-#### Purpose:
-
-Handle authored directional DVD auto-actions as real navigation transitions without allowing a rejected arrow input to terminate playback.
-
-#### Outcome:
-
-Source `7186fb4` replaces libdvdnav's opaque directional convenience calls with the equivalent public target-selection operation against the helper's already-derived authored link.  A valid target carrying `auto_action_mode` is then explicitly activated and routed through the same existing menu-pending or stream-hop classification used by Enter, ensuring the old NAV packet is invalidated and the destination is consumed before another command; normal targets remain highlight-only, invalid links are ignored, and a library-rejected arrow now logs `ignored-error` and returns a no-hop result instead of killing the helper.  Enter activation reuses the factored classification without changing its behavior.  The focused regression covers valid and invalid target bounds plus auto-action classification, and passes under optimization, AddressSanitizer and UndefinedBehaviorSanitizer; the changed source passes GCC analyzer and a strict native helper build.  Twenty terminal-overlay, one hundred random-access, one hundred staging, one hundred local menu-hop, twenty unsupported-LPCM and real MP3, WAV, FLAC and Ogg seek integrations pass alongside the focused AC-3, audio-seek, audio-UI, visualizer, DVD SPU, reserve and Program Stream seek checks.  An isolated exact-source build-PC checkout completes another one hundred menu-hop repetitions and the retained live sequence-end/overlay Icarus regression.  The 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_MenuAuto_7186fb4` has SHA-256 `8a7d511846c160c0d4b4c0727fb420e76d147abcad8049384fc79b0d5e619411`; the proven terminal still drain, Main, protocol, decoder, RTL, visualizer and RBF are unchanged.
-
-#### Next Steps:
-
-Install only `host/build/MediaPlayer_Helper_MenuAuto_7186fb4` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  Reproduce the Coming to America Scene Selection route, navigate repeatedly across its scene pages, specifically exercise the prior Left auto-action from the first scene button followed by another direction, and require every authored background and highlight to update without helper exit; activate a scene, return to the root menu and repeat.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback and the forum disc's silent LPCM menu followed by supported AC-3 title playback, then provide a fresh log, screenshot and telemetry snapshot for qualification.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_source.c
-- tools/test_dvd_menu_hop.c
 
 #### Status:
 
