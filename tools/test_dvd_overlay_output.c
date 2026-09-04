@@ -760,15 +760,18 @@ static void encode_pes_pts(uint8_t encoded[5], uint64_t pts)
     encoded[4] = (uint8_t)(0x01u | ((pts << 1) & 0xfeu));
 }
 
-static int compare_fixture_video_without_pcm(FILE *stream,
-                                             const uint8_t *expected,
-                                             size_t expected_size)
+static int compare_fixture_video_and_pcm(FILE *stream,
+                                         const uint8_t *expected_video,
+                                         size_t expected_video_size,
+                                         const int16_t *expected_pcm,
+                                         size_t expected_pcm_frames)
 {
     uint8_t *actual = NULL;
     long end;
     size_t actual_size;
     size_t actual_offset = 0;
     size_t video_offset = 0;
+    size_t pcm_offset = 0;
     int failed = 0;
 
     if (fflush(stream) == EOF || fseek(stream, 0, SEEK_END) < 0 ||
@@ -793,18 +796,38 @@ static int compare_fixture_video_without_pcm(FILE *stream,
                 failed = 1;
                 break;
             }
+            for (unsigned frame = 0; frame < frames; ++frame) {
+                size_t sample = pcm_offset * 2u;
+                uint16_t left =
+                    ((uint16_t)actual[actual_offset + 5u + frame * 4u] << 8) |
+                    actual[actual_offset + 6u + frame * 4u];
+                uint16_t right =
+                    ((uint16_t)actual[actual_offset + 7u + frame * 4u] << 8) |
+                    actual[actual_offset + 8u + frame * 4u];
+
+                if (pcm_offset >= expected_pcm_frames ||
+                    left != (uint16_t)expected_pcm[sample] ||
+                    right != (uint16_t)expected_pcm[sample + 1u]) {
+                    failed = 1;
+                    break;
+                }
+                pcm_offset++;
+            }
+            if (failed)
+                break;
             actual_offset += record_size;
             continue;
         }
-        if (video_offset >= expected_size ||
-            actual[actual_offset] != expected[video_offset]) {
+        if (video_offset >= expected_video_size ||
+            actual[actual_offset] != expected_video[video_offset]) {
             failed = 1;
             break;
         }
         actual_offset++;
         video_offset++;
     }
-    if (video_offset != expected_size)
+    if (video_offset != expected_video_size ||
+        pcm_offset != expected_pcm_frames)
         failed = 1;
     free(actual);
     return failed ? -1 : 0;
@@ -829,6 +852,7 @@ static int test_automatic_menu_scheduling_epoch(void)
     size_t first_play_size = VIDEO_QUEUE_LIMIT - 8u;
     size_t menu_video_size = VIDEO_QUEUE_LIMIT + 65536u;
     size_t offset;
+    size_t pcm_offset;
     uint64_t menu_pts = 0;
     int input_fd = -1;
     int input_open = 0;
@@ -836,7 +860,7 @@ static int test_automatic_menu_scheduling_epoch(void)
 
     first_play = malloc(first_play_size);
     menu_video = malloc(menu_video_size);
-    pcm = calloc(200000u, sizeof(*pcm));
+    pcm = malloc(200000u * sizeof(*pcm));
     output.video = tmpfile();
     failed |= require(first_play != NULL && menu_video != NULL && pcm != NULL &&
                           output.video != NULL,
@@ -844,6 +868,10 @@ static int test_automatic_menu_scheduling_epoch(void)
     if (failed)
         goto done;
     memset(first_play, 0x5a, first_play_size);
+    for (offset = 0; offset < 100000u; ++offset) {
+        pcm[offset * 2u] = (int16_t)(offset * 17u + 3u);
+        pcm[offset * 2u + 1u] = (int16_t)(0x6000u - offset * 29u);
+    }
     memset(menu_video, 0x66, menu_video_size);
     for (offset = 0; offset + 6u <= menu_video_size; offset += 32768u) {
         menu_video[offset] = 0;
@@ -899,6 +927,7 @@ static int test_automatic_menu_scheduling_epoch(void)
     failed |= require(rearm_for_automatic_menu(&audio, &output) == 0,
                       "automatic menu scheduling rearm failed");
     failed |= require(output.scheduler_enabled &&
+                          output.automatic_menu_epoch &&
                           !output.scheduler_started &&
                           !output.iso_start_filter_active &&
                           output.iso_pts_normalization &&
@@ -922,7 +951,7 @@ static int test_automatic_menu_scheduling_epoch(void)
     for (offset = 0; offset < 65536u; offset += 16384u) {
         failed |= require(queue_h262_video(
                               &output, menu_video + offset, 16384u,
-                              offset == 0, 0, menu_pts) == 0 &&
+                              1, 0, menu_pts) == 0 &&
                               scheduler_drain(&output, 0) == 0,
                           "sequence-header-free menu startup could not queue");
     }
@@ -960,32 +989,61 @@ static int test_automatic_menu_scheduling_epoch(void)
                           output.scheduler_enabled &&
                           !output.silent_video_mode,
                       "fresh menu epoch did not accept synchronized AC-3");
-    failed |= require(write_pcm(&output, pcm, 100000, 2,
-                                PCM_SAMPLE_RATE) == 0 &&
-                          scheduler_drain(&output, 0) == 0,
-                      "automatic menu startup could not release held audio");
-    for (offset = 65536u; offset < menu_video_size; offset += 16384u) {
+    pcm_offset = 0;
+    for (offset = 65536u; offset < menu_video_size; offset += 32768u) {
         size_t count = menu_video_size - offset;
+        size_t pcm_count = 100000u - pcm_offset;
 
-        if (count > 16384u)
-            count = 16384u;
+        if (count > 32768u)
+            count = 32768u;
+        if (pcm_count > 1536u)
+            pcm_count = 1536u;
         failed |= require(queue_h262_video(
                               &output, menu_video + offset, count,
-                              0, 0, menu_pts) == 0 &&
-                              scheduler_drain(&output, 0) == 0,
-                          "long sequence-header-free menu did not drain");
+                              1, 0, menu_pts) == 0 &&
+                              write_pcm(&output, pcm + pcm_offset * 2u,
+                                        (int)pcm_count, 2,
+                                        PCM_SAMPLE_RATE) == 0 &&
+                              scheduler_drain(&output, 0) == 0 &&
+                              hold_available(&output) <= output.hold_limit,
+                          "long menu PCM and video did not drain boundedly");
         if (failed)
             goto done;
+        pcm_offset += pcm_count;
     }
+    while (pcm_offset < 100000u) {
+        size_t pcm_count = 100000u - pcm_offset;
+
+        if (pcm_count > 1536u)
+            pcm_count = 1536u;
+        failed |= require(write_pcm(&output, pcm + pcm_offset * 2u,
+                                    (int)pcm_count, 2,
+                                    PCM_SAMPLE_RATE) == 0 &&
+                              scheduler_drain(&output, 0) == 0 &&
+                              hold_available(&output) <= output.hold_limit,
+                          "automatic menu PCM tail did not drain boundedly");
+        if (failed)
+            goto done;
+        pcm_offset += pcm_count;
+    }
+    failed |= require(output.automatic_menu_pcm_fallback &&
+                          output.automatic_menu_stalled_pts > 0 &&
+                          hold_available(&output) ==
+                              PCM_SCHEDULE_RESERVE_FRAMES &&
+                          output.pcm_emitted_frames ==
+                              100000u - PCM_SCHEDULE_RESERVE_FRAMES &&
+                          output.automatic_menu_pcm_fallback_frames > 0,
+                      "nonadvancing menu PTS did not continuously drain PCM");
     failed |= require(flush_h262_video(&output) == 0 &&
                           scheduler_drain(&output, 0) == 0 &&
                           !output.video_head &&
                           output.video_queued_bytes == 0 &&
                           output.video_peak_bytes < VIDEO_QUEUE_LIMIT,
                       "long automatic menu retained bounded video");
-    failed |= require(compare_fixture_video_without_pcm(
-                          output.video, menu_video, menu_video_size) == 0,
-                      "automatic menu changed continuous H262 bytes");
+    failed |= require(compare_fixture_video_and_pcm(
+                          output.video, menu_video, menu_video_size, pcm,
+                          (size_t)output.pcm_emitted_frames) == 0,
+                      "automatic menu changed continuous H262 or PCM bytes");
 
 done:
     if (input_fd >= 0)
@@ -1004,6 +1062,87 @@ done:
         fclose(output.video);
     free(first_play);
     free(menu_video);
+    free(pcm);
+    return failed ? -1 : 0;
+}
+
+static int test_automatic_menu_advancing_pts_schedule(void)
+{
+    struct output_state output = {0};
+    struct video_chunk advancing = {0};
+    int16_t pcm[12000u * 2u];
+    size_t i;
+    int failed = 0;
+
+    output.video = tmpfile();
+    failed |= require(output.video != NULL,
+                      "could not create advancing-PTS control fixture");
+    if (failed)
+        return -1;
+    for (i = 0; i < 12000u * 2u; ++i)
+        pcm[i] = (int16_t)(i * 11u + 7u);
+    output.scheduler_enabled = 1;
+    output.scheduler_started = 1;
+    output.automatic_menu_epoch = 1;
+    output.hold_rate_hz = PCM_SAMPLE_RATE;
+    output.hold_limit = PCM_SAMPLE_RATE;
+    output.have_audio_pts = 1;
+    output.first_audio_pts = 90000u;
+    output.have_video_pts = 1;
+    output.max_video_pts = 180000u;
+    output.automatic_menu_stalled_pts = 7;
+    output.automatic_menu_pcm_fallback = 1;
+    advancing.has_pts = 1;
+    advancing.pts = 180001u;
+    scheduler_accept_video_pts(&output, &advancing);
+    failed |= require(!output.automatic_menu_stalled_pts &&
+                          !output.automatic_menu_pcm_fallback &&
+                          output.max_video_pts == 180001u,
+                      "advancing menu PTS did not restore normal scheduling");
+    failed |= require(hold_push(&output, pcm, 12000) == 0 &&
+                          scheduler_drain(&output, 0) == 0 &&
+                          output.pcm_emitted_frames ==
+                              PCM_SCHEDULE_BATCH_FRAMES &&
+                          hold_available(&output) ==
+                              12000u - PCM_SCHEDULE_BATCH_FRAMES &&
+                          !output.automatic_menu_pcm_fallback,
+                      "advancing menu PTS changed timestamp scheduling");
+    free(output.hold);
+    fclose(output.video);
+    return failed ? -1 : 0;
+}
+
+static int test_automatic_menu_pcm_hold_limit(void)
+{
+    struct output_state output = {0};
+    int16_t *pcm;
+    int failed = 0;
+
+    pcm = calloc((PCM_SAMPLE_RATE + 1u) * 2u, sizeof(*pcm));
+    output.video = tmpfile();
+    failed |= require(pcm != NULL && output.video != NULL,
+                      "could not create automatic-menu hold-limit fixture");
+    if (failed)
+        goto done;
+    output.scheduler_enabled = 1;
+    output.scheduler_started = 1;
+    output.automatic_menu_epoch = 1;
+    output.hold_rate_hz = PCM_SAMPLE_RATE;
+    output.hold_limit = PCM_SAMPLE_RATE;
+    output.have_audio_pts = 1;
+    output.first_audio_pts = 90000u;
+    output.have_video_pts = 1;
+    output.max_video_pts = 180000u;
+    output.pcm_emitted_frames =
+        scheduler_pcm_delivery_target(&output, output.max_video_pts);
+    failed |= require(hold_push(&output, pcm, PCM_SAMPLE_RATE + 1u) == 0 &&
+                          scheduler_drain(&output, 0) < 0,
+                      "automatic-menu PCM hold limit was not enforced");
+
+done:
+    free(output.hold);
+    if (output.video)
+        fclose(output.video);
     free(pcm);
     return failed ? -1 : 0;
 }
@@ -1128,6 +1267,10 @@ int main(void)
     if (test_late_audio_after_silent_release())
         return 1;
     if (test_automatic_menu_scheduling_epoch())
+        return 1;
+    if (test_automatic_menu_advancing_pts_schedule())
+        return 1;
+    if (test_automatic_menu_pcm_hold_limit())
         return 1;
     puts("DVD overlay output: exact plane and reserve ownership pass");
     return 0;

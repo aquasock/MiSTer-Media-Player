@@ -51,6 +51,7 @@
 #define PCM_STARTUP_VIDEO_BYTES     28672u
 #define PCM_RECORD_FRAMES           16u
 #define VIDEO_SLICE_BYTES           256u
+#define AUTOMATIC_MENU_STALLED_VIDEO_BYTES (256u * 1024u)
 #define H262_RESTART_DIAGNOSTIC_PREFIX_BYTES 256u
 #define MP3_PROBE_BYTES             (64u * 1024u)
 #define ID3V2_TAG_LIMIT             (64u * 1024u * 1024u)
@@ -253,6 +254,10 @@ struct output_state {
     int pcm_non_audio;       /* IEC 61937 burst records, never decoded PCM */
     int scheduler_enabled;
     int scheduler_started;
+    int automatic_menu_epoch;
+    unsigned automatic_menu_stalled_pts;
+    int automatic_menu_pcm_fallback;
+    uint64_t automatic_menu_pcm_fallback_frames;
     int iso_start_filter_active;
     int iso_pts_normalization;
     int h262_chroma_normalization;
@@ -2073,9 +2078,29 @@ static uint64_t scheduler_video_horizon(const struct output_state *output,
 static void scheduler_accept_video_pts(struct output_state *output,
                                        const struct video_chunk *chunk)
 {
-    if (!chunk->has_pts ||
-        (output->have_video_pts && chunk->pts <= output->max_video_pts))
+    if (!chunk->has_pts)
         return;
+    if (output->have_video_pts && chunk->pts <= output->max_video_pts) {
+        if (output->automatic_menu_epoch &&
+            chunk->pts == output->max_video_pts &&
+            output->automatic_menu_stalled_pts != UINT32_MAX)
+            output->automatic_menu_stalled_pts++;
+        return;
+    }
+    if (output->automatic_menu_epoch) {
+        output->automatic_menu_stalled_pts = 0;
+        if (output->automatic_menu_pcm_fallback) {
+            fprintf(stderr,
+                    "media_player_helper: automatic menu PCM timestamp "
+                    "scheduling resumed old_pts=%llu new_pts=%llu "
+                    "fallback_frames=%llu\n",
+                    (unsigned long long)output->max_video_pts,
+                    (unsigned long long)chunk->pts,
+                    (unsigned long long)
+                        output->automatic_menu_pcm_fallback_frames);
+            output->automatic_menu_pcm_fallback = 0;
+        }
+    }
     output->max_video_pts = chunk->pts;
     output->max_video_pts_byte = output->video_bytes - chunk->offset;
     output->have_video_pts = 1;
@@ -2182,6 +2207,7 @@ static int rearm_for_automatic_menu(struct audio_state *audio,
     }
     reset_audio_for_navigation(audio);
     reset_output_for_navigation(output, hold_limit, 1);
+    output->automatic_menu_epoch = 1;
     output->iso_start_filter_active = 0;
     if (have_prior_pts) {
         output->iso_pts_normalized_max = prior_pts;
@@ -2398,6 +2424,79 @@ static void scheduler_log_progress(struct output_state *output)
 }
 
 /*
+ * Some authored motion menus leave the video horizon at the first audio PTS,
+ * repeat one video PTS indefinitely, or stop carrying video timestamps.  Once
+ * one of those conditions is established and the normal PTS target is
+ * exhausted, keep only the ordinary startup reserve and release excess PCM as
+ * bounded batches.  The unchanged output and FPGA FIFO credit pace those
+ * writes at the sink clock.  Any later PTS advance disables this fallback
+ * before its new timestamp target is evaluated.
+ */
+static int scheduler_automatic_menu_pcm(struct output_state *output,
+                                        uint64_t timestamp_due)
+{
+    uint64_t video_since_pts;
+    size_t available;
+    size_t excess;
+    size_t emit;
+
+    if (!output->automatic_menu_epoch || timestamp_due ||
+        !output->have_audio_pts || !output->have_video_pts)
+        return 0;
+    video_since_pts = output->video_bytes > output->max_video_pts_byte ?
+                      output->video_bytes - output->max_video_pts_byte : 0;
+    if (output->max_video_pts > output->first_audio_pts &&
+        !output->automatic_menu_stalled_pts &&
+        video_since_pts < AUTOMATIC_MENU_STALLED_VIDEO_BYTES)
+        return 0;
+    available = hold_available(output);
+    if (available <= PCM_SCHEDULE_RESERVE_FRAMES)
+        return 0;
+    if (!output->automatic_menu_pcm_fallback) {
+        output->automatic_menu_pcm_fallback = 1;
+        fprintf(stderr,
+                "media_player_helper: automatic menu PCM fallback "
+                "activated stalled_pts=%llu repeats=%u video_since_pts=%llu "
+                "held=%zu reserve=%u\n",
+                (unsigned long long)output->max_video_pts,
+                output->automatic_menu_stalled_pts,
+                (unsigned long long)video_since_pts, available,
+                PCM_SCHEDULE_RESERVE_FRAMES);
+    }
+    do {
+        excess = available - PCM_SCHEDULE_RESERVE_FRAMES;
+        emit = excess > PCM_SCHEDULE_BATCH_FRAMES ?
+               PCM_SCHEDULE_BATCH_FRAMES : excess;
+        if (hold_emit_frames(output, emit) < 0)
+            return -1;
+        output->automatic_menu_pcm_fallback_frames += emit;
+        available = hold_available(output);
+    } while (available > PCM_SCHEDULE_RESERVE_FRAMES);
+    return 0;
+}
+
+static int scheduler_check_automatic_menu_hold(struct output_state *output)
+{
+    size_t available;
+
+    if (!output->automatic_menu_epoch || !output->scheduler_started ||
+        output->hold_active || !output->hold_limit)
+        return 0;
+    available = hold_available(output);
+    if (available <= output->hold_limit)
+        return 0;
+    fprintf(stderr,
+            "media_player_helper: automatic menu PCM hold limit exceeded "
+            "held=%zu limit=%zu max_video_pts=%llu repeats=%u "
+            "fallback=%d\n",
+            available, output->hold_limit,
+            (unsigned long long)output->max_video_pts,
+            output->automatic_menu_stalled_pts,
+            output->automatic_menu_pcm_fallback);
+    return -1;
+}
+
+/*
  * Program Stream packet order is not a delivery schedule: a mux may place
  * several pictures between audio PES packets.  Once startup is released, keep
  * video in a bounded lookahead queue and admit each timestamped chunk only
@@ -2486,12 +2585,17 @@ static int scheduler_drain(struct output_state *output, int at_eof)
             output, output->max_video_pts);
         uint64_t due = target > output->pcm_emitted_frames ?
                        target - output->pcm_emitted_frames : 0;
+        uint64_t timestamp_due = due;
 
         if (due > PCM_SCHEDULE_BATCH_FRAMES)
             due = PCM_SCHEDULE_BATCH_FRAMES;
         if (due && hold_emit_frames(output, due) < 0)
             return -1;
+        if (scheduler_automatic_menu_pcm(output, timestamp_due) < 0)
+            return -1;
     }
+    if (scheduler_check_automatic_menu_hold(output) < 0)
+        return -1;
     if (output->scheduler_started && !output->hold_active)
         scheduler_log_progress(output);
     return 0;

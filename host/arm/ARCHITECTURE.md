@@ -183,8 +183,17 @@ only its audio and bounded scheduling state, and does not re-enable the initial
 sequence/I/reference filter. The first menu video timestamp is rebased above
 the last emitted DVD timestamp, and the same offset is applied to menu audio,
 so the continuing FPGA timeline remains monotonic without changing authored
-A/V timing. Explicit navigation hops and finite still boundaries continue to
-use the READY/GO reset path. Future work may add optical-device
+A/V timing. If that epoch's video horizon remains at its first audio PTS,
+repeats a timestamped video PTS, or delivers 256 KiB of video without advancing
+it, exhausting the normal timestamp-derived PCM target activates a menu-only
+fallback. It drains the excess above the startup reserve as individually
+bounded ordinary PCM batches, and unchanged output and FPGA FIFO credit pace
+the batches at the sink clock. A later video PTS advance immediately restores
+the normal timestamp scheduler. The existing four-second hold limit is a hard
+post-drain invariant in this fallback domain, so malformed scheduling stops
+with a diagnostic rather than growing the host queue to exhaustion. Explicit
+navigation hops and finite still boundaries continue to use the READY/GO reset
+path. Future work may add optical-device
 discovery beyond the explicit `/dev/sr0` launcher. Angles, track selection and
 general seeking remain separate work.
 
