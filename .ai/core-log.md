@@ -1,3 +1,32 @@
+## 980 COMMIT Unreleased 715ff18 2026-09-04T06:45:38-07:00
+
+#### Coming From:
+
+Unreleased 715ff18
+
+#### Purpose:
+
+Confirm the source-`715ff18` title audio cutouts and isolate the PCM starvation mechanism.
+
+#### Outcome:
+
+The user confirms that brief audio cutouts were audible during the Simpsons episode, so the schema-21 title snapshot's sole error flag `0x0400`, PCM FIFO floor zero and latched underrun are a real source-`715ff18` regression rather than an incidental diagnostic.  The title scheduler exposes the mechanism between 551.857780 and 555.773724 seconds: across 3.915944 seconds of wall time it emits only 50,560 PCM frames, or 1.053333 seconds at 48 kHz, while its real-time diagnostic budget advances 187,966 frames.  The prior 120,600-frame lead is exhausted and leaves a 16,806-frame, 350.125-millisecond deficit.  This is not an optical, helper, decoder or transport stall: Main performs 248 reads totaling 4,063,232 bytes during the interval, the helper retains 66,560 to 77,440 decoded PCM frames, and only the title's maximum video PTS advances slowly by about one second.  Normal title scheduling therefore underfeeds the sink when a high-byte, sparse-video-PTS interval occurs even though decoded PCM is available.  The automatic-menu real-time pacing correction remains validated and the two Space presses continue to represent two distinct authored menus.
+
+#### Next Steps:
+
+After user approval, add a physical-DVD normal-title monotonic PCM lower bound that admits already-decoded held audio only as the exact selected sample-rate clock earns it, retains video PTS as the primary ordering authority, resets at navigation and stream boundaries, and leaves file, ISO and automatic-menu scheduling unchanged.  Add production-path regressions for sparse or stalled title video PTS, fast-decode rate limiting, PTS resumption, navigation reset and unchanged automatic-menu pacing; then run the strict optimized, analyzer, sanitizer, repetition and retained integration suites and build only a new static ARM helper locally.  Hardware acceptance will repeat the same two-menu Simpsons route and require continuous episode audio with schema-21 underrun zero, followed by Futurama menu, Audio CD and ordinary-audio spot checks.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 979 COMMIT Unreleased 715ff18 2026-09-04T06:34:19-07:00
 
 #### Coming From:
@@ -1249,39 +1278,5 @@ Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with `ho
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 940 COMMIT Unreleased 177886b 2026-09-03T03:51:20-07:00
-
-#### Coming From:
-
-Unreleased 7759f87
-
-#### Purpose:
-
-Qualify, document and package the accepted v0.9.0 runtime set for the user's GitHub release publication.
-
-#### Outcome:
-
-The user reports that the complete v0.9.0 functional and regression matrix looks good and accepts the exact runtime set for release.  At the user's explicit direction, packaging invoked no build: it retained the already clean, reproducible, timing-qualified source-`dfe1057` RBF and byte-identical accepted source-`3689cca` Main, source-`0f1165c` helper and source-`366a227` visualizer pack with source-`932dc22` behavior.  The helper's protocol-one capability probe passes.  `host/build/MiSTer_Media_Player_v0.9.0.zip` contains the five runtime/launcher payloads, installation and source notes, the project licence, seven dependency licences and a 15-entry SHA-256 manifest.  A fresh extraction is byte-identical to its bounded staging directory, every manifest entry passes, ZIP integrity is clean, and Main/helper retain mode 755 while all other files use mode 644.  The 6,580,818-byte archive has SHA-256 `e8bc8e0c25291df85d6d53ad2688995d30ce156c547b7315b08058052863e1f9`; its 16 files total 10,476,902 uncompressed bytes.  Source `177886b` moves the changelog into the dated v0.9.0 milestone, starts a clean Unreleased section and finalizes the README, release notes, architecture, build and test guidance with the exact package identity, accepted validation and no-rebuild provenance.  Documentation link, fence, whitespace, package-identity and staged-diff audits pass.  No tag or GitHub Release was created.
-
-#### Next Steps:
-
-The repository and package are ready for the project owner to create annotated tag `v0.9.0` on the final metadata commit following source `177886b`, create a GitHub pre-release titled `MiSTer Media Player v0.9.0`, attach `host/build/MiSTer_Media_Player_v0.9.0.zip`, and use `docs/RELEASE_NOTES_v0.9.0.md` as the release description.  After publication, record the tag resolution, GitHub release time and downloaded-asset verification in a VERSION entry without changing the accepted runtime payloads.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- README.md
-- docs/ARCHITECTURE.md
-- docs/BUILDING.md
-- docs/RELEASE_NOTES_v0.9.0.md
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
