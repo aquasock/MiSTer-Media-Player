@@ -1,4 +1,4 @@
-## 964 COMMIT Unreleased ??? 2026-09-04T02:17:33-07:00
+## 964 COMMIT Unreleased 889f4ea 2026-09-04T02:17:33-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Replace visible whole-GOP visualizer grade steps with deterministic three-frame 
 
 #### Outcome:
 
-The approved helper-and-asset-only change will introduce a version-two visualizer pack containing the eight steady grade streams plus dedicated upward and downward adjacent-grade transition streams.  A level change will select one independently decodable three-picture transition GOP at the matching loop phase so its grade advances across approximately 100 milliseconds instead of changing on one picture boundary; motion phase, closed-GOP safety, native-interlaced syntax, RMS thresholds, hysteresis, one-level slew, overlay cap, transport slicing and idle level zero remain unchanged.  The helper will continue accepting version-one packs with their established stepped behavior, while the new generated asset is expected to grow from approximately 3.7 MiB to approximately 10 MiB and remain under the existing 16 MiB validation ceiling.  Main, the media protocol, RTL and the RBF are outside this change.
+Source `889f4ea` adds version-two visualizer index handling with eight steady variants, seven adjacent upward transitions and seven adjacent downward transitions, each containing twenty phase-aligned, three-picture native-interlaced closed GOPs.  The helper selects a transition GOP whenever its existing hysteretic one-level slew rises or falls and retains the old steady-stream behavior for version-one packs; idle level zero, the overlay cap, transport slicing, RMS thresholds and media lifecycle are unchanged.  The generator applies the grade ramp per frame and verifies all 440 index entries plus exact file-size accounting before publishing.  Independent FFmpeg decoding measures the first zero-to-one rise at mean luma 56.3227, 61.6911 and 63.2825 between steady endpoints 52.8588 and 63.1943, while the reverse transition measures 61.7344, 56.5000 and 53.0892.  Optimized, AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer selector tests pass, with LeakSanitizer unavailable under the local ptrace wrapper; strict native compilation, audio UI, seek and exact-pack idle plus MP3, WAV, FLAC and Ogg integrations pass for both version one and version two.  GNU 10.2.1 produced the 974,244-byte static stripped ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `f2ab5cd997363ec678371674c13e14428ae79ea81a1d883a13dfa4ed2ace3e95`, and deterministic generation produced the 11,201,580-byte `host/build/MediaPlayer_Visualizer.mmpvis` with SHA-256 `4e1c4f6eeaf2e6b781401b15902b60bd4d38e8254f4f5220a3133b3f5d84753f`; Main, protocol, RTL and RBF remain unchanged.
 
 #### Next Steps:
 
-Extend the pack index interpretation for version two without weakening all existing GOP validation, teach the generator to encode frame-evaluated grade ramps for every adjacent direction, and add focused tests that distinguish steady, rising and falling entry selection across overlay caps, target reversals, seeks and version-one fallback.  Generate the production pack, independently decode representative steady and alternating transitions, run strict optimized, sanitizer and analyzer coverage plus retained audio integration, then commit and build only `MediaPlayer_Helper` and `MediaPlayer_Visualizer.mmpvis` locally for hardware comparison.
+Exit the MediaPlayer core so the idle helper is not using either file, replace `/media/fat/linux/MediaPlayer_Helper` and `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` with the two new artifacts, preserve executable mode on the helper, and retain the current `MiSTer_MediaPlayer` and `MediaPlayer_20260904.rbf`.  Re-enter the core to verify the steady idle loop, play an audio file or Audio CD past the ten-second overlay timeout and compare several loud and quiet passages for smooth approximately 100-millisecond grade transitions in both directions, then confirm DVD and MPEG-2 takeover before marking this source hardware-passed.
 
 #### Files Modified:
 
@@ -30,7 +30,7 @@ Extend the pack index interpretation for version two without weakening all exist
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
