@@ -1,3 +1,32 @@
+## 953 COMMIT Unreleased 5f1cf92 2026-09-03T19:51:25-07:00
+
+#### Coming From:
+
+Unreleased 5f1cf92
+
+#### Purpose:
+
+Qualify source `5f1cf92` across Futurama's automatic root menu, nested episode-selection menus and selected-title playback.
+
+#### Outcome:
+
+The physical source-`5f1cf92` run passes hardware validation.  All three finite intro boundaries drain and release, automatic menu entry at 35.059491 seconds preserves the continuous decoder epoch, and the bounded fallback activates with 183,808 held PCM frames before settling near its 8,192-frame reserve without a hold-limit diagnostic, signal-nine termination or audio underrun.  The root menu initially appears frozen while the output path consumes an approximately 1.16 to 1.21 million-frame PCM scheduling lead, about 24 to 25 seconds, but then animates normally and accepts directional input; this is observable catch-up latency rather than a decoder deadlock.  Root-menu activation, nested episode-selection transitions and their overlay transactions complete, the final selection leaves the menu at 327.905704 seconds, and the chosen episode sustains advancing presentation timestamps for more than ninety seconds with over 77 MiB of helper video delivered.  The user confirms the menus are navigable and the selected episode looks and sounds good.  The checksum-valid schema-21 snapshot reports 128 displayed pictures, 127 swaps, zero decoder and PCM protocol errors, zero audio underruns and a valid overlay, while the updated screenshot visibly captures episode playback.  The 17,823,653-byte log, 1,386,067-byte screenshot and 818-byte telemetry sidecar have SHA-256 `4e31c76f52ab03fa55a38027c314064306d4ff9ac8d8b5a3056666d35e41eea7`, `e6511bd6c54ccab344419b1c703b38d61430c1073790293f1d11fef66e0273ce` and `9e6ede6ae979d7a24a16133f9ec1237dc3c4f4dda7bc444c4a84494f26052633`.
+
+#### Next Steps:
+
+Retain source `5f1cf92` and its helper as the accepted hardware baseline.  Treat the initial automatic-menu catch-up as a future latency optimization rather than reopening the functional fix, and broaden physical-disc regression to other automatic menus, still menus and supported title audio before the next release boundary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 952 COMMIT Unreleased 5f1cf92 2026-09-03T18:36:35-07:00
 
 #### Coming From:
@@ -1180,37 +1209,6 @@ After user approval, preserve the qualified authored bytes and append five zero-
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 913 COMMIT Unreleased d75327e 2026-09-02T19:06:18-07:00
-
-#### Coming From:
-
-Unreleased efe2a76
-
-#### Purpose:
-
-Terminate a qualified single-picture DVD menu stream so the existing decoder completes and publishes its authored still background.
-
-#### Outcome:
-
-Source `d75327e` appends the standard four-byte H.262 `sequence_end_code` after terminal random-access filtering qualifies and drains an authored sequence-plus-I group into the pending DVD activation stage.  The terminator remains inside the same bounded transaction before its established READY/GO barrier, provides the non-slice delimiter required to close the final `picture_data()` region, and asserts the decoder's existing one-picture end-of-sequence publication path without fabricating a picture or changing authored picture bytes.  The production-path regression proves the exact input sequence and I picture remain byte-identical, exactly one `00 00 01 b7` record follows them, the emitted picture count remains one and the stage retains picture-bearing hop classification.  Strict native, GNU 10.2.1 ARM, full helper sanitizer and analyzer builds pass, as do focused and retained random-access, overlay, staging, reserve, menu-hop, DVD SPU, AC-3, LPCM-skip, Program Stream seek, audio UI, timer and visualizer checks; high-risk repetitions complete at 100 random-access, 20 terminal overlay, 100 staging, 100 menu-hop and 20 LPCM-skip runs, and real MP3, WAV, FLAC and Ogg seek integrations pass.  The 961,956-byte static stripped ARMv7 hard-float helper `host/build/MediaPlayer_Helper_SceneEnd_d75327e` has SHA-256 `fc5545cf2f652c5d92bc0cfd9fa77205fdc25fe9c5d823c47d30689f32c19ce5`; ordinary random access, overlay-only continuation, Main, protocol, decoder logic, visualizer, RTL and RBF are unchanged.
-
-#### Next Steps:
-
-Install only `host/build/MediaPlayer_Helper_SceneEnd_d75327e` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining the current Main, visualizer pack and timing-qualified RBF.  On Coming to America, enter Scene Selection and require its authored background plus selector to appear, remain responsive and launch a selected scene; return to the root menu and repeat entry to cover the full transition.  Retest Blazing Saddles root-menu loading, The Big Lebowski menu/title playback, and the forum disc's silent LPCM menu followed by supported AC-3 title playback; if Scene Selection remains black, collect a fresh helper/Main log, screenshot and schema-21 telemetry to verify sequence-end recognition, one completed reference picture and one displayed picture.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
 
 #### Status:
 
