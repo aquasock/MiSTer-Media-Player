@@ -1,4 +1,4 @@
-## 975 COMMIT Unreleased ??? 2026-09-04T05:19:48-07:00
+## 975 COMMIT Unreleased 36dc0ac 2026-09-04T05:19:48-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Bound deferred same-menu activation audio and restore sink-paced menu scheduling
 
 #### Outcome:
 
-Add the existing PCM hold ceiling as a second decision pressure for a deferred activation that remains in menu space without qualifying an independent MPEG-2 restart group, allowing a low-bitrate branch to leave finite staging before decoded audio grows toward target RAM capacity.  Preserve exact staged video, audio and overlay order, commit the activation stage before enabling live sink pacing, acknowledge continuation without resetting Main, and then restore the automatic-menu scheduling epoch so its established fallback drains toward the existing watermark and its hard hold invariant remains active.  Keep the source-`cd484ba` video-pressure decision, PTS rebase, qualified motion-menu restart, actual menu-to-title barrier, decoder, protocol, Main, visualizer and RBF unchanged.
+Source `36dc0ac` adds the existing PCM hold ceiling as a second decision pressure for a deferred activation that remains in menu space without qualifying an independent MPEG-2 restart group.  A low-bitrate branch now rebases its staged timestamps and commits its exact finite prefix before enabling live output, releases the startup hold, acknowledges continuation without resetting Main, and restores the automatic-menu epoch so the established sink-paced fallback drains toward its watermark and keeps the hard hold invariant active; video pressure retains the same continuation path, while qualified restarts and actual menu-to-title exits retain their decoder barriers.  The production-translation-unit regression drives the real private AC-3 PES path with PCM pressure at 16,384 frames while video remains at 32,776 queued bytes, proves the 32,780-byte two-record stage commits first, validates both streams at rebased PTS 900,001, observes the continuation event, and verifies byte-exact interleaved video and PCM while the hold settles at the 8,192-frame test watermark.  Strict optimized and AddressSanitizer plus UndefinedBehaviorSanitizer runs pass, as do GCC analysis apart from the known audio-overlay allocation false positive, twenty production repetitions, one hundred menu-hop repetitions, fifty reserve and stage repetitions, retained DVD, AC-3, CDDA, audio UI, visualizer, seek and static Main tests.  GNU 10.2.1 produced the 978,340-byte stripped static ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `8411bc5d73179ba1cff9a32fa2ce8bbd1095353d188c2893d833094bee5d8c28`; it has no dynamic section and passes its protocol-one capability probe plus real MP3, WAV, FLAC, Ogg, pause-barrier, idle-visualizer and private-audio integrations.  Main, protocol, decoder, visualizer, RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Add a production-translation-unit regression whose same-menu activation reaches the PCM ceiling before the video queue guard and verify that it commits below stage capacity, acknowledges promptly, rebases both streams, activates sink pacing and bounds held PCM without changing bytes or records.  Retain the video-pressure continuation test plus qualified restarts, stills, title exits, overlays, DVD scheduling and all audio controls; run optimized, sanitizer, analyzer, repetition and real-helper integration suites, then build and verify only one static ARMv7 helper locally for the same Simpsons hardware route.
+Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`36dc0ac` artifact and leave the current per-core Main, RBF and visualizer in place.  Repeat the same Simpsons launch and root-menu selection, require a prompt `DVD menu activation preserved resident decoder context pressure=pcm` record with held PCM near 183,808 frames followed by `automatic menu PCM fallback activated`, confirm the episode-selection menu appears without the prior 36.65-second delay, then activate and play the first episode without signal-nine termination or `helper-error`.  Retest Futurama root and nested menus plus title playback, spot-check Audio CD and ordinary audio playback, and return the updated results for hardware qualification.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Add a production-translation-unit regression whose same-menu activation reaches 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
