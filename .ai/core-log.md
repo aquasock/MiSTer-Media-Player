@@ -1,3 +1,41 @@
+## 965 COMMIT Unreleased ??? 2026-09-04T02:52:38-07:00
+
+#### Coming From:
+
+Unreleased 889f4ea
+
+#### Purpose:
+
+Make the first Play/Pause press reveal the standalone-audio player UI before holding audio and visualizer transport, with deterministic resume behavior and no RTL change.
+
+#### Outcome:
+
+The user hardware-accepts source `889f4ea` as visibly smoothing the eight-level visualizer transitions, then reports that after the audio-player overlay has timed out the first Space press pauses music and the visualizer without revealing the UI, while the second Space resumes both and makes the UI appear.  Inspection identifies an ordering defect rather than an overlay-rendering defect: isolated Main submits `USER_ACTIVITY`, immediately sets `playback_paused` and stops draining the helper pipe, so the helper's in-band overlay-style record remains behind the pause until resume.  The approved correction will add an audio-only pause barrier in which the helper reveals the existing overlay, flushes output, acknowledges readiness and waits for the existing `GO`; Main will continue draining only through that acknowledgment and pipe quiescence, then hold playback, while the next Play/Pause press sends `GO` and resumes.  DVD and MPEG-2 pause behavior, the ten-second emitted-audio timer, visualizer selection, audio decoding, RTL and RBF remain outside this boundary.
+
+#### Next Steps:
+
+Implement the paired control command and acknowledgment in the shared protocol, standalone audio-file and Audio CD helper paths, and isolated Main state machine; extend production-path helper and Main lifecycle regressions to prove that the overlay record precedes pause readiness, no bytes advance while held, and `GO` resumes playback.  Update user and architecture documentation, run strict native, sanitizer, analyzer, audio-file, Audio CD, visualizer and full pinned-Main patch-stack tests, commit and push the source, then build only `MediaPlayer_Helper` and `MiSTer_MediaPlayer` locally for hardware validation without rebuilding the visualizer asset or RBF.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/test_audio_file_seek.py
+- tools/test_main_cdda.py
+- tools/test_main_seek_lifecycle.cpp
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 964 COMMIT Unreleased 889f4ea 2026-09-04T02:17:33-07:00
 
 #### Coming From:
@@ -1225,35 +1263,6 @@ The new telemetry-enabled run is healthy through the live capture endpoint: Blaz
 #### Next Steps:
 
 Do not bundle a speculative Blazing Saddles change.  Preserve this run as acceptance of its startup, root-menu continuation, title launch and active-program chapter hop, and make the next approved helper boundary only the already-diagnosed Big Lebowski picture-bearing motion-menu staging promotion from entry 924.  Retest Big Lebowski Scene Selection as the primary acceptance route while retaining this exact Blazing Saddles route, Coming to America's finite and indefinite Scene Selection paths, ordinary movie chapters and the forum disc's LPCM-menu behavior; if the black Blazing Saddles attempt recurs with a fresh log, diagnose that trace as a separate reproducible boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 925 COMMIT Unreleased 6b63c91 2026-09-02T21:56:19-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Record Blazing Saddles' successful first source-`6b63c91` run and determine whether the supplied second-run evidence can diagnose its root-menu hang.
-
-#### Outcome:
-
-The user reports that Blazing Saddles initially booted, entered its menu, played and accepted chapter skips, further qualifying the corrected helper installation and active-program chapter path, but that a subsequent core reload produced a black hang after Root Menu.  Only `mister-screenshot.png` is fresh at 21:53; it is an all-black 1,920-by-1,080 image with no telemetry matrix, 559 bytes and SHA-256 `d964cb7603836826beb6afaa57ff6343531871568ec91a4fcc0cd55365f6ee73`.  `MediaPlayer_ARM.log` and `telemetry.txt` retain their 21:24 timestamps and exact hashes from the preceding Big Lebowski Scene Selection run, so their staging-capacity failure and schema-21 snapshot cannot be attributed to Blazing Saddles.  The collection script saves the screenshot before retrieving `/tmp/MediaPlayer_ARM.log` and exits under `set -e` if that retrieval fails, leaving the prior local log and sidecar untouched; the observed file combination therefore indicates that no fresh helper log was available to the collection, consistent with telemetry not being active for this attempt.  The current evidence cannot distinguish a helper failure, a Main/helper synchronization wait or an authored first-play delay, and no runtime source was changed.
-
-#### Next Steps:
-
-Hold the approved combined-build boundary until a fresh trace identifies the second correction.  Enable telemetry before loading Blazing Saddles, launch the disc, reproduce Root Menu from the black state, capture while it remains hung and verify that `.ai/current_results/MediaPlayer_ARM.log` receives the new run's timestamp rather than retaining the Big Lebowski file; if collection again stops after the screenshot, first confirm that `/tmp/MediaPlayer_ARM.log` exists on MiSTer.  Once fresh evidence is present, classify the exact navigation boundary and combine its narrow helper-side correction with the already-proposed bounded Big Lebowski motion-menu staging promotion, then run both discs plus Coming to America and the forum disc through the full regression and ARM build boundary.
 
 #### Files Modified:
 
