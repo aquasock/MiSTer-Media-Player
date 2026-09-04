@@ -1,4 +1,4 @@
-## 950 COMMIT Unreleased ??? 2026-09-03T17:53:57-07:00
+## 950 COMMIT Unreleased 0df8570 2026-09-03T17:53:57-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Carry a live silent-video decoder session continuously into an automatic DVD men
 
 #### Outcome:
 
-The approved change will retain every finite-still and explicit-navigation decoder boundary but replace the automatic silent-video menu boundary with a helper-only transition.  The helper will drain its one-byte H.262 compatibility lookahead at the point silent video becomes immediate so byte order remains exact, preserve the live FPGA decoder and resident picture when libdvdnav enters menu space, and reset only audio plus bounded scheduling state without re-enabling the initial random-access filter.  The new epoch will translate menu video and audio timestamps together against the continuing presentation timeline, preventing both the observed 2 MiB startup-queue failure and a backward FPGA timestamp while requiring no Main, protocol, RTL or RBF change.
+Source `0df8570` removes the automatic silent-video-to-menu READY/GO boundary while retaining every finite-still and explicit-navigation decoder boundary.  Silent-video release now includes the H.262 compatibility filter's pending byte in its capacity decision and flushes that byte through the bounded queue before switching to immediate output, preserving exact order.  Automatic menu entry keeps the live FPGA decoder and resident frame, rearms only helper audio and bounded scheduling state, leaves the initial sequence/I/reference filter disabled, and establishes one explicit PTS offset shared by menu video and audio above the preceding DVD timestamp.  The production regression releases a near-2 MiB silent first-play fixture byte-exactly, then schedules more than 2 MiB of picture-bearing menu video with no new sequence header alongside synchronized AC-3 without reaching the lookahead limit.  Optimized, AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer builds pass, as do the strict native static helper and retained DVD random-access, menu-hop, SPU, reserve, staging, unsupported-LPCM, audio UI, visualizer and seek tests.  GNU 10.2.1 builds the 966,052-byte stripped static ARMv7 helper `host/build/MediaPlayer_Helper` with SHA-256 `af73f0d5ae8104ef05fa3270b51a5da3bf92b39189cd32fc9219b5d2ac0efb6c`; Main remains source `d7d5ab2`, and the protocol, decoder RTL and RBF are unchanged.
 
 #### Next Steps:
 
-Implement and document the continuous automatic-menu epoch, including explicit timestamp translation shared by the new video and first audio PTS.  Extend the production helper regression with a silent first-play session followed by more than 2 MiB of menu video that deliberately contains pictures but no new sequence header, synchronized AC-3 and overlay traffic; require byte-exact output, bounded queue release, no initial random-access filter, no Main boundary command and no late-audio rejection.  Retain finite-still boundary, explicit menu-hop, random-access, reserve, staging, overlay, audio and seek coverage under strict native, analyzer and sanitizer builds, then compile only the static ARM helper locally for Futurama testing with source-`d7d5ab2` Main and the existing RBF.
+Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`0df8570` artifact, retain the source-`d7d5ab2` per-core Main and existing RBF, then rerun Futurama disc one through all finite intro stills, the complete 20th Century animation and the moving menu.  Confirm that menu entry produces the new `DVD automatic menu scheduling epoch continued` and `DVD automatic menu PTS epoch` diagnostics, no fourth Main decoder boundary, no `video lookahead limit exceeded`, visible menu motion and selector response; return the resulting log, screenshot and telemetry for hardware qualification.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Implement and document the continuous automatic-menu epoch, including explicit t
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
