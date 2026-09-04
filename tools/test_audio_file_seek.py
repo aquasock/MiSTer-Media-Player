@@ -219,6 +219,62 @@ def visualizer_stream_summary(stream: bytes) -> tuple[int, dict[int, int]]:
     return pictures, commands
 
 
+def run_idle_visualizer(helper: Path, visualizer: Path) -> None:
+    environment = os.environ.copy()
+    environment["MMP_VISUALIZER_PATH"] = str(visualizer)
+    process = subprocess.Popen(
+        [str(helper), "--protocol", "1", "--source", "idle:"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=environment,
+    )
+    assert process.stdout is not None
+    assert process.stderr is not None
+    os.set_blocking(process.stdout.fileno(), False)
+    os.set_blocking(process.stderr.fileno(), False)
+    stream = bytearray()
+    errors = bytearray()
+    deadline = time.monotonic() + 0.55
+
+    while time.monotonic() < deadline:
+        drain_fd(process.stdout.fileno(), stream)
+        drain_fd(process.stderr.fileno(), errors)
+        if process.poll() is not None:
+            raise RuntimeError(
+                "idle visualizer exited unexpectedly:\n"
+                + errors.decode(errors="replace")
+            )
+        time.sleep(0.005)
+    process.terminate()
+    process.wait(timeout=2.0)
+    drain_fd(process.stdout.fileno(), stream)
+    drain_fd(process.stderr.fileno(), errors)
+    pictures, commands = visualizer_stream_summary(stream)
+    forbidden_records = any(
+        marker in stream
+        for marker in (
+            b"\x00\x00\x01\xb1",
+            b"\x00\x00\x01\xb6",
+            b"\x00\x00\x01\xb9",
+        )
+    )
+    if pictures < 9 or pictures > 30 or commands or forbidden_records:
+        raise RuntimeError(
+            "idle visualizer cadence/plane contract failed: "
+            f"pictures={pictures} commands={commands} "
+            f"forbidden_records={forbidden_records} bytes={len(stream)}"
+        )
+    if (b"idle visualizer started rate=48000 Hz" not in errors or
+            b"audio UI" in errors):
+        raise RuntimeError(
+            "idle visualizer startup contract failed:\n"
+            + errors.decode(errors="replace")
+        )
+    print(
+        f"idle visualizer: PASS pictures={pictures} bytes={len(stream)}"
+    )
+
+
 def run_fixture(helper: Path, fixture: Path,
                 visualizer: Path | None = None) -> None:
     parent, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_SEQPACKET)
@@ -422,6 +478,8 @@ def main() -> int:
     visualizer = args.visualizer.resolve() if args.visualizer else None
     if visualizer is not None and not visualizer.is_file():
         parser.error(f"visualizer does not exist: {visualizer}")
+    if visualizer is not None:
+        run_idle_visualizer(helper, visualizer)
 
     formats = (
         ("mp3", 44100, ["-c:a", "libmp3lame", "-b:a", "128k"]),

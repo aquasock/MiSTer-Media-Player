@@ -32,7 +32,12 @@ v0.9.0 provides:
   full-screen 4:3 CRT-safe layout reserving album-art, metadata and playlist
   regions and implementing transport, elapsed, total, remaining and progress
   presentation;
-- an optional legal-H.262 audio visualizer pack: a translucent scanline-style interface covers a seamless MPEG-2 loop for ten seconds without playback input, then clears while the loop's eight synchronized color grades follow decoded-PCM loudness with hysteresis and bounded transitions; activity restores the interface and a missing pack retains the normal screen;
+- an optional legal-H.262 visualizer pack: its seamless MPEG-2 loop is the idle
+  background whenever the core is loaded, DVD or MPEG-2 media replaces it,
+  and standalone audio overlays its translucent player interface for ten
+  seconds before the loop's synchronized color grades follow decoded-PCM
+  loudness; a missing pack retains audio playback but leaves the idle screen
+  without that background;
 - a clean-video queue so decoder backpressure cannot prevent timely PCM delivery;
 - continuous progressive 4:2:0 I/P/B decoding, retained DDR3 reference banks, separate B scratch storage, and coded-order/display-order presentation;
 - full 8-bit Y, Cb, and Cr reconstruction with limited-range BT.601 presentation;
@@ -143,7 +148,7 @@ The standalone-audio visualizer has this role:
 
 | Release file | MiSTer destination | Required for |
 | --- | --- | --- |
-| `linux/MediaPlayer_Visualizer.mmpvis` | `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` | Standalone-audio visualizer; audio still works if omitted |
+| `linux/MediaPlayer_Visualizer.mmpvis` | `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` | Idle background and standalone-audio visualizer; audio still works if omitted |
 
 The `Load Physical Disc` submenu starts an inserted Video DVD through
 `dvdmenu:/dev/sr0` or an Audio CD through `cdda:/dev/sr0` directly. Patched Main
@@ -163,6 +168,11 @@ The current menu provides a `Load Physical Disc` submenu for direct Video DVD
 or Audio CD playback, a `Load Disc Image` submenu whose `Video DVD` choice opens
 an ISO-only browser, and immediate `Load MPEG-2 Video File` and `Load Audio File`
 browsers. Each picker exposes only its relevant formats.
+With the visualizer pack installed, loading the core starts its background
+automatically. Video DVD and MPEG-2 playback replace it; the background returns
+after playback ends or fails. Audio files and Audio CDs reuse that loop and
+show the existing player overlay for ten seconds before clearing it. The idle
+source is ARM-paced and sends no silent PCM, and no alternate RBF is required.
 Aspect Ratio defaults to 16:9 with 4:3 as the alternate; Deinterlacer Mode
 offers Bob and Weave. Telemetry defaults to Off for normal playback; turning it
 On reveals the internally captured hardware snapshot and enables the combined

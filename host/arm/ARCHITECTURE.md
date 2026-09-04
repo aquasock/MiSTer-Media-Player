@@ -16,7 +16,12 @@ MediaPlayer_Helper --protocol 1 --source file:/absolute/path/movie.mpg
 remain accepted for transition and local verification, but Main uses the
 versioned form. Menu-capable launches use `isomenu:` or `dvdmenu:`; the
 corresponding `iso:` and `dvd:` routes retain longest-title playback. Physical
-Audio CD playback uses `cdda:/dev/sr0`.
+Audio CD playback uses `cdda:/dev/sr0`. The internal `idle:` source validates
+and loops the installed visualizer pack without a media file or PCM stream.
+Isolated Main starts it on MediaPlayer core entry, replaces it when a selected
+source starts, and restores it after playback. A failed idle helper or asset
+launch is suppressed until a media cycle or core reload rather than retried on
+every Main poll.
 
 Main optionally passes `--control-fd FD`, a private version-one
 `SOCK_SEQPACKET` channel separate from standard output.  Player-one Left and
@@ -313,6 +318,13 @@ the inactivity epoch behind the existing READY/GO decoder barrier. Successful
 EOF writes a sequence end and synchronously republishes the completed player
 screen for the replay-ready retained presentation. The FPGA decoder, display
 record format and RBF are unchanged.
+
+When `idle:` owns the decoder, the helper derives a 48 kHz virtual sample
+position from `CLOCK_MONOTONIC` and feeds only the level-zero visualizer GOPs to
+the existing sample-domain scheduler. It emits neither silent PCM nor an audio
+UI overlay. The two-GOP lead remains intact, subsequent GOPs follow the pack's
+encoded cadence, and Main performs the same download deassert/reassert boundary
+used by ordinary source changes before real video or audio takes ownership.
 
 Standalone `.mp3` is an audio-only use of the same output contract: miniaudio's
 bundled MP3 backend skips stream metadata, decodes MPEG-1 Layer III mono or

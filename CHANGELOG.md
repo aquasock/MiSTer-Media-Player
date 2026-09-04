@@ -16,6 +16,12 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Added an always-on idle visualizer lifecycle without changing the FPGA. When
+  the MediaPlayer core is loaded, isolated Main starts the existing visualizer
+  pack through a monotonic-time helper source; DVD or MPEG-2 playback replaces
+  it, audio retains the ten-second player overlay, and the idle loop returns
+  after playback. A failed idle launch is not retried until a media cycle or
+  core reload prevents a missing helper or pack from causing a restart loop.
 - Added direct Audio CD playback from `/dev/sr0`. The helper inventories audio
   tracks, skips data tracks, reads CDDA
   sectors as 44.1 kHz stereo PCM, and reuses the standalone-audio interface,

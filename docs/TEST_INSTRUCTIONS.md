@@ -13,6 +13,23 @@ Run normal playback first with `Telemetry` Off. Turn it On only for a fresh
 diagnostic run; the next playback creates `/tmp/MediaPlayer_ARM.log`, and later
 playback replaces it.
 
+## Idle visualizer lifecycle
+
+1. Load the MediaPlayer core without selecting media. With
+   `MediaPlayer_Visualizer.mmpvis` installed, require the visualizer background
+   to begin and continue at stable cadence without audible PCM.
+2. Open the OSD and browse without selecting media. The background must remain
+   active behind the OSD.
+3. Start a Video DVD or MPEG-2 file. Require one clean decoder transition and
+   normal video takeover with no visualizer frames mixed into playback.
+4. Stop playback or let a finite source end. Require the idle background to
+   return automatically. Repeat with an audio file and Audio CD; each must show
+   the player overlay immediately, clear it after ten seconds, and continue the
+   audio-reactive visualizer.
+5. Temporarily omit the pack and reload the core. Main must attempt idle startup
+   only once rather than repeatedly launching the helper; ordinary audio must
+   still use its full-frame fallback interface.
+
 ## MPEG Program Stream
 
 1. Open a recommended-recipe `.mpg` containing MPEG-2 I/P/B video and MP2

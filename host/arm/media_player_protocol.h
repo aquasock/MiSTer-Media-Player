@@ -9,6 +9,7 @@
 #define MEDIA_PLAYER_DVD_MENU_PREFIX "dvdmenu:"
 #define MEDIA_PLAYER_ISO_MENU_PREFIX "isomenu:"
 #define MEDIA_PLAYER_CDDA_PREFIX "cdda:"
+#define MEDIA_PLAYER_IDLE_PREFIX "idle:"
 
 /* Private SOCK_SEQPACKET channel between MiSTer Main and the ARM helper. */
 #define MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER 0x01
@@ -54,7 +55,7 @@
     (MEDIA_PLAYER_PCM_MODE_48K | MEDIA_PLAYER_PCM_MODE_STEREO)
 
 #define MEDIA_PLAYER_CAPABILITIES \
-    "protocol=1 sources=file,iso,dvd,isomenu,dvdmenu,cdda " \
+    "protocol=1 sources=file,iso,dvd,isomenu,dvdmenu,cdda,idle " \
     "containers=m2v,mpeg-ps,mp3,wav,flac,ogg-vorbis,cdda video=h262 " \
     "audio=mp2-s16le-44100,mp2-s16le-48000," \
     "mp3-s16le-44100,mp3-s16le-48000,wav-s16le-stereo-44100,wav-s16le-stereo-48000," \

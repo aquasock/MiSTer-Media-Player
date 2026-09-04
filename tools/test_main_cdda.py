@@ -20,7 +20,11 @@ def main() -> int:
 
     core = Path(sys.argv[1]).read_text(encoding="utf-8")
     patch = Path(sys.argv[2]).read_text(encoding="utf-8")
-    helper = Path(sys.argv[3]).read_text(encoding="utf-8")
+    helper_path = Path(sys.argv[3])
+    helper = helper_path.read_text(encoding="utf-8")
+    protocol = helper_path.with_name("media_player_protocol.h").read_text(
+        encoding="utf-8"
+    )
     menu_entries = (
         '"P1,Load Physical Disc;"',
         '"P1F1,DVD,Video DVD;"',
@@ -66,6 +70,15 @@ def main() -> int:
         'if (track_controls)',
         'seek_pending = true;',
         'Audio CD track command=%s',
+        'static bool idle_session = false;',
+        'static bool idle_retry_blocked = false;',
+        'return mediaplayer_start_session(source_spec, index, false);',
+        'telemetry_enabled = !idle && user_io_status_get("[125]");',
+        'return mediaplayer_start_session("idle:", MEDIAPLAYER_STREAM_INDEX, true);',
+        'if (idle_session)',
+        'if (was_idle) idle_retry_blocked = true;',
+        'if (block_idle_retry) idle_retry_blocked = true;',
+        'if (!idle_retry_blocked && !mediaplayer_start_idle())',
     )
 
     for marker in markers:
@@ -77,16 +90,22 @@ def main() -> int:
             '!strcasecmp(extension, ".cd")' not in patch,
             "marker-extension routing remains in Main")
     helper_markers = (
+        "!strcmp(source_specification, MEDIA_PLAYER_IDLE_PREFIX)",
         "is_cdda = !strncmp(source_specification, MEDIA_PLAYER_CDDA_PREFIX,",
-        "if (!is_cdda &&\n        media_source_open",
-        "else if (!is_cdda && !is_wav && !is_flac && !is_ogg &&",
-        "if (!is_cdda && media_source_prepare",
-        "if (is_cdda) {\n        if (process_cdda_stream",
+        "if (!is_cdda && !is_idle_visualizer &&\n        media_source_open",
+        "else if (!is_cdda && !is_idle_visualizer && !is_wav && !is_flac &&",
+        "if (!is_cdda && !is_idle_visualizer &&\n        media_source_prepare",
+        "if (is_idle_visualizer) {\n        if (process_idle_visualizer",
+        "} else if (is_cdda) {\n        if (process_cdda_stream",
+        "idle playback must not emit silent PCM",
         "MEDIA_PLAYER_CONTROL_SEEK_CONTINUE",
         "cdda_complete_reposition",
     )
     for marker in helper_markers:
         require(marker in helper, f"missing helper Audio CD contract: {marker}")
+    require('#define MEDIA_PLAYER_IDLE_PREFIX "idle:"' in protocol and
+            'sources=file,iso,dvd,isomenu,dvdmenu,cdda,idle' in protocol,
+            "missing idle visualizer protocol capability")
 
     print("MediaPlayer loader menu/Main/helper contract: PASS")
     return 0

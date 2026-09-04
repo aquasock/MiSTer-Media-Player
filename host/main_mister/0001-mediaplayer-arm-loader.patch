@@ -317,7 +317,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,1094 @@
+@@ -0,0 +1,1157 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -367,6 +367,8 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +static bool menu_active = false;
 +static bool retain_clean_eof = false;
 +static bool replay_ready = false;
++static bool idle_session = false;
++static bool idle_retry_blocked = false;
 +static std::string playback_source_spec;
 +static unsigned char playback_index = 0;
 +
@@ -567,6 +569,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +
 +static void finish_download(const char *reason, bool release_download)
 +{
++	const bool was_idle = idle_session;
 +	const bool arm_replay = !release_download && retain_clean_eof &&
 +	                        !playback_source_spec.empty();
 +	pending_size = pending_offset = 0;
@@ -608,8 +611,9 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	menu_controls = false;
 +	menu_active = false;
 +	retain_clean_eof = false;
-+	replay_ready = arm_replay;
-+	if (!arm_replay)
++	if (!was_idle) replay_ready = arm_replay;
++	idle_session = false;
++	if (!arm_replay && !was_idle)
 +		playback_source_spec.clear();
 +}
 +
@@ -617,6 +621,9 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +{
 +	int status = 0;
 +	pid_t result;
++	const bool block_idle_retry = idle_session &&
++	                              strcmp(reason, "external") &&
++	                              strcmp(reason, "core-changed");
 +
 +	if (helper_fd >= 0 || helper_pid > 0 || download_active)
 +		diagnostic_write("stop reason=%s pid=%d\n", reason, (int)helper_pid);
@@ -632,12 +639,16 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +		helper_pid = -1;
 +	}
 +	diagnostic_close();
++	if (block_idle_retry) idle_retry_blocked = true;
 +}
 +
 +void mediaplayer_stop()
 +{
 +	stop_with_reason("external");
 +}
++
++static int mediaplayer_start_session(const char *source_spec,
++                                     unsigned char index, bool idle);
 +
 +int mediaplayer_start(const char *path, unsigned char index)
 +{
@@ -680,15 +691,28 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +
 +int mediaplayer_start_source(const char *source_spec, unsigned char index)
 +{
++	return mediaplayer_start_session(source_spec, index, false);
++}
++
++static int mediaplayer_start_session(const char *source_spec,
++                                     unsigned char index, bool idle)
++{
 +	int pipefd[2];
 +	int control_pair[2];
 +	pid_t pid;
 +	const char *audio_out;
 +	bool telemetry_enabled;
 +	std::string requested_source;
++	std::string saved_replay_source;
++	bool saved_replay_ready = false;
 +
 +	if (!mediaplayer_is_core() || !source_spec || !*source_spec) return 0;
 +	requested_source = source_spec;
++	if (idle)
++	{
++		saved_replay_source = playback_source_spec;
++		saved_replay_ready = replay_ready;
++	}
 +	/*
 +	 * The AC-3 decoder runs in the helper, so only the helper can choose
 +	 * between decoded stereo and an IEC 61937 burst. Read the same OSD bit
@@ -696,9 +720,15 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	 * fork, and fix the mode for this playback.
 +	 */
 +	audio_out = user_io_status_get("[126]") ? "spdif" : "hdmi";
-+	telemetry_enabled = user_io_status_get("[125]");
++	telemetry_enabled = !idle && user_io_status_get("[125]");
 +	mediaplayer_stop();
-+	diagnostic_open(requested_source.c_str(), index, telemetry_enabled);
++	if (idle)
++	{
++		playback_source_spec = saved_replay_source;
++		replay_ready = saved_replay_ready;
++	}
++	else
++		diagnostic_open(requested_source.c_str(), index, telemetry_enabled);
 +	if (pipe(pipefd) < 0)
 +	{
 +		diagnostic_write("pipe failed errno=%d message=%s\n", errno, strerror(errno));
@@ -781,6 +811,8 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	helper_fd = pipefd[0];
 +	control_fd = control_pair[0];
 +	helper_pid = pid;
++	idle_session = idle;
++	if (!idle) idle_retry_blocked = false;
 +	playback_index = index;
 +	playback_paused = false;
 +	chapter_barrier = false;
@@ -789,7 +821,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	seek_pending = false;
 +	stream_boundary_pending = false;
 +	stream_boundary_pipe_empty = false;
-+	replay_ready = false;
++	if (!idle) replay_ready = false;
 +	menu_active = false;
 +	menu_controls = !strncasecmp(requested_source.c_str(), "dvdmenu:", 8) ||
 +	                !strncasecmp(requested_source.c_str(), "isomenu:", 8);
@@ -814,8 +846,8 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	                              !strcasecmp(source_extension, ".wav") ||
 +	                              !strcasecmp(source_extension, ".flac") ||
 +	                              !strcasecmp(source_extension, ".ogg")));
-+	retain_clean_eof = seek_controls;
-+	playback_source_spec = requested_source;
++	retain_clean_eof = !idle && seek_controls;
++	if (!idle) playback_source_spec = requested_source;
 +	user_io_set_index(index);
 +	user_io_file_info(".M2V");
 +	user_io_set_download(1);
@@ -823,9 +855,17 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	download_assert_us = monotonic_us();
 +	diagnostic_write("download asserted index=%u pid=%d\n",
 +	                 (unsigned)index, (int)helper_pid);
-+	printf("MediaPlayer: streaming %s through ARM helper\n",
-+	       requested_source.c_str());
++	if (idle)
++		printf("MediaPlayer: idle visualizer started through ARM helper\n");
++	else
++		printf("MediaPlayer: streaming %s through ARM helper\n",
++		       requested_source.c_str());
 +	return 1;
++}
++
++static int mediaplayer_start_idle()
++{
++	return mediaplayer_start_session("idle:", MEDIAPLAYER_STREAM_INDEX, true);
 +}
 +
 +static int send_control(uint8_t command)
@@ -1047,6 +1087,18 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +		replay_ready = false;
 +		playback_paused = false;
 +		printf("MediaPlayer: replay starting from beginning\n");
++		if (!mediaplayer_start_source(source.c_str(), index))
++			printf("MediaPlayer: replay failed to start\n");
++		return 1;
++	}
++	if (idle_session)
++	{
++		if (input != MEDIAPLAYER_INPUT_PLAY_PAUSE || !replay_ready) return 0;
++		if (!pressed) return 1;
++		std::string source = playback_source_spec;
++		unsigned char index = playback_index;
++		replay_ready = false;
++		printf("MediaPlayer: replay replacing idle visualizer\n");
 +		if (!mediaplayer_start_source(source.c_str(), index))
 +			printf("MediaPlayer: replay failed to start\n");
 +		return 1;
@@ -1277,6 +1329,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +		if (pending_eof && pending_size == pending_offset)
 +		{
 +			int status = 0;
++			const bool was_idle = idle_session;
 +			pid_t result = helper_pid > 0 ?
 +				waitpid(helper_pid, &status, 0) : -1;
 +			int wait_errno = result < 0 ? errno : 0;
@@ -1295,6 +1348,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +			}
 +			finish_download(clean ? (retain ? "eof-replay-ready" : "eof") :
 +			                         "helper-error", !retain);
++			if (was_idle) idle_retry_blocked = true;
 +			if (!clean)
 +				printf("MediaPlayer: ARM helper exited with an error\n");
 +			diagnostic_write("transfer complete submitted=%llu reads=%u\n",
@@ -1379,10 +1433,19 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +
 +void mediaplayer_poll()
 +{
++	if (!mediaplayer_is_core())
++	{
++		if (helper_fd >= 0 || helper_pid > 0 || download_active)
++			stop_with_reason("core-changed");
++		idle_retry_blocked = false;
++		replay_ready = false;
++		playback_source_spec.clear();
++		return;
++	}
 +	if (helper_fd < 0)
 +	{
-+		if (download_active && !mediaplayer_is_core())
-+			finish_download("core-changed", true);
++		if (!idle_retry_blocked && !mediaplayer_start_idle())
++			idle_retry_blocked = true;
 +		return;
 +	}
 +	if (chapter_barrier || navigation_pending || seek_pending)

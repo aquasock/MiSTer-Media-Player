@@ -83,7 +83,9 @@ python3 tools/generate-audio-visualizer.py \
 The helper validates the pack signature, index, GOP structure and native
 interlaced picture metadata before using it. The target install path is
 `/media/fat/linux/MediaPlayer_Visualizer.mmpvis`; a missing or rejected pack
-falls back to the full-frame audio interface.
+falls back to the full-frame audio interface and disables the idle background.
+The idle lifecycle changes only the helper and patched Main, so rebuilding it
+does not require Quartus or a new RBF.
 
 The deterministic menu boundary tests are `tools/test_dvd_spu.c`,
 `tools/test_dvd_random_access.c` plus the three
