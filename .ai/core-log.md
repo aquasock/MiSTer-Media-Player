@@ -1,3 +1,32 @@
+## 987 COMMIT Unreleased f597cb1 2026-09-04T18:09:25-07:00
+
+#### Coming From:
+
+Unreleased f597cb1
+
+#### Purpose:
+
+Compare the nearly synchronized Futurama title against the failing Simpsons title and identify the disc-level property that exposes the host scheduler.
+
+#### Outcome:
+
+The source-`f597cb1` Futurama run proves the Simpsons failure is not a general RBF format or clock defect.  Both titles enter 720-by-480 NTSC MPEG-2 with frame-rate code four, the same interlaced-sequence and progressive-picture repeat-field startup form, and 48 kHz AC-3, while Futurama actually supplies more compressed data in the thirty-second snapshot.  Their decisive difference is delivery shape: Simpsons scheduler samples retain approximately 62,000 to 86,000 already-decoded PCM frames while queued video repeatedly reaches zero, whereas Futurama has zero median held PCM, a maximum of only 5,248 frames and 121,559 bytes of median future video queue.  Futurama consequently dequeues 1,427,422 PCM frames or 29.737958 seconds during its first thirty seconds, against Simpsons' 27.759854 seconds, and has only 29 candidate-unavailable presentation windows against 60.  Simpsons is also costlier to decode despite accepting fewer bytes: its 1,465,925,354 stall cycles are 58.012 cycles per accepted byte against Futurama's 40.110, about 44.6 percent higher, and its 201 B pictures consume about 32.8 percent more B-stall cycles per picture than Futurama's 200.  Futurama still records one startup FIFO starvation and transient display gaps, matching the user's report that synchronization drifts slightly and returns, but over 171.937972 seconds its PCM and video-PTS progress differ by only 0.117078 seconds and its one DVD PTS discontinuity is normalized without failure.  This combination identifies Simpsons as an audio-forward or more burstily multiplexed Program Stream paired with higher-cost pictures: the helper drains after every PES and repeatedly loses future video-PTS lookahead, so it holds abundant decoded AC-3 behind a stale video horizon while the small FPGA FIFO empties and the slower picture path intermittently lacks a candidate.  The 5,990,963-byte log, 339,121-byte screenshot and 857-byte telemetry sidecar have SHA-256 `ed7e004c1fa255b00a3b4c50a8b9a398ffa3217765d1067976ba8330b34c8947`, `d8ce7c087649c578cfe683794304e41cf28429a17c31982ab5ccd836b5f27660` and `2956e7b1362b3058474aa95817743229c963331b2cdb8cf9ceafd38de285872b`.
+
+#### Next Steps:
+
+Keep the installed RBF and all RTL unchanged.  After user approval, make the next boundary helper-only: retain a bounded future video-PTS horizon across PES packets instead of draining the video queue immediately after each packet, so an audio-forward mux such as Simpsons can schedule its already-decoded PCM smoothly without using host wall time or changing the cumulative PTS-derived rate.  Add production-path fixtures that alternate long AC-3-forward regions with sparse, expensive video PES timestamps and model a 48 kHz 16,384-frame sink, prove no startup starvation, bounded queues, exact elementary-stream bytes and convergence after burst timing, then build only the static ARM helper for comparative Simpsons and Futurama tests; do not build or modify an RBF.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 986 COMMIT Unreleased f597cb1 2026-09-04T17:56:01-07:00
 
 #### Coming From:
@@ -1244,35 +1273,6 @@ Leave `/media/fat/MiSTer` untouched, install the archive's `MiSTer_MediaPlayer` 
 - host/arm/ARCHITECTURE.md
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - tools/test_main_seek_lifecycle.cpp
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 947 COMMIT Unreleased ae533a1 2026-09-03T16:48:14-07:00
-
-#### Coming From:
-
-Unreleased ae533a1
-
-#### Purpose:
-
-Qualify the isolated-Main stream-boundary build on Futurama disc one and isolate its first finite-still freeze.
-
-#### Outcome:
-
-The physical source-`ae533a1` run confirms that the per-core Main selection works, but rejects the stream-boundary handshake as implemented.  Main starts the `MediaPlayer` core through its alternate executable and the helper completes the first authored ten-second FBI still, sends the autonomous boundary event and waits for GO.  Main receives that event at 20.234007 seconds after submitting 224,682 bytes, but retains one buffered byte and never records `DVD stream boundary released after drain`; more than four million later would-block polls submit no additional data through the 227-second capture endpoint.  The visible FBI frame and checksum-valid schema-21 snapshot show that this is a host-handshake deadlock rather than a decoder failure: the FPGA accepted 224,669 decoder bytes, exactly the 224,665-byte authored video plus the four-byte sequence end, completed and displayed its one I picture, reports sequence end, presentation complete and session quiet, and has zero decoder errors, transport blocks, PCM samples or audio underruns.  The five following zero bytes are implementation-only transport drain; four crossed Main before the terminal decoder stopped returning input credit and the fifth remains in Main's pipe buffer, so the current requirement that every boundary byte receive FPGA credit can never become true.  The 5,630,162-byte log, 685,317-byte screenshot and 441-byte telemetry sidecar have SHA-256 `24ff68036d13b73d674dca1bf349a5fb2041d4de4343ef3f0bbe8ac041732d45`, `afcb6905c04398c9bcf6f2aef795d55bbcc85c990000d90908b6bc88f6c84f3e` and `dfb936ef46bc9eb7324357e82d356be24c3f7646d4bc6183ba5e07e7880bfa52`.
-
-#### Next Steps:
-
-After user approval, distinguish a finite terminal boundary from an automatic silent-menu boundary on the control channel and give only the terminal form an explicit five-byte discardable-tail contract.  Main must continue submitting all meaningful queued media, then after pipe quiescence accept at most the declared number of remaining zero tail bytes, record their exact count, reset download once and send GO; a nonzero byte, an oversized remainder or any residue on the automatic boundary must fail rather than be hidden.  Extend the Main regression with the observed one-byte no-credit remainder plus zero-, partial- and malformed-tail cases, retain the helper production-path and sanitizer suites, rebuild the patched per-core Main and static ARM helper locally, and retest Futurama through every finite intro still into its moving menu without changing the RBF or RTL.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
