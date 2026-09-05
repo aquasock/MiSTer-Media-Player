@@ -8,11 +8,12 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
-- Drained the physical-DVD asynchronous output reserve before every
-  PTS-authorized ordinary-title PCM batch. Scheduled samples can no longer sit
-  behind up to four MiB of older compressed video, while the batch still
-  follows all earlier bytes and retains the existing cumulative PTS rate,
-  startup reserve, source producer ring, menus, protocol, and RBF.
+- Parsed the complete 27 MHz SCR from DVD Program Stream pack headers and used
+  it as an ordinary-title PCM horizon only after it overtakes a stale video
+  PTS. The authored pack clock bridges sparse-video-PTS intervals without the
+  rejected host wall clock or title reserve drain, preserves its fractional
+  extension across wrap and navigation epochs, and leaves menus, ordinary
+  Program Stream files, transport order, the protocol, and the RBF unchanged.
 - Retained one bounded future video timestamp while scheduling ordinary DVD
   titles. Audio-forward Program Stream multiplexing can now expose its next
   PTS horizon before the preceding video is admitted, keeping already-decoded

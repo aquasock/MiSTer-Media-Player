@@ -210,13 +210,7 @@ stream hop, reserve discard may cancel the unwritten suffix of the record stalle
 in the full pipe as well as queued records; Main discards the
 already-written prefix during the existing ready/go barrier. A menu command
 that resolves as a continuation never requests that discard, so its output is
-still delivered byte-for-byte without a reset. During ordinary title playback,
-each PTS-authorized PCM batch first waits for this asynchronous reserve to
-empty. The batch therefore remains behind every earlier transport byte but
-cannot be hidden behind up to four MiB of already-admitted compressed video;
-later video is queued only after it. The pipe's small active tail remains in
-order, and the separate eight-MiB physical source producer ring continues to
-bridge optical stalls while output follows decoder backpressure.
+still delivered byte-for-byte without a reset.
 
 The menu routes instead preserve libdvdnav first-play behavior, VM domain
 transitions, authored finite or indefinite stills, button state, CLUT changes
@@ -241,17 +235,24 @@ Ordinary DVD titles retain one advancing timestamped video chunk in their
 bounded two-MiB queue. The demultiplexer can therefore read far enough beyond
 an audio-forward or bursty PES run to discover the following video horizon;
 untimestamped video before that retained chunk is still admitted in slices and
-its known PTS advance is interpolated across those bytes. Decoded PCM remains
-governed by the existing cumulative video-PTS target plus startup reserve, not
-wall time, source speed, pipe acceptance or the number of PES packets. On a
-physical disc, the output reserve is drained before each such admitted PCM
-batch so this scheduling decision reaches Main promptly without overtaking
-older video. A second advancing timestamp releases the preceding one. EOF,
-finite still and resident menu-continuation boundaries force the retained tail
-through exactly, while a timestamp-poor stream reaching the established queue
-limit takes the same explicit full-drain fallback rather than growing without
-bound. ISO timestamp rebasing, automatic menus, non-DVD Program Streams and all
-elementary bytes are unchanged.
+its known PTS advance is interpolated across those bytes. The demultiplexer also
+decodes the complete 33-bit SCR base and nine-bit extension from each DVD
+MPEG-2 pack header, retaining the clock in its native 27 MHz domain. SCR wraps
+add the exact clock modulus, other backward moves start a monotonic DVD epoch,
+and every navigation reset clears that state. Decoded PCM normally remains
+governed by the cumulative video-PTS target plus startup reserve. Only when the
+normalized SCR overtakes a stale ordinary-title video PTS can its authored pack
+clock supply the larger cumulative target; the fractional extension is retained
+through the 48 kHz conversion. This excludes host wall time, source speed, pipe
+acceptance and PES count while bridging a title whose multiplex continues
+without another video PTS. Automatic menus retain their separately qualified
+fallback, and ordinary non-DVD Program Streams do not collect normalized SCR.
+A second advancing video timestamp releases the preceding lookahead and resumes
+as the primary horizon whenever it is later. EOF, finite still and resident
+menu-continuation boundaries force the retained tail through exactly, while a
+timestamp-poor stream reaching the established queue limit takes the same
+explicit full-drain fallback rather than growing without bound. Elementary
+video and PCM samples remain byte-exact and in their established output order.
 
 If an automatic-menu epoch's video horizon remains at its first audio PTS,
 repeats a timestamped video PTS, or delivers 256 KiB of video without advancing

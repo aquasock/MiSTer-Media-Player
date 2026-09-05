@@ -6,7 +6,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <pthread.h>
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1228,170 +1227,254 @@ static int test_audio_forward_title_pts_lookahead(void)
     return failed ? -1 : 0;
 }
 
-struct title_reserve_capture {
-    int fd;
-    uint8_t *data;
-    size_t size;
-    unsigned delay_us;
-    int failed;
-};
-
-static void *title_reserve_reader(void *opaque)
+static void encode_mpeg2_pack_header(uint8_t header[10], uint64_t scr_base,
+                                     unsigned scr_extension,
+                                     unsigned stuffing)
 {
-    struct title_reserve_capture *capture = opaque;
-    struct timespec delay = {
-        capture->delay_us / 1000000u,
-        (long)(capture->delay_us % 1000000u) * 1000l
-    };
-    size_t offset = 0;
-
-    while (nanosleep(&delay, &delay) < 0 && errno == EINTR)
-        ;
-    while (offset < capture->size) {
-        ssize_t count = read(capture->fd, capture->data + offset,
-                             capture->size - offset);
-
-        if (count > 0) {
-            offset += (size_t)count;
-            continue;
-        }
-        if (count < 0 && errno == EINTR)
-            continue;
-        capture->failed = 1;
-        break;
-    }
-    return NULL;
+    memset(header, 0, 10);
+    header[0] = 0x40u | (uint8_t)((scr_base >> 27) & 0x38u) | 0x04u |
+                (uint8_t)((scr_base >> 28) & 0x03u);
+    header[1] = (uint8_t)(scr_base >> 20);
+    header[2] = (uint8_t)((scr_base >> 12) & 0xf8u) | 0x04u |
+                (uint8_t)((scr_base >> 13) & 0x03u);
+    header[3] = (uint8_t)(scr_base >> 5);
+    header[4] = (uint8_t)((scr_base & 0x1fu) << 3) | 0x04u |
+                (uint8_t)((scr_extension >> 7) & 0x03u);
+    header[5] = (uint8_t)((scr_extension & 0x7fu) << 1) | 0x01u;
+    header[8] = 0x07u;
+    header[9] = 0xf8u | (uint8_t)(stuffing & 7u);
 }
 
-static int test_title_pcm_prompt_delivery(void)
+static int test_dvd_pack_scr_decode(void)
 {
-    enum {
-        PRIOR_VIDEO_BYTES = OUTPUT_RESERVE_BYTES,
-        PCM_FRAMES = PCM_SCHEDULE_BATCH_FRAMES,
-        PCM_BYTES = PCM_FRAMES * 4u +
-                    PCM_FRAMES / PCM_RECORD_FRAMES * 5u,
-        LATER_VIDEO_BYTES = 4096,
-        CAPTURE_BYTES = PRIOR_VIDEO_BYTES + PCM_BYTES + LATER_VIDEO_BYTES
-    };
-    struct title_reserve_capture capture = {0};
+    static const uint64_t scr_base = 0x123456789ULL;
+    static const unsigned scr_extension = 299u;
+    uint8_t header[10];
+    uint8_t stuffing[7];
     struct output_state output = {0};
-    pthread_t reader;
-    uint8_t *prior_video = NULL;
-    uint8_t *expected_video = NULL;
-    int16_t *pcm = NULL;
-    FILE *captured = NULL;
-    int descriptors[2] = {-1, -1};
-    uint64_t started;
-    uint64_t finished;
-    size_t offset;
-    int reader_started = 0;
+    struct media_source input = {0};
+    char input_path[] = "/tmp/mmp-pack-scr-XXXXXX";
+    char source_error[128];
+    int input_fd = -1;
+    int input_open = 0;
     int failed = 0;
 
-    prior_video = malloc(PRIOR_VIDEO_BYTES);
-    expected_video = malloc(PRIOR_VIDEO_BYTES + LATER_VIDEO_BYTES);
+    encode_mpeg2_pack_header(header, scr_base, scr_extension,
+                             sizeof(stuffing));
+    memset(stuffing, 0xff, sizeof(stuffing));
+    input_fd = mkstemp(input_path);
+    failed |= require(input_fd >= 0 &&
+                          write(input_fd, header, sizeof(header)) ==
+                              (ssize_t)sizeof(header) &&
+                          write(input_fd, stuffing, sizeof(stuffing)) ==
+                              (ssize_t)sizeof(stuffing) &&
+                          close(input_fd) == 0,
+                      "could not create SCR pack fixture");
+    input_fd = -1;
+    failed |= require(!failed &&
+                          media_source_open(&input, input_path, source_error,
+                                            sizeof(source_error)) ==
+                              MEDIA_SOURCE_OK,
+                      "could not open SCR pack fixture");
+    input_open = !failed;
+    output.iso_pts_normalization = 1;
+    failed |= require(!failed &&
+                          read_program_stream_pack(&input, &output) == 0 &&
+                          output.have_iso_scr &&
+                          output.iso_scr_raw_max ==
+                              scr_base * SYSTEM_CLOCK_PTS_SCALE +
+                                  scr_extension &&
+                          output.iso_scr_normalized_max ==
+                              output.iso_scr_raw_max &&
+                          media_source_getc(&input) == EOF,
+                      "MPEG-2 pack SCR or stuffing decoded incorrectly");
+    if (input_open) {
+        media_source_close(&input);
+        input_open = 0;
+    }
+
+    header[4] &= (uint8_t)~0x04u;
+    input_fd = open(input_path, O_WRONLY | O_TRUNC);
+    failed |= require(input_fd >= 0 &&
+                          write(input_fd, header, sizeof(header)) ==
+                              (ssize_t)sizeof(header) &&
+                          close(input_fd) == 0,
+                      "could not create malformed SCR pack fixture");
+    input_fd = -1;
+    memset(&input, 0, sizeof(input));
+    failed |= require(media_source_open(&input, input_path, source_error,
+                                        sizeof(source_error)) ==
+                          MEDIA_SOURCE_OK,
+                      "could not open malformed SCR pack fixture");
+    input_open = !failed;
+    failed |= require(!failed &&
+                          read_program_stream_pack(&input, &output) < 0,
+                      "malformed MPEG-2 SCR marker was accepted");
+
+    if (input_open)
+        media_source_close(&input);
+    if (input_fd >= 0)
+        close(input_fd);
+    unlink(input_path);
+    return failed ? -1 : 0;
+}
+
+static int test_dvd_scr_normalization(void)
+{
+    struct output_state discontinuity = {0};
+    struct output_state wrap = {0};
+    struct output_state menu = {0};
+    struct output_state reset = {0};
+    const uint64_t before = 20u * (uint64_t)SYSTEM_CLOCK_HZ + 17u;
+    const uint64_t after = 2u * (uint64_t)SYSTEM_CLOCK_HZ + 29u;
+    int failed = 0;
+
+    discontinuity.iso_pts_normalization = 1;
+    failed |= require(normalize_program_scr(&discontinuity, before) == 0 &&
+                          normalize_program_scr(&discontinuity, after) == 0 &&
+                          discontinuity.iso_scr_discontinuities == 1u &&
+                          discontinuity.iso_scr_normalized_max == before + 1u,
+                      "DVD SCR discontinuity did not rebase monotonically");
+    wrap.iso_pts_normalization = 1;
+    failed |= require(normalize_program_scr(
+                          &wrap, SYSTEM_CLOCK_WRAP_TICKS - 100u) == 0 &&
+                          normalize_program_scr(&wrap, 50u) == 0 &&
+                          wrap.iso_scr_wraps == 1u &&
+                          wrap.iso_scr_discontinuities == 0u &&
+                          wrap.iso_scr_normalized_max ==
+                              SYSTEM_CLOCK_WRAP_TICKS + 50u,
+                      "natural DVD SCR wrap lost elapsed clock ticks");
+    menu.iso_pts_normalization = 1;
+    menu.automatic_menu_epoch = 1;
+    failed |= require(normalize_program_scr(&menu, before) == 0 &&
+                          !menu.have_iso_scr,
+                      "automatic menu unexpectedly retained title SCR");
+    reset.video = tmpfile();
+    reset.iso_pts_normalization = 1;
+    reset.have_iso_scr = 1;
+    reset.iso_scr_raw_max = before;
+    reset.iso_scr_normalized_max = before;
+    reset.title_scr_fallback_logged = 1;
+    failed |= require(reset.video != NULL,
+                      "could not create SCR navigation-reset fixture");
+    if (reset.video) {
+        reset_output_for_navigation(&reset, PCM_SAMPLE_RATE, 1);
+        failed |= require(!reset.have_iso_scr &&
+                              !reset.iso_scr_raw_max &&
+                              !reset.iso_scr_normalized_max &&
+                              !reset.title_scr_fallback_logged &&
+                              reset.iso_pts_normalization,
+                          "navigation retained an old SCR title epoch");
+        fclose(reset.video);
+    }
+    return failed ? -1 : 0;
+}
+
+static int test_sparse_title_scr_pcm_schedule(void)
+{
+    enum { PCM_FRAMES = 4 * PCM_SAMPLE_RATE };
+    static const uint64_t first_audio_pts = 90000u;
+    static const uint64_t stale_video_pts = first_audio_pts + 45000u;
+    struct output_state output = {0};
+    struct output_state video_primary = {0};
+    struct output_state menu = {0};
+    struct output_state ordinary = {0};
+    int16_t *pcm = NULL;
+    uint64_t target;
+    uint64_t before;
+    size_t frame;
+    int failed = 0;
+
     pcm = malloc(PCM_FRAMES * 2u * sizeof(*pcm));
-    capture.data = malloc(CAPTURE_BYTES);
-    captured = tmpfile();
-    failed |= require(prior_video != NULL && expected_video != NULL &&
-                          pcm != NULL && capture.data != NULL &&
-                          captured != NULL && pipe(descriptors) == 0,
-                      "could not create title prompt-delivery fixture");
+    output.video = tmpfile();
+    failed |= require(pcm != NULL && output.video != NULL,
+                      "could not create sparse-title SCR fixture");
     if (failed)
         goto done;
-    memset(prior_video, 0x55, PRIOR_VIDEO_BYTES);
-    memcpy(expected_video, prior_video, PRIOR_VIDEO_BYTES);
-    memset(expected_video + PRIOR_VIDEO_BYTES, 0x66,
-           LATER_VIDEO_BYTES);
-    for (offset = 0; offset < PCM_FRAMES; ++offset) {
-        pcm[offset * 2u] = (int16_t)(offset * 31u + 7u);
-        pcm[offset * 2u + 1u] =
-            (int16_t)(0x5000u - offset * 19u);
+    for (frame = 0; frame < PCM_FRAMES; ++frame) {
+        pcm[frame * 2u] = (int16_t)(frame * 23u + 5u);
+        pcm[frame * 2u + 1u] = (int16_t)(0x7000u - frame * 11u);
     }
-    capture.fd = descriptors[0];
-    capture.size = CAPTURE_BYTES;
-    capture.delay_us = 100000u;
     output.scheduler_enabled = 1;
     output.scheduler_started = 1;
     output.iso_pts_normalization = 1;
     output.audio_pes_seen = 1;
     output.have_audio_pts = 1;
-    output.first_audio_pts = 90000u;
+    output.first_audio_pts = first_audio_pts;
     output.have_video_pts = 1;
-    output.max_video_pts = 135000u;
+    output.max_video_pts = stale_video_pts;
     output.hold_rate_hz = PCM_SAMPLE_RATE;
     output.hold_limit = PCM_HOLD_DEFAULT_MS * PCM_SAMPLE_RATE / 1000u;
-    failed |= require(output_reserve_create(
-                          &output.reserve, descriptors[1],
-                          OUTPUT_RESERVE_BYTES) == 0,
-                      "could not create title output reserve");
-    for (offset = 0; !failed && offset < PRIOR_VIDEO_BYTES;
-         offset += 65536u) {
-        failed |= require(write_video_immediate(
-                              &output, prior_video + offset, 65536u,
-                              "prompt-delivery prior video") == 0,
-                          "could not populate title output reserve");
+    output.pcm_emitted_frames = PCM_SCHEDULE_RESERVE_FRAMES;
+    failed |= require(hold_push(&output, pcm, PCM_FRAMES) == 0,
+                      "could not stage sparse-title PCM");
+    output.have_iso_scr = 1;
+    output.iso_scr_raw_max =
+        (first_audio_pts + 3u * 90000u) * SYSTEM_CLOCK_PTS_SCALE + 299u;
+    output.iso_scr_normalized_max = output.iso_scr_raw_max;
+    target = scheduler_title_pcm_delivery_target(&output, stale_video_pts);
+    failed |= require(target > scheduler_pcm_delivery_target(
+                                    &output, stale_video_pts) &&
+                          output.title_scr_fallback_logged &&
+                          scheduler_scr_elapsed_frames(562u,
+                                                       PCM_SAMPLE_RATE) == 1u &&
+                          scheduler_scr_elapsed_frames(563u,
+                                                       PCM_SAMPLE_RATE) == 2u,
+                      "27 MHz SCR fallback or fractional extension was lost");
+    while (!failed && output.pcm_emitted_frames < target) {
+        before = output.pcm_emitted_frames;
+        failed |= require(scheduler_drain(&output, 0) == 0 &&
+                              output.pcm_emitted_frames > before &&
+                              output.pcm_emitted_frames - before <=
+                                  PCM_SCHEDULE_BATCH_FRAMES,
+                          "sparse-title SCR did not make bounded PCM progress");
     }
-    failed |= require(!failed && hold_push(&output, pcm, PCM_FRAMES) == 0 &&
-                          pthread_create(&reader, NULL,
-                                         title_reserve_reader,
-                                         &capture) == 0,
-                      "could not start prompt-delivery sink");
-    if (failed)
-        goto done;
-    reader_started = 1;
-    started = monotonic_us();
-    failed |= require(started != 0 &&
-                          scheduler_emit_pcm(&output, PCM_FRAMES) == 0,
-                      "title PCM prompt delivery failed");
-    finished = monotonic_us();
-    failed |= require(finished >= started &&
-                          finished - started >= 50000u &&
-                          output.title_pcm_prompt_logged &&
-                          output.pcm_emitted_frames == PCM_FRAMES &&
-                          hold_available(&output) == 0,
-                      "title PCM did not wait for the backpressured reserve");
-    failed |= require(write_video_immediate(
-                          &output,
-                          expected_video + PRIOR_VIDEO_BYTES,
-                          LATER_VIDEO_BYTES,
-                          "prompt-delivery later video") == 0,
-                      "could not queue video after prompt PCM");
-    failed |= require(output_reserve_destroy(output.reserve) == 0,
-                      "could not drain title prompt-delivery output");
-    output.reserve = NULL;
-    close(descriptors[1]);
-    descriptors[1] = -1;
-    pthread_join(reader, NULL);
-    reader_started = 0;
-    failed |= require(!capture.failed &&
-                          fwrite(capture.data, 1, CAPTURE_BYTES, captured) ==
-                              CAPTURE_BYTES &&
+    failed |= require(!failed && output.pcm_emitted_frames == target &&
                           compare_fixture_video_and_pcm(
-                              captured, expected_video,
-                              PRIOR_VIDEO_BYTES + LATER_VIDEO_BYTES,
-                              pcm, PCM_FRAMES) == 0,
-                      "prompt delivery changed reserve, PCM or video order");
+                              output.video, NULL, 0, pcm,
+                              (size_t)(target -
+                                       PCM_SCHEDULE_RESERVE_FRAMES)) == 0,
+                      "SCR fallback changed decoded PCM samples");
+
+    video_primary = output;
+    video_primary.hold = NULL;
+    video_primary.hold_count = 0;
+    video_primary.hold_head = 0;
+    video_primary.video = NULL;
+    video_primary.title_scr_fallback_logged = 0;
+    video_primary.max_video_pts = first_audio_pts + 5u * 90000u;
+    failed |= require(scheduler_title_pcm_delivery_target(
+                          &video_primary,
+                          video_primary.max_video_pts) ==
+                          scheduler_pcm_delivery_target(
+                              &video_primary,
+                              video_primary.max_video_pts) &&
+                          !video_primary.title_scr_fallback_logged,
+                      "SCR overrode an advancing video PTS horizon");
+    menu = video_primary;
+    menu.automatic_menu_epoch = 1;
+    menu.max_video_pts = stale_video_pts;
+    failed |= require(scheduler_title_pcm_delivery_target(
+                          &menu, stale_video_pts) ==
+                          scheduler_pcm_delivery_target(
+                              &menu, stale_video_pts) &&
+                          !menu.title_scr_fallback_logged,
+                      "SCR fallback escaped into an automatic menu");
+    ordinary = video_primary;
+    ordinary.iso_pts_normalization = 0;
+    ordinary.max_video_pts = stale_video_pts;
+    failed |= require(scheduler_title_pcm_delivery_target(
+                          &ordinary, stale_video_pts) ==
+                          scheduler_pcm_delivery_target(
+                              &ordinary, stale_video_pts) &&
+                          !ordinary.title_scr_fallback_logged,
+                      "SCR fallback escaped into an ordinary Program Stream");
 
 done:
-    if (output.reserve) {
-        size_t discarded;
-
-        (void)output_reserve_discard(output.reserve, &discarded);
-        (void)output_reserve_destroy(output.reserve);
-    }
-    if (descriptors[1] >= 0)
-        close(descriptors[1]);
-    if (reader_started)
-        pthread_join(reader, NULL);
-    if (descriptors[0] >= 0)
-        close(descriptors[0]);
-    if (captured)
-        fclose(captured);
     free(output.hold);
-    free(capture.data);
+    if (output.video)
+        fclose(output.video);
     free(pcm);
-    free(expected_video);
-    free(prior_video);
     return failed ? -1 : 0;
 }
 
@@ -2194,7 +2277,11 @@ int main(void)
         return 1;
     if (test_audio_forward_title_pts_lookahead())
         return 1;
-    if (test_title_pcm_prompt_delivery())
+    if (test_dvd_pack_scr_decode())
+        return 1;
+    if (test_dvd_scr_normalization())
+        return 1;
+    if (test_sparse_title_scr_pcm_schedule())
         return 1;
     if (test_title_pts_lookahead_pressure())
         return 1;
