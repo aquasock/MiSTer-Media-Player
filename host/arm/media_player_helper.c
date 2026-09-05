@@ -257,6 +257,7 @@ struct output_state {
     int scheduler_enabled;
     int scheduler_started;
     int title_pts_lookahead_logged;
+    int title_pcm_prompt_logged;
     int automatic_menu_epoch;
     unsigned automatic_menu_stalled_pts;
     int automatic_menu_pcm_fallback;
@@ -2083,21 +2084,46 @@ static int hold_emit_frames(struct output_state *output, uint64_t frames)
 
 /*
  * The physical-DVD reserve is intentionally large enough to bridge optical
- * stalls during ordinary playback.  Once a timestamp-stalled menu enters its
- * explicit monotonic scheduler, allowing that reserve to absorb a permitted
- * batch would still hide the helper's chosen delivery point behind up to four
- * MiB of older output.  Drain it before each clock-admitted batch so the batch
- * reaches Main promptly; the monotonic budget, not reserve, pipe or SPI
- * acceptance, owns its maximum rate.  Each individual write remains bounded.
+ * stalls, but allowing it to absorb a permitted PCM batch can hide the
+ * helper's chosen delivery point behind up to four MiB of older video.  Drain
+ * it before each PTS-admitted ordinary-title batch and each clock-admitted
+ * automatic-menu batch so that decision reaches Main promptly.  The selected
+ * scheduling budget, not reserve, pipe or SPI acceptance, still owns the
+ * maximum rate, and each individual write remains bounded.
  */
+static int scheduler_title_pcm_prompt_delivery(
+    const struct output_state *output)
+{
+    return output->reserve && output->iso_pts_normalization &&
+           !output->iso_start_filter_active &&
+           !output_stage_active(output->activation_stage) &&
+           !output->automatic_menu_epoch && output->audio_pes_seen &&
+           output->have_audio_pts && output->scheduler_started &&
+           !output->hold_active;
+}
+
 static int scheduler_emit_pcm(struct output_state *output, uint64_t frames)
 {
-    if (output->automatic_menu_pcm_fallback && output->reserve &&
-        output_reserve_drain(output->reserve) < 0) {
-        fprintf(stderr,
-                "media_player_helper: automatic menu PCM pacing failed: %s\n",
-                strerror(errno));
-        return -1;
+    int automatic_menu = output->automatic_menu_pcm_fallback &&
+                         output->reserve;
+    int title = scheduler_title_pcm_prompt_delivery(output);
+
+    if (automatic_menu || title) {
+        if (output_reserve_drain(output->reserve) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: %s PCM prompt delivery failed: %s\n",
+                    automatic_menu ? "automatic menu" : "DVD title",
+                    strerror(errno));
+            return -1;
+        }
+        if (title && !output->title_pcm_prompt_logged) {
+            fprintf(stderr,
+                    "media_player_helper: DVD title PCM prompt delivery "
+                    "activated reserve=%zu batch=%llu\n",
+                    output_reserve_capacity(output->reserve),
+                    (unsigned long long)frames);
+            output->title_pcm_prompt_logged = 1;
+        }
     }
     return hold_emit_frames(output, frames);
 }

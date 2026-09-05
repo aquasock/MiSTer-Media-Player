@@ -8,6 +8,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Drained the physical-DVD asynchronous output reserve before every
+  PTS-authorized ordinary-title PCM batch. Scheduled samples can no longer sit
+  behind up to four MiB of older compressed video, while the batch still
+  follows all earlier bytes and retains the existing cumulative PTS rate,
+  startup reserve, source producer ring, menus, protocol, and RBF.
 - Retained one bounded future video timestamp while scheduling ordinary DVD
   titles. Audio-forward Program Stream multiplexing can now expose its next
   PTS horizon before the preceding video is admitted, keeping already-decoded

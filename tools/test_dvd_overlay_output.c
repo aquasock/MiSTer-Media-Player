@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1227,6 +1228,173 @@ static int test_audio_forward_title_pts_lookahead(void)
     return failed ? -1 : 0;
 }
 
+struct title_reserve_capture {
+    int fd;
+    uint8_t *data;
+    size_t size;
+    unsigned delay_us;
+    int failed;
+};
+
+static void *title_reserve_reader(void *opaque)
+{
+    struct title_reserve_capture *capture = opaque;
+    struct timespec delay = {
+        capture->delay_us / 1000000u,
+        (long)(capture->delay_us % 1000000u) * 1000l
+    };
+    size_t offset = 0;
+
+    while (nanosleep(&delay, &delay) < 0 && errno == EINTR)
+        ;
+    while (offset < capture->size) {
+        ssize_t count = read(capture->fd, capture->data + offset,
+                             capture->size - offset);
+
+        if (count > 0) {
+            offset += (size_t)count;
+            continue;
+        }
+        if (count < 0 && errno == EINTR)
+            continue;
+        capture->failed = 1;
+        break;
+    }
+    return NULL;
+}
+
+static int test_title_pcm_prompt_delivery(void)
+{
+    enum {
+        PRIOR_VIDEO_BYTES = OUTPUT_RESERVE_BYTES,
+        PCM_FRAMES = PCM_SCHEDULE_BATCH_FRAMES,
+        PCM_BYTES = PCM_FRAMES * 4u +
+                    PCM_FRAMES / PCM_RECORD_FRAMES * 5u,
+        LATER_VIDEO_BYTES = 4096,
+        CAPTURE_BYTES = PRIOR_VIDEO_BYTES + PCM_BYTES + LATER_VIDEO_BYTES
+    };
+    struct title_reserve_capture capture = {0};
+    struct output_state output = {0};
+    pthread_t reader;
+    uint8_t *prior_video = NULL;
+    uint8_t *expected_video = NULL;
+    int16_t *pcm = NULL;
+    FILE *captured = NULL;
+    int descriptors[2] = {-1, -1};
+    uint64_t started;
+    uint64_t finished;
+    size_t offset;
+    int reader_started = 0;
+    int failed = 0;
+
+    prior_video = malloc(PRIOR_VIDEO_BYTES);
+    expected_video = malloc(PRIOR_VIDEO_BYTES + LATER_VIDEO_BYTES);
+    pcm = malloc(PCM_FRAMES * 2u * sizeof(*pcm));
+    capture.data = malloc(CAPTURE_BYTES);
+    captured = tmpfile();
+    failed |= require(prior_video != NULL && expected_video != NULL &&
+                          pcm != NULL && capture.data != NULL &&
+                          captured != NULL && pipe(descriptors) == 0,
+                      "could not create title prompt-delivery fixture");
+    if (failed)
+        goto done;
+    memset(prior_video, 0x55, PRIOR_VIDEO_BYTES);
+    memcpy(expected_video, prior_video, PRIOR_VIDEO_BYTES);
+    memset(expected_video + PRIOR_VIDEO_BYTES, 0x66,
+           LATER_VIDEO_BYTES);
+    for (offset = 0; offset < PCM_FRAMES; ++offset) {
+        pcm[offset * 2u] = (int16_t)(offset * 31u + 7u);
+        pcm[offset * 2u + 1u] =
+            (int16_t)(0x5000u - offset * 19u);
+    }
+    capture.fd = descriptors[0];
+    capture.size = CAPTURE_BYTES;
+    capture.delay_us = 100000u;
+    output.scheduler_enabled = 1;
+    output.scheduler_started = 1;
+    output.iso_pts_normalization = 1;
+    output.audio_pes_seen = 1;
+    output.have_audio_pts = 1;
+    output.first_audio_pts = 90000u;
+    output.have_video_pts = 1;
+    output.max_video_pts = 135000u;
+    output.hold_rate_hz = PCM_SAMPLE_RATE;
+    output.hold_limit = PCM_HOLD_DEFAULT_MS * PCM_SAMPLE_RATE / 1000u;
+    failed |= require(output_reserve_create(
+                          &output.reserve, descriptors[1],
+                          OUTPUT_RESERVE_BYTES) == 0,
+                      "could not create title output reserve");
+    for (offset = 0; !failed && offset < PRIOR_VIDEO_BYTES;
+         offset += 65536u) {
+        failed |= require(write_video_immediate(
+                              &output, prior_video + offset, 65536u,
+                              "prompt-delivery prior video") == 0,
+                          "could not populate title output reserve");
+    }
+    failed |= require(!failed && hold_push(&output, pcm, PCM_FRAMES) == 0 &&
+                          pthread_create(&reader, NULL,
+                                         title_reserve_reader,
+                                         &capture) == 0,
+                      "could not start prompt-delivery sink");
+    if (failed)
+        goto done;
+    reader_started = 1;
+    started = monotonic_us();
+    failed |= require(started != 0 &&
+                          scheduler_emit_pcm(&output, PCM_FRAMES) == 0,
+                      "title PCM prompt delivery failed");
+    finished = monotonic_us();
+    failed |= require(finished >= started &&
+                          finished - started >= 50000u &&
+                          output.title_pcm_prompt_logged &&
+                          output.pcm_emitted_frames == PCM_FRAMES &&
+                          hold_available(&output) == 0,
+                      "title PCM did not wait for the backpressured reserve");
+    failed |= require(write_video_immediate(
+                          &output,
+                          expected_video + PRIOR_VIDEO_BYTES,
+                          LATER_VIDEO_BYTES,
+                          "prompt-delivery later video") == 0,
+                      "could not queue video after prompt PCM");
+    failed |= require(output_reserve_destroy(output.reserve) == 0,
+                      "could not drain title prompt-delivery output");
+    output.reserve = NULL;
+    close(descriptors[1]);
+    descriptors[1] = -1;
+    pthread_join(reader, NULL);
+    reader_started = 0;
+    failed |= require(!capture.failed &&
+                          fwrite(capture.data, 1, CAPTURE_BYTES, captured) ==
+                              CAPTURE_BYTES &&
+                          compare_fixture_video_and_pcm(
+                              captured, expected_video,
+                              PRIOR_VIDEO_BYTES + LATER_VIDEO_BYTES,
+                              pcm, PCM_FRAMES) == 0,
+                      "prompt delivery changed reserve, PCM or video order");
+
+done:
+    if (output.reserve) {
+        size_t discarded;
+
+        (void)output_reserve_discard(output.reserve, &discarded);
+        (void)output_reserve_destroy(output.reserve);
+    }
+    if (descriptors[1] >= 0)
+        close(descriptors[1]);
+    if (reader_started)
+        pthread_join(reader, NULL);
+    if (descriptors[0] >= 0)
+        close(descriptors[0]);
+    if (captured)
+        fclose(captured);
+    free(output.hold);
+    free(capture.data);
+    free(pcm);
+    free(expected_video);
+    free(prior_video);
+    return failed ? -1 : 0;
+}
+
 static int test_title_pts_lookahead_pressure(void)
 {
     const size_t payload_size = VIDEO_QUEUE_LIMIT - 64u;
@@ -2025,6 +2193,8 @@ int main(void)
     if (test_late_audio_after_silent_release())
         return 1;
     if (test_audio_forward_title_pts_lookahead())
+        return 1;
+    if (test_title_pcm_prompt_delivery())
         return 1;
     if (test_title_pts_lookahead_pressure())
         return 1;
