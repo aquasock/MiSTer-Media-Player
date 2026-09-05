@@ -8,6 +8,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Retained one bounded future video timestamp while scheduling ordinary DVD
+  titles. Audio-forward Program Stream multiplexing can now expose its next
+  PTS horizon before the preceding video is admitted, keeping already-decoded
+  PCM available to the 48 kHz sink without introducing a host clock or
+  changing authored bytes, cumulative PTS timing, menus, stills, or the RBF.
 - Extended the default-off hardware telemetry to schema 22. Five previously
   unused words now report full display progress, audio-domain PCM consumption,
   displayed and pending PTS lateness against the audio-derived STC, and

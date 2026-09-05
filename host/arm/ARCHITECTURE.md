@@ -229,7 +229,23 @@ only its audio and bounded scheduling state, and does not re-enable the initial
 sequence/I/reference filter. The first menu video timestamp is rebased above
 the last emitted DVD timestamp, and the same offset is applied to menu audio,
 so the continuing FPGA timeline remains monotonic without changing authored
-A/V timing. If that epoch's video horizon remains at its first audio PTS,
+A/V timing.
+
+Ordinary DVD titles retain one advancing timestamped video chunk in their
+bounded two-MiB queue. The demultiplexer can therefore read far enough beyond
+an audio-forward or bursty PES run to discover the following video horizon;
+untimestamped video before that retained chunk is still admitted in slices and
+its known PTS advance is interpolated across those bytes. Decoded PCM remains
+governed by the existing cumulative video-PTS target plus startup reserve, not
+wall time, source speed, pipe acceptance or the number of PES packets. A second
+advancing timestamp releases the preceding one. EOF, finite still and resident
+menu-continuation boundaries force the retained tail through exactly, while a
+timestamp-poor stream reaching the established queue limit takes the same
+explicit full-drain fallback rather than growing without bound. ISO timestamp
+rebasing, automatic menus, non-DVD Program Streams and all elementary bytes are
+unchanged.
+
+If an automatic-menu epoch's video horizon remains at its first audio PTS,
 repeats a timestamped video PTS, or delivers 256 KiB of video without advancing
 it, exhausting the normal timestamp-derived PCM target activates a menu-only
 fallback. It drains held audio as individually bounded ordinary PCM batches
@@ -242,7 +258,7 @@ ceiling. For a physical DVD, every admitted batch also drains the asynchronous
 output reserve. The default four-second hold consequently settles at a
 two-second low watermark, retains equal safety headroom for later Program
 Stream audio bursts and cannot run at optical-drive or SPI acceptance speed.
-Ordinary advancing-timestamp title playback retains its reserve unchanged. A
+Automatic-menu advancing-timestamp playback retains its reserve unchanged. A
 later video PTS advance immediately restores the normal timestamp scheduler.
 The hold limit remains a hard post-drain invariant in this fallback domain, so
 malformed scheduling stops with a diagnostic rather than growing the host queue

@@ -1117,6 +1117,169 @@ static int compare_fixture_video_and_pcm(FILE *stream,
     return failed ? -1 : 0;
 }
 
+static int test_audio_forward_title_pts_lookahead(void)
+{
+    enum {
+        CHUNKS = 6,
+        CHUNK_BYTES = 4096,
+        INTERVAL_FRAMES = PCM_SAMPLE_RATE / 2,
+        TOTAL_PCM_FRAMES = CHUNKS * INTERVAL_FRAMES
+    };
+    static const uint64_t first_audio_pts = 90000u;
+    struct output_state output = {0};
+    uint8_t video[CHUNKS * CHUNK_BYTES];
+    int16_t pcm[TOTAL_PCM_FRAMES * 2u];
+    unsigned chunk_index;
+    size_t sample;
+    int failed = 0;
+
+    output.video = tmpfile();
+    failed |= require(output.video != NULL,
+                      "could not create title-lookahead output");
+    if (failed)
+        return -1;
+    for (chunk_index = 0; chunk_index < CHUNKS; ++chunk_index)
+        memset(video + (size_t)chunk_index * CHUNK_BYTES,
+               (int)(0x41u + chunk_index), CHUNK_BYTES);
+    for (sample = 0; sample < TOTAL_PCM_FRAMES; ++sample) {
+        pcm[sample * 2u] = (int16_t)(sample * 29u + 3u);
+        pcm[sample * 2u + 1u] =
+            (int16_t)(0x6000u - sample * 17u);
+    }
+    output.scheduler_enabled = 1;
+    output.scheduler_started = 1;
+    output.iso_pts_normalization = 1;
+    output.audio_pes_seen = 1;
+    output.have_audio_pts = 1;
+    output.first_audio_pts = first_audio_pts;
+    output.have_video_pts = 1;
+    output.max_video_pts = first_audio_pts;
+    output.hold_rate_hz = PCM_SAMPLE_RATE;
+    output.hold_limit = PCM_HOLD_DEFAULT_MS * PCM_SAMPLE_RATE / 1000u;
+    output.pcm_emitted_frames = PCM_SCHEDULE_RESERVE_FRAMES;
+    failed |= require(hold_push(&output, pcm, TOTAL_PCM_FRAMES) == 0,
+                      "could not stage audio-forward title PCM");
+    failed |= require(queue_video(
+                          &output, video, CHUNK_BYTES, 1, 0,
+                          first_audio_pts + 45000u) == 0 &&
+                          scheduler_drain(&output, 0) == 0 &&
+                          output.video_bytes == 0 &&
+                          output.video_queued_bytes == CHUNK_BYTES &&
+                          scheduler_future_video_pts(&output) == 1u &&
+                          output.title_pts_lookahead_logged,
+                      "single future title PTS was not retained");
+    for (chunk_index = 1; !failed && chunk_index < CHUNKS;
+         ++chunk_index) {
+        uint64_t retained_pts = first_audio_pts +
+            (uint64_t)(chunk_index + 1u) * 45000u;
+        uint64_t admitted_pts = retained_pts - 45000u;
+        uint64_t target;
+        uint64_t consumed =
+            (uint64_t)chunk_index * INTERVAL_FRAMES;
+        uint64_t lead;
+
+        failed |= require(queue_video(
+                              &output,
+                              video + (size_t)chunk_index * CHUNK_BYTES,
+                              CHUNK_BYTES, 1, 0, retained_pts) == 0 &&
+                              scheduler_drain(&output, 0) == 0,
+                          "audio-forward title burst did not schedule");
+        target = scheduler_pcm_delivery_target(&output, admitted_pts);
+        lead = output.pcm_emitted_frames > consumed ?
+               output.pcm_emitted_frames - consumed : 0;
+        failed |= require(output.video_bytes ==
+                              (uint64_t)chunk_index * CHUNK_BYTES &&
+                              output.video_queued_bytes == CHUNK_BYTES &&
+                              output.video_head != NULL &&
+                              output.video_head->has_pts &&
+                              output.video_head->pts == retained_pts &&
+                              scheduler_future_video_pts(&output) == 1u &&
+                              output.max_video_pts == admitted_pts &&
+                              output.pcm_emitted_frames == target &&
+                              lead >= PCM_SCHEDULE_RESERVE_FRAMES -
+                                          PCM_REFILL_FRAMES &&
+                              lead <= PCM_SCHEDULE_RESERVE_FRAMES,
+                          "title lookahead did not preserve its 48 kHz "
+                          "sink reserve");
+    }
+    failed |= require(!failed && scheduler_drain_all(&output, 0) == 0 &&
+                          output.video_head == NULL &&
+                          output.video_queued_bytes == 0 &&
+                          output.video_bytes == sizeof(video) &&
+                          output.max_video_pts ==
+                              first_audio_pts + CHUNKS * 45000u &&
+                          output.pcm_emitted_frames ==
+                              scheduler_pcm_delivery_target(
+                                  &output,
+                                  first_audio_pts + CHUNKS * 45000u),
+                      "title lookahead force drain did not converge");
+    failed |= require(!failed &&
+                          compare_fixture_video_and_pcm(
+                              output.video, video, sizeof(video), pcm,
+                              (size_t)(output.pcm_emitted_frames -
+                                       PCM_SCHEDULE_RESERVE_FRAMES)) == 0,
+                      "title lookahead changed video bytes or PCM samples");
+
+    while (output.video_head)
+        free_video_head(&output);
+    free(output.hold);
+    fclose(output.video);
+    return failed ? -1 : 0;
+}
+
+static int test_title_pts_lookahead_pressure(void)
+{
+    const size_t payload_size = VIDEO_QUEUE_LIMIT - 64u;
+    struct output_state output = {0};
+    uint8_t *payload = NULL;
+    int failed = 0;
+
+    payload = malloc(payload_size);
+    output.video = tmpfile();
+    failed |= require(payload != NULL && output.video != NULL,
+                      "could not create title-lookahead pressure fixture");
+    if (failed)
+        goto done;
+    memset(payload, 0x55, payload_size);
+    output.scheduler_enabled = 1;
+    output.scheduler_started = 1;
+    output.iso_pts_normalization = 1;
+    output.audio_pes_seen = 1;
+    output.have_audio_pts = 1;
+    output.first_audio_pts = 90000u;
+    output.have_video_pts = 1;
+    output.max_video_pts = 90000u;
+    output.hold_rate_hz = PCM_SAMPLE_RATE;
+    output.hold_limit = PCM_HOLD_DEFAULT_MS * PCM_SAMPLE_RATE / 1000u;
+    output.pcm_emitted_frames = PCM_SCHEDULE_RESERVE_FRAMES;
+    failed |= require(queue_video(&output, payload, payload_size,
+                                  0, 0, 0) == 0 &&
+                          scheduler_drain(&output, 0) == 0 &&
+                          output.video_bytes == 0 &&
+                          output.video_queued_bytes == payload_size &&
+                          scheduler_future_video_pts(&output) == 0u,
+                      "timestamp-poor title did not retain bounded input");
+    failed |= require(!failed &&
+                          scheduler_make_title_video_room(
+                              &output, 65u, 0) == 0 &&
+                          output.video_head == NULL &&
+                          output.video_queued_bytes == 0 &&
+                          output.video_bytes == payload_size,
+                      "title queue pressure did not force bounded progress");
+    failed |= require(!failed && compare_fixture_video_and_pcm(
+                          output.video, payload, payload_size,
+                          NULL, 0) == 0,
+                      "title pressure fallback changed video bytes");
+
+done:
+    while (output.video_head)
+        free_video_head(&output);
+    if (output.video)
+        fclose(output.video);
+    free(payload);
+    return failed ? -1 : 0;
+}
+
 static int test_pcm_pressure_menu_activation_continuation(void)
 {
     static const uint8_t staged_marker[] = {0x91, 0x82, 0x73, 0x64};
@@ -1860,6 +2023,10 @@ int main(void)
     if (test_provisional_menu_activation_followup())
         return 1;
     if (test_late_audio_after_silent_release())
+        return 1;
+    if (test_audio_forward_title_pts_lookahead())
+        return 1;
+    if (test_title_pts_lookahead_pressure())
         return 1;
     if (test_automatic_menu_scheduling_epoch())
         return 1;

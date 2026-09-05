@@ -256,6 +256,7 @@ struct output_state {
     int pcm_non_audio;       /* IEC 61937 burst records, never decoded PCM */
     int scheduler_enabled;
     int scheduler_started;
+    int title_pts_lookahead_logged;
     int automatic_menu_epoch;
     unsigned automatic_menu_stalled_pts;
     int automatic_menu_pcm_fallback;
@@ -2777,8 +2778,41 @@ static int scheduler_check_automatic_menu_hold(struct output_state *output)
  * longer than the other's sink can survive.  This preserves both elementary
  * streams exactly while removing mux-burst starvation and mux-burst stalling.
  */
-static int scheduler_drain(struct output_state *output, int at_eof)
+static unsigned scheduler_future_video_pts(const struct output_state *output)
 {
+    const struct video_chunk *chunk;
+    uint64_t maximum = output->max_video_pts;
+    unsigned count = 0;
+    int have_maximum = output->have_video_pts;
+
+    for (chunk = output->video_head; chunk; chunk = chunk->next) {
+        if (!chunk->has_pts ||
+            (have_maximum && chunk->pts <= maximum))
+            continue;
+        maximum = chunk->pts;
+        have_maximum = 1;
+        count++;
+    }
+    return count;
+}
+
+static int scheduler_title_pts_lookahead(const struct output_state *output,
+                                         int at_eof, int force_all)
+{
+    return output->iso_pts_normalization &&
+           !output->automatic_menu_epoch &&
+           output->audio_pes_seen && output->have_audio_pts &&
+           output->scheduler_started && !output->hold_active &&
+           !at_eof && !force_all;
+}
+
+static int scheduler_drain_mode(struct output_state *output, int at_eof,
+                                int force_all)
+{
+    unsigned future_pts = 0;
+    int retain_future_pts = 0;
+    int retained_for_lookahead = 0;
+
     if (output->iso_start_filter_active) {
         if (at_eof)
             fprintf(stderr,
@@ -2814,12 +2848,40 @@ static int scheduler_drain(struct output_state *output, int at_eof)
                 output->scheduler_started = 1;
                 if (hold_emit_frames(output, PCM_INITIAL_RELEASE_FRAMES) < 0)
                     return -1;
+                retain_future_pts = scheduler_title_pts_lookahead(
+                    output, at_eof, force_all);
+                if (retain_future_pts)
+                    future_pts = scheduler_future_video_pts(output);
             }
             continue;
         }
 
         if (!output->scheduler_started)
             break;
+        if (!retain_future_pts) {
+            retain_future_pts = scheduler_title_pts_lookahead(
+                output, at_eof, force_all);
+            if (retain_future_pts)
+                future_pts = scheduler_future_video_pts(output);
+        }
+        if (retain_future_pts) {
+            int advances = chunk->has_pts &&
+                (!output->have_video_pts ||
+                 chunk->pts > output->max_video_pts);
+
+            if (!future_pts || (future_pts == 1u && advances)) {
+                retained_for_lookahead = 1;
+                if (!output->title_pts_lookahead_logged) {
+                    fprintf(stderr,
+                            "media_player_helper: DVD title PTS lookahead "
+                            "activated queued=%zu future_pts=%u held=%zu\n",
+                            output->video_queued_bytes, future_pts,
+                            hold_available(output));
+                    output->title_pts_lookahead_logged = 1;
+                }
+                break;
+            }
+        }
         slice = remaining > VIDEO_SLICE_BYTES ? VIDEO_SLICE_BYTES : remaining;
         target = scheduler_pcm_delivery_target(
             output, scheduler_video_horizon(output, slice));
@@ -2832,7 +2894,8 @@ static int scheduler_drain(struct output_state *output, int at_eof)
             due = PCM_REFILL_FRAMES;
         available_total = output->pcm_emitted_frames +
                           (uint64_t)hold_available(output);
-        if (!at_eof && available_total < output->pcm_emitted_frames + due)
+        if (!at_eof && !force_all &&
+            available_total < output->pcm_emitted_frames + due)
             break;
         if (due && scheduler_emit_pcm(output, due) < 0)
             return -1;
@@ -2843,6 +2906,10 @@ static int scheduler_drain(struct output_state *output, int at_eof)
         output->video_queued_bytes -= slice;
         if (chunk->offset < chunk->size)
             continue;
+        if (retain_future_pts && chunk->has_pts &&
+            (!output->have_video_pts ||
+             chunk->pts > output->max_video_pts) && future_pts)
+            future_pts--;
         scheduler_accept_video_pts(output, chunk);
         free_video_head(output);
     }
@@ -2852,7 +2919,8 @@ static int scheduler_drain(struct output_state *output, int at_eof)
      * against those bytes would starve the sink exactly where the source is
      * quietest.  Serve the horizon once the queue is drained as well.
      */
-    if (output->scheduler_started && !output->hold_active && !output->video_head) {
+    if (output->scheduler_started && !output->hold_active &&
+        (!output->video_head || retained_for_lookahead)) {
         uint64_t target = scheduler_pcm_delivery_target(
             output, output->max_video_pts);
         uint64_t due = target > output->pcm_emitted_frames ?
@@ -2871,6 +2939,34 @@ static int scheduler_drain(struct output_state *output, int at_eof)
     if (output->scheduler_started && !output->hold_active)
         scheduler_log_progress(output);
     return 0;
+}
+
+static int scheduler_drain(struct output_state *output, int at_eof)
+{
+    return scheduler_drain_mode(output, at_eof, 0);
+}
+
+static int scheduler_drain_all(struct output_state *output, int at_eof)
+{
+    return scheduler_drain_mode(output, at_eof, 1);
+}
+
+static int scheduler_make_title_video_room(struct output_state *output,
+                                           size_t incoming_size,
+                                           int incoming_has_record)
+{
+    if (!output->scheduler_enabled || output->iso_start_filter_active ||
+        !output->iso_pts_normalization || output->automatic_menu_epoch ||
+        !output->audio_pes_seen ||
+        !video_queue_would_overflow(output, incoming_size,
+                                    incoming_has_record))
+        return 0;
+    fprintf(stderr,
+            "media_player_helper: DVD title PTS lookahead pressure "
+            "fallback queued=%zu incoming=%zu held=%zu\n",
+            output->video_queued_bytes, incoming_size,
+            hold_available(output));
+    return scheduler_drain_all(output, 0);
 }
 
 /*
@@ -3019,7 +3115,7 @@ static int release_unqualified_menu_activation(
             menu, output, incoming_has_pts, incoming_pts) < 0)
         return -1;
     output->iso_start_filter_active = 0;
-    if (scheduler_drain(output, 0) < 0)
+    if (scheduler_drain_all(output, 0) < 0)
         return -1;
     if (video_queue_would_overflow(output, incoming_size,
                                    incoming_has_record)) {
@@ -3085,7 +3181,7 @@ static int iso_finalize_terminal_random_access(struct output_state *output)
 
     if (filtered <= 0)
         return filtered;
-    if (scheduler_drain(output, 0) < 0 ||
+    if (scheduler_drain_all(output, 0) < 0 ||
         write_video_immediate(output, terminal_tail, sizeof(terminal_tail),
                               "DVD terminal sequence end and drain") < 0)
         return -1;
@@ -3109,7 +3205,7 @@ static int finalize_dvd_still_random_access(struct output_state *output)
     if (!output->video_head)
         return 0;
     if (!output->iso_start_filter_active)
-        return scheduler_drain(output, 0);
+        return scheduler_drain_all(output, 0);
     filtered = iso_finalize_terminal_random_access(output);
     if (filtered < 0)
         return -1;
@@ -4088,6 +4184,9 @@ static int process_pes(struct media_source *input, uint8_t code,
             !output->audio_pes_seen &&
             video_queue_would_overflow(output, video_size, has_record) &&
             scheduler_release_silent_video(output) < 0)
+            goto done;
+        if (scheduler_make_title_video_room(
+                output, video_size, has_record) < 0)
             goto done;
 
         if (output->scheduler_enabled) {
