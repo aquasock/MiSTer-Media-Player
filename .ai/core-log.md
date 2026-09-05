@@ -1,4 +1,4 @@
-## 992 COMMIT Unreleased ??? 2026-09-05T00:01:53-07:00
+## 992 COMMIT Unreleased 5fe2a8b 2026-09-05T00:01:53-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Replace the rejected title reserve drain with DVD Program Stream SCR fallback sc
 
 #### Outcome:
 
-The approved boundary will remove only source `22b0a98`'s ordinary-title prompt-drain behavior while retaining source `50c410a`'s bounded future-video-PTS lookahead.  The physical DVD demux will parse each MPEG-2 pack header's complete 27-MHz System Clock Reference instead of discarding it, normalize its 33-bit base and 9-bit extension across wrap and DVD navigation epochs, and use that authored multiplex clock only when it has advanced beyond the ordinary title's stale video-PTS horizon.  Video PTS remains the primary scheduler authority, SCR cannot run during menus or non-DVD Program Streams, host wall time remains excluded, exact video and PCM payload order remains unchanged, and malformed marker, extension or discontinuity state will fail or reset conservatively rather than invent timing.  Main, the protocol, RTL and the RBF will not change.
+Source `5fe2a8b` removes only source `22b0a98`'s disproven ordinary-title prompt-reserve drain while retaining source `50c410a`'s bounded future-video-PTS lookahead.  The physical DVD demux now parses each MPEG-2 pack header's complete 27-MHz System Clock Reference, validates its marker and extension fields, normalizes natural wrap and backward DVD discontinuities into a monotonic epoch, and uses that authored multiplex clock only when it advances beyond an ordinary title's stale video-PTS horizon.  Video PTS remains primary whenever it is later; SCR is excluded from menus and ordinary file Program Streams, host wall time remains excluded, and navigation resets all SCR state.  Focused production tests cover exact base and extension parsing, invalid markers, fractional-frame conversion, discontinuity and wrap normalization, navigation reset, scope exclusions, PTS precedence, four seconds of sparse-PTS delivery, exact elementary-stream bytes and samples, and twenty repeated scheduler runs.  Strict optimized, AddressSanitizer, UndefinedBehaviorSanitizer and analyzer builds pass, together with retained DVD random-access, SPU, menu-hop, AC-3, Program Stream seek, reserve, output-stage, CDDA, audio UI, visualizer, private-audio and Main contract tests; generated MPEG-2 DVD and MPEG-1 Program Stream smoke tests and real MP3, WAV, FLAC and Ogg integrations also pass.  Two GNU 10.2.1 hard-float ARMv7 builds are byte-identical and produce the 986,532-byte stripped static `host/build/MediaPlayer_Helper` with SHA-256 `9cc244a62aec81569ab65cf1076b22007404c854fd52ed06f16959fceebf4df0`; it has no interpreter or dynamic dependency.  Main, the protocol, RTL and the RBF are unchanged.
 
 #### Next Steps:
 
-Implement focused production-path regressions for MPEG-2 pack-header decoding, 27-MHz fractional SCR progress, multi-second sparse-video-PTS PCM continuity, normal advancing-video-PTS precedence, backward discontinuity rebasing, navigation reset, menu and non-DVD exclusion, byte-exact video and exact PCM reconstruction.  Run strict optimized, analyzer, AddressSanitizer, UndefinedBehaviorSanitizer and repeated DVD scheduler coverage plus retained DVD navigation, Program Stream seek, reserve, stage, audio, visualizer and Main contract integrations, then produce two identical stripped static GNU 10.2.1 ARMv7 helpers for a Simpsons and Futurama hardware comparison without rebuilding the RBF.
+Exit MediaPlayer and manually replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper`, preserving executable mode; retain the installed Main and RBF.  Enable telemetry, follow the same Simpsons route through both authored menus, run the first episode for at least sixty seconds, and return the fresh log, screenshot and telemetry sidecar with the direction and approximate amount of any lip-sync error and every audible cutout.  The title log must contain `DVD title SCR fallback activated`; `DVD title PTS lookahead activated` may also appear.  Then spot-check Futurama to confirm its accepted playback remains okay.  Do not rebuild or replace the RBF.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Implement focused production-path regressions for MPEG-2 pack-header decoding, 2
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
