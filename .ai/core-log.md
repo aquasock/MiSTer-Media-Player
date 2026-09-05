@@ -1,3 +1,35 @@
+## 993 COMMIT Unreleased ??? 2026-09-05T01:18:32-07:00
+
+#### Coming From:
+
+Unreleased 5fe2a8b
+
+#### Purpose:
+
+Remove the disproven read-ahead SCR title clock and bridge the measured physical-DVD timestamp droughts with bounded video-PTS lookahead.
+
+#### Outcome:
+
+The fresh Futurama run shows source `5fe2a8b` releasing audio far ahead of elapsed playback because the newest Program Stream SCR belongs to data already read into host queues rather than media consumed by the FPGA.  The planned helper-only correction will restore video PTS as the sole ordinary-title scheduling authority and expand only the active ordinary-DVD-title video queue from two to four MiB, sufficient to cross the repeated approximately 2.096-MiB pressure boundaries in the captured Futurama stream without altering automatic menus, files, Main, the protocol, RTL or the proven RBF.
+
+#### Next Steps:
+
+Implement the bounded title-only queue limit and a production regression covering a three-MiB untimestamped video span followed by a real future PTS, then run strict optimized, sanitizer, output-order, Main-contract and real helper integration tests.  Build the static ARM helper twice for reproducibility and prepare only that helper for physical Futurama and Simpsons validation while retaining the installed Main and RBF.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 992 COMMIT Unreleased 5fe2a8b 2026-09-05T00:01:53-07:00
 
 #### Coming From:
@@ -1252,34 +1284,5 @@ Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`67ce19d` art
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 953 COMMIT Unreleased 5f1cf92 2026-09-03T19:51:25-07:00
-
-#### Coming From:
-
-Unreleased 5f1cf92
-
-#### Purpose:
-
-Qualify source `5f1cf92` across Futurama's automatic root menu, nested episode-selection menus and selected-title playback.
-
-#### Outcome:
-
-The physical source-`5f1cf92` run passes hardware validation.  All three finite intro boundaries drain and release, automatic menu entry at 35.059491 seconds preserves the continuous decoder epoch, and the bounded fallback activates with 183,808 held PCM frames before settling near its 8,192-frame reserve without a hold-limit diagnostic, signal-nine termination or audio underrun.  The root menu initially appears frozen while the output path consumes an approximately 1.16 to 1.21 million-frame PCM scheduling lead, about 24 to 25 seconds, but then animates normally and accepts directional input; this is observable catch-up latency rather than a decoder deadlock.  Root-menu activation, nested episode-selection transitions and their overlay transactions complete, the final selection leaves the menu at 327.905704 seconds, and the chosen episode sustains advancing presentation timestamps for more than ninety seconds with over 77 MiB of helper video delivered.  The user confirms the menus are navigable and the selected episode looks and sounds good.  The checksum-valid schema-21 snapshot reports 128 displayed pictures, 127 swaps, zero decoder and PCM protocol errors, zero audio underruns and a valid overlay, while the updated screenshot visibly captures episode playback.  The 17,823,653-byte log, 1,386,067-byte screenshot and 818-byte telemetry sidecar have SHA-256 `4e31c76f52ab03fa55a38027c314064306d4ff9ac8d8b5a3056666d35e41eea7`, `e6511bd6c54ccab344419b1c703b38d61430c1073790293f1d11fef66e0273ce` and `9e6ede6ae979d7a24a16133f9ec1237dc3c4f4dda7bc444c4a84494f26052633`.
-
-#### Next Steps:
-
-Retain source `5f1cf92` and its helper as the accepted hardware baseline.  Treat the initial automatic-menu catch-up as a future latency optimization rather than reopening the functional fix, and broaden physical-disc regression to other automatic menus, still menus and supported title audio before the next release boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
