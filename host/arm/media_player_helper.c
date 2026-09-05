@@ -39,6 +39,7 @@
  * and keeps the runaway protection this bound exists for.
  */
 #define VIDEO_QUEUE_LIMIT  (2u * 1024u * 1024u)
+#define TITLE_VIDEO_QUEUE_LIMIT (4u * 1024u * 1024u)
 #define OUTPUT_RESERVE_BYTES (4u * 1024u * 1024u)
 #define OUTPUT_ACTIVATION_STAGE_DECISION_BYTES (4u * 1024u * 1024u)
 #define OUTPUT_ACTIVATION_STAGE_BYTES (8u * 1024u * 1024u)
@@ -58,9 +59,6 @@
 #define MP3_PROBE_BYTES             (64u * 1024u)
 #define ID3V2_TAG_LIMIT             (64u * 1024u * 1024u)
 #define ISO_PTS_DISCONTINUITY_TICKS (10u * 90000u)
-#define SYSTEM_CLOCK_HZ             27000000u
-#define SYSTEM_CLOCK_PTS_SCALE      300u
-#define SYSTEM_CLOCK_WRAP_TICKS     ((1ULL << 33) * SYSTEM_CLOCK_PTS_SCALE)
 #define AUDIO_VISUALIZER_PATH "/media/fat/linux/MediaPlayer_Visualizer.mmpvis"
 #define AUDIO_OVERLAY_RECORDS \
     (2u + (AUDIO_UI_OVERLAY_BYTES + 4095u) / 4096u)
@@ -260,7 +258,6 @@ struct output_state {
     int scheduler_enabled;
     int scheduler_started;
     int title_pts_lookahead_logged;
-    int title_scr_fallback_logged;
     int automatic_menu_epoch;
     unsigned automatic_menu_stalled_pts;
     int automatic_menu_pcm_fallback;
@@ -281,12 +278,6 @@ struct output_state {
     unsigned iso_pts_discontinuities;
     uint64_t iso_pts_rebase_floor;
     int iso_pts_rebase_pending;
-    int have_iso_scr;
-    uint64_t iso_scr_epoch_offset;
-    uint64_t iso_scr_raw_max;
-    uint64_t iso_scr_normalized_max;
-    unsigned iso_scr_discontinuities;
-    unsigned iso_scr_wraps;
     uint32_t pts_window;      /* start-code scanner across queued payloads */
     unsigned pictures_since_pts;
     int pts_boundary_seen;    /* sequence or group header since last record */
@@ -1400,91 +1391,6 @@ static int normalize_audio_pts(struct output_state *output, uint64_t raw_pts,
     return 0;
 }
 
-/*
- * SCR is monotonic within one Program Stream clock epoch, unlike decode-order
- * picture PTS.  Preserve its full 27 MHz value so the nine-bit extension is
- * not lost.  A natural 33-bit SCR-base wrap adds the exact modulus; any other
- * backward movement starts a new DVD clock epoch immediately after the prior
- * maximum.  Navigation resets output_state, so unrelated titles never share
- * this normalization state.
- */
-static int normalize_program_scr(struct output_state *output,
-                                 uint64_t raw_scr)
-{
-    uint64_t normalized;
-
-    if (!output || !output->iso_pts_normalization ||
-        output->automatic_menu_epoch)
-        return 0;
-    if (raw_scr >= SYSTEM_CLOCK_WRAP_TICKS) {
-        fprintf(stderr, "media_player_helper: invalid DVD SCR value\n");
-        return -1;
-    }
-    if (!output->have_iso_scr) {
-        output->have_iso_scr = 1;
-        output->iso_scr_raw_max = raw_scr;
-        output->iso_scr_normalized_max = raw_scr;
-        return 0;
-    }
-    if (raw_scr < output->iso_scr_raw_max) {
-        uint64_t next;
-
-        if (output->iso_scr_raw_max >
-                SYSTEM_CLOCK_WRAP_TICKS -
-                    (uint64_t)ISO_PTS_DISCONTINUITY_TICKS *
-                        SYSTEM_CLOCK_PTS_SCALE &&
-            raw_scr < (uint64_t)ISO_PTS_DISCONTINUITY_TICKS *
-                          SYSTEM_CLOCK_PTS_SCALE) {
-            if (output->iso_scr_epoch_offset >
-                    UINT64_MAX - SYSTEM_CLOCK_WRAP_TICKS) {
-                fprintf(stderr,
-                        "media_player_helper: DVD SCR wrap overflow\n");
-                return -1;
-            }
-            output->iso_scr_epoch_offset += SYSTEM_CLOCK_WRAP_TICKS;
-            output->iso_scr_wraps++;
-            fprintf(stderr,
-                    "media_player_helper: DVD SCR wrap raw=%llu "
-                    "offset=%llu count=%u\n",
-                    (unsigned long long)raw_scr,
-                    (unsigned long long)output->iso_scr_epoch_offset,
-                    output->iso_scr_wraps);
-        } else {
-            if (output->iso_scr_normalized_max == UINT64_MAX) {
-                fprintf(stderr,
-                        "media_player_helper: DVD SCR epoch overflow\n");
-                return -1;
-            }
-            next = output->iso_scr_normalized_max + 1u;
-            if (raw_scr > next) {
-                fprintf(stderr,
-                        "media_player_helper: invalid DVD SCR epoch\n");
-                return -1;
-            }
-            output->iso_scr_epoch_offset = next - raw_scr;
-            output->iso_scr_discontinuities++;
-            fprintf(stderr,
-                    "media_player_helper: DVD SCR discontinuity raw=%llu "
-                    "normalized=%llu offset=%llu count=%u\n",
-                    (unsigned long long)raw_scr,
-                    (unsigned long long)next,
-                    (unsigned long long)output->iso_scr_epoch_offset,
-                    output->iso_scr_discontinuities);
-        }
-        output->iso_scr_raw_max = raw_scr;
-    }
-    if (raw_scr > UINT64_MAX - output->iso_scr_epoch_offset) {
-        fprintf(stderr, "media_player_helper: normalized DVD SCR overflow\n");
-        return -1;
-    }
-    normalized = raw_scr + output->iso_scr_epoch_offset;
-    if (raw_scr > output->iso_scr_raw_max)
-        output->iso_scr_raw_max = raw_scr;
-    if (normalized > output->iso_scr_normalized_max)
-        output->iso_scr_normalized_max = normalized;
-    return 0;
-}
-
 static void encode_video_pts(uint8_t record[9], uint64_t pts)
 {
     uint64_t value = ((pts & 0x1ffffffffULL) << 7) | (3u << 5) | (1u << 2);
@@ -1591,21 +1497,30 @@ static int write_visualizer_video(void *opaque, const uint8_t *data,
     return write_video_immediate(opaque, data, size, "audio visualizer video");
 }
 
+static size_t video_queue_limit(const struct output_state *output)
+{
+    return output->iso_pts_normalization &&
+           !output->automatic_menu_epoch && output->audio_pes_seen &&
+           output->scheduler_started && !output->iso_start_filter_active ?
+               TITLE_VIDEO_QUEUE_LIMIT : VIDEO_QUEUE_LIMIT;
+}
+
 static int video_queue_would_overflow(const struct output_state *output,
                                       size_t size, int has_record)
 {
+    size_t limit = video_queue_limit(output);
     size_t prefix = has_record ? 9u : 0u;
     size_t pending = output->h262_chroma_normalization &&
                      output->h262_chroma.have_pending ? 1u : 0u;
     size_t incoming;
 
-    if (size > VIDEO_QUEUE_LIMIT - prefix)
+    if (size > limit - prefix)
         return 1;
     incoming = size + prefix;
-    if (pending > VIDEO_QUEUE_LIMIT - incoming)
+    if (pending > limit - incoming)
         return 1;
     incoming += pending;
-    return output->video_queued_bytes > VIDEO_QUEUE_LIMIT - incoming;
+    return output->video_queued_bytes > limit - incoming;
 }
 
 static int queue_video(struct output_state *output, const uint8_t *data,
@@ -1615,9 +1530,11 @@ static int queue_video(struct output_state *output, const uint8_t *data,
     size_t prefix = has_record ? 9u : 0u;
 
     if (video_queue_would_overflow(output, size, has_record)) {
+        size_t limit = video_queue_limit(output);
+
         fprintf(stderr,
-                "media_player_helper: video lookahead limit exceeded (%u bytes)\n",
-                (unsigned)VIDEO_QUEUE_LIMIT);
+                "media_player_helper: video lookahead limit exceeded "
+                "(%zu bytes)\n", limit);
         return -1;
     }
     chunk = calloc(1, sizeof(*chunk));
@@ -2176,6 +2093,15 @@ static int hold_emit_frames(struct output_state *output, uint64_t frames)
     return hold_flush(output, available - emit);
 }
 
+/*
+ * The physical-DVD reserve is intentionally large enough to bridge optical
+ * stalls during ordinary playback.  Once a timestamp-stalled menu enters its
+ * explicit monotonic scheduler, allowing that reserve to absorb a permitted
+ * batch would still hide the helper's chosen delivery point behind up to four
+ * MiB of older output.  Drain it before each clock-admitted batch so the batch
+ * reaches Main promptly; the monotonic budget, not reserve, pipe or SPI
+ * acceptance, owns its maximum rate.  Each individual write remains bounded.
+ */
 static int scheduler_emit_pcm(struct output_state *output, uint64_t frames)
 {
     if (output->automatic_menu_pcm_fallback && output->reserve &&
@@ -2217,75 +2143,6 @@ static uint64_t scheduler_pcm_delivery_target(
     uint64_t target = scheduler_pcm_target(output, video_pts);
 
     return target - target % PCM_REFILL_FRAMES;
-}
-
-static uint64_t scheduler_scr_elapsed_frames(uint64_t ticks,
-                                             unsigned rate_hz)
-{
-    uint64_t seconds = ticks / SYSTEM_CLOCK_HZ;
-    uint64_t fraction = ticks % SYSTEM_CLOCK_HZ;
-    uint64_t frames;
-
-    if (seconds > UINT64_MAX / rate_hz)
-        return UINT64_MAX;
-    frames = seconds * rate_hz;
-    fraction = (fraction * rate_hz + SYSTEM_CLOCK_HZ - 1u) /
-               SYSTEM_CLOCK_HZ;
-    return frames > UINT64_MAX - fraction ? UINT64_MAX : frames + fraction;
-}
-
-/*
- * Ordinary DVD titles normally follow the newest video PTS.  Some authored
- * multiplexes carry several seconds of packs and audio without another video
- * timestamp.  SCR is the authored 27 MHz Program Stream arrival clock in the
- * same time domain as PTS, so once it overtakes that stale picture horizon it
- * can advance the PCM target without substituting host wall time.  Menus use
- * their separately qualified monotonic fallback and non-DVD Program Streams
- * never populate normalized SCR state.
- */
-static uint64_t scheduler_title_pcm_delivery_target(
-    struct output_state *output, uint64_t video_pts)
-{
-    uint64_t video_target = scheduler_pcm_delivery_target(output, video_pts);
-    uint64_t audio_scr;
-    uint64_t elapsed;
-    uint64_t scr_target;
-
-    if (!output->iso_pts_normalization || output->automatic_menu_epoch ||
-        !output->have_iso_scr || !output->have_audio_pts ||
-        !output->hold_rate_hz || !output->have_video_pts ||
-        output->first_audio_pts >
-            UINT64_MAX / SYSTEM_CLOCK_PTS_SCALE)
-        return video_target;
-    audio_scr = output->first_audio_pts * SYSTEM_CLOCK_PTS_SCALE;
-    if (output->iso_scr_normalized_max <= audio_scr)
-        return video_target;
-    elapsed = scheduler_scr_elapsed_frames(
-        output->iso_scr_normalized_max - audio_scr,
-        (unsigned)output->hold_rate_hz);
-    if (elapsed == UINT64_MAX ||
-        elapsed > UINT64_MAX - PCM_SCHEDULE_RESERVE_FRAMES)
-        scr_target = UINT64_MAX;
-    else
-        scr_target = elapsed + PCM_SCHEDULE_RESERVE_FRAMES;
-    scr_target -= scr_target % PCM_REFILL_FRAMES;
-    if (scr_target <= video_target)
-        return video_target;
-    if (!output->title_scr_fallback_logged) {
-        fprintf(stderr,
-                "media_player_helper: DVD title SCR fallback activated "
-                "scr27=%llu scr_base=%llu scr_extension=%u "
-                "video_pts=%llu target=%llu\n",
-                (unsigned long long)output->iso_scr_normalized_max,
-                (unsigned long long)(output->iso_scr_normalized_max /
-                                     SYSTEM_CLOCK_PTS_SCALE),
-                (unsigned)(output->iso_scr_normalized_max %
-                           SYSTEM_CLOCK_PTS_SCALE),
-                (unsigned long long)video_pts,
-                (unsigned long long)scr_target);
-        output->title_scr_fallback_logged = 1;
-    }
-    return scr_target;
 }
 
 /*
@@ -2737,8 +2594,7 @@ static void scheduler_log_progress(struct output_state *output)
     output->sched_log_next_us = now + 1000000u;
     elapsed_us = now - output->sched_log_start_us;
     expected = elapsed_us * (uint64_t)rate_hz / 1000000u;
-    target = scheduler_title_pcm_delivery_target(output,
-                                                  output->max_video_pts);
+    target = scheduler_pcm_delivery_target(output, output->max_video_pts);
     fprintf(stderr,
             "media_player_helper: sched elapsed_us=%llu emitted=%llu "
             "expected=%llu delta=%lld target=%llu max_video_pts=%llu "
@@ -2930,9 +2786,13 @@ static int scheduler_check_automatic_menu_hold(struct output_state *output)
  * several pictures between audio PES packets.  Once startup is released, keep
  * video in a bounded lookahead queue and admit each timestamped chunk only
  * after its corresponding PCM horizon plus one FPGA startup reserve is ready.
- * Admission is sliced so that neither stream can hold the shared path for
- * longer than the other's sink can survive.  This preserves both elementary
- * streams exactly while removing mux-burst starvation and mux-burst stalling.
+ * Four MiB covers the physical Simpsons and Futurama title droughts that
+ * exceeded the former two-MiB boundary.  Source-read-ahead clocks are not a
+ * valid substitute: they can queue seconds of PCM ahead of the video bytes
+ * that made those clocks observable.  Admission is sliced so that neither
+ * stream can hold the shared path for longer than the other's sink can
+ * survive.  This preserves both elementary streams exactly while removing
+ * mux-burst starvation and mux-burst stalling.
  */
 static unsigned scheduler_future_video_pts(const struct output_state *output)
 {
@@ -3039,7 +2899,7 @@ static int scheduler_drain_mode(struct output_state *output, int at_eof,
             }
         }
         slice = remaining > VIDEO_SLICE_BYTES ? VIDEO_SLICE_BYTES : remaining;
-        target = scheduler_title_pcm_delivery_target(
+        target = scheduler_pcm_delivery_target(
             output, scheduler_video_horizon(output, slice));
         due = target > output->pcm_emitted_frames ?
               target - output->pcm_emitted_frames : 0;
@@ -3077,7 +2937,7 @@ static int scheduler_drain_mode(struct output_state *output, int at_eof,
      */
     if (output->scheduler_started && !output->hold_active &&
         (!output->video_head || retained_for_lookahead)) {
-        uint64_t target = scheduler_title_pcm_delivery_target(
+        uint64_t target = scheduler_pcm_delivery_target(
             output, output->max_video_pts);
         uint64_t due = target > output->pcm_emitted_frames ?
                        target - output->pcm_emitted_frames : 0;
@@ -3923,60 +3783,19 @@ static int seek_command_seconds(int command, int *seconds)
     }
 }
 
-static int read_program_stream_pack(struct media_source *input,
-                                    struct output_state *output)
+static int skip_program_stream_pack(struct media_source *input)
 {
     uint8_t header[10];
-    uint64_t scr_base;
-    uint64_t scr;
-    size_t stuffing = 0;
 
     if (read_exact(input, header, 1) < 0)
         return -1;
-    if ((header[0] & 0xc0) == 0x40) {
-        unsigned extension;
-        unsigned mux_rate;
-
-        if (read_exact(input, header + 1, 9) < 0)
-            return -1;
-        if (!(header[0] & 0x04u) || !(header[2] & 0x04u) ||
-            !(header[4] & 0x04u) || !(header[5] & 0x01u) ||
-            (header[8] & 0x03u) != 0x03u) {
-            fprintf(stderr,
-                    "media_player_helper: invalid MPEG-2 pack markers\n");
-            return -1;
-        }
-        scr_base = ((uint64_t)(header[0] & 0x38u) << 27) |
-                   ((uint64_t)(header[0] & 0x03u) << 28) |
-                   ((uint64_t)header[1] << 20) |
-                   ((uint64_t)(header[2] & 0xf8u) << 12) |
-                   ((uint64_t)(header[2] & 0x03u) << 13) |
-                   ((uint64_t)header[3] << 5) |
-                   ((uint64_t)header[4] >> 3);
-        extension = ((unsigned)(header[4] & 0x03u) << 7) |
-                    ((unsigned)header[5] >> 1);
-        mux_rate = ((unsigned)header[6] << 14) |
-                   ((unsigned)header[7] << 6) |
-                   ((unsigned)header[8] >> 2);
-        if (extension >= SYSTEM_CLOCK_PTS_SCALE || !mux_rate) {
-            fprintf(stderr,
-                    "media_player_helper: invalid MPEG-2 pack clock\n");
-            return -1;
-        }
-        scr = scr_base * SYSTEM_CLOCK_PTS_SCALE + extension;
-        stuffing = header[9] & 7u;
-    } else if ((header[0] & 0xf0) == 0x20) {
-        if (read_exact(input, header + 1, 7) < 0)
-            return -1;
-        scr_base = decode_pts(header);
-        scr = scr_base * SYSTEM_CLOCK_PTS_SCALE;
-    } else {
-        fprintf(stderr, "media_player_helper: invalid pack header\n");
-        return -1;
-    }
-    if (normalize_program_scr(output, scr) < 0)
-        return -1;
-    return skip_bytes(input, stuffing) < 0 ? -1 : 0;
+    if ((header[0] & 0xc0) == 0x40)
+        return read_exact(input, header + 1, 9) < 0 ||
+               skip_bytes(input, header[9] & 7) < 0 ? -1 : 0;
+    if ((header[0] & 0xf0) == 0x20)
+        return read_exact(input, header + 1, 7);
+    fprintf(stderr, "media_player_helper: invalid pack header\n");
+    return -1;
 }
 
 /*
@@ -4002,7 +3821,7 @@ static int scan_program_stream_seek(
         if (media_source_position(input, &after_code) < 0)
             return -1;
         if (code == 0xba) {
-            if (read_program_stream_pack(input, NULL) < 0)
+            if (skip_program_stream_pack(input) < 0)
                 return -1;
             continue;
         }
@@ -4129,8 +3948,20 @@ static int preflight_program_stream(struct media_source *input)
         if (code == 0xb9)
             break;
         if (code == 0xba) {
-            if (read_program_stream_pack(input, NULL) < 0)
+            uint8_t header[10];
+            if (read_exact(input, header, 1) < 0)
                 return -1;
+            if ((header[0] & 0xc0) == 0x40) {
+                if (read_exact(input, header + 1, 9) < 0 ||
+                    skip_bytes(input, header[9] & 7) < 0)
+                    return -1;
+            } else if ((header[0] & 0xf0) == 0x20) {
+                if (read_exact(input, header + 1, 7) < 0)
+                    return -1;
+            } else {
+                fprintf(stderr, "media_player_helper: invalid pack header\n");
+                return -1;
+            }
             continue;
         }
         if ((code & 0xf0) == 0xe0) {
@@ -5027,10 +4858,7 @@ static int process_program_stream(struct media_source *input,
             return 0;
         }
         if (code == 0xba) {
-            if (read_program_stream_pack(input, output) < 0)
-                return -1;
-            if (output->scheduler_enabled &&
-                scheduler_drain(output, 0) < 0)
+            if (skip_program_stream_pack(input) < 0)
                 return -1;
             continue;
         }
@@ -6017,11 +5845,8 @@ int main(int argc, char **argv)
                 (unsigned long long)output.pcm_emitted_frames);
     if (output.iso_pts_normalization)
         fprintf(stderr,
-                "media_player_helper: DVD PTS discontinuities=%u "
-                "SCR discontinuities=%u wraps=%u\n",
-                output.iso_pts_discontinuities,
-                output.iso_scr_discontinuities,
-                output.iso_scr_wraps);
+                "media_player_helper: DVD PTS discontinuities=%u\n",
+                output.iso_pts_discontinuities);
 done:
     program_stream_seek_destroy(&seek_index);
     if (audio_file_control_state.seek_pending && control_fd >= 0)

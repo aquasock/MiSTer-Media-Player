@@ -232,27 +232,27 @@ so the continuing FPGA timeline remains monotonic without changing authored
 A/V timing.
 
 Ordinary DVD titles retain one advancing timestamped video chunk in their
-bounded two-MiB queue. The demultiplexer can therefore read far enough beyond
+bounded four-MiB queue. The demultiplexer can therefore read far enough beyond
 an audio-forward or bursty PES run to discover the following video horizon;
 untimestamped video before that retained chunk is still admitted in slices and
-its known PTS advance is interpolated across those bytes. The demultiplexer also
-decodes the complete 33-bit SCR base and nine-bit extension from each DVD
-MPEG-2 pack header, retaining the clock in its native 27 MHz domain. SCR wraps
-add the exact clock modulus, other backward moves start a monotonic DVD epoch,
-and every navigation reset clears that state. Decoded PCM normally remains
-governed by the cumulative video-PTS target plus startup reserve. Only when the
-normalized SCR overtakes a stale ordinary-title video PTS can its authored pack
-clock supply the larger cumulative target; the fractional extension is retained
-through the 48 kHz conversion. This excludes host wall time, source speed, pipe
-acceptance and PES count while bridging a title whose multiplex continues
-without another video PTS. Automatic menus retain their separately qualified
-fallback, and ordinary non-DVD Program Streams do not collect normalized SCR.
-A second advancing video timestamp releases the preceding lookahead and resumes
-as the primary horizon whenever it is later. EOF, finite still and resident
+its known PTS advance is interpolated across those bytes. Decoded PCM remains
+governed by the existing cumulative video-PTS target plus startup reserve, not
+wall time, source speed, pipe acceptance or the number of PES packets. A second
+advancing timestamp releases the preceding one. EOF, finite still and resident
 menu-continuation boundaries force the retained tail through exactly, while a
 timestamp-poor stream reaching the established queue limit takes the same
-explicit full-drain fallback rather than growing without bound. Elementary
-video and PCM samples remain byte-exact and in their established output order.
+explicit full-drain fallback rather than growing without bound. ISO timestamp
+rebasing, automatic menus, non-DVD Program Streams and all elementary bytes are
+unchanged.
+
+The ordinary-title scheduler deliberately does not use the newest Program
+Stream SCR as an elapsed playback clock. The helper can parse several seconds
+ahead into its host queues, so such a value describes future source data rather
+than PCM already consumed by the FPGA. Physical Futurama and Simpsons captures
+showed that substitution filling the PCM side of the shared in-band path,
+reducing Main to sample-sized credits and starving compressed video queued
+behind it. The larger bounded PTS lookahead bridges those measured sparse-PTS
+regions without advancing audio independently of admitted video.
 
 If an automatic-menu epoch's video horizon remains at its first audio PTS,
 repeats a timestamped video PTS, or delivers 256 KiB of video without advancing

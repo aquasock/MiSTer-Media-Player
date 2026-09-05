@@ -8,12 +8,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
-- Parsed the complete 27 MHz SCR from DVD Program Stream pack headers and used
-  it as an ordinary-title PCM horizon only after it overtakes a stale video
-  PTS. The authored pack clock bridges sparse-video-PTS intervals without the
-  rejected host wall clock or title reserve drain, preserves its fractional
-  extension across wrap and navigation epochs, and leaves menus, ordinary
-  Program Stream files, transport order, the protocol, and the RBF unchanged.
+- Expanded ordinary DVD title video-PTS lookahead from two to four MiB so the
+  scheduler can bridge the measured sparse-timestamp regions without treating
+  source-read-ahead SCR as elapsed playback time. PCM remains paced only by the
+  admitted video horizon, preventing future audio from filling the shared path
+  ahead of compressed video.
 - Retained one bounded future video timestamp while scheduling ordinary DVD
   titles. Audio-forward Program Stream multiplexing can now expose its next
   PTS horizon before the preceding video is admitted, keeping already-decoded
