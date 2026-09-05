@@ -1,3 +1,32 @@
+## 986 COMMIT Unreleased f597cb1 2026-09-04T17:56:01-07:00
+
+#### Coming From:
+
+Unreleased f597cb1
+
+#### Purpose:
+
+Evaluate schema-22 on the repeated Simpsons title run and separate the persistent audio lead from its newly audible PCM stutters.
+
+#### Outcome:
+
+The physical source-`f597cb1` run validates the passive schema-22 instrumentation but rejects playback acceptance: the user reports the same progressive audio lead and more audible stutters, concentrated near title startup and disappearing as playback settles.  The checksum-valid thirty-second snapshot records 732 displayed pictures and 731 swaps at 24.415 pictures per second, 1,332,473 actual audio-domain dequeues or 27.759854 seconds of 48 kHz PCM, a pending timestamped picture 206,487 ticks or 2.294300 seconds behind the audio-derived STC, and 60 candidate-unavailable, 998 cadence-blocked and zero timestamp-blocked presentation windows.  The zero timestamp block count excludes future-PTS admission waits, while 60 unavailable windows, 319 display-gap outliers up to 83.448433 milliseconds and 1,465,925,354 decoder-stall cycles establish intermittent decoder or presentation unavailability; the displayed-frame PTS itself was invalid at the frozen snapshot, so the fixed startup component of the 2.294-second candidate lateness cannot be separated from accumulated lateness in this capture.  Host scheduling still does not run audio fast: across 94.112970 seconds of title logging, emitted PCM advances 93.496000 seconds at 0.993447 real time while maximum video PTS advances 93.760333 seconds at 0.996253 real time, and the helper's PCM lead over that PTS shrinks by about 0.264 seconds.  The stutter is an independent startup-fill defect rather than continuing transport failure: the FIFO floor reaches zero with no shared-transport block and audible continuity recovers after the pipeline settles, but `audio_pcm_output_adapter` leaves `underrun` sticky after the first starvation recovery, so Main's edge counter is structurally limited to one event per reset and does not contradict multiple early dropouts.  The 5,745,413-byte log, 586,785-byte screenshot and 831-byte telemetry sidecar have SHA-256 `1ba4d981d6d017193761c196fdab1e0a966f5b7dfbbf57645c8f5fcd971bd671`, `91e3830fbeb45436f81153e7eaf34edcbd4615152d8623e22625d29ce98dc515` and `11b27f0f1bfcbb5863861975d5f8b0a8c48f514a2cf75d3da8f2078d6bee74c0`.
+
+#### Next Steps:
+
+Do not restore a helper wall-clock floor or otherwise make PCM run independently of video PTS.  After user approval, treat the remaining synchronization work as an emergency functional RTL boundary: coordinate audio startup with the first presentable video and adequate PCM prefill, design and simulate bounded late-picture recovery against the audio presentation clock while retaining the early timestamp gate and native field-order rules, and make underrun reporting count distinct starvation episodes.  Keep the accepted helper's long-term PTS-derived rate unchanged, build an RBF only after focused startup and presentation regressions pass, and qualify that functional build across three seeds before another physical Simpsons test.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 985 COMMIT Unreleased f597cb1 2026-09-04T16:42:49-07:00
 
 #### Coming From:
@@ -1244,39 +1273,6 @@ After user approval, distinguish a finite terminal boundary from an automatic si
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 946 COMMIT Unreleased ae533a1 2026-09-03T16:22:52-07:00
-
-#### Coming From:
-
-Unreleased ce5a826
-
-#### Purpose:
-
-Install the patched Main only for MediaPlayer so development testing no longer replaces the official system-wide MiSTer executable.
-
-#### Outcome:
-
-Source `ae533a1` makes `host/build/MiSTer_MediaPlayer` the canonical patched-Main output and adds a merge-only `MiSTer.ini` fragment containing the core-reported `[MediaPlayer]` section and `main=MiSTer_MediaPlayer`.  Current build and hardware-test guidance now installs that executable at `/media/fat/MiSTer_MediaPlayer`, retains `/media/fat/MiSTer` for every other core and explains the automatic return to official Main when the Menu core loads; the published v0.9.0 records remain unchanged as historical package provenance.  The pinned-Main build applies and compiles locally with GNU 10.2.1, shell syntax and the exact fragment contract pass, and the renamed 1,182,692-byte binary is byte-identical to the tested source-`ce5a826` Main at SHA-256 `99084bc5db9062e2984ec93f40158f4bfd4c265300b314c7a7ddbd6e8081f706`; the matched 966,052-byte helper remains SHA-256 `32c9a5846aac94f4c1ce2c1bb36a752b5a1c71bfa4ab0bcf304170ef58645e72`.  The host-only test archive `host/build/MiSTer_MediaPlayer_StreamBoundary_ae533a1.zip` contains the two executables, merge fragment, installation and provenance notes plus a five-entry manifest; ZIP integrity and a fresh-extraction manifest check pass.  It is 1,335,862 bytes at SHA-256 `ab9601a2c1c1f08c42aeec842187d822d0b69ea8bb4ddd697c3a7ec42b18697c`.  Helper behavior, Main behavior, RTL, RBF and visualizer are unchanged from `ce5a826`.
-
-#### Next Steps:
-
-Leave `/media/fat/MiSTer` untouched, extract the test archive, copy `MiSTer_MediaPlayer` and `linux/MediaPlayer_Helper` to the paths in `INSTALL.txt`, merge only its `[MediaPlayer]` fragment at the end of the existing `/media/fat/MiSTer.ini`, set both executables to mode 755 and reboot.  Confirm MediaPlayer enters the alternate Main and returning to the Menu core returns to official Main, then run Futurama disc one through every finite intro still into its automatic menu.  Acceptance requires continued playback after each still, visible background and moving selector, synchronized AC-3, responsive activation and fresh log, screenshot and telemetry evidence from the matched pair.
-
-#### Files Modified:
-
-- README.md
-- assets/MiSTer_MediaPlayer.ini.fragment
-- docs/BUILDING.md
-- docs/TEST_INSTRUCTIONS.md
-- host/build_arm_stack.sh
 
 #### Status:
 
