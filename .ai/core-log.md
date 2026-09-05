@@ -1,4 +1,4 @@
-## 985 COMMIT Unreleased ??? 2026-09-04T16:42:49-07:00
+## 985 COMMIT Unreleased f597cb1 2026-09-04T16:42:49-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add passive schema-22 A/V progress telemetry that distinguishes decoder availabi
 
 #### Outcome:
 
-The approved diagnostic will preserve every schema-21 overlay and deadline word while assigning the five currently zero words 58 through 62 to A/V synchronization evidence.  Word 58 will carry a full-width displayed-picture count, word 59 a Gray-synchronized full-width audio-domain PCM dequeue count, words 60 and 61 the signed audio-derived-STC lateness of the displayed and pending picture PTS, and word 62 saturating counts of presentation windows blocked by unavailable candidate output, cadence gating or a future timestamp plus PTS-valid flags.  The profiler inputs and top-level observation wiring will expand only for these passive signals; no diagnostic output will feed the decoder, presentation scheduler, audio adapter, transport or host protocol.
+Source `f597cb1` preserves every schema-21 overlay and audio word while assigning the five previously zero words 58 through 62 to passive A/V synchronization evidence: full-width display progress, a Gray-synchronized audio-domain PCM dequeue count, signed displayed and pending PTS lateness against the audio-derived STC, and saturating presentation-window counts categorized as unavailable candidate, cadence gate or future timestamp.  No diagnostic output feeds playback logic.  The five host decoder regressions and Python compilation pass, and the extended Icarus visibility regression proves schema selection, all five packed words, signed lateness and retained hidden/live overlay behavior.  The fixed build seed `260829` completes synthesis, fit and assembly with zero errors; the timing gate passes global setup at `+0.095 ns`, hold at `+0.243 ns`, recovery at `+3.136 ns`, removal at `+0.660 ns` and minimum pulse width at `+0.925 ns`.  The resulting 4,478,968-byte `output_files/MediaPlayer_AVSyncDiag_f597cb1.rbf` has matching local/build-PC SHA-256 `80b4a075166f8a4ea078482ee6b75250641e3f0740cd4fc350479b180459cafd`.  At the user's direction this exceptional diagnostic build was allowed to finish after the normal policy was clarified: diagnostic RBF rebuilds are otherwise prohibited, and any future necessary RBF rebuild must be treated as an emergency requiring three-seed qualification.
 
 #### Next Steps:
 
-Implement schema 22 in the hardware cadence profiler and top level, extend the screenshot decoder and its host regression, and extend the telemetry visibility simulation to prove full counters, signed lateness, cause packing, validity and checksum behavior.  Run all retained RTL unit and integrated simulations, the host telemetry tests and static checks, then compile the full Quartus project and confirm timing, fitter and resource reports remain acceptable.  Publish a uniquely named diagnostic RBF while retaining source `0a2e2af` Main and helper; the next 30-second Simpsons title capture must quantify displayed pictures versus consumed PCM and show whether accumulated lateness comes from decoder availability, native-film cadence or timestamp gating before any functional A/V correction is proposed.
+Manually upload only `output_files/MediaPlayer_AVSyncDiag_f597cb1.rbf`, retaining the current source-`0a2e2af` Main and helper, enable telemetry and repeat the same Simpsons first-episode route for at least 30 seconds after playback starts.  Return the fresh log, screenshot and telemetry sidecar plus the audible synchronization result; schema 22 must quantify displayed pictures versus consumed PCM and show whether accumulated lateness comes from decoder availability, native-film cadence or timestamp gating before any functional correction is proposed.  Do not initiate another RBF build for ordinary diagnostics; reserve any future build for an explicitly approved emergency and qualify it across three seeds.
 
 #### Files Modified:
 
@@ -27,7 +27,7 @@ Implement schema 22 in the hardware cadence profiler and top level, extend the s
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
