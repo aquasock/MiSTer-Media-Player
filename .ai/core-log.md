@@ -1,3 +1,32 @@
+## 989 COMMIT Unreleased 50c410a 2026-09-04T21:13:18-07:00
+
+#### Coming From:
+
+Unreleased 50c410a
+
+#### Purpose:
+
+Evaluate bounded title PTS lookahead on the failing Simpsons disc and localize the remaining audio delay and cutouts.
+
+#### Outcome:
+
+The physical source-`50c410a` run validates the new lookahead mechanism but does not pass playback acceptance: Futurama remains okay, while the user reports that Simpsons still has delayed audio and two audible cutouts, although the cutouts appear improved.  The title records one `DVD title PTS lookahead activated` marker and its scheduler samples retain approximately 4,048 to 417,463 queued video bytes with 57,856 to 94,848 held PCM frames, eliminating the prior capture's repeated zero-video horizon.  At a nearly byte-aligned thirty-second schema-22 point, however, the displayed state remains 732 pictures and 731 swaps at 24.411 pictures per second, with 60 candidate-unavailable, 998 cadence-blocked and zero timestamp-blocked windows, and the pending candidate remains exactly 206,487 ticks or 2.294300 seconds late.  FPGA audio consumption improves by only 10,374 frames or 216.125 milliseconds to 1,342,847 frames, 27.975979 seconds, while the matching helper progress record has already emitted 1,553,280 frames; 210,433 emitted frames or 4.384021 seconds therefore remain upstream of the PCM sink in the shared reserve, pipe and transport rather than in the helper's decoded-audio hold.  The helper's output reserve can carry four MiB of earlier interleaved video, so preserving a future PTS does not by itself make a newly scheduled PCM batch reach Main or the FPGA promptly when the Simpsons decoder applies sustained backpressure.  The sticky underrun remains set with FIFO floor zero and cannot count the user's two distinct events.  The 4,658,629-byte log, 608,901-byte screenshot and 831-byte telemetry sidecar have SHA-256 `d51bfeaaf8eed09652c06ee1b112f156c5f784b3566c4cea4ef5bcd061d0009e`, `d15e4a0756856e40ae9aee1c6ea3e58d2f86ecd202cccef19f4aeed7a7544eb3` and `27dd01a5ce8fc0bf48940531c4b4502e42a1aad85057015b9030b7cab2b83ae9`.
+
+#### Next Steps:
+
+Do not rebuild or change the RBF.  After user approval, make the next boundary helper-only: before each PTS-admitted ordinary-title PCM batch, drain the physical-DVD asynchronous output reserve as the accepted automatic-menu pacing path already does, so scheduled samples cannot remain behind seconds of older compressed video; retain the future-PTS queue, cumulative PTS authority, exact stream order, startup reserve, menu behavior and the physical source producer ring.  Add a production regression with a full four-MiB stalled output reserve that proves each scheduled PCM batch reaches the downstream writer before later video, retains bounded optical buffering, and converges without advancing audio independently of video PTS, then rebuild only the static ARM helper and repeat Simpsons plus Futurama.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 988 COMMIT Unreleased 50c410a 2026-09-04T18:11:54-07:00
 
 #### Coming From:
@@ -1245,35 +1274,6 @@ Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`0df8570` art
 - host/arm/ARCHITECTURE.md
 - host/arm/media_player_helper.c
 - tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 949 COMMIT Unreleased d7d5ab2 2026-09-03T17:49:51-07:00
-
-#### Coming From:
-
-Unreleased d7d5ab2
-
-#### Purpose:
-
-Qualify the boundary odd-byte correction on Futurama disc one and isolate the later black failure during its 20th Century transition.
-
-#### Outcome:
-
-The physical source-`d7d5ab2` run validates the corrected Main boundary path but rejects the complete host behavior.  All three finite first-play stills now finish and cross one decoder boundary each, the first two observed odd tails each log `pipe quiescent odd_tail=1` and submit their final byte, and every boundary reaches `released after drain`; the third session then qualifies a normal sequence/I/P restart group, releases 2,096,389 queued silent-video bytes and visibly advances into the 20th Century animation.  At 40.445047 seconds libdvdnav enters menu space while that live video session is still progressing, and the helper requests a fourth decoder boundary; Main drains 76,372 remaining bytes, resets the healthy decoder at 41.727776 seconds and leaves a black display.  The fresh menu epoch emits no H.262 restart diagnostic because its next 2,097,152 bytes never contain the sequence-header/I/reference combination required only after a decoder reset, although the helper accepts AC-3, publishes nine complete 86,400-byte overlay planes and remains responsive to an Up command that changes button one to four.  At 85.968714 seconds the queued video reaches the implementation guard and `video lookahead limit exceeded` deliberately exits the helper with code one.  Checksum-valid schema-21 telemetry confirms zero pictures and swaps in the reset session, nine valid overlay commits with no protocol error, and no audio underrun or transport block; the black 1,920-by-1,080 screenshot retains only the telemetry raster.  The 1,707,301-byte log, 1,557-byte screenshot and 480-byte telemetry sidecar have SHA-256 `9ec5ac166630067398f71e8226ed2c2b7a49f0cc68639ce43effc59bd3101789`, `5b3b2acf3c879c741b48e7d7a9c6c89b2ffc73f65b7ad1af633f7903491c421b` and `c5c1c9ba9f37749c4f0fa08b16d9ad56761fc12579b5b63b3739cd0509618f`.
-
-#### Next Steps:
-
-After user approval, preserve all finite-still decoder boundaries and the source-`d7d5ab2` Main correction, but stop resetting the already-live FPGA decoder solely because the continuous first-play video enters menu space.  Replace that automatic boundary with a helper-only audio and scheduling epoch transition that drains any pending H.262 normalization byte in original order, retains continuous decoder context and the resident picture, does not re-enable the initial random-access filter, and keeps the new menu's audio/video PTS relationship valid without a backward FPGA timestamp.  Add a production-path regression whose post-transition video exceeds 2 MiB without a new sequence header, proving byte-exact continuous delivery, bounded scheduling, synchronized AC-3 admission, overlay continuation and no Main READY/GO; retain finite-still boundaries, explicit navigation hops, late-audio rejection and sanitizer coverage, then build only a new ARM helper and retest Futurama through the complete animation into its moving menu.  Main, protocol, RTL and RBF should remain unchanged.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
