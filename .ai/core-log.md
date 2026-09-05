@@ -1,3 +1,35 @@
+## 988 COMMIT Unreleased ??? 2026-09-04T18:11:54-07:00
+
+#### Coming From:
+
+Unreleased f597cb1
+
+#### Purpose:
+
+Retain bounded future video-PTS lookahead so audio-forward DVD multiplexing cannot starve scheduled PCM behind a stale video horizon.
+
+#### Outcome:
+
+The approved helper-only change will separate Program Stream ingestion from immediate post-PES draining long enough to retain a bounded future video timestamp runway, while preserving exact video bytes, decoded PCM, navigation boundaries, the established PTS-derived cumulative rate and every automatic-menu fallback.  It will not use host wall time for ordinary titles and will not change Main, the protocol, RTL or the RBF.
+
+#### Next Steps:
+
+Implement the minimum-lookahead policy with explicit bounded fallback for EOF, navigation, timestamp-poor streams and existing queue pressure; extend the production translation-unit regression with Simpsons-shaped early AC-3 and sparse video-PTS bursts plus a modeled 48 kHz sink, and retain Futurama-shaped balanced multiplexing, menus, discontinuities and exact-output controls.  Run strict optimized, sanitizer, analyzer, repetition and retained DVD/audio suites, build only the static ARM helper locally, verify reproducibility and prepare it for manual MiSTer installation without starting Quartus.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 987 COMMIT Unreleased f597cb1 2026-09-04T18:09:25-07:00
 
 #### Coming From:
@@ -1242,37 +1274,6 @@ After user approval, preserve all finite-still decoder boundaries and the source
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 948 COMMIT Unreleased d7d5ab2 2026-09-03T16:51:15-07:00
-
-#### Coming From:
-
-Unreleased ae533a1
-
-#### Purpose:
-
-Submit the final odd byte of an autonomous DVD boundary after nonblocking pipe quiescence instead of returning before the existing transport path.
-
-#### Outcome:
-
-Source `d7d5ab2` corrects the single Main control-flow defect demonstrated by the Futurama trace: after an autonomous boundary, nonblocking pipe quiescence with one buffered byte now falls through to the existing transport routine, which submits that real byte in a zero-padded 16-bit word, while ordinary non-boundary lone bytes remain held and `EINTR` remains nonterminal.  A later empty-pipe observation permits the existing reset and GO handshake, so no media byte is discarded and the control protocol, helper, RTL and RBF are unchanged.  The lifecycle regression covers ordinary hold, interrupted read, boundary odd-byte submission, empty-pipe release, exact byte accounting and a single reset/GO; optimized, AddressSanitizer plus UndefinedBehaviorSanitizer and GCC analyzer runs pass.  The production overlay-output regression passes optimized, AddressSanitizer and UndefinedBehaviorSanitizer runs, the patch applies cleanly to pinned Main `0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f`, and two local GNU 10.2.1 ARM builds are byte-identical.  The resulting 1,182,692-byte ARMv7 executable `host/build/MiSTer_MediaPlayer` has SHA-256 `250f065859f30150a4b8226072b254ff81f76e27e1b926d1c63ede0ef48bc121`; the unchanged 966,052-byte helper has SHA-256 `32c9a5846aac94f4c1ce2c1bb36a752b5a1c71bfa4ab0bcf304170ef58645e72`.  The 1,335,713-byte archive `host/build/MiSTer_MediaPlayer_BoundaryByte_d7d5ab2.zip` has SHA-256 `0ef5a03055e39a52ea185064ca32b1a74c53f67fe0309200f72d0f38d6086783`; ZIP integrity, fresh extraction, executable modes and its five-file manifest verify.
-
-#### Next Steps:
-
-Leave `/media/fat/MiSTer` untouched, install the archive's `MiSTer_MediaPlayer` and `linux/MediaPlayer_Helper` at the paths documented in `INSTALL.txt`, merge only its `[MediaPlayer]` fragment, set both executables to mode 755 and reboot.  Retest Futurama through every finite first-play still into its visible moving menu with synchronized AC-3 and responsive activation.  The log should show the helper boundary request and Main boundary pending; when an odd tail exists it should then show `DVD stream boundary pipe quiescent odd_tail=1`, a one-byte transfer, `DVD stream boundary released after drain`, and helper release rather than repeated would-block polling.  Collect a fresh Main/helper log, screenshot and telemetry for acceptance or further isolation.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_main_seek_lifecycle.cpp
 
 #### Status:
 
