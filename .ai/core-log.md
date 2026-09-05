@@ -1,3 +1,32 @@
+## 991 COMMIT Unreleased 22b0a98 2026-09-04T23:57:03-07:00
+
+#### Coming From:
+
+Unreleased 22b0a98
+
+#### Purpose:
+
+Evaluate prompt title-PCM delivery on the failing Simpsons title and determine whether the asynchronous helper reserve causes its persistent cutouts and desynchronization.
+
+#### Outcome:
+
+The physical source-`22b0a98` run rejects prompt title-PCM delivery as a playback correction: the user reports that audible cutouts remain and A/V desynchronization is unchanged.  Both `DVD title PTS lookahead activated` and `DVD title PCM prompt delivery activated reserve=4194304 batch=2048` occur, proving that the intended helper path ran and that the four-MiB asynchronous reserve was synchronously drained before scheduled title PCM.  Nevertheless, the checksum-valid schema-22 snapshot remains effectively the prior Simpsons state at its internally frozen 30.000-second epoch: 25,214,024 accepted bytes, 730 displayed pictures and 729 swaps at 24.366 pictures per second, 1,339,712 audio-domain dequeues or 27.910667 seconds, 66 candidate-unavailable, 994 cadence-blocked and zero timestamp-blocked windows, 1,464,734,399 decoder-stall cycles, and one sticky underrun with FIFO floor zero.  The user's later telemetry invocation does not extend these counters because the overlay snapshot itself is bounded at exactly 1,800,000,000 60-MHz session cycles.  More importantly, the continuing helper log exposes a 2.558400-second interval from Main diagnostic time 156.447116 to 159.005516 with no pipe read: across the surrounding 3.128651 seconds, emitted PCM advances only 24,064 frames or 0.501333 seconds and maximum video PTS advances only 55,556 ticks or 0.617289 seconds despite 82,304 held PCM frames and 155,923 queued video bytes.  The scheduler's wall-time deficit therefore jumps from 64,514 frames, 1.344042 seconds, to 190,625 frames, 3.971354 seconds and remains about 3.9 seconds through the final 53.277553-second sample.  This reproduces the Simpsons-specific sparse-video-PTS drought after removing reserve latency: prompt delivery cannot create timestamp authority, and a helper wall-clock substitute was already physically rejected because it lets audio run ahead of actual video presentation.  The 3,649,656-byte log, 457,475-byte screenshot and 818-byte telemetry sidecar have SHA-256 `aec8690ffa0122e4107ba832041cf69e4537b3ca34e7a8635e28b743af7999ec`, `af7483f0356d51061a7850f2fce895a8403d1d220d36fc0906292bbc76335fac` and `c87ac03de6310f9ff7da07bc536f67c1fa78bb460d641b719fb1cbc1a63c779d`.
+
+#### Next Steps:
+
+Do not rebuild or change the RBF.  Treat the four-MiB prompt-drain experiment as disproven and do not stack another host timing heuristic on it.  After user approval, revert only source `22b0a98`'s title prompt-delivery change while retaining source `50c410a`'s bounded future-PTS lookahead, then rebuild only the static ARM helper to restore the smaller accepted change.  The remaining Simpsons defect cannot be robustly corrected by helper scheduling alone: the source offers no advancing video timestamp during the multi-second drought, while the helper has no feedback for actual FPGA video presentation, and the previously tested wall clock advances audio independently and worsens drift.  With the user's no-RBF constraint, retain the working helper baseline for other DVDs and document Simpsons as a disc-specific limitation unless a future explicitly approved emergency implements presentation-aware A/V coordination and three-seed RBF qualification.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 990 COMMIT Unreleased 22b0a98 2026-09-04T21:15:32-07:00
 
 #### Coming From:
@@ -1246,35 +1275,6 @@ Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`5f1cf92` art
 - host/arm/ARCHITECTURE.md
 - host/arm/media_player_helper.c
 - tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 951 COMMIT Unreleased 0df8570 2026-09-03T18:32:13-07:00
-
-#### Coming From:
-
-Unreleased 0df8570
-
-#### Purpose:
-
-Qualify the continuous automatic-menu epoch on Futurama disc one and isolate its remaining burst-audio failure.
-
-#### Outcome:
-
-The physical source-`0df8570` run validates the continuous decoder correction but rejects its audio scheduling.  All three finite intro boundaries complete, automatic menu entry at 43.904862 seconds produces the new helper-only scheduling and PTS epochs without a fourth Main decoder reset, the menu becomes visible and animated, and the user confirms its selector responds.  The checksum-valid schema-21 capture reports 128 displayed pictures and 127 swaps in 4.423730 seconds, zero decoder flags, zero PCM protocol errors and a valid overlay; Main records eighty-two complete overlay commits with no ordering error and no video lookahead failure.  At menu entry the first raw PTS 45,045 is translated to 647,273, equal to the later maximum video horizon, so the audio target remains fixed at the 8,192-frame reserve for the entire run.  The scheduler consequently emits only its 128-frame safety refill per 4,096 video bytes, averaging about 4,270 frames per second instead of 48,000 and matching the reported periodic distorted bursts, while AC-3 decode accumulates unchecked: the final progress record has emitted 591,360 frames but holds 118,129,152 frames, approximately 472.5 MiB of stereo PCM.  Linux then kills the helper with signal nine at 187.177284 seconds, consistent with exhausting the target's approximately 492 MiB visible RAM.  The 4,060,455-byte log, 637,658-byte screenshot and 844-byte telemetry sidecar have SHA-256 `f22b5b1808ac1bb94b8c19440e4c19079410d7c3fed86b5dff1f06925148dbba`, `1bdd9d344bb5b18584c6f04b258b7397b9285806ae4c0f995fcf986c11ed86dc` and `1322af6836d63a481d2fbab7b4815c84a6c95a6a38792eaeba79a139f3a47f19`.
-
-#### Next Steps:
-
-After user approval, preserve the source-`0df8570` continuous decoder/menu transition and normal advancing-PTS scheduler, but add an automatic-menu-only PCM fallback for an exhausted timestamp target: after startup, when decoded audio exceeds the existing reserve and the video horizon schedules nothing, emit the excess in bounded batches through the unchanged PCM transport so FPGA FIFO credit supplies the real-time 48 kHz backpressure instead of allowing an unbounded host queue.  Add a hard bounded-hold invariant and diagnostics, extend the production regression with repeated or nonadvancing menu video PTS plus sustained decoded PCM to prove continuous exact sample delivery, bounded memory, byte-exact video and unchanged advancing-PTS behavior, rerun strict native, analyzer, sanitizer and retained DVD/audio suites, then build only a new static ARM helper for another Futurama menu test; Main, protocol, RTL and RBF should remain unchanged.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
