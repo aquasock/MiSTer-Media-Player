@@ -1,4 +1,4 @@
-## 988 COMMIT Unreleased ??? 2026-09-04T18:11:54-07:00
+## 988 COMMIT Unreleased 50c410a 2026-09-04T18:11:54-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Retain bounded future video-PTS lookahead so audio-forward DVD multiplexing cann
 
 #### Outcome:
 
-The approved helper-only change will separate Program Stream ingestion from immediate post-PES draining long enough to retain a bounded future video timestamp runway, while preserving exact video bytes, decoded PCM, navigation boundaries, the established PTS-derived cumulative rate and every automatic-menu fallback.  It will not use host wall time for ordinary titles and will not change Main, the protocol, RTL or the RBF.
+Source `50c410a` makes the ordinary DVD title scheduler retain exactly one advancing timestamped video chunk in its existing bounded two-MiB queue, allowing an audio-forward Program Stream to reveal the next PTS horizon before the preceding video is admitted.  Untimestamped bytes before that future chunk still use the established interpolated horizon, while a second advancing PTS releases the prior one and decoded PCM remains governed only by the cumulative video-PTS target plus the existing 8,192-frame startup reserve; no title wall clock was restored.  EOF, authored stills and resident menu continuations force exact completion, and timestamp-poor input reaching queue pressure takes an explicit bounded full drain.  The new production-translation-unit regression models six Simpsons-shaped half-second horizons behind 144,000 held PCM frames, proves the modeled 48 kHz sink retains 8,064 to 8,192 frames of reserve, verifies one future PTS remains queued, exercises timestamp-free pressure and compares every video byte and emitted PCM sample exactly.  Strict optimized, AddressSanitizer, UndefinedBehaviorSanitizer and focused analyzer builds pass, as do twenty scheduler repetitions, the retained DVD random-access, SPU, AC-3, Program Stream seek, reserve, stage, CDDA, audio UI, visualizer, private-audio, Main contract and real MP3, WAV, FLAC and Ogg seek integrations.  Two GNU 10.2.1 hard-float ARMv7 builds are identical and produce the 982,436-byte stripped static `host/build/MediaPlayer_Helper` with SHA-256 `604261b240355d62dc406ff11e5ef7dee738f849009b85c2ee8ed2c01633c6d6`; it has no interpreter or dynamic section.  Main, the protocol, RTL and the RBF are unchanged.
 
 #### Next Steps:
 
-Implement the minimum-lookahead policy with explicit bounded fallback for EOF, navigation, timestamp-poor streams and existing queue pressure; extend the production translation-unit regression with Simpsons-shaped early AC-3 and sparse video-PTS bursts plus a modeled 48 kHz sink, and retain Futurama-shaped balanced multiplexing, menus, discontinuities and exact-output controls.  Run strict optimized, sanitizer, analyzer, repetition and retained DVD/audio suites, build only the static ARM helper locally, verify reproducibility and prepare it for manual MiSTer installation without starting Quartus.
+Exit MediaPlayer and manually replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper`, preserving executable mode; retain the installed Main and RBF.  Enable telemetry, repeat the same Simpsons route through both authored menus and the first episode for at least thirty seconds, and return the fresh log, screenshot and telemetry sidecar together with whether startup stutters or progressive desynchronization remain.  The log should contain one `DVD title PTS lookahead activated` marker during ordinary title playback.  Then spot-check the Futurama title to confirm its naturally balanced multiplex remains nearly synchronized; do not rebuild the RBF.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Implement the minimum-lookahead policy with explicit bounded fallback for EOF, n
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
