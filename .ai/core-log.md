@@ -1,3 +1,35 @@
+## 990 COMMIT Unreleased ??? 2026-09-04T21:15:32-07:00
+
+#### Coming From:
+
+Unreleased 50c410a
+
+#### Purpose:
+
+Deliver PTS-authorized ordinary-title PCM promptly instead of allowing the asynchronous DVD output reserve to hide it behind seconds of older video.
+
+#### Outcome:
+
+The approved helper-only change will drain the existing physical-DVD output reserve immediately before each scheduled ordinary-title PCM batch, matching the established prompt-delivery boundary already used by automatic-menu clocked batches.  It will preserve exact stream order, the cumulative video-PTS target, the 8,192-frame startup reserve, bounded future-PTS lookahead, the eight-MiB physical source producer ring and every navigation or menu rule; it will not prioritize audio past earlier video, introduce a title wall clock, change Main or the protocol, or touch RTL and the RBF.
+
+#### Next Steps:
+
+Implement the narrow reserve-drain condition only for PTS-authorized ordinary DVD title PCM emission, with automatic menus retaining their existing path and nonphysical Program Streams unchanged.  Extend the production translation-unit regression with a backpressured pipe and a populated four-MiB reserve, prove that prior bytes drain before the scheduled PCM batch and later video follows it without sample or compressed-byte changes, then run strict optimized, sanitizer, analyzer, repetition and retained DVD/audio suites.  Build only the static ARM helper locally twice for reproducibility and prepare it for manual MiSTer installation without invoking Quartus.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- tools/test_dvd_overlay_output.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 989 COMMIT Unreleased 50c410a 2026-09-04T21:13:18-07:00
 
 #### Coming From:
@@ -1243,37 +1275,6 @@ After user approval, preserve the source-`0df8570` continuous decoder/menu trans
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 950 COMMIT Unreleased 0df8570 2026-09-03T17:53:57-07:00
-
-#### Coming From:
-
-Unreleased d7d5ab2
-
-#### Purpose:
-
-Carry a live silent-video decoder session continuously into an automatic DVD menu while starting a fresh synchronized helper scheduling epoch.
-
-#### Outcome:
-
-Source `0df8570` removes the automatic silent-video-to-menu READY/GO boundary while retaining every finite-still and explicit-navigation decoder boundary.  Silent-video release now includes the H.262 compatibility filter's pending byte in its capacity decision and flushes that byte through the bounded queue before switching to immediate output, preserving exact order.  Automatic menu entry keeps the live FPGA decoder and resident frame, rearms only helper audio and bounded scheduling state, leaves the initial sequence/I/reference filter disabled, and establishes one explicit PTS offset shared by menu video and audio above the preceding DVD timestamp.  The production regression releases a near-2 MiB silent first-play fixture byte-exactly, then schedules more than 2 MiB of picture-bearing menu video with no new sequence header alongside synchronized AC-3 without reaching the lookahead limit.  Optimized, AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer builds pass, as do the strict native static helper and retained DVD random-access, menu-hop, SPU, reserve, staging, unsupported-LPCM, audio UI, visualizer and seek tests.  GNU 10.2.1 builds the 966,052-byte stripped static ARMv7 helper `host/build/MediaPlayer_Helper` with SHA-256 `af73f0d5ae8104ef05fa3270b51a5da3bf92b39189cd32fc9219b5d2ac0efb6c`; Main remains source `d7d5ab2`, and the protocol, decoder RTL and RBF are unchanged.
-
-#### Next Steps:
-
-Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`0df8570` artifact, retain the source-`d7d5ab2` per-core Main and existing RBF, then rerun Futurama disc one through all finite intro stills, the complete 20th Century animation and the moving menu.  Confirm that menu entry produces the new `DVD automatic menu scheduling epoch continued` and `DVD automatic menu PTS epoch` diagnostics, no fourth Main decoder boundary, no `video lookahead limit exceeded`, visible menu motion and selector response; return the resulting log, screenshot and telemetry for hardware qualification.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
 
 #### Status:
 
