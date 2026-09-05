@@ -1,4 +1,4 @@
-## 990 COMMIT Unreleased ??? 2026-09-04T21:15:32-07:00
+## 990 COMMIT Unreleased 22b0a98 2026-09-04T21:15:32-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Deliver PTS-authorized ordinary-title PCM promptly instead of allowing the async
 
 #### Outcome:
 
-The approved helper-only change will drain the existing physical-DVD output reserve immediately before each scheduled ordinary-title PCM batch, matching the established prompt-delivery boundary already used by automatic-menu clocked batches.  It will preserve exact stream order, the cumulative video-PTS target, the 8,192-frame startup reserve, bounded future-PTS lookahead, the eight-MiB physical source producer ring and every navigation or menu rule; it will not prioritize audio past earlier video, introduce a title wall clock, change Main or the protocol, or touch RTL and the RBF.
+Source `22b0a98` drains the physical-DVD asynchronous output reserve immediately before every PTS-authorized ordinary-title PCM batch, reusing the prompt-delivery primitive already established for automatic-menu clocked batches.  Earlier transport bytes still drain first and later video remains behind the PCM records, while the cumulative video-PTS target, 8,192-frame startup reserve, bounded future-PTS queue, eight-MiB source producer ring, menu activation staging and navigation behavior remain unchanged; no title wall clock or priority reordering was introduced.  The production translation-unit regression fills the complete four-MiB reserve behind a delayed backpressured pipe, proves the PCM call waits for prior reserve output, then compares every prior video byte, 2,048 PCM frames and later video byte in exact order.  Strict optimized, AddressSanitizer, UndefinedBehaviorSanitizer and focused analyzer builds pass, as do twenty prompt-delivery scheduler repetitions, retained DVD random-access, SPU, AC-3, Program Stream seek, reserve, stage, CDDA, audio UI, visualizer, private-audio, Main contract and real MP3, WAV, FLAC and Ogg seek integrations.  Two GNU 10.2.1 hard-float ARMv7 builds are identical and produce the 982,436-byte stripped static `host/build/MediaPlayer_Helper` with SHA-256 `723f8f151e26591e442ba4d81d18c7591e4b387a5fb3f1441b4ce51fa9631806`; it has no interpreter or dynamic section.  Main, the protocol, RTL and the RBF are unchanged.
 
 #### Next Steps:
 
-Implement the narrow reserve-drain condition only for PTS-authorized ordinary DVD title PCM emission, with automatic menus retaining their existing path and nonphysical Program Streams unchanged.  Extend the production translation-unit regression with a backpressured pipe and a populated four-MiB reserve, prove that prior bytes drain before the scheduled PCM batch and later video follows it without sample or compressed-byte changes, then run strict optimized, sanitizer, analyzer, repetition and retained DVD/audio suites.  Build only the static ARM helper locally twice for reproducibility and prepare it for manual MiSTer installation without invoking Quartus.
+Exit MediaPlayer and manually replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper`, preserving executable mode; retain the installed Main and RBF.  Enable telemetry and repeat the same Simpsons route through both authored menus and the first episode for at least thirty seconds, requiring both `DVD title PTS lookahead activated` and `DVD title PCM prompt delivery activated` in the log; return the fresh log, screenshot and telemetry sidecar together with the direction and approximate amount of any remaining lip-sync error and every audible cutout.  Then spot-check Futurama to ensure its accepted playback remains okay; do not rebuild the RBF.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Implement the narrow reserve-drain condition only for PTS-authorized ordinary DV
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
