@@ -386,7 +386,14 @@ always @(posedge clk) begin
                 !(queued_run_active&&!queued_run_closed))
             deferred_reference_payload<=1;
         if(!native_film_mode) native_fields_elapsed<=0;
-        else if(cadence_tick_pulse && display_picture_present && native_fields_elapsed!=3)
+        // Entry 152: count a field from either window.  In film mode the swap
+        // opportunity comes from field_swap while this counter was driven only
+        // by field_window, and field_window does not fire on every field the
+        // swap window does.  The counter therefore ran slow, a picture never
+        // reached its authored duration on time, and it was held one extra
+        // field.  Counting on either pulse restores authored cadence; using
+        // swap_window_pulse alone is far worse, at 4.508 fields per picture.
+        else if((cadence_tick_pulse||swap_window_pulse) && native_fields_elapsed!=3)
             native_fields_elapsed<=native_fields_elapsed+1'b1;
 
         // Seed the generation comparison from the first published reference.
