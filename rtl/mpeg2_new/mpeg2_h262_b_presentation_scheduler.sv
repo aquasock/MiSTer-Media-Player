@@ -169,8 +169,19 @@ wire cadence_slot=native_film_mode ?
     ((native_fields_elapsed>=native_field_duration) &&
      (candidate_top_field_first==native_field)) :
     ordinary_cadence_slot;
+// Entry 143: a film-mode picture's display duration is fully authored by its
+// own top-field-first and repeat-first-field descriptors, so an early
+// timestamp must not withhold it.  The timeline's discontinuity re-anchor
+// keeps the clock near the stream; the timestamp stays a gate only on the
+// ordinary path, which is unchanged.
+// Entry 143: a film-mode picture's display duration is fully authored by its
+// own top-field-first and repeat-first-field descriptors, so an early
+// timestamp must not withhold it.  The timeline's discontinuity re-anchor
+// keeps the clock near the stream; the timestamp stays a gate only on the
+// ordinary path, which is unchanged.
 wire presentation_slot=cadence_slot&&
-                       (!timestamp_candidate_active||timestamp_candidate_due);
+                       (native_film_mode||
+                        !timestamp_candidate_active||timestamp_candidate_due);
 wire presentation_consume=swap_window_pulse&&presentation_slot&&
                           scheduled_frame_valid&&scheduled_frame_differs;
 

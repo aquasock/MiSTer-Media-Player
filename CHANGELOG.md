@@ -8,6 +8,363 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Gave the presentation timeline stream-timing-discontinuity handling and
+  stopped gating film-mode presentation on a not-yet-due timestamp. A delivered
+  record lying more than one second from the running clock now re-establishes
+  that clock instead of stalling playback until wall time catches up, which is
+  what a decoder crossing a cell boundary must do, and a film-mode picture
+  whose display duration its own top-field-first and repeat-first-field
+  descriptors already authorize is no longer withheld because its timestamp is
+  early. On the exact retained Futurama replay this removes a 1.94-second
+  freeze, takes timestamp-blocked swap opportunities from 237 to zero and
+  parity-blocked ones from 171 to 52, and raises presented pictures per second
+  from 16.56 to 22.46 against a 24.5166 target, with reconstructed pixels,
+  blocks and prediction lookups unchanged and every error counter at zero. The
+  ordinary non-film presentation path is unchanged by construction.
+- Added a simulator-only timestamp-association diagnostic. Every delivered
+  timestamp record and every picture header is logged with its stream byte
+  offset, the value bound, its source, and the system time clock at that
+  moment, together with totals for records delivered, records overwritten
+  before consumption, pictures annotated and unannotated, and bindings whose
+  value lies more than one second from the clock. Nothing feeds decoder,
+  scheduler, presentation or stream control.
+- Added a simulator-only classification of the native film cadence gate's
+  parity term. A per-picture parity-wait histogram, a check that the
+  scheduler's own field-parity input alternates on every swap opportunity, and
+  a joint parity/first-field distribution restricted to slots whose authored
+  field duration is already satisfied together separate a structurally
+  unsatisfiable condition from genuine phase drift. The native trace also now
+  records the two signals the gate actually compares, the scheduler parity
+  input and the candidate's authored first-field order, together with elapsed
+  and required field counts and film mode, because it previously recorded only
+  the displayed picture's first-field order and no parity input at all. Nothing
+  feeds decoder, scheduler, presentation or stream control.
+- Removed the unused MiSTer core-template demonstration logic, `rtl/mycore.v`
+  with its `rtl/cos.sv` and `rtl/lfsr.v` helpers. The three formed a closed
+  cluster in which `cos` and `lfsr` were instantiated only by `mycore` and
+  `mycore` was instantiated by nothing, and none of the three was referenced by
+  any project, Tcl or QIP file. The project's own PLL sources `rtl/pll.v` and
+  `rtl/pll/pll_0002.v` are retained because `sys/sys.qip` resolves
+  `sys/pll_q17.qip` from the Quartus version and that file supplies the `pll`
+  module instantiated by MediaPlayer.
+- Removed the frozen MPEG2FPGA reference tree and its two inactive integration
+  files from the repository. Nothing under `rtl/mpeg2fpga/` was in `files.qip`,
+  no module it defined was instantiated anywhere in the active design, and its
+  sixty-six module names did not collide with any of the one hundred thirty-four
+  active ones, so the deletion cannot change synthesis or simulation output. An
+  audit against the active decoder found zero verbatim shared statements and no
+  distinctive shared identifiers; the only token overlap was Altera FIFO
+  megafunction parameter boilerplate, and coinciding constants are the
+  normative H.262 default matrices, scan orders and start codes. Attribution to
+  the original work is retained in `README.md`.
+- Added a simulator-only closed classification of every native film-mode swap
+  opportunity. Each field slot is attributed to exactly one of picture swap,
+  authored field-duration hold, top-field-first parity mismatch, timestamp
+  wait, candidate starvation or unchanged candidate, so the cadence gate's
+  parity term can be separated from legal `repeat_first_field` holds without
+  feeding decoder, scheduler, presentation or stream control.
+- Added simulator-only B-pixel pair feasibility accounting for the exact
+  settled Futurama B172 transaction. Passive counters classify adjacent pair
+  heads by prediction direction and field mode, and bound the subset whose
+  frame-mode interpolation footprints remain within the retained local words
+  without feeding reconstruction, storage, memory, or presentation control.
+- Allowed the B raster engine to use the existing two-bank writer's capacity
+  acknowledgement for non-row-final blocks. A bounded B-owned outstanding
+  count retains ordered DDR completions, and every macroblock-row final block
+  still waits until all accepted writes have persisted before the row can
+  retire; P reconstruction, writer storage, arbitration, and clocks are
+  unchanged.
+- Added simulator-only prediction-service attribution for the exact settled
+  Futurama B172 transaction. Passive counters partition its prediction-to-ready
+  window and separately measure reference-cache, DDR-arbiter, retained-footprint
+  lookup, pixel-combination, emission, and writer-persistence activity without
+  feeding decoder, memory, scheduler, presentation, or stream control.
+- Corrected the simulator-only post-inverse-quant sparsity histogram to use a
+  one-shot window from the settled Futurama B172 header through that picture's
+  persistence-ready event. Passive counters classify only those completed
+  blocks by nonzero coefficient rows after mismatch control and conservatively
+  model the clocks recoverable by zero-filling an all-zero first-pass row
+  without feeding decoder, scheduler, presentation, or stream control.
+- Added a simulator-only cycle timeline for the settled Futurama P171-to-B172
+  boundary. Passive timestamps now separate the following-picture delimiter
+  and header bytes, final P parse/transform/raster/persistence events, and the
+  first B parse, row, replay, prediction, and ready events without feeding any
+  decoder, scheduler, stream, or presentation control.
+- Added simulator-only, mutually exclusive attribution for queued-header
+  capacity and the settled Futurama picture-168 interval. Passive counters and
+  transition records separate missing future-reference publication, ordinary-
+  reference ownership, active decode and scratch-destination availability
+  without feeding decoder, scheduler, presentation or stream control.
+- Overlapped each block's first separable IDCT pass with inverse-quantized
+  coefficient delivery. The existing multiplier bank starts only after a full
+  eight-coefficient row is available and pauses behind an explicit row-ready
+  boundary, shortening P-, B- and intra-picture transform completion without
+  adding another transform context or changing arithmetic, rounding, mismatch
+  control, sample order, reference ownership, presentation, helper scheduling
+  or clocks.
+- Made the bounded DVD replay's cadence score descriptor-aware and optionally
+  delayed. A measurement window can now begin after an explicit presentation-
+  clock warmup, and each selected picture interval is compared with the two or
+  three fields authored by its `repeat_first_field` descriptor. Reports count
+  only non-authored and excess fields instead of treating legal 3:2 telecine
+  holds as 29.97-frame-per-second drops; production RTL, helper scheduling and
+  decoder clocks are unchanged.
+- Added simulator-only attribution for every B-presentation hold term. The
+  counters distinguish queued-generation promotion from real scratch-bank,
+  ordinary-reference, deferred-header, and secondary-reference ownership so a
+  throughput experiment can reject scheduler changes that have no material
+  admission opportunity without changing decoder or presentation behavior.
+- Preserved the resident FPGA video epoch when Root Menu moves from one
+  confirmed active DVD menu domain to another and the destination supplies
+  only replacement subpicture or audio records. The helper now routes that
+  bounded case through its existing payload-aware pending-menu decision;
+  title-to-menu calls, destination title changes and failed identity queries
+  retain the full decoder stream-hop reset.
+- Moved successful PCM completion out of the collision-prone unframed
+  `00 00 01 b6` byte marker and onto the versioned helper/Main control
+  channel. Main defers that event until helper stdout reaches EOF, ordering one
+  terminal sideband frame after every extracted PCM frame while allowing the
+  same byte sequence in active H.262 data to pass without ending audio. Audio
+  FIFO backpressure now asserts `ioctl_wait` only for an actual index-2 payload
+  write, so the read-only credit/integrity status command remains serviceable
+  when the FIFO is full and cannot trap Main's event loop in the SPI handshake.
+- Decoupled embedded PCM delivery from compressed-video backpressure. Main now
+  reads the helper's annotated stream into a bounded four-MiB HPS queue, copies
+  complete PCM frames into an independently credited
+  index-2 lane, and gives it priority only while cumulative sideband delivery is
+  no more than 8,192 frames (170.667 ms at 48 kHz) ahead of matching records
+  accepted on the original ordered index-1 stream. Reaching that limit lets
+  video catch up before more PCM is sent, bounding the roughly 1.3-second audio
+  lead observed in hardware while retaining enough reserve for the measured
+  153.631-ms transport stall. A 1,024-frame CDC staging FIFO feeds the existing
+  16,384-frame audio reservoir; once sideband delivery starts, the original
+  in-band PCM records are still parsed but discarded as duplicates. When the
+  sideband FIFO reaches zero credit, Main yields without consuming data and
+  continues servicing video. Defensive handling for an exact all-one response
+  remains limited to established verified mode, while genuinely mismatched
+  responses remain fatal. Both transports retain rolling
+  accepted-word counters and digests, and MPEG decoding, authored cadence,
+  overlays, the audio output clock, and helper scheduling are unchanged.
+- Restricted the retained PCM startup cushion to ordinary DVD titles. Initial
+  and automatic DVD menu domains retain the established 8,192-frame threshold,
+  allowing silent authored segments to release their two-picture video lead
+  without waiting for nonexistent PCM. For audio-bearing titles, the helper still
+  waits for 73,728 decoded frames before releasing 16,384 frames to fill the
+  FPGA FIFO, leaving 57,344 frames in Linux to cover the measured cold-start
+  Program Stream interleave deficit. Scheduling may consume that cushion down
+  to an 8,192-frame Linux floor while soft video admission lets the parser
+  cross early mux bursts, and startup video remains in the bounded four-MiB
+  title queue until both reserves exist. Steady-state 48-kHz PCM, authored
+  picture cadence, record bytes, fences, Main, and RTL are unchanged.
+- Prevented the DVD helper's record-aware output reserve from waiting for a
+  future normal-video record while already-fenced PCM is queued. Fenced PCM
+  still yields immediately whenever normal video is already available, but it
+  can now retire while the single producer is still working toward the next
+  video enqueue, eliminating a circular wait under sustained MiSTer
+  backpressure without changing record bytes, fences, Main, RTL, or clocks.
+- Prevented sustained native DVD playback from deadlocking when an ordinary
+  reference publication coincides with presentation and leaves the primary
+  pending identity naming the bank already on screen. Once the accepted next
+  I/P header has released the secondary reference, the scheduler now retires
+  only that duplicate identity without consuming cadence credit or resetting
+  the framebuffer, promotes the secondary through the existing ownership
+  path, and resumes its retained payload in the remaining free bank. Normal
+  different-bank, unreleased-secondary, B-reorder, timestamp, audio, helper,
+  Main, and clock behavior is unchanged.
+- Added bounded physical-DVD pipeline telemetry at the helper's existing
+  progress cadence. It reports cumulative optical-source read and consumer
+  wait timing, Program Stream PES service, AC-3 decode cost, and
+  scheduler/output service. A second detail record separates authored-picture
+  pacing sleeps, late picture admissions, reserve producer waits, queue peaks,
+  and contiguous nonblocking sink stalls, including 10/50/100-millisecond
+  thresholds. Timing is sampled only around existing waits and at the existing
+  report boundary; media records, scheduling decisions, Main, RTL, and the RBF
+  are unchanged.
+- Made the automatic-menu PCM hold threshold apply playback-rate backpressure
+  instead of terminating the helper. Stationary-PTS authored menus now keep
+  servicing PCM and navigation controls while remaining bounded, rather than
+  playing briefly and returning to the idle visualizer.
+- Clocked ordinary DVD-title picture starts from the MPEG sequence header's
+  authored rate, including exact 30,000/1,001 NTSC cadence, on the same
+  monotonic epoch as 48 kHz PCM. Title startup now requires the complete
+  8,192-frame PCM reserve; each due PCM quantum crosses behind the preceding
+  completed-video fence before more compressed video. A due authored picture
+  can now cross a video-only Program Stream run without waiting for a later
+  audio PES; the 4 KiB PCM-free byte-ratio gate remains only for titles without
+  an established picture clock. This removes the circular wait that filled the
+  four-MiB queue and produced recurring multi-second audio/video collapses.
+  Picture-clocked titles no longer retain the redundant future-PTS lookahead,
+  and scheduler diagnostics report emitted and expected picture counts
+  directly.
+- Clocked reserve-backed DVD PCM at the helper's actual playback boundary for
+  both encrypted images and physical discs. Elapsed monotonic time is now the
+  bounded delivery target, rather than merely an upper limit that a slow
+  authored-video PTS can hold below 48 kHz; authored PTS remains the hard
+  decoded-data admission barrier. Delivery remains limited to 128 frames after
+  an exact 256-byte video fence and uses the 128 KiB record-aware reserve, so a
+  source discovered ahead of playback cannot run audio early. Automatic-menu
+  waits now drain progress packets from older Main builds while preserving
+  interactive commands. Current Main no longer sends those obsolete
+  diagnostic-only packets, preventing any long scheduler or output-pressure
+  interval from filling the command socket and returning playback to the idle
+  visualizer. The real command protocol, media payload bytes, RTL, and the RBF
+  are unchanged.
+- Restored the last pre-regression physical-DVD title scheduler and its 4 MiB
+  ordered output reserve while retaining the later 8 MiB asynchronous optical
+  input ring. This removes the 128 KiB reserve, wall-clock title floor,
+  transport-credit pacing and queue-pressure mechanisms introduced after all
+  three control DVDs first regressed. Current Main progress packets remain
+  framing-compatible but are diagnostic-only at the helper.
+- Replaced libdvdnav's zero-only padding workaround with a bounded search for
+  an actually decodable NAV packet. Up to 1,024 zero, ordinary MPEG or invalid
+  sectors may be rejected, with cache ownership preserved; recovery cannot
+  cross the current authored cell, and a bogus terminal VOBU ends that cell
+  through the normal navigation transition.
+- Allowed encrypted DVD-image title-key recovery to cross bounded zero-filled
+  VOB padding before or between MPEG packs. Nonzero non-MPEG data and existing
+  seek, read and scan limits remain stopping boundaries, while directly visible
+  key-free summaries identify recovery after padding or the exact failure.
+- Added a bounded, key-free libdvdcss recovery summary for encrypted DVD ISO
+  titles whose VTS key cannot be recovered, distinguishing stream termination
+  from non-MPEG and scan-limit failures without enabling verbose key logging.
+- Replaced the physical-DVD title queue's four-MiB full-drain fallback with
+  bounded room-making. When the next PES would cross the hard limit, the
+  helper now waits for transport credit only while releasing the minimum
+  complete 256-byte scheduled slices and their exact fenced PCM items needed
+  to admit that packet, then returns immediately to Program Stream parsing.
+  The queue bound, stream order, 32-KiB transport window, Main, protocol, RTL,
+  and RBF are unchanged.
+- Made ordinary physical-DVD title transport admission nonblocking while the
+  bounded video queue has room. The helper now pumps immediately available
+  verified FPGA progress and returns to Program Stream parsing when the next
+  complete 256-byte video slice plus its possible fenced 32-frame PCM item
+  lacks credit, allowing later interleaved AC-3 to refill the PCM hold. EOF and
+  explicit drains still complete synchronously, while four-MiB queue pressure
+  now makes only enough blocking progress for the incoming PES; the 32-KiB
+  window, payloads, Main, protocol, RTL, and RBF are unchanged.
+- Removed hard retention of the only known future video-PTS chunk during
+  ordinary physical-DVD titles. Timestamp-free video still waits for one real
+  future PTS and uses it for byte interpolation, but that timestamped chunk now
+  continues immediately instead of exposing sparse PES cadence as synchronized
+  audio/video stalls. The clock floor, authored synchronization barrier,
+  per-slice PCM fence, transport feedback, Main, protocol, RTL, and RBF remain
+  unchanged.
+- Separated physical-DVD title synchronization debt from pacing debt. Missing
+  PCM required by authored PTS still blocks video, while the monotonic floor and
+  free-video refill now emit opportunistically without withholding video needed
+  to reach later interleaved AC-3 packets. Main, protocol, RTL, and the RBF are
+  unchanged.
+- Matched physical-DVD title pre-fence admission to the actual 32-frame PCM
+  delivery item. The scheduler no longer waits for a generic 2,048-frame batch
+  when a normal 2,016-frame AC-3 refill can serve the next fenced video slice,
+  preventing the four-MiB PTS-lookahead pressure cycle that stalled both media
+  streams. Payloads, targets, fence ordering, Main, protocol, RTL, and the RBF
+  are unchanged.
+- Added a bounded real-time floor to ordinary physical-DVD title PCM
+  scheduling. The floor anchors when title delivery coupling begins and
+  advances at the selected sample rate, preventing a lagging admitted-video
+  PTS horizon from starving the FPGA audio clock. Authored PTS can still raise
+  the cumulative synchronization target; each increment still requires a
+  strictly advancing normal-video fence, remains limited to one 32-frame
+  item, and crosses the existing 32-KiB accepted-transport window. Menus,
+  payload bytes, Main, protocol, RTL, and the RBF are unchanged.
+- Added diagnostic-only record-aware shadow accounting to telemetry-enabled
+  Main. Independent parsers now count complete PCM records and frames when
+  bytes enter Main from the helper and when verified FPGA transfer steps accept
+  them. Periodic and stream-epoch summaries mirror the frozen RBF's PTS, PCM,
+  PCM-end and overlay record lengths, allowing a physical run to distinguish
+  helper starvation, Main transport loss and FPGA parser loss without changing
+  playback ordering, pacing, the helper protocol, or the RBF.
+- Reduced each physical-DVD title priority item from eight adjacent PCM wire
+  records to two (32 frames) after hardware showed that the 128-frame item
+  still collapsed shared-parser acceptance into sample-sized credits. Each
+  strictly advancing normal-video fence continues to authorize at most one
+  item; repeated or older fences preserve the remaining decoded samples and
+  return to Program Stream parsing. The physical-title PTS target is rounded
+  to the same 32-frame unit so smaller items remain evenly distributed rather
+  than clustering at the former 128-frame refill boundary. The prior
+  repeated-fence transport deadlock cannot recur. Main, the media protocol,
+  and the RBF are unchanged.
+- Closed the physical-DVD title flow-control loop between the helper and Main.
+  Main now reports cumulative bytes accepted by verified FPGA transfer steps
+  over the existing private control socket; the helper keeps outstanding title
+  output within 32 KiB, limits scheduled video admissions to 4 KiB and divides
+  delivery-fenced PCM into bounded quanta. Exact progress is rebased at each
+  READY/GO boundary, including activation-stage commits, so prior or discarded
+  bytes cannot become false credit. Title PCM items are now limited to 32
+  frames after physical validation of the original 128-frame bound. This
+  changes only the matched ARM helper and Main; the annotated FPGA stream and
+  RBF remain unchanged.
+- Reduced the physical-DVD helper output reserve from 4 MiB to 128 KiB now
+  that title-side optical reads have their own 8 MiB producer ring. The input
+  ring still absorbs multi-second drive stalls, while the shorter downstream
+  queue keeps scheduled PCM inside the existing 171 ms lead instead of hiding
+  it behind several hundred milliseconds of already-queued video.
+- Extended the physical-DVD optical producer ring to titles launched through
+  authored menus. Menu navigation remains synchronous, and only a title entered
+  after an actually consumed active-menu state starts the existing 8 MiB ring
+  with a 4 MiB prefill; libdvdnav's provisional first-play title cannot start
+  it, nor can a command-side title query start it before the corresponding
+  navigation event is consumed. Producer-ahead VM state stays hidden until its
+  corresponding title bytes are consumed, and prefetch stops before a
+  return-to-menu event or an interactive navigation command. This keeps optical
+  read stalls off the audio/video scheduler thread.
+- Coupled every ordinary physical-DVD title's PCM delivery to the exact video
+  slices that authorize it. Sparse future PTS are still interpolated across
+  their intervening bytes, but each video slice now crosses as a complete
+  normal reserve record before its bounded PCM increment can use that record's
+  retirement fence. This prevents both low-hold and high-hold titles from
+  turning producer-ahead timestamps into audio bursts that choke the shared
+  FPGA input path, while retaining exact samples, video bytes and timestamps.
+- Expanded ordinary DVD title video-PTS lookahead from two to four MiB so the
+  scheduler can bridge the measured sparse-timestamp regions without treating
+  source-read-ahead SCR as elapsed playback time. The authored PCM target
+  remains tied to the admitted video horizon, while the later bounded
+  sink-rate floor prevents that horizon from starving an already-running
+  audio clock.
+- Retained one bounded future video timestamp while scheduling ordinary DVD
+  titles. Audio-forward Program Stream multiplexing can now expose its next
+  PTS horizon before the preceding video is admitted, keeping already-decoded
+  PCM available to the 48 kHz sink without changing authored bytes,
+  cumulative PTS timing, menus, stills, or the RBF.
+- Extended the default-off hardware telemetry to schema 22. Five previously
+  unused words now report full display progress, audio-domain PCM consumption,
+  displayed and pending PTS lateness against the audio-derived STC, and
+  categorized presentation-window gating without affecting playback logic.
+- Clocked the DVD automatic-menu PCM fallback explicitly at its selected sample
+  rate after the existing bounded initial release. A fast optical source now
+  waits at the decoded-audio ceiling instead of flooding Main at source/SPI
+  speed, and a PCM-pressure resident-context continuation remains provisionally
+  tracked so a later menu-to-title exit still receives the decoder barrier.
+- Bounded decoded audio during deferred same-menu DVD activations. Low-bitrate
+  menu branches can now commit their resident-context continuation when the
+  existing PCM hold ceiling is reached instead of waiting only for video queue
+  pressure, and automatic-menu sink pacing resumes after the finite activation
+  stage commits.
+- Fixed deferred DVD button activations that remain in menu space and continue
+  an existing MPEG-2 sequence without repeating an independently decodable
+  startup group. At the existing video-queue guard, the helper now rebases the
+  staged timestamps above the prior live epoch and commits the exact queued
+  stream through the resident decoder instead of aborting before its larger
+  motion-menu decision threshold; qualified restarts and title exits retain
+  their decoder barriers.
+- Filled the Audio CD metadata panel from the existing TOC selection: title now
+  mirrors the active `TRACK nn` playlist row, artist and album retain `---`, and
+  all three colons align. Audio CDs also receive a built-in aspect-corrected
+  disc image in the artwork viewport without adding an external asset.
+- Changed Audio CD timing from the concatenated-disc clock to the active track:
+  elapsed, remaining, track total and the progress bar now follow the selected
+  TOC span, while the playlist clock reports the total duration of all audio
+  tracks on the disc. Ordinary standalone-audio file timing is unchanged.
+- Populated the Audio CD player playlist from the drive TOC with `TRACK 01`-style
+  labels. The playing track is selected across natural boundaries, previous or
+  next track changes and fixed seeks, while a six-row window keeps it near the
+  vertical center when list boundaries permit; controls are unchanged.
+- Changed standalone-audio pause ordering so the first Space or Start press
+  reveals the player overlay, drains that in-band style update, and only then
+  holds audio and visualizer transport at a helper/Main pause barrier. Resume
+  releases the held helper with the existing `GO`; DVD and MPEG-2 pause remain
+  the original immediate Main-side transport hold.
 - Replaced whole-GOP audio-visualizer grade steps with version-two transition
   GOPs. Each adjacent rise or fall now crosses between grades over three
   frames while preserving the eight-level RMS response, native-interlaced
