@@ -55,7 +55,8 @@ always @(posedge clk) begin
         phase_accum      <= 26'd0;
     end
     else begin
-        fifo_rd <= 1'b0;
+        fifo_rd  <= 1'b0;
+        underrun <= 1'b0;
 
         if (!started) begin
             phase_accum <= 26'd0;
