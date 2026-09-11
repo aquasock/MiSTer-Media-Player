@@ -35,10 +35,15 @@
  * Entry 693: the lookahead holds video while the scheduler reads far enough
  * ahead to satisfy the PCM reserve, so this bound scales with that reserve.
  * At 8192 frames of reserve the 512 KiB bound is reached on real DVD muxing
- * and aborts playback; 2 MiB is still negligible against 492 MiB of host RAM
- * and keeps the runaway protection this bound exists for.
+ * and aborts playback; 2 MiB was still negligible against 492 MiB of host RAM
+ * and kept the runaway protection this bound exists for.
+ *
+ * A high-bitrate custom progressive encode (~6.3 Mbps average) reached the
+ * 2 MiB bound and aborted with "video lookahead limit exceeded" well before
+ * end of file. 4 MiB clears that content with margin and remains negligible
+ * against host RAM.
  */
-#define VIDEO_QUEUE_LIMIT  (2u * 1024u * 1024u)
+#define VIDEO_QUEUE_LIMIT  (4u * 1024u * 1024u)
 #define OUTPUT_RESERVE_BYTES (4u * 1024u * 1024u)
 #define OUTPUT_ACTIVATION_STAGE_DECISION_BYTES (4u * 1024u * 1024u)
 #define OUTPUT_ACTIVATION_STAGE_BYTES (8u * 1024u * 1024u)
