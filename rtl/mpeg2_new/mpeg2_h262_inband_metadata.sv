@@ -48,6 +48,9 @@
 // ============================================================================
 
 module mpeg2_h262_inband_metadata
+#(
+    parameter integer STREAM_FIFO_DEPTH = 256
+)
 (
     input  wire        clk,
     input  wire        reset,
@@ -57,7 +60,7 @@ module mpeg2_h262_inband_metadata
     output wire        input_ready,
     input  wire        input_end,
 
-    output reg   [7:0] stream_data,
+    output wire  [7:0] stream_data,
     output wire        stream_valid,
     input  wire        stream_ready,
 
@@ -107,12 +110,13 @@ localparam [3:0] S_FILL           = 4'd0,
                  S_OVERLAY_LEN_LO = 4'd7,
                  S_OVERLAY_PAYLOAD= 4'd8;
 
+localparam integer STREAM_FIFO_AW = $clog2(STREAM_FIFO_DEPTH);
+
 reg [3:0]  state;
 reg [31:0] window;
 reg [2:0]  window_fill;
 reg [2:0]  payload_index;
 reg [39:0] payload;
-reg        stream_pending;
 reg [5:0]  pcm_frames_left;
 reg        pcm_mode_seen;
 reg [1:0]  pcm_byte_index;
@@ -129,17 +133,30 @@ assign overlay_start = overlay_queue_start[0];
 assign overlay_last  = overlay_queue_last[0];
 assign overlay_valid = (overlay_queue_count != 2'd0);
 
-// The integrated decoder advances on stream_valid itself rather than on a
-// conventional valid-and-ready transfer.  Retain a pending output byte while
-// it is stalled, but expose valid only in the cycle the decoder accepts it.
-// This preserves the pre-extractor pulse-valid contract and prevents a held
-// byte from being parsed repeatedly during picture-ownership backpressure.
-assign stream_valid = stream_pending && stream_ready;
+// The extractor used to hold at most one pending clean-stream byte, so when
+// the downstream video queue stalled (stream_ready low), input_ready stalled
+// with it -- blocking the entire extractor, including PCM/PTS records that
+// appear later in the same interleaved byte stream, even though those bytes
+// have nothing to do with the video queue being full.  A small circular
+// buffer decouples extraction from that downstream backpressure: bytes queue
+// here while the video queue is stalled, and PCM/PTS records keep parsing
+// and reaching the audio sink without waiting on video.
+reg [7:0]  stream_fifo_mem [0:STREAM_FIFO_DEPTH-1];
+reg [STREAM_FIFO_AW:0] stream_fifo_wptr;
+reg [STREAM_FIFO_AW:0] stream_fifo_rptr;
+wire stream_fifo_empty = (stream_fifo_wptr == stream_fifo_rptr);
+wire stream_fifo_full =
+    (stream_fifo_wptr[STREAM_FIFO_AW-1:0] == stream_fifo_rptr[STREAM_FIFO_AW-1:0]) &&
+    (stream_fifo_wptr[STREAM_FIFO_AW] != stream_fifo_rptr[STREAM_FIFO_AW]);
 
-// Accept input whenever the pending output is free or will transfer in this
-// cycle, except while draining the window at end of transfer.
-// The last byte of every frame, not merely of every record, is the one the
-// sink must be ready for.
+assign stream_valid = !stream_fifo_empty;
+assign stream_data  = stream_fifo_mem[stream_fifo_rptr[STREAM_FIFO_AW-1:0]];
+
+wire stream_fifo_pop = !stream_fifo_empty && stream_ready;
+
+// Accept input whenever the FIFO has room, except while draining the window
+// at end of transfer.  The last byte of every frame, not merely of every
+// record, is the one the sink must be ready for.
 wire pcm_payload_final =
     (state == S_PCM_PAYLOAD) && pcm_mode_seen && (pcm_byte_index == 2'd3);
 wire pts_payload_final =
@@ -149,10 +166,16 @@ wire pts_payload_final =
 assign input_ready =
     (state != S_FLUSH) &&
     (state != S_PCM_END) &&
-    (!stream_pending || stream_ready) &&
+    !stream_fifo_full &&
     (!pts_payload_final || metadata_ready) &&
     (!pcm_payload_final || pcm_ready) &&
     ((state != S_OVERLAY_PAYLOAD) || (overlay_queue_count != 2'd2));
+
+wire stream_fifo_push_stream =
+    (state == S_STREAM) && input_valid && input_ready;
+wire stream_fifo_push_flush =
+    (state == S_FLUSH) && !stream_fifo_full && (window_fill != 3'd0);
+wire stream_fifo_push = stream_fifo_push_stream || stream_fifo_push_flush;
 
 wire overlay_enqueue =
     (state == S_OVERLAY_PAYLOAD) && input_valid && input_ready;
@@ -177,8 +200,8 @@ always @(posedge clk) begin
         window_fill        <= 3'd0;
         payload_index      <= 3'd0;
         payload            <= 40'd0;
-        stream_data        <= 8'd0;
-        stream_pending     <= 1'b0;
+        stream_fifo_wptr   <= {(STREAM_FIFO_AW+1){1'b0}};
+        stream_fifo_rptr   <= {(STREAM_FIFO_AW+1){1'b0}};
         pts_90k            <= 33'd0;
         picture_structure  <= 2'd0;
         top_field_first    <= 1'b0;
@@ -264,8 +287,12 @@ always @(posedge clk) begin
             default: begin end
         endcase
 
-        if (stream_pending && stream_ready)
-            stream_pending <= 1'b0;
+        if (stream_fifo_push) begin
+            stream_fifo_mem[stream_fifo_wptr[STREAM_FIFO_AW-1:0]] <= window[31:24];
+            stream_fifo_wptr <= stream_fifo_wptr + 1'b1;
+        end
+        if (stream_fifo_pop)
+            stream_fifo_rptr <= stream_fifo_rptr + 1'b1;
 
         case (state)
 
@@ -312,9 +339,8 @@ always @(posedge clk) begin
                     // must not be emitted, but the byte falling out of the
                     // window precedes the marker and still belongs to the
                     // stream.  Dropping it here silently truncated the byte
-                    // before every record.
-                    stream_data   <= window[31:24];
-                    stream_pending <= 1'b1;
+                    // before every record.  (The byte itself is queued by
+                    // stream_fifo_push_stream above, keyed off input_ready.)
                     window        <= 32'd0;
                     window_fill   <= 3'd0;
                     payload_index <= 3'd0;
@@ -326,10 +352,6 @@ always @(posedge clk) begin
                         state <= S_PCM_END;
                     else
                         state <= S_OVERLAY_LEN_HI;
-                end
-                else begin
-                    stream_data  <= window[31:24];
-                    stream_pending <= 1'b1;
                 end
             end
             else if (input_end)
@@ -448,11 +470,10 @@ always @(posedge clk) begin
             end
 
         // Emit the residual window at end of transfer, oldest byte first.
+        // (Each byte is queued by stream_fifo_push_flush above.)
         S_FLUSH:
-            if (!stream_pending || stream_ready) begin
+            if (!stream_fifo_full) begin
                 if (window_fill != 3'd0) begin
-                    stream_data  <= window[31:24];
-                    stream_pending <= 1'b1;
                     window       <= {window[23:0], 8'd0};
                     window_fill  <= window_fill - 3'd1;
                 end
