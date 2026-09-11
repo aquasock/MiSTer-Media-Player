@@ -137,6 +137,15 @@ reg ordinary_resume_pending;
 reg ordinary_terminal_drain_pending;
 
 reg [1:0] native_fields_elapsed;
+// Entry 153: a display field has elapsed exactly when the display field parity
+// changes, and nothing else defines it.  Entry 152 counted cadence_tick_pulse
+// or swap_window_pulse instead, and both fire inside a single field, so this
+// counter advanced from one straight to three and every three-field picture
+// reached its authored duration a whole field early.  The parity gate below
+// then held that picture for the field the counter had skipped, which is why
+// the error never showed up in the presented rate.  Count the parity edge.
+reg native_field_q;
+wire native_field_elapsed_pulse=native_field!=native_field_q;
 wire [1:0] native_field_duration=display_repeat_first_field ? 2'd3 : 2'd2;
 
 wire ordinary_b_header_wait=pending_frame_valid&&
@@ -165,9 +174,14 @@ wire scheduled_frame_differs=scheduled_frame_scratch?
     (!display_scratch||(scheduled_scratch_bank!=display_scratch_bank)):
     (display_scratch||(scheduled_frame_bank!=display_frame_bank));
 wire ordinary_cadence_slot;
+// Entry 153: the authored duration is the whole of film-mode cadence.  Also
+// requiring the display's current field parity to equal the picture's
+// top_field_first made the scheduler refuse a picture that had already served
+// its authored fields, costing one extra field on 22 percent of pictures; the
+// field order inside a picture is already owned by native_field_order, and the
+// focused run confirms field_order_error stays zero without this term.
 wire cadence_slot=native_film_mode ?
-    ((native_fields_elapsed>=native_field_duration) &&
-     (candidate_top_field_first==native_field)) :
+    (native_fields_elapsed>=native_field_duration) :
     ordinary_cadence_slot;
 // Entry 143: a film-mode picture's display duration is fully authored by its
 // own top-field-first and repeat-first-field descriptors, so an early
@@ -357,6 +371,7 @@ always @(posedge clk) begin
         ordinary_terminal_drain_pending<=0;
         run_picture_count<=0;presentation_complete<=1;presentation_error<=0;
         native_fields_elapsed<=0;
+        native_field_q<=native_field;
     end else begin
         b_user_success_d<=b_user_success;
         if(b_picture_start&&ordinary_b_header_wait)
@@ -385,15 +400,9 @@ always @(posedge clk) begin
         else if(non_b_picture_start&&run_closed&&
                 !(queued_run_active&&!queued_run_closed))
             deferred_reference_payload<=1;
+        native_field_q<=native_field;
         if(!native_film_mode) native_fields_elapsed<=0;
-        // Entry 152: count a field from either window.  In film mode the swap
-        // opportunity comes from field_swap while this counter was driven only
-        // by field_window, and field_window does not fire on every field the
-        // swap window does.  The counter therefore ran slow, a picture never
-        // reached its authored duration on time, and it was held one extra
-        // field.  Counting on either pulse restores authored cadence; using
-        // swap_window_pulse alone is far worse, at 4.508 fields per picture.
-        else if((cadence_tick_pulse||swap_window_pulse) && native_fields_elapsed!=3)
+        else if(native_field_elapsed_pulse && native_fields_elapsed!=3)
             native_fields_elapsed<=native_fields_elapsed+1'b1;
 
         // Seed the generation comparison from the first published reference.
