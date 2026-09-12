@@ -1,3 +1,32 @@
+## 965 COMMIT Unreleased 1b1ab7a 2026-09-12T04:11:45-07:00
+
+#### Coming From:
+
+Unreleased b0372f6
+
+#### Purpose:
+
+Fix the residual multi-frame screen flash still seen on every standalone audio-file seek after `b0372f6`, reported by the user as Bob/Weave visibly affecting the visualizer image again.
+
+#### Outcome:
+
+The user installed and tested the `b0372f6`/`1a6297f` 3-seed build: `.mpg` seeking remains unaffected, standalone MP3 seek/pause/skip no longer freezes, pops or falls back to the idle visualizer, but a shorter screen flash on every seek remained, visible as Bob/Weave affecting the image.  A screenshot captured from the test MiSTer mid-issue via `tools/mister.sh screenshot` showed a corrupted block rather than a clean frame, which the user clarified is simply the visible signature of Bob motion-adaptive deinterlacing applied to the visualizer's static frame during the flash, the same mechanism as the original flicker report, not separate DDR corruption.  Investigation found a second module untouched by `b0372f6`: `mpeg2_luma_framebuffer`'s picture-present/generation tracking (`mpeg2_new_framebuffer_reset`) and the interlace-mode-change detector feeding it (`mpeg2_new_native_active_sync`) both still reset directly on `reset_mpeg2`, which includes the Entry 237 rearm pulse fired on every seek; `b0372f6` only protected `mpeg2_h262_audio_ui`'s own persistent `mode_active`/`display_bank` state, not this separate read-side module, so the framebuffer's "is a picture present yet" tracking still reset on every seek even though the underlying DDR content and its validity are completely unaffected, producing a visible multi-frame gap until the next audio UI commit recovered it.
+
+#### Next Steps:
+
+Source `1b1ab7a` adds `reset_mpeg2_display_domain` (true reset unconditionally, the rearm pulse only when `audio_ui_mode_active` is false) and uses it in place of raw `reset_mpeg2` for both `mpeg2_new_native_active_sync` and `mpeg2_new_framebuffer_reset`, exempting them from the rearm while the audio UI owns the display.  Run a fresh 3-seed Quartus build (RTL touched again) and deliver the RBF for the user to retest standalone MP3 seeking for a completely clean transition with no flash and no Bob/Weave sensitivity, while confirming `.mpg` seeking and normal video playback remain unaffected.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 964 COMMIT Unreleased b0372f6 2026-09-12T03:26:13-07:00
 
 #### Coming From:
@@ -1204,35 +1233,6 @@ The new telemetry-enabled run is healthy through the live capture endpoint: Blaz
 #### Next Steps:
 
 Do not bundle a speculative Blazing Saddles change.  Preserve this run as acceptance of its startup, root-menu continuation, title launch and active-program chapter hop, and make the next approved helper boundary only the already-diagnosed Big Lebowski picture-bearing motion-menu staging promotion from entry 924.  Retest Big Lebowski Scene Selection as the primary acceptance route while retaining this exact Blazing Saddles route, Coming to America's finite and indefinite Scene Selection paths, ordinary movie chapters and the forum disc's LPCM-menu behavior; if the black Blazing Saddles attempt recurs with a fresh log, diagnose that trace as a separate reproducible boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 925 COMMIT Unreleased 6b63c91 2026-09-02T21:56:19-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Record Blazing Saddles' successful first source-`6b63c91` run and determine whether the supplied second-run evidence can diagnose its root-menu hang.
-
-#### Outcome:
-
-The user reports that Blazing Saddles initially booted, entered its menu, played and accepted chapter skips, further qualifying the corrected helper installation and active-program chapter path, but that a subsequent core reload produced a black hang after Root Menu.  Only `mister-screenshot.png` is fresh at 21:53; it is an all-black 1,920-by-1,080 image with no telemetry matrix, 559 bytes and SHA-256 `d964cb7603836826beb6afaa57ff6343531871568ec91a4fcc0cd55365f6ee73`.  `MediaPlayer_ARM.log` and `telemetry.txt` retain their 21:24 timestamps and exact hashes from the preceding Big Lebowski Scene Selection run, so their staging-capacity failure and schema-21 snapshot cannot be attributed to Blazing Saddles.  The collection script saves the screenshot before retrieving `/tmp/MediaPlayer_ARM.log` and exits under `set -e` if that retrieval fails, leaving the prior local log and sidecar untouched; the observed file combination therefore indicates that no fresh helper log was available to the collection, consistent with telemetry not being active for this attempt.  The current evidence cannot distinguish a helper failure, a Main/helper synchronization wait or an authored first-play delay, and no runtime source was changed.
-
-#### Next Steps:
-
-Hold the approved combined-build boundary until a fresh trace identifies the second correction.  Enable telemetry before loading Blazing Saddles, launch the disc, reproduce Root Menu from the black state, capture while it remains hung and verify that `.ai/current_results/MediaPlayer_ARM.log` receives the new run's timestamp rather than retaining the Big Lebowski file; if collection again stops after the screenshot, first confirm that `/tmp/MediaPlayer_ARM.log` exists on MiSTer.  Once fresh evidence is present, classify the exact navigation boundary and combine its narrow helper-side correction with the already-proposed bounded Big Lebowski motion-menu staging promotion, then run both discs plus Coming to America and the forum disc through the full regression and ARM build boundary.
 
 #### Files Modified:
 
