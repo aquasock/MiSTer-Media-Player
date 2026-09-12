@@ -1,3 +1,32 @@
+## 972 COMMIT Unreleased ??? 2026-09-12T10:13:02-07:00
+
+#### Coming From:
+
+Unreleased 5ce3c1f
+
+#### Purpose:
+
+Fix the `.mpg` progress overlay still only appearing on resume, not on pause, despite `24a6bda`'s lightweight style-toggle fix - the user's own repro (wait for auto-hide, then pause) showed nothing at all on screen while paused.
+
+#### Outcome:
+
+The user reported the exact `24a6bda`-era symptom again ("shows up on resume, not pause") on a fresh install of the current build.  Checking the actual installed binaries found the deployed `MediaPlayer_Helper` still hashed to `f329dce`'s build, not `24a6bda`'s - the fix had never actually reached the test hardware.  Reinstalling the correct `24a6bda` helper (`chmod +x` and atomic rename over the running, text-busy binary, since the process had it open) did not fix the symptom, so the bug is real, not a stale-binary artifact.  With telemetry enabled, a live ARM diagnostic log captured the exact failing pause event (`pause requested` -> `pause helper ready` -> `playback paused`, no errors) but this traced to a genuine structural bug in `video_overlay_pause_barrier()`: it calls `control_wait_for_go()`, which blocks for the entire pause duration, on the line *before* `video_overlay_service()` - the only function that renders fresh content and performs the actual CONFIG+DATA+COMMIT publish - ever gets to run in `process_program_stream()`'s loop.  The barrier's own lightweight `MEDIA_PLAYER_OVERLAY_STYLE` toggle (added in `24a6bda`) only flips a visibility/palette flag; it carries no pixel data, so on a reveal-from-hidden it can only re-show whatever was last actually committed to the FPGA plane - which service() never got to refresh, since it's blocked from running until the barrier returns after resume.  The reason `24a6bda` avoided calling `video_overlay_publish()` (the full ~88 KiB republish) from inside the barrier was a real race with Main's `pause_pipe_empty` detection, but that race is specifically about a write still in flight when Main stops draining *after* `pause_ready` becomes true - not about doing the publish before `PAUSE_READY` is even sent, while Main is still draining completely normally exactly as it does for any other periodic mid-playback refresh.
+
+#### Next Steps:
+
+Source `???` restructures `video_overlay_pause_barrier()` to force `video_overlay_service()` to run (via `pending_reveal`) *before* sending `PAUSE_READY`, so a full fresh publish completes and is fully handed to the pipe while Main is still in normal-drain mode, then only afterward announces ready and blocks for GO - eliminating the specific stuck-write mechanism the original bug fix was guarding against, since nothing is left in flight by the time Main could stop draining.  Removed the now-unused `video_overlay_style()` (its only caller was the block just rewritten).  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  `host/build/MediaPlayer_Helper` (SHA-256 `1f1ee6909b4cf89abb560faa4cfe591322529e7ed788d195ec75903b50a3764d`) is built; deliver it (current RBF `5ce3c1f`/seed99 and Main unaffected) for the user to retest: let the overlay auto-hide, then pause - it should reveal immediately with current, accurate TOTAL/ELAPSED/REMAIN, not stay blank until the next resume.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 971 COMMIT Unreleased 5ce3c1f 2026-09-12T08:06:57-07:00
 
 #### Coming From:
@@ -1207,35 +1236,6 @@ Root Menu performs a genuine second navigation attempt rather than merely redisp
 #### Next Steps:
 
 Do not implement the entry-932 gating alone.  After user approval, make one diagnostic helper build that logs a bounded byte-exact prefix and parsed sequence, picture and extension fields for each initial random-access group before publication, without changing the bytes, decoder, Main, RBF, visualizer or timing.  Reproduce Big Lebowski startup and Root Menu once with that helper, identify the exact common construct at the 187/188-byte boundary against the frontend's 22 syntax-source checks, and then propose the narrowest helper-side compatibility normalization that preserves ordinary DVD streams and all accepted Blazing Saddles and Coming to America menu behavior.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 932 COMMIT Unreleased 932dc22 2026-09-02T23:55:22-07:00
-
-#### Coming From:
-
-Unreleased 932dc22
-
-#### Purpose:
-
-Accept the helper-only visualizer blend and localize The Big Lebowski's fresh failure to its initial non-menu authored still.
-
-#### Outcome:
-
-The user accepts source `932dc22`'s visualizer presentation.  The matched Big Lebowski capture instead isolates an independent DVD startup failure: after CSS setup and title inventory, the disc remains outside a menu and reaches a three-second authored still; the generalized terminal finalizer releases its 5,482-byte one-picture H.262 payload at sequence offset 0 and I-picture offset 170, appends sequence end plus drain, and Main submits the resulting 5,490 bytes.  The checksum-valid schema-21 snapshot records H.262 syntax error flag `0x0001` after only 187 accepted video bytes, zero completed or displayed pictures and zero swaps.  The helper neither crashes nor stalls: it proceeds through the following seven-second still and continues generating title video and audio, while Main has submitted 183,236,608 bytes by the 92.55-second capture endpoint with no transport block or audio underrun.  Source `9c00a20` broadened terminal still finalization from pending menu activations to every initial-filter still to repair direct Root Menu one-picture backgrounds; that now exposes this decoder-rejected non-menu first-play picture instead of retaining it behind the startup filter until a later complete random-access group supersedes it.  The 1,519,541-byte log, 1,445-byte telemetry barcode screenshot and 337-byte decoded sidecar have SHA-256 `8be2813b811564546c1ce79e4bf444fede5ff4cafac48f00ebb7bcda1cbeabc5`, `da9debc380f82fdfe9a656d5b8786310764e9582cd11f75a27ab6bf83337c067` and `4192d812816d56e8f24e2e7750c021efff272c61b614082df942fc9445b1811a`.  No runtime source was changed.
-
-#### Next Steps:
-
-After user approval, keep terminal finalization for an active DVD menu or pending authored menu activation, but leave an initial non-menu finite still queued under the existing random-access filter so a later complete sequence/I/reference group can replace its decoder entry point.  Add production-path regressions proving that a non-menu first-play still does not release or clear the filter, a direct Root Menu one-picture still still receives the terminal tail, and pending finite and indefinite menu activations retain their current staged policies.  Run strict random-access, overlay, navigation, staging, LPCM, audio and sanitizer suites, build one static ARMv7 helper without changing Main, the decoder, RBF, visualizer asset or accepted visualizer cadence, then retest Big Lebowski startup plus Blazing Saddles and Coming to America menu entry.
 
 #### Files Modified:
 
