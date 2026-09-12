@@ -1,4 +1,4 @@
-## 972 COMMIT Unreleased ??? 2026-09-12T10:13:02-07:00
+## 972 COMMIT Unreleased 016f1e2 2026-09-12T10:13:02-07:00
 
 #### Coming From:
 
@@ -14,7 +14,7 @@ The user reported the exact `24a6bda`-era symptom again ("shows up on resume, no
 
 #### Next Steps:
 
-Source `???` restructures `video_overlay_pause_barrier()` to force `video_overlay_service()` to run (via `pending_reveal`) *before* sending `PAUSE_READY`, so a full fresh publish completes and is fully handed to the pipe while Main is still in normal-drain mode, then only afterward announces ready and blocks for GO - eliminating the specific stuck-write mechanism the original bug fix was guarding against, since nothing is left in flight by the time Main could stop draining.  Removed the now-unused `video_overlay_style()` (its only caller was the block just rewritten).  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  `host/build/MediaPlayer_Helper` (SHA-256 `1f1ee6909b4cf89abb560faa4cfe591322529e7ed788d195ec75903b50a3764d`) is built; deliver it (current RBF `5ce3c1f`/seed99 and Main unaffected) for the user to retest: let the overlay auto-hide, then pause - it should reveal immediately with current, accurate TOTAL/ELAPSED/REMAIN, not stay blank until the next resume.
+Source `016f1e2` restructures `video_overlay_pause_barrier()` to force `video_overlay_service()` to run (via `pending_reveal`) *before* sending `PAUSE_READY`, so a full fresh publish completes and is fully handed to the pipe while Main is still in normal-drain mode, then only afterward announces ready and blocks for GO - eliminating the specific stuck-write mechanism the original bug fix was guarding against, since nothing is left in flight by the time Main could stop draining.  Removed the now-unused `video_overlay_style()` (its only caller was the block just rewritten).  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  `host/build/MediaPlayer_Helper` (SHA-256 `1f1ee6909b4cf89abb560faa4cfe591322529e7ed788d195ec75903b50a3764d`) is built; deliver it (current RBF `5ce3c1f`/seed99 and Main unaffected) for the user to retest: let the overlay auto-hide, then pause - it should reveal immediately with current, accurate TOTAL/ELAPSED/REMAIN, not stay blank until the next resume.
 
 #### Files Modified:
 
