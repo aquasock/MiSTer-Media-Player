@@ -1102,28 +1102,6 @@ static void video_overlay_descriptor(const uint8_t *plane,
     overlay->visible = visible;
 }
 
-/* Mirrors audio_overlay_style(): a single ~41-byte visibility-only record,
- * not a full CONFIG+DATA+COMMIT republish.  video_overlay_pause_barrier()
- * uses this exclusively, never video_overlay_publish() - a full ~88 KiB
- * republish inside the pause barrier races Main's pause_pipe_empty
- * detection, which can see a momentary gap mid-transfer and finalize the
- * pause before the trailing COMMIT record gets through, stranding it until
- * the next resume unblocks the pipe (the bug this function fixes). This
- * relies on the plane already holding a committed bitmap from an earlier
- * video_overlay_publish() - guaranteed by the unconditional reveal at
- * session start - exactly like the audio player's overlay never needs a
- * fresh bitmap at pause time either. */
-static int video_overlay_style(struct output_state *output, uint8_t command,
-                               int visible)
-{
-    struct dvd_spu_overlay overlay;
-    uint8_t payload[41];
-
-    video_overlay_descriptor(output->video_overlay_plane, &overlay, visible);
-    overlay_style_payload(&overlay, payload);
-    return emit_display_record(output, command, payload, sizeof(payload));
-}
-
 /*
  * Best-effort total-duration estimate from the video PTS/byte-offset pair
  * already tracked for scheduling (max_video_pts/max_video_pts_byte) against
@@ -1202,31 +1180,32 @@ static void video_overlay_service(struct output_state *output)
 }
 
 /*
- * Mirrors audio_pause_barrier(): reveal the overlay with a lightweight
- * style-only toggle (never video_overlay_publish() - see video_overlay_
- * style()'s comment for why), then block until Main has drained whatever
- * was already queued and sends GO.  process_program_stream()'s decode loop
- * naturally stops producing new output while blocked here, matching the
- * barrier Main's pause_barrier_finish() requires before it actually
- * asserts playback_paused - without this barrier at all, a pause request
- * that only pings the overlay (no barrier) races the helper's own output
- * pipe filling and blocking, and the reveal is only ever seen on the next
- * resume.
+ * Publish fresh content BEFORE announcing PAUSE_READY, while Main is still
+ * draining completely normally - identical to any periodic refresh during
+ * active playback, which is already known to be safe.  video_overlay_
+ * service() is forced to run via pending_reveal so a hidden overlay is
+ * unconditionally redrawn with current TOTAL/ELAPSED/REMAIN, not left
+ * showing whatever (possibly very stale, or nothing at all if it had
+ * never been drawn this reveal) content the plane last held.  By the time
+ * PAUSE_READY is sent below, every byte of that publish has already been
+ * handed to the pipe, so there is nothing still in flight for Main's
+ * pause_pipe_empty detection to race against - unlike the earlier bug
+ * where a full publish happening only after PAUSE_READY could leave a
+ * write() blocked once Main actually stopped draining.  Then block until
+ * Main has drained whatever was already queued and sends GO.
+ * process_program_stream()'s decode loop naturally stops producing new
+ * output while blocked here, matching the barrier Main's
+ * pause_barrier_finish() requires before it actually asserts
+ * playback_paused.
  */
 static int video_overlay_pause_barrier(struct output_state *output,
                                        int control_fd)
 {
-    int reveal = !output->video_overlay_visible;
-
     output->video_overlay_activity_pts = output->max_video_pts;
     output->video_overlay_visible = 1;
-    if (reveal &&
-        video_overlay_style(output, MEDIA_PLAYER_OVERLAY_STYLE, 1) < 0) {
-        fprintf(stderr,
-                "media_player_helper: video overlay pause style "
-                "failed\n");
-        return -1;
-    }
+    output->video_overlay_pending_reveal = 1;
+    video_overlay_service(output);
+
     if (control_send(control_fd, MEDIA_PLAYER_CONTROL_PAUSE_READY) < 0) {
         fprintf(stderr,
                 "media_player_helper: video overlay pause barrier "
