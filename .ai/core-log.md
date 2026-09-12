@@ -1,3 +1,32 @@
+## 975 COMMIT Unreleased ??? 2026-09-12T12:33:49-07:00
+
+#### Coming From:
+
+Unreleased 618b197
+
+#### Purpose:
+
+Reconstruct the wall-clock overlay-timing work (auto-hide while paused, and the seek-timing fix) that was live-iterated and deployed on top of `618b197` without ever being committed, and is now gone from both git and the build output path - re-implement it from scratch as a single committed change instead of leaving it lost.
+
+#### Outcome:
+
+A live debugging session chasing the .mpg progress overlay's pause/seek behavior went through several real, working intermediate states (a wall-clock `OVERLAY_IDLE_MS` deadline in the pause barrier, a seek activity-mark fix, and a full rewrite of `video_overlay_service()`/`video_overlay_mark_activity()` from PTS-based to `monotonic_us()`-based idle/refresh tracking) built and deployed directly to the test hardware without an intervening `git commit` - each ARM cross-build overwrote the same output binary, so once a later change was built the earlier one was gone from disk too, and none of it was ever committed to source control. When a genuine, apparently pre-existing decoder hang was found afterward (unrelated to these changes, reproducible even on the fully-reverted `618b197` build) and then a request came to restore the pre-hang state, there was no commit and no surviving binary to restore from - only this session's own memory of the changes. The user correctly identified this as defeating the entire purpose of the commit-before-build workflow.
+
+#### Next Steps:
+
+Re-implement the wall-clock overlay-timing mechanism from scratch on top of `618b197`, matching the design worked out live: `video_overlay_service()`'s idle-hide and refresh-cadence checks switch from `max_video_pts` deltas to `monotonic_us()` deltas (PTS reflects how much of the stream has been parsed/submitted, not real elapsed time, and bursts far ahead of real time whenever the decode pipeline refills - most visibly right after a seek); `video_overlay_mark_activity()` anchors to `monotonic_us()` directly; `video_overlay_publish()` renders with the overlay's actual visibility instead of a hardcoded always-visible, so a background refresh can update pixel content without forcing the overlay on screen; and the pause barrier polls for GO with a wall-clock ten-second deadline (`control_wait_for_go_timed()`), clearing the overlay once idle and falling back to an unbounded wait, since PTS does not advance at all while genuinely paused. This time, commit as soon as it builds clean and is confirmed non-regressive, before any further live iteration.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 974 COMMIT Unreleased 618b197 2026-09-12T11:54:33-07:00
 
 #### Coming From:
@@ -1214,34 +1243,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 935 COMMIT Unreleased ac13724 2026-09-03T00:16:48-07:00
-
-#### Coming From:
-
-Unreleased ac13724
-
-#### Purpose:
-
-Bundle the source-`ac13724` H.262 restart diagnostic helper with its matched runtime set and physical-drive launcher for forum testing.
-
-#### Outcome:
-
-`host/build/MiSTer_Media_Player_H262Diag_ac13724.zip` contains the exact source-`ac13724` static ARMv7 diagnostic helper, accepted source-`3689cca` Main, current source-`366a227` interlaced visualizer pack, timing-qualified source-`dfe1057` `MediaPlayer_20260901.rbf`, `games/MediaPlayer/USB DVD Drive.dvd`, diagnostic installation and source-provenance notes, the project licence and all seven bundled dependency licences.  It is explicitly identified as an unreleased diagnostic community test rather than a tagged or fixed release.  A fresh extraction contains sixteen files, all fifteen manifest entries pass SHA-256 verification, both executables retain mode 755, and the helper, Main, visualizer, RBF and launcher are byte-identical to their qualified inputs; ZIP integrity reports no errors.  The 6,578,930-byte archive has SHA-256 `ceb791f59ccc8db2d9702fb6631b9705a793d645fa8b2532560d5eeab26777ef`.
-
-#### Next Steps:
-
-Upload `host/build/MiSTer_Media_Player_H262Diag_ac13724.zip` to the forum and have the tester follow `INSTALL.txt`: enable telemetry, start The Big Lebowski, leave the failed startup visible briefly, press Root Menu once and leave that failed screen visible briefly, then return the helper log, telemetry screenshot and decoded sidecar.  Keep this package labeled diagnostic until those two bounded H.262 prefixes identify the compatibility correction and subsequent hardware testing qualifies a fixed build.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
