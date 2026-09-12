@@ -1,3 +1,32 @@
+## 967 COMMIT Unreleased fa0ebf6 2026-09-12T06:19:27-07:00
+
+#### Coming From:
+
+Unreleased 08db78e
+
+#### Purpose:
+
+Fix the .mpg progress-bar overlay never appearing on screen despite `08db78e`'s ARM/Main changes transmitting it correctly.
+
+#### Outcome:
+
+The user reported no visible change on real `.mpg` playback.  A fresh telemetry-enabled log confirmed `08db78e`'s helper code was running (`video progress overlay enabled file_size=...`) and that Main's overlay-trace patch showed `overlay_submit config`/`commit` pairs with a changing content hash roughly once per second, proving the overlay data was being rendered and transmitted correctly end to end.  The bug is in `mpeg2_h262_dvd_overlay.sv`, the FPGA-side DVD-style overlay compositor this feature rides on: `overlay_sample_valid` required `native_active` (the decoder's raw interlace flag, wired from `display_native_interlaced`) to be asserted before compositing any pixel, and the row-fetch request trigger for its line cache carried the same gate, so the cache was never even populated.  The same telemetry log's `H262 restart fields` diagnostic confirmed the user's test file is genuinely `sequence_progressive=1`/`progressive=1` content, so `native_active` reads 0 for it and the overlay is received and parsed correctly but never draws a pixel; the standalone audio player's identical overlay mechanism is unaffected because it does not depend on this signal.  The user confirmed this project no longer plays genuinely interlaced content - only converted progressive `.mpg` files and the progressive audio UI/visualizer - and authorized breaking interlaced/native-passthrough compatibility to fix this.
+
+#### Next Steps:
+
+Source `fa0ebf6` removes `native_active` from both the row-request trigger and the sample-valid gate in `mpeg2_h262_dvd_overlay.sv`; `h_pos`/`v_pos` already enumerate a straightforward progressive raster there regardless of source interlace, so this does not change what row is requested or sampled, only removes a gate that no longer corresponds to how this core is used.  The `native_active` port is left connected but unused rather than touching the module interface.  This touches RTL, so a 3-seed Quartus build is required; deliver the RBF plus the already-built `08db78e` Main/helper for the user to retest the `.mpg` progress-bar overlay, and confirm ordinary `.mpg` and audio-player playback are unaffected.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_dvd_overlay.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 966 COMMIT Unreleased 08db78e 2026-09-12T05:45:00-07:00
 
 #### Coming From:
@@ -1213,35 +1242,6 @@ Exit MediaPlayer and install only `host/build/MediaPlayer_Helper_MenuTransitions
 - host/arm/ARCHITECTURE.md
 - host/arm/media_player_helper.c
 - tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 927 COMMIT Unreleased 6b63c91 2026-09-02T22:16:01-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Diagnose Blazing Saddles' reproducible black decoder state after returning from long-running title playback to its root menu.
-
-#### Outcome:
-
-The fresh telemetry-enabled trace disproves a helper crash: after approximately 619.78 seconds of healthy playback, Root Menu succeeds, enters the menu domain, discards the old reserve and completes READY/GO in about 29 milliseconds; Main then receives and publishes a complete 86,400-byte selector overlay, while the helper remains alive and continues polling through the 679.72-second capture endpoint.  The new root destination reaches an authored indefinite still, but produces no `random access`, scheduler-progress or terminal-finalizer diagnostic after the barrier even though its overlay changes repeatedly.  This uniquely matches a single-picture menu stream retained by the helper's initial random-access filter: `wait_dvd_still()` calls `iso_finalize_terminal_random_access()` only when `activation_pending` is true, whereas Root Menu is classified immediately as `MEDIA_SOURCE_DVD_STREAM_HOP`, clears that flag and resets the decoder before reaching the still.  Consequently the queued picture receives neither the valid H.262 sequence end nor its five transport-drain bytes, no menu video crosses to Main and the screen remains black with the independently valid selector state unable to make a visible composite.  The 15,514,884-byte log, 559-byte all-black screenshot and 2,818-byte no-matrix sidecar have SHA-256 `2e25ec68e38676f4d221b37ca24c9365a5aa2ed4b25bb1ae51c28c3063ac595e`, `1fa718e5c800529417461bd164f5afadd65ec82288dd97ce9c34c334f65a91b1` and `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004`.  No runtime source was changed.
-
-#### Next Steps:
-
-After user approval, make one helper-only commit containing both diagnosed boundaries.  Generalize terminal DVD-still finalization so any active initial random-access filter with queued video, including a direct Root Menu hop, receives the existing sequence-end and transport-drain tail before waiting; retain activation staging only as the destination publication policy.  Separately give picture-bearing deferred motion-menu staging bounded headroom beyond the existing 4 MiB decision watermark and promote such a destination through the existing staged READY/GO stream-hop path before `ENOSPC`.  Add exact production-path regressions for an unstaged Root Menu one-picture indefinite still, the existing staged terminal still, an over-watermark motion menu with byte-exact post-barrier commit, the accepted 3,797,120-byte finite-still route below the watermark and overlay-only continuation, then run strict native, sanitizer, analyzer, DVD navigation, staging, random-access, overlay, LPCM, audio and seek suites locally and on the build PC before producing one static ARM helper for the specified Big Lebowski and Blazing Saddles hardware routes.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
