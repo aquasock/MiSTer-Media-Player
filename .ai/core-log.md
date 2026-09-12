@@ -1,3 +1,37 @@
+## 971 COMMIT Unreleased ??? 2026-09-12T08:06:57-07:00
+
+#### Coming From:
+
+Unreleased 6ac6895
+
+#### Purpose:
+
+Remove RTL and OSD support for native (unscaled 480i) presentation, Bob/Weave deinterlacing, and DVD/CD physical-media and disc-image menu entries, since this project only ever plays progressive `.mpg` files and the progressive audio UI/visualizer through the standard scaled HDMI/analog path, in order to recover FPGA resources and improve timing margin (seed26 passed `6ac6895` at only +0.050 ns setup slack).
+
+#### Outcome:
+
+The user asked what could safely be removed from the RBF to help timing/resources now that interlace, Bob/Weave and native output are all unsupported project scope, then directed starting the removal, later narrowing it to "standard HDMI and analog video out" for video and "spdif, analog, and HDMI" for audio, and separately asked to drop the DVD-video and Audio-CD OSD load options.  A repo-wide search for video-SDI support found nothing to remove - the only "SDI" matches are `SDIO_DAT`/`SDIO_CMD`/`SDIO_CLK` (the SD card interface) and `ADC_SDI` (the audio ADC's SPI pin name), both generic MiSTer board-framework names unrelated to video SDI.  Removed: `rtl/mpeg2_native_timing_pattern.sv` (dead, unreferenced); the `mpeg2_hdmi_deinterlace_control` instantiation, tying `HDMI_BOB_DEINT` directly to `1'b0` and deleting `rtl/mpeg2_hdmi_deinterlace_control.sv` along with the now-orphaned `audio_ui_mode_active_video_sync`/`audio_ui_mode_active_video` synchronizer and its `MediaPlayer.sdc` false-path exception; the `"O[124],Deinterlacer Mode:,Bob,Weave;"` OSD entry; the `mpeg2_h262_native_field_order` instantiation and the `mpeg2_new_native_480i_request`/`mpeg2_new_presentation_request` decision chain it fed, simplifying `mpeg2_new_presentation_request` to `mpeg2_new_native_progressive_supported` directly since `mpeg2_new_progressive_sequence` is always true for this project's content, and tying `mpeg2_video_output_timing`'s `interlaced_request_async`/`top_field_first_async` ports to `1'b0`; the `mpeg2_new_film_mode_video_sync` synchronizer, simplifying `mpeg2_new_swap_window_video`'s assignment to `display_frame_window` directly; and the presentation scheduler's `native_film_mode` port, tied to `1'b0`.  Also removed `"P1,Load Physical Disc;"`, `"P1F1,DVD,Video DVD;"`, `"P1F2,CD,Audio CD;"`, `"P2,Load Disc Image;"` and `"P2F3,ISO,Video DVD;"` from `CONF_STR`, keeping `"F4,...;"`/`"F5,...;"` direct `.mpg`/audio-file loading - verified safe since Main's patch dispatches on a single fixed `MEDIAPLAYER_STREAM_INDEX = 1`, not the OSD slot number.  Deliberately deferred: `mpeg2_new_native_active_mpeg2`/`_sync`/`_mode_change`, which are already effectively dead for progressive-only content but are intertwined with the `reset_mpeg2_display_domain` fix from `fa0ebf6`, judged too risky to bundle into this same pass.
+
+#### Next Steps:
+
+Commit the implementation, then run a 3-seed Quartus build (this touches RTL and `files.qip`) and deliver the winning seed's RBF for the user to retest: `.mpg` playback, seeking, pause/resume and the progress overlay, and standalone audio playback/visualizer should all behave exactly as before, with the Bob/Weave OSD option, the DVD/CD load menu entries, and the native-480i decision path gone.
+
+#### Files Modified:
+
+- MediaPlayer.sdc
+- MediaPlayer.sv
+- files.qip
+- rtl/mpeg2_hdmi_deinterlace_control.sv
+- rtl/mpeg2_native_timing_pattern.sv
+- rtl/mpeg2_new/mpeg2_h262_native_field_order.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 970 COMMIT Unreleased 6ac6895 2026-09-12T07:39:05-07:00
 
 #### Coming From:
@@ -1213,35 +1247,3 @@ None.
 - [ ] Passed
 
 ---
-
-## 931 COMMIT Unreleased 932dc22 2026-09-02T23:23:00-07:00
-
-#### Coming From:
-
-Unreleased 366a227
-
-#### Purpose:
-
-Minimize the striped standalone-audio interface artifact with helper-only overlay transparency and a covered-visualizer brightness limit while preserving the accepted animation cadence.
-
-#### Outcome:
-
-Source `932dc22` makes standalone-audio overlay palette index zero fully transparent, the dark panel color alpha `0xa0`, and both border/text colors opaque, so missed or background-only rows expose the continuously decoded visualizer while retained UI detail reads as a translucent scanline-style HUD.  While that overlay is visible, the already-scheduled GOP selector limits the displayed grade to level 3 of 7; the existing ten-second CLEAR restores the full zero-through-seven loudness range, and activity or seek reapplies the cap without changing `due_gops`, GOP phase, source frame rate, slice size or service cadence.  Focused strict and ASAN/UBSAN tests prove exact palette alpha, covered attack `1,2,3,3...`, revealed recovery `4,5,6,7`, and renewed capping after activity and seek; GCC analyzer passes both changed translation units.  Native real-helper tests pass MP3, WAV, FLAC and Ogg with 378 through 381 decoded pictures and one CLEAR each, and the final ARMv7 helper passes the same four formats with 372 through 381 pictures and one CLEAR each.  GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_Scanline_932dc22` at SHA-256 `a87a6a81e21996735abc0d218d9d301ad8e349f96b0eeb8d891a172b86c70b09`.  The visualizer asset, decoder, Main and RBF are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_Scanline_932dc22` using executable mode, preserving the installed visualizer pack, Main and timing-qualified RBF.  Play standalone audio and require the first ten seconds to show a readable translucent scanline-style interface with the disruptive full-width dark bars removed or materially minimized; after the existing CLEAR, require the normal full-brightness visualizer.  Press Space during playback and pause, require the interface to return immediately over the animation with its quieter brightness ceiling, and confirm that the visualizer motion rate remains constant in both states and returns to full range after another ten seconds without input.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/audio_visualizer.c
-- host/arm/media_player_helper.c
-- tools/test_audio_visualizer.c
-- tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [x] Passed
