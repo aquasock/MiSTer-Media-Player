@@ -1,3 +1,32 @@
+## 974 COMMIT Unreleased ??? 2026-09-12T11:54:33-07:00
+
+#### Coming From:
+
+Unreleased a45a67c
+
+#### Purpose:
+
+Revert the wall-clock idle-hide-while-paused mechanism and the seek-timing rewrite built on top of `a45a67c`: live testing found they introduced a real hang, and the feature they were chasing (auto-hiding the overlay while genuinely paused) was already known architecturally unreachable, so the safer move is dropping back to the last state confirmed fully stable.
+
+#### Outcome:
+
+On top of `a45a67c` (STYLE-only reveal + background refresh), three more iterations were built and live-tested without committing: (1) added `flush_output()` to `video_overlay_pause_barrier()` after discovering the STYLE write was sitting unflushed in the helper's own stdio buffer, which the user confirmed fixed the pause-reveal bug; (2) added a wall-clock `OVERLAY_IDLE_MS` deadline inside the barrier's wait loop to also auto-hide the overlay after ten seconds *while still paused* - the user confirmed play/pause was working well with this in place, even though the hide-while-paused half of it turned out to be structurally unreachable (Main stops draining its pipe entirely while `playback_paused`, so a CLEAR sent from inside the barrier can never actually arrive until resume); (3) chasing a *separate* reported bug (overlay flashing then vanishing after a seek), first anchored the seek's activity mark to the seek target PTS, then - once that proved insufficient because PTS is not a reliable stand-in for real elapsed time during decoder buffer refills - rewrote the whole idle/refresh mechanism (`video_overlay_service()`, `video_overlay_mark_activity()`, and the pause barrier's own wait) to use `monotonic_us()` throughout.  The user confirmed the seek fix worked, then during further open-ended testing (play/pause and seeking back and forth) hit a hard hang: helper cleanly blocked in `poll()` (confirmed via `/proc/<pid>/wchan`), but Main itself pinned at 50% CPU while "R (running)" instead of idling, and two resume keypresses produced no effect and no new log lines - a genuine deadlock/spin, not a cosmetic issue, reproducible from a fresh reboot with a single pause. No `strace`/`gdb` available on the target to pin down the exact mechanism.
+
+#### Next Steps:
+
+Reverted `host/arm/media_player_helper.c` to exactly `a45a67c` plus only the one isolated, well-understood `flush_output()` fix (verified via `git diff --stat`: 8 insertions, 1 deletion) - dropping the wall-clock idle-while-paused loop, the seek PTS-anchor attempt, and the full monotonic_us() rewrite entirely.  This intentionally leaves both previously-reported cosmetic issues unresolved (overlay doesn't auto-hide while paused; a seek can still show a brief stale-timing flash) in exchange for the last build with no observed hangs.  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  `host/build/MediaPlayer_Helper` (SHA-256 `51a9c3968dbb9fa8415741392fcdb96e8166864538eb9412483a4a1d3efd9c94`) is built and deployed (current RBF `5ce3c1f`/seed99 and Main unaffected); the user is stress-testing this build now to confirm the hang is actually gone before this is considered resolved.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 973 COMMIT Unreleased a45a67c 2026-09-12T10:27:30-07:00
 
 #### Coming From:
@@ -1209,37 +1238,6 @@ Upload `host/build/MiSTer_Media_Player_H262Diag_ac13724.zip` to the forum and ha
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 934 COMMIT Unreleased ac13724 2026-09-03T00:01:33-07:00
-
-#### Coming From:
-
-Unreleased 932dc22
-
-#### Purpose:
-
-Capture the exact common H.262 header construct rejected near byte 188 in The Big Lebowski's startup and Root Menu stills without changing playback behavior.
-
-#### Outcome:
-
-Source `ac13724` retains every filtered byte and existing publication decision while logging at most the first 256 post-filter bytes plus bounded parsed sequence-header, sequence-extension, picture-header and picture-coding-extension fields for each successful initial random-access group.  A focused production-translation-unit regression proves the collector extracts 720x480 sequence, I-picture and raw extension fields without changing one input byte; the existing terminal-still regressions additionally prove the emitted picture bytes remain exact.  Strict native compilation and DVD random-access, menu-hop, reserve, staging, overlay, SPU, Program Stream seek, audio seek/UI/visualizer and private-audio/LPCM-skip suites pass, as do Address/Undefined sanitizers, GCC analyzer, native static build and the MP3/WAV/FLAC/Ogg real-helper seek/visualizer suite against both native and ARM executables.  The local static stripped ARMv7 diagnostic helper `host/build/MediaPlayer_Helper_H262Diag_ac13724` is 966,052 bytes with SHA-256 `15dc2ddb7d55fedac950ac3ce7401d56340a2d032edda45c1578c3cd04f986a1`; its capabilities match the accepted helper.  No decoder, Main, RBF, visualizer, media byte or scheduling behavior changed.
-
-#### Next Steps:
-
-Install only `host/build/MediaPlayer_Helper_H262Diag_ac13724` as `/media/fat/linux/MediaPlayer_Helper`, enable telemetry, start The Big Lebowski and leave its failed startup visible briefly, then press Root Menu once and leave that failed screen visible briefly.  Return the updated results folder; its log should contain two `H262 restart diagnostic` prefixes and two `H262 restart fields` records, allowing the exact common byte-187/188 decoder rejection to be identified before any compatibility normalization is proposed.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
 
 #### Status:
 
