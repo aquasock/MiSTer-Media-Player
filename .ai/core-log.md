@@ -1,3 +1,34 @@
+## 976 COMMIT Unreleased ??? 2026-09-12T12:52:53-07:00
+
+#### Coming From:
+
+Unreleased e7fde30
+
+#### Purpose:
+
+Fix the video progress overlay showing TOTAL/REMAIN as 00:00 on a large (~4 GiB) `.mpg` file, and restyle the progress-strip labels to "Label: HH:MM:SS" moved closer to the bar.
+
+#### Outcome:
+
+The user tested a second, much longer `.mpg` file (24fps, ~4.06 GiB) and found pausing showed `TOTAL 00:00`/`REMAIN 00:00` while the progress bar itself still filled correctly.  The ARM diagnostic log showed `video progress overlay enabled file_size=-1` at session start - the file-size `stat()` call was failing.  The file is 4,359,360,512 bytes, past the boundary a 32-bit `off_t`/`struct stat` can represent; without large-file support, glibc's `stat()` on the ARM target returns `EOVERFLOW` instead of a size for any file at or beyond that boundary (roughly 2-4 GiB depending on signedness).  `video_overlay_locked_length_pts()` treats `video_overlay_file_size <= 0` as "can't compute a duration yet" and returns 0 forever once locked that way, which is why TOTAL/REMAIN stayed at zero while the bar (driven by absolute PTS position, not the locked duration) still moved normally.  Separately, the user asked to restyle the progress strip: "Elapsed:"/"Remaining:"/"Total:" (colon, mixed case) instead of "ELAPSED"/"REMAIN"/the bare label, `HH:MM:SS` instead of `MM:SS`, and the whole strip moved down closer to the progress bar.
+
+#### Next Steps:
+
+Source `???` adds `-D_FILE_OFFSET_BITS=64` to `host/arm/Makefile`'s default `CPPFLAGS` (applies to every translation unit in both the native and ARM builds, harmless no-op on x86_64 where `off_t` is already 64-bit by default) so `stat()` correctly reports sizes for files past the 32-bit boundary instead of failing.  `host/arm/audio_ui.c`'s `format_time()` now formats `HH:MM:SS`; `draw_progress_strip()`'s three labels became `"Elapsed: %s"`, `"%s: %s"` (caller-supplied label, now passed capitalized - `"Total"` for the video overlay, `"Track"` for the audio player's own full UI), and `"Remaining: %s"`, and their Y position moved from 412 to 422 (closer to the progress bar at 438).  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  Committed immediately on a clean compile, before deployment.  `host/build/MediaPlayer_Helper` (SHA-256 `059bef4d4208356f747eaaf66b54ba177f6df35daa864e2dec7b7e0fac1bcabf`) is built; deliver it (current RBF `5ce3c1f`/seed99 and Main unaffected) for the user to retest the large file's TOTAL/REMAIN and the restyled labels/positioning, and to continue stress-testing for the separately-identified, apparently pre-existing decoder hang (unrelated to this fix).
+
+#### Files Modified:
+
+- host/arm/Makefile
+- host/arm/audio_ui.c
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 975 COMMIT Unreleased e7fde30 2026-09-12T12:33:49-07:00
 
 #### Coming From:
@@ -1214,34 +1245,5 @@ The next helper-only change should apply the identical narrow normalization at e
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 936 COMMIT Unreleased ac13724 2026-09-03T00:38:42-07:00
-
-#### Coming From:
-
-Unreleased ac13724
-
-#### Purpose:
-
-Use the source-`ac13724` physical-disc diagnostics to identify The Big Lebowski's common startup and Root Menu H.262 rejection.
-
-#### Outcome:
-
-The user reports that the complete forum ZIP works perfectly on a fresh MiSTer, and after creating that installation's initially absent `/media/fat/screenshots` directory the intended capture succeeds.  The startup still terminal-filters 5,473 bytes and the Root Menu still terminal-filters 128,368 bytes, both with sequence offset zero and I-picture offset 170; their 256-byte prefixes are identical through byte 190 and first differ only in slice payload byte 191, after the decoder has already failed.  Both carry a 720-by-480, aspect-code-two, rate-code-four sequence with valid marker, sequence extension `148200010000` identifying profile/level `0x48`, non-progressive sequence and 4:2:0 chroma, followed by the same I frame and picture-coding extension `8ffff3c080`: all four `f_code` values are 15, picture structure is frame, frame prediction is set, concealment is clear, `progressive_frame` is one and `chroma_420_type` is zero.  Project reference H262-033 and H.262 6.3.10 require `chroma_420_type` to equal `progressive_frame` for 4:2:0; the frontend's source-21 check is the unique early check violated by these fields, and it evaluates on stream byte 186 immediately before the first slice at byte 187, matching the reset session's 188 accepted bytes, error flag `0x0001`, and zero completed or displayed pictures.  The helper remains alive beyond 386 seconds and Main submits more than 912 MB, excluding a transport or helper failure.  The 6,497,185-byte log, 1,451-byte screenshot and 376-byte checksum-valid schema-21 sidecar have SHA-256 `140890eff54f08712d07da8d9bf4d85034c8b3e5038195047c11ad181a958c0d`, `8cfc68f0bb767f52ce2ac7ca38d101ff349639b3b7e21bd1d5a80f979e58ce97` and `a720e6a6355b778971f8138b56e9940e55045d21babde553343919f9cb1d6c46`.
-
-#### Next Steps:
-
-After user approval, preserve the decoder, RBF, Main, random-access structure, byte count and every conforming stream while adding one helper-side compatibility normalization at the already-buffered initial I-picture boundary: only when a parsed sequence extension identifies 4:2:0 and the parsed frame-picture coding extension has `progressive_frame=1` with the nonconforming `chroma_420_type=0`, change that one field from zero to one and log the exact offset and before/after byte.  Add captured-header and conforming-control regressions proving only byte 185 changes from `0xc0` to `0xc1`, simulate the frontend to prove source 21 clears and the first slice is admitted, run the full strict, sanitizer, analyzer, DVD, LPCM and audio suites, build only a new static ARM helper, then retest both Big Lebowski stills plus the accepted Blazing Saddles and Coming to America menu routes.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
