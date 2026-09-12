@@ -1,3 +1,33 @@
+## 968 COMMIT Unreleased f329dce 2026-09-12T07:08:14-07:00
+
+#### Coming From:
+
+Unreleased fa0ebf6
+
+#### Purpose:
+
+Fix two remaining `.mpg` progress-overlay problems: it only revealed on the next resume rather than on pause itself, and TOTAL/REMAIN visibly jumped around instead of counting down smoothly.
+
+#### Outcome:
+
+The user confirmed the overlay now draws (`fa0ebf6`) but reported it "only shows up on resume, not pause," matching the audio player's own pre-`4116a00` bug, and that ELAPSED was stable while REMAIN and TOTAL jumped around.  The pause-reveal bug traced to the same root cause as the audio player's original one: the fire-and-forget `MEDIA_CONTROL_USER_ACTIVITY` ping added in `08db78e` raced Main's own transfer loop, which stops draining the helper's output pipe as soon as `playback_paused` is set; once that pipe fills, `process_program_stream()` blocks inside a write and never returns to the top of its loop to see the pending control byte until the *next* unpause lets the blocked write through.  Main's existing audio pause barrier (`MEDIA_CONTROL_PAUSE`/`PAUSE_READY`, `pause_pending`/`pause_ready`/`pause_pipe_empty`, `pause_barrier_finish()`) already solves exactly this by continuing to drain normally while `pause_pending` is set and only asserting `playback_paused` once the helper has replied and the pipe is confirmed empty; it was gated on `audio_visualizer_controls` only.  The TOTAL/REMAIN jitter traced to `video_overlay_estimated_length_pts()` recomputing the `max_video_pts`/`max_video_pts_byte` ratio on every publish, which drifts slightly as more of a VBR file is read; REMAIN (`length - position`) inherits that same drift.
+
+#### Next Steps:
+
+Source `f329dce` widens the pause-barrier gate from `audio_visualizer_controls` to `seek_controls` (audio_visualizer_controls plus direct `.mpg`/`.mpeg` files, excluding DVD/ISO/menu content) so `.mpg` sessions use the identical, already-correct barrier; added `video_overlay_pause_barrier()` (mirrors `audio_pause_barrier()`) wired into `process_program_stream()`'s per-iteration command read in place of the removed `MEDIA_CONTROL_USER_ACTIVITY` ping.  Renamed the estimator to `video_overlay_locked_length_pts()` and made it compute the ratio once (a new `video_overlay_length_known` flag), caching the result in `output_state` and preserving it across `reset_output_for_navigation()`'s memset alongside the other `video_overlay_*` resources, so a seek does not re-lock a different estimate mid-session.  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  `host/build/MiSTer_MediaPlayer` (SHA-256 `a7bf5dcd6af84f6de6134a2fcd447041f67d59662b0776e2a1985f6be5f2fe13`) and `host/build/MediaPlayer_Helper` (SHA-256 `214e48931268df2e498a73c2e4b4b32d0f570b774c5f09be533266f205383312`) are both built; the current RBF (`fa0ebf6`, seed 33) is unaffected.  Deliver both for the user to retest: the overlay should reveal immediately on pause (not just resume), and TOTAL should hold one static value for the whole session while REMAIN counts down smoothly.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 967 COMMIT Unreleased fa0ebf6 2026-09-12T06:19:27-07:00
 
 #### Coming From:
@@ -1213,37 +1243,6 @@ Exit MediaPlayer, replace `/media/fat/linux/MediaPlayer_Helper` with `host/build
 - host/arm/audio_visualizer.c
 - tools/generate-audio-visualizer.py
 - tools/test_audio_visualizer.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 928 COMMIT Unreleased 9c00a20 2026-09-02T22:31:00-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Complete picture-bearing motion-menu transitions before their activation stage fills and publish terminal one-picture DVD menus after every navigation route.
-
-#### Outcome:
-
-Source `9c00a20` preserves the 4 MiB classification boundary but expands the bounded activation stage to 8 MiB, statically reserving at least one complete 2 MiB video-queue drain beyond that decision; a pending picture-qualified motion menu still in the menu domain now requests the existing staged READY/GO hop at the watermark and publishes its bytes atomically after the decoder reset instead of failing at capacity.  DVD still waiting now applies the existing byte-exact terminal random-access finalizer whenever an initial filter retains queued video, independent of deferred activation state, so direct Root Menu transitions such as the reproduced long-running Blazing Saddles route receive the H.262 sequence end and five transport-drain bytes while staged destinations retain their prior publication policy.  New production-path regressions verify the exact unstaged terminal tail, the accepted 3,797,120-byte finite-still classification below the watermark and an exact 4 MiB motion-menu commit; strict native DVD, staging, reserve, random-access, overlay, audio, visualizer, LPCM-skip and seek suites pass locally and on the build PC, including 20 focused and 50 staging/menu-hop local repetitions plus focused ASAN and UBSAN on both hosts.  GCC analyzer finds no change-related fault after demoting its pre-existing audio-overlay allocation warning.  ARM GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_MenuTransitions_9c00a20` with SHA-256 `cbd5359271c10c2788b66b83d21fc21f82631e7b77c49e2697b715bfc805f143`; Main, RTL, the RBF and libdvdnav policy are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer and install only `host/build/MediaPlayer_Helper_MenuTransitions_9c00a20` as `/media/fat/linux/MediaPlayer_Helper` with executable mode while preserving the installed Main, visualizer asset and timing-qualified RBF.  On The Big Lebowski, enter Scene Selection, change pages, play a scene, return to the menu, resume the saved title position, re-enter Scene Selection and change pages again; acceptance requires a logged `DVD picture-bearing motion menu requires staged stream hop` at or beyond 4 MiB, READY/GO completion and continued navigation without `No space left on device`.  On Blazing Saddles, play for several minutes and press Root Menu; acceptance requires a logged terminal random-access group and authored-still drain followed by a visible responsive menu.  Retain shorter Coming to America Scene Selection, ordinary chapter, forum-disc LPCM-menu and title-audio checks before marking this source hardware-passed.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
 
 #### Status:
 
