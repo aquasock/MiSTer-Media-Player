@@ -1,3 +1,32 @@
+## 973 COMMIT Unreleased ??? 2026-09-12T10:27:30-07:00
+
+#### Coming From:
+
+Unreleased 016f1e2
+
+#### Purpose:
+
+Fix the `.mpg` progress overlay still not appearing on pause: `016f1e2`'s reorder (full publish before `PAUSE_READY`) did not close the race after all - live testing showed Main's own overlay trace receiving the CONFIG record but never the matching COMMIT.
+
+#### Outcome:
+
+The user's retest of `016f1e2` reproduced the exact same symptom.  A live ARM diagnostic log (telemetry enabled) captured Main's `overlay_submit` trace for the failing pause: `config sequence=21` was received, but no `commit sequence=21` (or any `data` records) ever appeared, even though the helper is strictly sequential and cannot send `PAUSE_READY` until `video_overlay_publish()`'s writes have all already returned successfully.  This means the race is not about *when* the helper writes relative to `PAUSE_READY` at all - `PAUSE_READY` travels on a small, separate `control_fd` channel Main can process independently of how far its own asynchronous drain loop has gotten through the ~88 KiB already sitting in the bulk pipe from the publish.  A stale `pause_pipe_empty=true` (set from any earlier momentary gap, since `pause_pending` is already true from the moment Main decides to pause, well before the helper even starts processing the command) combined with `pause_ready` becoming true is enough for `pause_barrier_finish()` to fire and Main to stop draining, abandoning whatever of the publish it had not yet read - regardless of whether the helper sent it before or after `PAUSE_READY`.  The only way to make this safe is to keep the amount of data crossing the wire at pause time small enough that draining it is not itself a multi-poll-cycle operation - i.e. go back to `24a6bda`'s original small `MEDIA_PLAYER_OVERLAY_STYLE`-only reveal - and instead fix the actual staleness problem it was trading away: `video_overlay_service()` previously stopped publishing entirely once idle-hidden, so the plane content a later STYLE-only reveal could show was frozen at whatever was last rendered before the hide, potentially minutes stale.
+
+#### Next Steps:
+
+Reverted `video_overlay_pause_barrier()` back to the small `video_overlay_style()`-only reveal (restored the function `016f1e2` deleted).  Fixed the real problem instead: `video_overlay_publish()` now renders with `output->video_overlay_visible` (was hardcoded to always-visible) so a publish can update pixel content without also forcing the overlay on screen, and `video_overlay_service()` no longer stops entirely once idle-hidden - it keeps publishing fresh content in the background on a slower five-second cadence (`VIDEO_OVERLAY_BACKGROUND_REFRESH_TICKS`, vs. the one-second cadence used while visible) with `visible=0`, so the FPGA plane stays reasonably current the whole time the overlay is hidden.  These background refreshes happen during ordinary, non-barrier operation - the same proven-safe context as any other periodic refresh - so they carry none of the pause-time race risk; only the actual reveal at pause time still crosses the wire, and it is back to the small, safe record.  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  `host/build/MediaPlayer_Helper` (SHA-256 `e731e7f405e3530c4fa8bbac94e5b0ea12bab6ef0b5f595a17ef333e4bc25a1c`) is built; deliver it (current RBF `5ce3c1f`/seed99 and Main unaffected) for the user to retest: let the overlay auto-hide, then pause - it should reveal immediately with reasonably current TOTAL/ELAPSED/REMAIN (at most a few seconds stale, not minutes), and no longer race Main's drain detection since the pause-time transfer is tiny again.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 972 COMMIT Unreleased 016f1e2 2026-09-12T10:13:02-07:00
 
 #### Coming From:
@@ -14,7 +43,7 @@ The user reported the exact `24a6bda`-era symptom again ("shows up on resume, no
 
 #### Next Steps:
 
-Source `016f1e2` restructures `video_overlay_pause_barrier()` to force `video_overlay_service()` to run (via `pending_reveal`) *before* sending `PAUSE_READY`, so a full fresh publish completes and is fully handed to the pipe while Main is still in normal-drain mode, then only afterward announces ready and blocks for GO - eliminating the specific stuck-write mechanism the original bug fix was guarding against, since nothing is left in flight by the time Main could stop draining.  Removed the now-unused `video_overlay_style()` (its only caller was the block just rewritten).  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  `host/build/MediaPlayer_Helper` (SHA-256 `1f1ee6909b4cf89abb560faa4cfe591322529e7ed788d195ec75903b50a3764d`) is built; deliver it (current RBF `5ce3c1f`/seed99 and Main unaffected) for the user to retest: let the overlay auto-hide, then pause - it should reveal immediately with current, accurate TOTAL/ELAPSED/REMAIN, not stay blank until the next resume.
+Source `016f1e2` restructures `video_overlay_pause_barrier()` to force `video_overlay_service()` to run (via `pending_reveal`) *before* sending `PAUSE_READY`, so a full fresh publish completes and is fully handed to the pipe while Main is still in normal-drain mode, then only afterward announces ready and blocks for GO.  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  Delivered and the user retested with telemetry enabled: the symptom was unchanged, and a live ARM diagnostic log pinpointed why - Main's own `overlay_submit` trace showed the CONFIG record of the reveal-triggered publish arriving, but no matching COMMIT ever appeared, even though the helper is fully synchronous and cannot send `PAUSE_READY` until the entire publish's writes have already returned.  The real race is not about ordering within the helper at all: `PAUSE_READY` arrives on a small, separate `control_fd` channel that Main can process independently of how far its own asynchronous drain loop has gotten through the ~88 KiB already sitting in the bulk pipe, so `pause_barrier_finish()` can fire (and Main stop draining) while most of a large publish is still unread and gets abandoned.  Superseded by the fix logged in entry 973.
 
 #### Files Modified:
 
@@ -22,7 +51,7 @@ Source `016f1e2` restructures `video_overlay_pause_barrier()` to force `video_ov
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1211,35 +1240,6 @@ Install only `host/build/MediaPlayer_Helper_H262Diag_ac13724` as `/media/fat/lin
 - host/arm/ARCHITECTURE.md
 - host/arm/media_player_helper.c
 - tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 933 COMMIT Unreleased 932dc22 2026-09-02T23:59:04-07:00
-
-#### Coming From:
-
-Unreleased 932dc22
-
-#### Purpose:
-
-Determine whether Root Menu recovers The Big Lebowski's failed startup or independently reproduces its decoder rejection.
-
-#### Outcome:
-
-Root Menu performs a genuine second navigation attempt rather than merely redisplaying the first latched telemetry state.  At 113.253892 seconds Main sends command `0x09`; libdvdnav reports a successful root hop, the helper enters the menu, discards 4,180,090 reserved bytes, returns READY at 113.302508 seconds and releases the reset/GO barrier at 113.313835 seconds.  The destination then reaches its authored 15-second menu still and terminal-finalizes a new group with sequence offset 0, I-picture offset 170 and next reference offset 128,368.  The new checksum-valid schema-21 snapshot nevertheless records the same H.262 syntax flag `0x0001`, only 188 accepted bytes, and zero completed, displayed or reference pictures and swaps; the preceding independent startup snapshot failed at 187 bytes with the same sequence and I-picture offsets.  The helper remains alive, continues publishing menu highlights and has supplied 870,570,274 bytes by the 370.83-second capture endpoint, proving that the reset succeeds but both authored stills share an early H.262 construct rejected by the decoder.  Therefore entry 932's proposed non-menu-only gating could avoid the first failure but cannot make this root menu work and must not be shipped as the complete correction.  The 6,131,013-byte log, 1,451-byte barcode screenshot and 376-byte sidecar have SHA-256 `0334960b4723a0f4559d11ed89d3d660f916d109f574f8a3160896a7b17081e7`, `cd46075c074321026dd213f5514271b5502899e3325397b9f9e37bd0cc6f71a0` and `a720e6a6355b778971f8138b56e9940e55045d21babde553343919f9cb1d6c46`.  No runtime source was changed.
-
-#### Next Steps:
-
-Do not implement the entry-932 gating alone.  After user approval, make one diagnostic helper build that logs a bounded byte-exact prefix and parsed sequence, picture and extension fields for each initial random-access group before publication, without changing the bytes, decoder, Main, RBF, visualizer or timing.  Reproduce Big Lebowski startup and Root Menu once with that helper, identify the exact common construct at the 187/188-byte boundary against the frontend's 22 syntax-source checks, and then propose the narrowest helper-side compatibility normalization that preserves ordinary DVD streams and all accepted Blazing Saddles and Coming to America menu behavior.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
