@@ -78,16 +78,10 @@ assign VIDEO_ARY = widescreen ? 12'd9  : 12'd3;
 `include "build_id.v"
 localparam CONF_STR = {
 	"MediaPlayer;;",
-	"P1,Load Physical Disc;",
-	"P1F1,DVD,Video DVD;",
-	"P1F2,CD,Audio CD;",
-	"P2,Load Disc Image;",
-	"P2F3,ISO,Video DVD;",
 	"F4,M2VMPGMPEVOB,Load MPEG-2 Video File;",
 	"F5,WAVMP3FLCOGG,Load Audio File;",
 	"-;",
 	"O[121],Aspect Ratio,16:9,4:3;",
-	"O[124],Deinterlacer Mode:,Bob,Weave;",
 	"O[3:1],Audio Test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
 	"O[126],Audio Output,HDMI,S/PDIF;",
 	"O[125],Telemetry,Off,On;",
@@ -867,12 +861,14 @@ wire        display_field_window;
 wire        display_frame_window;
 wire        display_field_swap_window;
 wire        display_native_interlaced;
-wire        display_hdmi_bob_deinterlace;
 wire        mpeg2_new_native_active_mpeg2;
 
-// MiSTer's scaler consumes this request only on its processed HDMI path.
-// Direct video continues to carry the core's native interlaced timing.
-assign HDMI_BOB_DEINT = display_hdmi_bob_deinterlace;
+// Bob/Weave deinterlacing and native (unscaled) output are both out of
+// scope: this project only plays progressive content (the user's own .mpg
+// encodes and the progressive audio UI/visualizer) through the standard
+// scaled HDMI/analog path, so display_native_interlaced never requests
+// interlaced timing and this request is always false.
+assign HDMI_BOB_DEINT = 1'b0;
 
 wire [7:0]  fb_video_r;
 wire [7:0]  fb_video_g;
@@ -962,8 +958,10 @@ mpeg2_video_output_timing mpeg2_video_output_timing
 (
 	.clk                     (clk_video),
 	.reset                   (reset_video),
-	.interlaced_request_async(mpeg2_new_native_480i_request),
-	.top_field_first_async   (mpeg2_new_native_top_field_first),
+	// Interlaced native presentation is no longer supported (progressive
+	// content only); tied off rather than driven by a removed decision chain.
+	.interlaced_request_async(1'b0),
+	.top_field_first_async   (1'b0),
 	.interlaced_active       (display_native_interlaced),
 	.ce_pixel                (display_pixel_ce),
 	.h_pos                   (display_h_pos),
@@ -975,16 +973,6 @@ mpeg2_video_output_timing mpeg2_video_output_timing
 	.field_window            (display_field_window),
 	.field_swap_window       (display_field_swap_window),
 	.frame_window            (display_frame_window)
-);
-
-mpeg2_hdmi_deinterlace_control mpeg2_hdmi_deinterlace_control
-(
-	.clk                     (clk_video),
-	.reset                   (reset_video),
-	.native_interlaced       (display_native_interlaced &&
-	                          !audio_ui_mode_active_video),
-	.bob_selected_async      (!status[124]),
-	.hdmi_bob_deint          (display_hdmi_bob_deinterlace)
 );
 
 ///////////////////////   NEW H.262 DECODER   ////////////////////
@@ -1022,42 +1010,21 @@ wire        mpeg2_new_intra_vlc_format;
 wire        mpeg2_new_alternate_scan;
 wire        mpeg2_new_progressive_frame;
 wire        mpeg2_new_chroma_420_type;
-// Picture field-order and repeat metadata feed native film presentation.
+// Picture field-order and repeat metadata previously also fed native film
+// presentation (mpeg2_h262_native_field_order and the native-480i decision
+// below). This project only ever decodes progressive content now (the
+// user's own .mpg encodes and the progressive audio UI/visualizer), so
+// mpeg2_new_progressive_sequence is always true, making the native-480i
+// path (gated on !mpeg2_new_progressive_sequence) permanently dead; removed
+// entirely rather than left as always-false logic for synthesis to prune.
 wire        mpeg2_new_top_field_first;
-wire        mpeg2_new_native_film_mode;
 wire        mpeg2_new_native_progressive_supported;
 wire        mpeg2_new_native_film_supported;
 wire        mpeg2_new_native_480i_supported;
+wire        mpeg2_new_native_film_mode;
 wire        mpeg2_new_pce_repeat_first_field, mpeg2_new_pce_progressive_frame;
-wire        mpeg2_new_native_field_order_locked;
-wire        mpeg2_new_native_top_field_first;
-wire        mpeg2_new_native_field_order_mismatch;
 
-mpeg2_h262_native_field_order mpeg2_h262_native_field_order
-(
-	.clk                            (clk_mpeg2),
-	.reset                          (reset_mpeg2),
-	.picture_coding_extension_valid (mpeg2_new_picture_coding_extension_valid),
-	.progressive_sequence           (mpeg2_new_progressive_sequence),
-	.picture_top_field_first        (mpeg2_new_picture_coding_extension_top_field_first),
-	.picture_progressive_frame      (mpeg2_new_pce_progressive_frame),
-	.film_mode                      (mpeg2_new_native_film_mode),
-	.locked                         (mpeg2_new_native_field_order_locked),
-	.top_field_first                (mpeg2_new_native_top_field_first),
-	.mismatch                       (mpeg2_new_native_field_order_mismatch)
-);
-
-wire mpeg2_new_native_480i_request =
-    (mpeg2_new_phase1_supported ||
-     mpeg2_new_native_480i_supported ||
-     mpeg2_new_native_film_supported) &&
-	!mpeg2_new_progressive_sequence &&
-	mpeg2_new_native_field_order_locked &&
-	!mpeg2_new_native_field_order_mismatch;
-wire mpeg2_new_presentation_request =
-    mpeg2_new_progressive_sequence ?
-        mpeg2_new_native_progressive_supported :
-        mpeg2_new_native_480i_request;
+wire mpeg2_new_presentation_request = mpeg2_new_native_progressive_supported;
 // Entry 369: picture metadata supplied by the HPS in band with the
 // elementary stream.  Distinct from the frontend's parsed fields above:
 // these come from the container, those from the bitstream.
@@ -1246,26 +1213,6 @@ end
 
 wire audio_ui_initial_loading_video =
     audio_ui_initial_loading_video_sync[2];
-// The audio UI/visualizer full-frame buffer is always written progressive
-// (native_interlaced forced 0 below), but the HDMI Bob/Weave deinterlacer is
-// driven from the decoded video's own interlace request and has no way to
-// know the display has switched to this forced-progressive frame instead.
-// Applying Bob motion-adaptive deinterlacing to a frame whose two fields are
-// identical produces a visible vertical bob with no real motion to track.
-// Synchronize the mode flag into the video domain and force the deinterlacer
-// off whenever the audio UI owns the display.
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [2:0] audio_ui_mode_active_video_sync;
-
-always @(posedge clk_video) begin
-    if (reset_video)
-        audio_ui_mode_active_video_sync <= 3'b000;
-    else
-        audio_ui_mode_active_video_sync <=
-            {audio_ui_mode_active_video_sync[1:0], audio_ui_mode_active};
-end
-
-wire audio_ui_mode_active_video = audio_ui_mode_active_video_sync[2];
 wire        audio_ui_display_bank;
 wire        audio_ui_picture_publish;
 wire [15:0] audio_ui_committed_frames;
@@ -1645,13 +1592,7 @@ wire      mpeg2_new_display_scratch;
 wire      mpeg2_new_display_scratch_bank;
 wire [2:0] mpeg2_new_framebuffer_swap_reset_count;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [1:0] mpeg2_new_film_mode_video_sync;
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_native_field_sync;
-always @(posedge clk_video) begin
-    if(reset_video) mpeg2_new_film_mode_video_sync<=0;
-    else mpeg2_new_film_mode_video_sync<={mpeg2_new_film_mode_video_sync[0],mpeg2_new_native_film_mode};
-end
 always @(posedge clk_mpeg2) begin
     if(reset_mpeg2) mpeg2_new_native_field_sync<=0;
     else mpeg2_new_native_field_sync<={mpeg2_new_native_field_sync[1:0],display_field};
@@ -1673,8 +1614,9 @@ always @(posedge clk_video) begin
     if (reset_video)
         mpeg2_new_swap_window_video <= 1'b0;
     else
-        mpeg2_new_swap_window_video <= mpeg2_new_film_mode_video_sync[1] ?
-            display_field_swap_window : display_frame_window;
+        // Native film-mode presentation is no longer supported (progressive
+        // content only), so this window source is always display_frame_window.
+        mpeg2_new_swap_window_video <= display_frame_window;
 
     if (reset_video)
         mpeg2_new_cadence_window_video <= 1'b0;
@@ -1893,7 +1835,9 @@ mpeg2_h262_pts_presentation_timeline mpeg2_h262_pts_presentation_timeline
 
 mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
 (
-    .native_film_mode(mpeg2_new_native_film_mode && mpeg2_new_native_active_mpeg2),
+    // Native film-mode presentation is no longer supported (progressive
+    // content only); tied off rather than driven by dead upstream signals.
+    .native_film_mode(1'b0),
     .native_field(mpeg2_new_native_field_sync[2]),
     .display_picture_present(mpeg2_new_framebuffer_picture_present_sync[2]),
     .display_repeat_first_field(mpeg2_new_display_repeat_first_field),

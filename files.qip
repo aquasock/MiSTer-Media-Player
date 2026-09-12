@@ -1,6 +1,5 @@
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_player.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_video_output_timing.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_hdmi_deinterlace_control.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_stream_fifo.sv
 # Entry 395: codec-independent signed PCM proof path.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/audio_pcm_test_source.sv
@@ -9,7 +8,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/audio_pcm_output_adapte
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_progressive_geometry.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_luma_framebuffer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_frontend.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_native_field_order.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_dct_vlc.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_inverse_quant.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_idct.sv
@@ -27,7 +25,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_motion
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_output_cadence.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_native_timing_pattern.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_system_time_clock.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
