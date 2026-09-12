@@ -1,3 +1,32 @@
+## 964 COMMIT Unreleased ??? 2026-09-12T03:16:30-07:00
+
+#### Coming From:
+
+Unreleased adb4f53
+
+#### Purpose:
+
+Abandon the bespoke Main-side "skip the download reset" path for standalone audio-file seeking and instead unify standalone audio playback with the already-correct `.mpg` seek/play/pause architecture, fixing the visualizer's reset-visibility problem at its real cause instead of avoiding the shared reset.
+
+#### Outcome:
+
+Hardware testing of `39274a8`/`adb4f53` traced a second, deeper regression (premature clean end-of-stream a few seconds after a seek, falling back to the idle visualizer) that could not be pinned to any single mechanism through log analysis alone: transport-level SPI credit/digest validation never failed, and every identified buffer stage in the chain (Main's 16 KiB pending buffer, the 64 KiB OS pipe, the FPGA's 32 KiB `mpeg2_stream_fifo`, the PCM output adapter's sub-16384-sample counter) is too shallow to explain a multi-second gap through legitimate buffering, leaving the bespoke audio-only seek path's exact failure mode unresolved.  Rather than continue debugging a code path that exists only for standalone audio and has now produced two distinct regressions, the user redirected the design: this project only cares about direct file playback (DVD and Audio CD paths are out of scope), `.mpg` seeking already works perfectly through Main's ordinary full download-session reset (`MEDIA_CONTROL_READY`/`GO`, unconditional `user_io_set_download` toggle and reassert), and standalone audio-file playback should be structured identically to `.mpg` playback - the same session/seek/play/pause state machine, differing only in which "pipe" feeds it (H.262 video + MP2/AC3 audio demuxed from a Program Stream, versus the audio_ui/visualizer full-frame overlay + raw PCM decoded in ARM software) - which also sets up the audio UI's overlay protocol to later serve as the video player's subtitle renderer.  The originally reported flicker is most likely `mpeg2_h262_audio_ui`'s persistent `mode_active`/`display_bank` state being disrupted by `MediaPlayer.sv` Entry 237's elementary-stream rearm pulse on every download-session reset, which real H.262 video decode masks by continuously redrawing but the visualizer's persistent-frame overlay does not; the correct fix is to make that reset harmless to the audio UI's persistent display state, not to avoid the reset.
+
+#### Next Steps:
+
+Revert `39274a8` and `adb4f53` so standalone audio-file seeking returns to using the exact same unconditional `MEDIA_CONTROL_READY`/`GO` full-reset path as `.mpg` seeking, with no Main-side special-casing for audio content; then investigate and fix the RTL-side reason the audio UI's persistent overlay state visibly blanks across that reset (most likely exempting `mpeg2_h262_audio_ui`'s persistent state from the Entry 237 `mpeg2_h262_download_rearm` pulse), targeting a build that leaves `.mpg` seeking behavior completely unchanged.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 963 COMMIT Unreleased adb4f53 2026-09-12T02:40:53-07:00
 
 #### Coming From:
@@ -1198,35 +1227,6 @@ The user reports that Blazing Saddles initially booted, entered its menu, played
 #### Next Steps:
 
 Hold the approved combined-build boundary until a fresh trace identifies the second correction.  Enable telemetry before loading Blazing Saddles, launch the disc, reproduce Root Menu from the black state, capture while it remains hung and verify that `.ai/current_results/MediaPlayer_ARM.log` receives the new run's timestamp rather than retaining the Big Lebowski file; if collection again stops after the screenshot, first confirm that `/tmp/MediaPlayer_ARM.log` exists on MiSTer.  Once fresh evidence is present, classify the exact navigation boundary and combine its narrow helper-side correction with the already-proposed bounded Big Lebowski motion-menu staging promotion, then run both discs plus Coming to America and the forum disc through the full regression and ARM build boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 924 COMMIT Unreleased 6b63c91 2026-09-02T21:28:47-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Qualify the corrected source-`6b63c91` installation on The Big Lebowski and diagnose its Scene Selection failure.
-
-#### Outcome:
-
-The user confirms that the checksum-correct helper restores The Big Lebowski startup, root-menu operation and chapter skipping during movie playback, accepting the active-program chapter correction and disproving a source regression in the prior immediate crash.  The fresh trace then enters the root menu, preserves responsive highlights, selects button one and successfully begins a deferred Scene Selection activation at 102.416959 seconds.  Post-activation output contains a qualified H.262 sequence and reference group, but this authored motion-menu destination produces neither a menu-domain exit nor a DVD still before the 4,194,304-byte atomic activation stage fills; at 107.881250 seconds the helper deliberately exits with `staging scheduled video failed: No space left on device`, after which Main reports a normal exit-code-one helper error.  The message describes the in-memory bounded stage, not filesystem storage.  The screenshot correctly retains the last root-menu picture because no partial destination was published, while its checksum-valid schema-21 snapshot shows a completed overlay plane, no overlay protocol error and the last stable decoder state; the later single audio-underrun flag accompanies the terminated stream rather than identifying the cause.  The 3,054,475-byte log, 564,283-byte screenshot and 844-byte sidecar have SHA-256 `af8f741463cd36f3400e96e186cb4d6e46d7a4bf91b8327af526a7eb4db6003c`, `74a5447d25dbc3fea1bb6d21959be684129b420b9b907ed03878674f65b6a522` and `7fa1f1f937f6a629cd748d9a896815e128aff1b78d39b16770bfeaa72a4ea8f3`.  No runtime source was changed.
-
-#### Next Steps:
-
-After user approval, preserve the accepted chapter, menu, finite-still and overlay-only behavior while adding a bounded capacity-pressure decision for picture-bearing motion-menu activations: retain 4 MiB as the decision threshold, give the stage sufficient bounded headroom for one deepest scheduler drain, and when a pending menu destination remains in the menu domain with a qualified picture group at that threshold, promote it through the existing staged READY/GO stream-hop path instead of reaching `ENOSPC`.  Add production-path coverage for an over-threshold motion menu with byte-exact post-barrier commit, retain the accepted 3,797,120-byte finite-still case below the threshold and all overlay-only classifications, then run strict native, sanitizer, analyzer, DVD navigation, staging, random-access, overlay, LPCM, audio and seek regressions locally and on the build PC before producing a new static ARM helper for Big Lebowski Scene Selection plus the retained Coming to America, Blazing Saddles and forum-disc routes.
 
 #### Files Modified:
 
