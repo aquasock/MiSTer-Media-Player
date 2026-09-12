@@ -317,7 +317,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,1232 @@
+@@ -0,0 +1,1233 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -1017,6 +1017,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +			chapter_barrier = true;
 +			if (audio_visualizer_controls)
 +			{
++				chapter_download_rearmed = true;
 +				diagnostic_write("audio seek target ready; download retained\n");
 +			}
 +			else
