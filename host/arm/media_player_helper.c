@@ -1227,6 +1227,12 @@ static void video_overlay_service(struct output_state *output)
  * completely separate control_fd channel from this bulk pipe - decides the
  * barrier is satisfied and stops draining, stranding the unread remainder
  * until the next resume; a confirmed failure mode, not a theoretical one).
+ * output->video is a buffered FILE*, so the style write only actually
+ * reaches Main once flushed - mirrors audio_pause_barrier()'s own
+ * flush_output() call, which this function was missing entirely, leaving
+ * the style record stuck in the helper's own stdio buffer until some
+ * unrelated later write finally grew the buffer past its flush threshold
+ * (in practice, not until the next resume) - the bug this flush fixes.
  * Then block until Main has drained whatever was already queued and sends
  * GO.  process_program_stream()'s decode loop naturally stops producing
  * new output while blocked here, matching the barrier Main's
@@ -1247,7 +1253,8 @@ static int video_overlay_pause_barrier(struct output_state *output,
                 "failed\n");
         return -1;
     }
-    if (control_send(control_fd, MEDIA_PLAYER_CONTROL_PAUSE_READY) < 0) {
+    if (flush_output(output, "video overlay pause style") < 0 ||
+        control_send(control_fd, MEDIA_PLAYER_CONTROL_PAUSE_READY) < 0) {
         fprintf(stderr,
                 "media_player_helper: video overlay pause barrier "
                 "publication failed\n");
