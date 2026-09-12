@@ -1,3 +1,32 @@
+## 963 COMMIT Unreleased adb4f53 2026-09-12T02:40:53-07:00
+
+#### Coming From:
+
+Unreleased 39274a8
+
+#### Purpose:
+
+Fix a regression from `39274a8` where the audio player's screen no longer blanked on seek but audio instead stopped and the display froze after roughly one seek.
+
+#### Outcome:
+
+Hardware testing of `39274a8` on `10.10.0.45` reproduced the new symptom on a single MP3 seek, and `/tmp/MediaPlayer_ARM.log` was pulled and inspected: `t=6923223 chapter barrier released discarded=53764` proves `chapter_barrier_poll()`'s shared fallthrough path fired for this audio seek, which it should not have.  The cause is that `39274a8`'s `audio_visualizer_controls` branch skipped the manual `user_io_set_download(0)`/`(1)` toggle but never set `chapter_download_rearmed`, so the shared `if (!chapter_download_rearmed)` block below still ran `user_io_set_index()`, `user_io_file_info(".M2V")` and `user_io_set_download(1)` for every audio seek.  Reading pristine upstream `user_io.cpp` confirms `user_io_set_download()` sends its `FIO_FILE_TX` SPI assert unconditionally on every call regardless of Main's own `download_active` mirror, so this still reasserted a fresh download session to the FPGA, just without the preceding low pulse.  The log shows the remainder of the test file's audio, roughly 38 seconds' worth following the seek target, was consumed in only about 5.6 real seconds before a premature clean end-of-stream, consistent with the reassert disturbing FPGA-side burst credit/byte accounting and defeating playback pacing; Main's resulting hold-last-frame/stop-audio end-of-stream handling is what was observed as a freeze.  Source `adb4f53` sets `chapter_download_rearmed = true` in the audio branch, mirroring the non-audio branch, so the shared reassert is fully suppressed and an audio-only seek makes no download-related FPGA call at all.  The patch was reverified against pinned upstream `Main_MiSTer` `0a8fb44` with `git apply --check` and rebuilt; GNU 10.2.1 produced the stripped ARMv7 `host/build/MiSTer_MediaPlayer`, 1,186,780 bytes, SHA-256 `38430997604e44972cb434d782c39dbf3e5e91980546a12f3f644e4203652f71`.  No helper, decoder RTL or RBF changes were made or are required.
+
+#### Next Steps:
+
+Install `host/build/MiSTer_MediaPlayer` as executable `/media/fat/MiSTer_MediaPlayer` in place of the `39274a8` build, then repeat standalone MP3 seeking, including multiple repeated seeks in one session, and confirm no screen blank/flicker, no audio pop, no premature stop/freeze, and that playback continues correctly at normal pace from the seek target through to the file's true end; also recheck `.mpg`/DVD seeking is unaffected.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 962 COMMIT Unreleased 39274a8 2026-09-12T02:15:36-07:00
 
 #### Coming From:
@@ -1198,35 +1227,6 @@ The user confirms that the checksum-correct helper restores The Big Lebowski sta
 #### Next Steps:
 
 After user approval, preserve the accepted chapter, menu, finite-still and overlay-only behavior while adding a bounded capacity-pressure decision for picture-bearing motion-menu activations: retain 4 MiB as the decision threshold, give the stage sufficient bounded headroom for one deepest scheduler drain, and when a pending menu destination remains in the menu domain with a qualified picture group at that threshold, promote it through the existing staged READY/GO stream-hop path instead of reaching `ENOSPC`.  Add production-path coverage for an over-threshold motion menu with byte-exact post-barrier commit, retain the accepted 3,797,120-byte finite-still case below the threshold and all overlay-only classifications, then run strict native, sanitizer, analyzer, DVD navigation, staging, random-access, overlay, LPCM, audio and seek regressions locally and on the build PC before producing a new static ARM helper for Big Lebowski Scene Selection plus the retained Coming to America, Blazing Saddles and forum-disc routes.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 923 COMMIT Unreleased 6b63c91 2026-09-02T21:16:43-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Diagnose The Big Lebowski's immediate startup failure after installing the source-`6b63c91` chapter-navigation helper.
-
-#### Outcome:
-
-The fresh physical-disc run starts `dvdmenu:/dev/sr0`, forks helper PID 784 and asserts download, but helper stdout reaches EOF at 13.002 seconds and Main reaps the helper with signal 11 at 13.076 seconds after zero reads and zero submitted media bytes.  No libdvdnav title, CSS or chapter diagnostic appears, proving that the new chapter-control path is never reached.  A read-only FTP retrieval of `/media/fat/linux/MediaPlayer_Helper` finds the expected 961,956-byte length but SHA-256 `7d1ab3b073e9b120cdc285110a94c5ed47c78779cf61a21d60d17f0d8773346e`, rather than the released artifact's `556b706c8c8b4fc60a4e11c21adb62ebb40daec4201d3f4c0052d8275b59fabb`.  Bytes 1 through 458,752 exactly match the good artifact, with prefix SHA-256 `abd7f0665e7bdc22dbf3fd395e849efffdffe725a876289ebf2afb68c7fc0007`; the first difference is byte 458,753 and 428,092 bytes differ through byte 961,454.  The installed image also retains the old absolute chapter-control diagnostic and lacks the new active-VM diagnostic.  This is deterministic evidence of an interrupted in-place upload that left a hybrid new-prefix/old-tail ELF, fully explaining the immediate segmentation fault without indicating a source regression.  The supplied 1,940-byte log, 559-byte all-black screenshot and 2,818-byte no-telemetry sidecar have SHA-256 `99c947fd325de9d1f77bd95a0f6fbbfc4e9c596ba150f749cb75227669410f9c`, `d203038ddaadf5db6adf11901b670ba6930afc8dce176332662184b49780d50a` and `dc87b7c521cd9445bafb7ff475db4c6850d0db4402f67c945ce9163e169f0004`.  A fresh exact copy of the good build-PC artifact has been restored locally as `host/build/MediaPlayer_Helper_ChapterVM_6b63c91`.
-
-#### Next Steps:
-
-Exit the core and ensure no MediaPlayer helper process is running, then copy `host/build/MediaPlayer_Helper_ChapterVM_6b63c91` to `/media/fat/linux/MediaPlayer_Helper`, set mode 755 and read the installed file back before launching the core.  Require the read-back SHA-256 to equal `556b706c8c8b4fc60a4e11c21adb62ebb40daec4201d3f4c0052d8275b59fabb`; if it does not, repeat the transfer rather than testing a mixed executable.  Once verified, rerun The Big Lebowski startup and its failing menu-launched chapter route, then provide fresh telemetry-enabled results to qualify source `6b63c91`.
 
 #### Files Modified:
 
