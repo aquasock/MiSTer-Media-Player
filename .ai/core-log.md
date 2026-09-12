@@ -1,4 +1,4 @@
-## 964 COMMIT Unreleased ??? 2026-09-12T03:16:30-07:00
+## 964 COMMIT Unreleased b0372f6 2026-09-12T03:26:13-07:00
 
 #### Coming From:
 
@@ -12,13 +12,19 @@ Abandon the bespoke Main-side "skip the download reset" path for standalone audi
 
 Hardware testing of `39274a8`/`adb4f53` traced a second, deeper regression (premature clean end-of-stream a few seconds after a seek, falling back to the idle visualizer) that could not be pinned to any single mechanism through log analysis alone: transport-level SPI credit/digest validation never failed, and every identified buffer stage in the chain (Main's 16 KiB pending buffer, the 64 KiB OS pipe, the FPGA's 32 KiB `mpeg2_stream_fifo`, the PCM output adapter's sub-16384-sample counter) is too shallow to explain a multi-second gap through legitimate buffering, leaving the bespoke audio-only seek path's exact failure mode unresolved.  Rather than continue debugging a code path that exists only for standalone audio and has now produced two distinct regressions, the user redirected the design: this project only cares about direct file playback (DVD and Audio CD paths are out of scope), `.mpg` seeking already works perfectly through Main's ordinary full download-session reset (`MEDIA_CONTROL_READY`/`GO`, unconditional `user_io_set_download` toggle and reassert), and standalone audio-file playback should be structured identically to `.mpg` playback - the same session/seek/play/pause state machine, differing only in which "pipe" feeds it (H.262 video + MP2/AC3 audio demuxed from a Program Stream, versus the audio_ui/visualizer full-frame overlay + raw PCM decoded in ARM software) - which also sets up the audio UI's overlay protocol to later serve as the video player's subtitle renderer.  The originally reported flicker is most likely `mpeg2_h262_audio_ui`'s persistent `mode_active`/`display_bank` state being disrupted by `MediaPlayer.sv` Entry 237's elementary-stream rearm pulse on every download-session reset, which real H.262 video decode masks by continuously redrawing but the visualizer's persistent-frame overlay does not; the correct fix is to make that reset harmless to the audio UI's persistent display state, not to avoid the reset.
 
+`39274a8` and `adb4f53` are reverted (`03542c0`, `832a68d`), restoring `host/main_mister/0001-mediaplayer-arm-loader.patch` to byte-identical content with `4116a00`: standalone audio-file seeking now uses the exact same unconditional `MEDIA_CONTROL_READY`/`GO` full-reset path as `.mpg` seeking, with no Main-side branching on content type at all.  Source `b0372f6` implements the actual RTL fix: `mpeg2_h262_audio_ui` gains a `session_start` input, mirroring the existing `reset`/`session_start` split already used in `mpeg2_stream_fifo`, so only a true reset clears `mode_active`/`display_bank` while `session_start` (wired to `mpeg2_download_rearm_reset`, matching `reset` to `reset_mpeg2_base`) still resets the in-flight BEGIN/DATA/COMMIT parser state without disturbing which bank is on screen; both wired signals are already `clk_mpeg2`-domain, so no new CDC synchronizer or SDC exception was needed.  `tools/test_mpeg2_audio_ui.sv` gained coverage proving `mode_active`/`display_bank`/DDR bank addressing survive a `session_start` pulse mid-session while the protocol parser cleanly accepts a fresh frame afterward; this passed under `iverilog`/`vvp` prior to commit.  While reviewing the working tree, an unrelated hardware-validated fix from earlier in the session (forcing the HDMI Bob/Weave deinterlacer off while the audio UI owns the display, fixing the previously-reported visualizer interlace jutter) was found still uncommitted and was committed separately as `1a6297f` ahead of this entry's fix, since both needed the same build cycle.  Neither fix has been synthesized yet.
+
 #### Next Steps:
 
-Revert `39274a8` and `adb4f53` so standalone audio-file seeking returns to using the exact same unconditional `MEDIA_CONTROL_READY`/`GO` full-reset path as `.mpg` seeking, with no Main-side special-casing for audio content; then investigate and fix the RTL-side reason the audio UI's persistent overlay state visibly blanks across that reset (most likely exempting `mpeg2_h262_audio_ui`'s persistent state from the Entry 237 `mpeg2_h262_download_rearm` pulse), targeting a build that leaves `.mpg` seeking behavior completely unchanged.
+Run a 3-seed Quartus build (both RTL commits, `1a6297f` and `b0372f6`, touch `MediaPlayer.sv`) and, once at least one seed passes timing, deliver the RBF plus the reverted Main binary for the user to test: standalone MP3 seeking should show no blank/flicker/pop and no premature end-of-stream across repeated seeks, `.mpg` seeking must remain completely unaffected, and the visualizer should no longer show interlace jutter.
 
 #### Files Modified:
 
+- MediaPlayer.sdc
+- MediaPlayer.sv
 - host/main_mister/0001-mediaplayer-arm-loader.patch
+- rtl/mpeg2_new/mpeg2_h262_audio_ui.sv
+- tools/test_mpeg2_audio_ui.sv
 
 #### Status:
 
