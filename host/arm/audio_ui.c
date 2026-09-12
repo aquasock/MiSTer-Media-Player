@@ -257,9 +257,11 @@ static uint64_t rounded_up_seconds(uint64_t frames, unsigned rate_hz)
 static void format_time(char *text, size_t size, uint64_t seconds)
 {
     uint64_t minutes = seconds / 60u;
+    uint64_t hours = minutes / 60u;
 
-    (void)snprintf(text, size, "%02llu:%02llu",
-                   (unsigned long long)minutes,
+    (void)snprintf(text, size, "%02llu:%02llu:%02llu",
+                   (unsigned long long)hours,
+                   (unsigned long long)(minutes % 60u),
                    (unsigned long long)(seconds % 60u));
 }
 
@@ -291,15 +293,15 @@ static void draw_progress_strip(struct audio_ui *ui, uint64_t position,
     format_time(remaining, sizeof(remaining),
                 rounded_up_seconds(remaining_frames, rate_hz));
     (void)snprintf(elapsed_timing, sizeof(elapsed_timing),
-                   "ELAPSED %s", elapsed);
+                   "Elapsed: %s", elapsed);
     (void)snprintf(total_timing, sizeof(total_timing),
-                   "%s %s", total_label, total);
+                   "%s: %s", total_label, total);
     (void)snprintf(remaining_timing, sizeof(remaining_timing),
-                   "REMAIN %s", remaining);
+                   "Remaining: %s", remaining);
 
-    draw_centered_text(ui, 32, 412, 218, elapsed_timing, 1, UI_TEXT_Y);
-    draw_centered_text(ui, 250, 412, 220, total_timing, 1, UI_TEXT_Y);
-    draw_centered_text(ui, 470, 412, 218, remaining_timing, 1, UI_TEXT_Y);
+    draw_centered_text(ui, 32, 422, 218, elapsed_timing, 1, UI_TEXT_Y);
+    draw_centered_text(ui, 250, 422, 220, total_timing, 1, UI_TEXT_Y);
+    draw_centered_text(ui, 470, 422, 218, remaining_timing, 1, UI_TEXT_Y);
 
     /* Absolute decoder-frame position scaled across the track duration. */
     fill_rect(ui, 32, 438, 656, 14, UI_TRACK_Y, UI_CB, UI_CR);
@@ -391,7 +393,7 @@ static void render_frame(struct audio_ui *ui)
 
     draw_text(ui, 576, 378, "PLAYLIST --:--", 1, UI_MUTED_Y);
     draw_progress_strip(ui, ui->position_pcm_frames, ui->length_pcm_frames,
-                        ui->rate_hz, "TRACK");
+                        ui->rate_hz, "Track");
 }
 
 int audio_ui_create(struct audio_ui **result)

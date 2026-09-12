@@ -1207,7 +1207,7 @@ static int video_overlay_publish(struct output_state *output)
     if (audio_ui_render_progress_overlay(
             output->video_overlay_ui, output->max_video_pts,
             video_overlay_locked_length_pts(output),
-            VIDEO_OVERLAY_PTS_RATE_HZ, "TOTAL",
+            VIDEO_OVERLAY_PTS_RATE_HZ, "Total",
             output->video_overlay_plane, AUDIO_UI_OVERLAY_BYTES) < 0)
         return -1;
     video_overlay_descriptor(output->video_overlay_plane, &overlay,

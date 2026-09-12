@@ -1,6 +1,11 @@
 CC ?= cc
 CFLAGS ?= -O2 -Wall -Wextra -Werror -std=c11
-CPPFLAGS ?=
+# Large file support: without this, stat()/off_t are 32-bit on the ARM
+# target, and stat() fails with EOVERFLOW for any file at or beyond the
+# 32-bit size boundary (~2-4 GiB depending on signedness) instead of
+# returning a valid size - silently disabling the video progress overlay's
+# TOTAL/REMAIN duration estimate for any sufficiently large .mpg file.
+CPPFLAGS ?= -D_FILE_OFFSET_BITS=64
 LDFLAGS ?=
 DEPS_DIR ?= .deps
 A52_DIR ?= $(DEPS_DIR)/liba52
