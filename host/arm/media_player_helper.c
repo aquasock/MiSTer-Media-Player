@@ -67,9 +67,20 @@
 #define AUDIO_OVERLAY_RECORDS \
     (2u + (AUDIO_UI_OVERLAY_BYTES + 4095u) / 4096u)
 #define VIDEO_OVERLAY_PTS_RATE_HZ 90000u
-#define VIDEO_OVERLAY_IDLE_TICKS (10u * VIDEO_OVERLAY_PTS_RATE_HZ)
-#define VIDEO_OVERLAY_REFRESH_TICKS VIDEO_OVERLAY_PTS_RATE_HZ
-#define VIDEO_OVERLAY_BACKGROUND_REFRESH_TICKS (5u * VIDEO_OVERLAY_PTS_RATE_HZ)
+/*
+ * Real wall-clock milliseconds, not video PTS: max_video_pts tracks how much
+ * of the stream has been parsed/submitted, which runs ahead of real time
+ * whenever the decode pipeline is buffering - normal steady-state playback
+ * keeps that gap small, but a seek refills the pipeline in a burst, so
+ * max_video_pts can leap far past any PTS-based activity mark within
+ * milliseconds of wall-clock time.  A PTS-based idle timer read that leap as
+ * "ten seconds passed" and hid the just-revealed overlay almost instantly.
+ * monotonic_us() has no such burst behavior, and PTS does not advance at
+ * all while genuinely paused, which a wall clock handles for free too.
+ */
+#define OVERLAY_IDLE_MS 10000u
+#define OVERLAY_REFRESH_MS 1000u
+#define OVERLAY_BACKGROUND_REFRESH_MS 5000u
 
 _Static_assert(OUTPUT_ACTIVATION_STAGE_BYTES >=
                    OUTPUT_ACTIVATION_STAGE_DECISION_BYTES +
@@ -273,8 +284,8 @@ struct output_state {
     int64_t video_overlay_file_size;
     int video_overlay_visible;
     int video_overlay_pending_reveal;
-    uint64_t video_overlay_activity_pts;
-    uint64_t video_overlay_last_render_pts;
+    uint64_t video_overlay_activity_us;
+    uint64_t video_overlay_last_render_us;
     /* Locked once by video_overlay_length_pts(); a resource, not in-flight
      * state, so reset_output_for_navigation() preserves it like the fields
      * above instead of letting a seek re-lock a different estimate. */
@@ -463,6 +474,8 @@ static int control_send(int fd, uint8_t event)
     return -1;
 }
 
+static uint64_t monotonic_us(void);
+
 static int control_wait_for_go(int fd)
 {
     struct pollfd descriptor = {fd, POLLIN, 0};
@@ -474,6 +487,38 @@ static int control_wait_for_go(int fd)
         if (result < 0 && errno == EINTR)
             continue;
         if (result <= 0 || !(descriptor.revents & POLLIN))
+            return -1;
+        command = control_read_command(fd);
+        if (command == MEDIA_PLAYER_CONTROL_GO)
+            return 0;
+        if (command < 0)
+            return -1;
+        fprintf(stderr,
+                "media_player_helper: ignoring control 0x%02x while "
+                "waiting for go\n", command);
+    }
+}
+
+/* Like control_wait_for_go(), but returns 1 (not an error) if timeout_ms
+ * elapses without GO arriving, instead of blocking indefinitely - so a
+ * pause barrier can act (e.g. auto-hide its overlay) on a wall-clock
+ * deadline while still waiting.  Capped well under any real caller's
+ * deadline; only exists so the timeout fits an int without pulling in
+ * limits.h for a single clamp. */
+static int control_wait_for_go_timed(int fd, uint64_t timeout_ms)
+{
+    struct pollfd descriptor = {fd, POLLIN, 0};
+    int wait_ms = timeout_ms > 60000u ? 60000 : (int)timeout_ms;
+
+    for (;;) {
+        int result = poll(&descriptor, 1, wait_ms);
+        int command;
+
+        if (result < 0 && errno == EINTR)
+            continue;
+        if (!result)
+            return 1;
+        if (result < 0 || !(descriptor.revents & POLLIN))
             return -1;
         command = control_read_command(fd);
         if (command == MEDIA_PLAYER_CONTROL_GO)
@@ -1171,12 +1216,15 @@ static int video_overlay_publish(struct output_state *output)
 }
 
 /* Reveal on the next service call if not already visible; extend the
- * ten-second window either way.  Call on play, pause and seek. */
+ * ten-second window either way.  Call on play, pause and seek.  Anchored
+ * at monotonic_us(), not video PTS - see OVERLAY_IDLE_MS's comment: a seek
+ * or any other burst of buffered decode makes PTS a poor proxy for real
+ * elapsed time, but wall-clock time has no such discontinuity. */
 static void video_overlay_mark_activity(struct output_state *output)
 {
     if (!output->video_overlay_ui)
         return;
-    output->video_overlay_activity_pts = output->max_video_pts;
+    output->video_overlay_activity_us = monotonic_us();
     if (!output->video_overlay_visible) {
         output->video_overlay_visible = 1;
         output->video_overlay_pending_reveal = 1;
@@ -1194,26 +1242,28 @@ static void video_overlay_mark_activity(struct output_state *output)
  */
 static void video_overlay_service(struct output_state *output)
 {
-    unsigned refresh_ticks;
+    uint64_t now_us;
+    unsigned refresh_ms;
 
     if (!output->video_overlay_ui)
         return;
+    now_us = monotonic_us();
     if (output->video_overlay_visible &&
-        output->max_video_pts - output->video_overlay_activity_pts >=
-            VIDEO_OVERLAY_IDLE_TICKS) {
+        now_us - output->video_overlay_activity_us >=
+            (uint64_t)OVERLAY_IDLE_MS * 1000u) {
         output->video_overlay_visible = 0;
         if (emit_overlay_clear(output) < 0)
             fprintf(stderr,
                     "media_player_helper: video overlay clear failed\n");
     }
-    refresh_ticks = output->video_overlay_visible ?
-        VIDEO_OVERLAY_REFRESH_TICKS : VIDEO_OVERLAY_BACKGROUND_REFRESH_TICKS;
+    refresh_ms = output->video_overlay_visible ?
+        OVERLAY_REFRESH_MS : OVERLAY_BACKGROUND_REFRESH_MS;
     if (!output->video_overlay_pending_reveal &&
-        output->max_video_pts - output->video_overlay_last_render_pts <
-            refresh_ticks)
+        now_us - output->video_overlay_last_render_us <
+            (uint64_t)refresh_ms * 1000u)
         return;
     output->video_overlay_pending_reveal = 0;
-    output->video_overlay_last_render_pts = output->max_video_pts;
+    output->video_overlay_last_render_us = now_us;
     if (video_overlay_publish(output) < 0)
         fprintf(stderr,
                 "media_player_helper: video overlay publish failed\n");
@@ -1238,13 +1288,23 @@ static void video_overlay_service(struct output_state *output)
  * new output while blocked here, matching the barrier Main's
  * pause_barrier_finish() requires before it actually asserts
  * playback_paused.
+ *
+ * The ten-second auto-hide is normally driven by video_overlay_service()
+ * comparing wall-clock time, but service() cannot run at all while blocked
+ * here waiting for GO.  So this polls for GO with a bounded wall-clock
+ * deadline instead: once ten real seconds pass without GO, clear the
+ * overlay (flushed immediately, same as the reveal) and fall back to an
+ * unbounded wait - matching "reveals for ten seconds, then disappears"
+ * even though the video itself is not moving while paused.
  */
 static int video_overlay_pause_barrier(struct output_state *output,
                                        int control_fd)
 {
     int reveal = !output->video_overlay_visible;
+    uint64_t deadline_us;
+    int wait_result;
 
-    output->video_overlay_activity_pts = output->max_video_pts;
+    output->video_overlay_activity_us = monotonic_us();
     output->video_overlay_visible = 1;
     if (reveal &&
         video_overlay_style(output, MEDIA_PLAYER_OVERLAY_STYLE, 1) < 0) {
@@ -1260,11 +1320,34 @@ static int video_overlay_pause_barrier(struct output_state *output,
                 "publication failed\n");
         return -1;
     }
-    if (control_wait_for_go(control_fd) < 0) {
-        fprintf(stderr,
-                "media_player_helper: video overlay pause barrier "
-                "GO failed\n");
-        return -1;
+    deadline_us = monotonic_us() + (uint64_t)OVERLAY_IDLE_MS * 1000u;
+    for (;;) {
+        uint64_t now_us = monotonic_us();
+        uint64_t remaining_ms = now_us >= deadline_us ? 0 :
+            (deadline_us - now_us) / 1000u;
+
+        wait_result = control_wait_for_go_timed(control_fd, remaining_ms);
+        if (wait_result == 0)
+            break;
+        if (wait_result < 0) {
+            fprintf(stderr,
+                    "media_player_helper: video overlay pause barrier "
+                    "GO failed\n");
+            return -1;
+        }
+        output->video_overlay_visible = 0;
+        if (emit_overlay_clear(output) < 0 ||
+            flush_output(output, "video overlay pause idle clear") < 0)
+            fprintf(stderr,
+                    "media_player_helper: video overlay pause idle clear "
+                    "failed\n");
+        if (control_wait_for_go(control_fd) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: video overlay pause barrier "
+                    "GO failed\n");
+            return -1;
+        }
+        break;
     }
     return 0;
 }
