@@ -1,3 +1,32 @@
+## 977 COMMIT Unreleased ??? 2026-09-12T13:48:48-07:00
+
+#### Coming From:
+
+Unreleased af7f570
+
+#### Purpose:
+
+Remove the reconstructed idle-hide-while-paused overlay clear, which writes to the bulk output pipe after Main has already stopped draining it, and confirmed as a reproducible deadlock on hardware.
+
+#### Outcome:
+
+Hardware testing on `af7f570` reproduced a hang after only a few ordinary pause/resume cycles on both `fellow.mpg` and the baseline `01 - Pee Strike.mpg`, surviving a full core reboot and fresh reload. Diagnosis via `/proc/<pid>/wchan` caught `MediaPlayer_Helper` parked in `pipe_write` while `MiSTer_MediaPlayer` (Main) sat busy at 36-52% CPU without draining, and the ARM diagnostic log confirmed no further bytes were read after the hang point even after a fresh SSH-triggered refetch. `video_overlay_pause_barrier()`'s idle-timeout branch, reconstructed at entry 975 from a lost live-debug session, calls `emit_overlay_clear()` and `flush_output()` on the same buffered stdout pipe Main reads for bulk audio/video/overlay data - but this call happens strictly after `MEDIA_PLAYER_CONTROL_PAUSE_READY` is sent and acknowledged, at which point Main's own `mediaplayer_poll()` gate (`if (playback_paused && !stream_boundary_pending) return;`) has already stopped servicing that pipe, so the write blocks forever once residual buffered bytes plus the clear record exceed the pipe's capacity. This differs from the reveal-on-pause write immediately above it in the same function, which is safe only because it is sent before Main's gate engages - a distinction the function's own preceding comment already documented for the reveal case without recognizing the idle-clear case violates it. The fix removes the wall-clock idle-timeout loop and `control_wait_for_go_timed()` entirely, restoring an unconditional `control_wait_for_go()` block after publishing `PAUSE_READY`, so the overlay simply stays visible for the full duration of any pause instead of auto-hiding after ten seconds; the wall-clock idle-hide introduced at entry 975 for the actively-playing case is unaffected, since Main continues draining the pipe throughout normal playback.
+
+#### Next Steps:
+
+Build native and ARM, deploy via the atomic `.new`-then-`mv` pattern, and have the user reproduce the exact repro that hung before (a handful of ordinary pause/resume cycles on both test files) to confirm playback survives; also re-check the file's TOTAL/REMAIN duration estimate for `fellow.mpg`, which showed an implausible ~52 hour figure once the large-file `stat()` fix made it non-zero, and address the confirmed missing lowercase/space glyphs in the restyled progress-strip labels as a follow-up commit.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 976 COMMIT Unreleased af7f570 2026-09-12T12:52:53-07:00
 
 #### Coming From:
@@ -1201,38 +1230,6 @@ Source `0f1165c` replaces the startup-only correction boundary with a DVD/ISO el
 #### Next Steps:
 
 Exit MediaPlayer, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_H262Stream_0f1165c`, preserve executable mode and retain the installed Main, visualizer and timing-qualified RBF.  With telemetry enabled, start The Big Lebowski and require correction one at elementary offset 185, a second correction when the following seven-second still begins, accepted bytes advancing beyond the former 5,670-byte failure boundary, error flags remaining zero and normal title playback beginning.  Press `m`, exercise the Root Menu and Scene Selection repeatedly, return to the title and reopen both paths, then verify each new malformed authored sequence is corrected without a helper exit or decoder latch.  Spot-check Blazing Saddles and Coming to America title, menu and chapter navigation before returning the fresh log, screenshot and telemetry sidecar.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
-- tools/test_h262_restart_normalization.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 937 COMMIT Unreleased 490dc02 2026-09-03T00:41:17-07:00
-
-#### Coming From:
-
-Unreleased ac13724
-
-#### Purpose:
-
-Normalize The Big Lebowski's nonconforming 4:2:0 progressive-frame chroma flag at the helper's buffered initial I-picture boundary.
-
-#### Outcome:
-
-Implemented the helper-only compatibility normalization approved from entry 936's byte-exact physical evidence.  Immediately after successful random-access filtering, the helper now changes only `chroma_420_type` from zero to one when the buffered restart has a valid 4:2:0 sequence extension and a valid initial complete-frame progressive I-picture coding extension; conforming streams and out-of-scope malformed streams remain byte-identical, stream length and every offset remain unchanged, and the exact offset plus before/after byte are logged.  The captured 191-byte Big Lebowski prefix changes only byte 185 from `0xc0` to `0xc1` and is idempotent.  Its original form raises RTL syntax source 21, while the corrected form reaches the first slice with no syntax error and is accepted as a supported phase-1/native-film picture.  Strict focused C, ASan/UBSan, GCC analyzer, DVD random-access/menu-hop/overlay/SPU/staging/reserve/program-stream, audio seek/UI/visualizer, native static-helper capability and private audio/LPCM tests passed.  The exact ARM release artifact also passed its capability probe and real MP3/WAV/FLAC/Ogg visualizer integration (378/381 pictures and one clear record per file).  No Main, RBF or visualizer change was made.  Built `host/build/MediaPlayer_Helper_ChromaFix_490dc02`, 966052 bytes, SHA-256 `0d99ce70d703eb9486052f8673474aed0b85446e321b73d0d640573f79d3d2c0`.  Physical testing rejects this build for The Big Lebowski while confirming Blazing Saddles remains accepted.  The helper normalizes the first three-second authored still at offset 185 from `0xc0` to `0xc1`; telemetry proves that picture completes, displays and reaches presentation completion with no overlay or presentation fault.  After the still expires, libdvdnav supplies a second seven-second still but `iso_start_filter_active` is already clear, so the normalization is not revisited.  Telemetry then latches H.262 error flag `0x0001` at 5,670 accepted bytes: exactly the first corrected still's 5,473 bytes plus its nine-byte terminal tail plus 188 bytes of the next stream, reproducing the prior source-21 acceptance boundary.  The helper remains alive and continues supplying more than 122 MB, excluding CSS, drive, helper-exit and transport starvation failures.  The 1,178,545-byte log, 1,514-byte screenshot and checksum-valid 441-byte schema-21 sidecar have SHA-256 `9a7607eeeb9ab9030dc8c9d00f1ca03947bc74e91b142374f3cf10c7e347215e`, `3b8e91889e3b2ae78208151f07361f2b540d3f911c330c2916702cb2915d143c` and `4cdc025cc7864ab8449aee283afca0ec433e4e540f04ec8358b3673bae966ad3`.
-
-#### Next Steps:
-
-The next helper-only change should apply the identical narrow normalization at every qualifying DVD elementary-video sequence/I-picture boundary rather than only the session's first random-access group.  Preserve the one-bit 4:2:0/progressive-I gating, byte count, offsets, decoder, RBF and Main; handle start codes and extension fields split across PES payloads with bounded state; and log each correction.  Add regressions containing two consecutive captured malformed stills, deliberately split every relevant header across payload boundaries, plus conforming and out-of-scope controls.  Require both stills to clear source 21 in Icarus before another ARM helper build and physical Big Lebowski startup, title, Root Menu and repeated-menu test, while retaining Blazing Saddles and Coming to America acceptance.
 
 #### Files Modified:
 
