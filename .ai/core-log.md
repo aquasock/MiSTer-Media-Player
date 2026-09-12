@@ -1,4 +1,4 @@
-## 962 COMMIT Unreleased ??? 2026-09-12T02:15:36-07:00
+## 962 COMMIT Unreleased 39274a8 2026-09-12T02:15:36-07:00
 
 #### Coming From:
 
@@ -12,9 +12,11 @@ Stop standalone audio-file and Audio CD seeking from triggering the FPGA's full 
 
 Investigation traces the symptom to `MediaPlayer.sv`'s Entry 237 and Entry 410 reset chains: every `ioctl_download` rising edge is treated as a brand new elementary-stream session, rearming the MPEG-2 decode domain and stretching an audio FIFO/scheduler/underrun reset regardless of whether any video content is present.  Standalone `.mp3`/`.wav`/`.flac`/`.ogg` file seeking (`audio_file_complete_seek()`) and Audio CD track/seek repositioning (`cdda_complete_reposition()`) both complete through the shared `MEDIA_PLAYER_CONTROL_READY`/`GO` barrier in `host/main_mister/0001-mediaplayer-arm-loader.patch`'s `chapter_barrier_poll()`, which unconditionally toggles `user_io_set_download(0)` then `(1)` and reasserts `user_io_set_index()`/`file_info(".M2V")` — the same primitive used for a genuinely new file load; existing `.mpg`/DVD Program Stream seeking uses this identical barrier and toggle but is not visibly disruptive because the video decode pipeline is already mid-redecode, whereas standalone audio has no video content to mask the reset, so it is fully visible.  The user has confirmed `.mpg` seeking already works correctly and DVD/menu seeking is out of scope, so the approved fix is Main-only, with no ARM helper protocol changes, no decoder RTL changes and therefore no Quartus/RBF rebuild: in `chapter_barrier_poll()`'s `seek_pending` branch, when the already-available file-scope flag `audio_visualizer_controls` (true for `.mp3`/`.wav`/`.flac`/`.ogg` files and `cdda:` tracks, set in `mediaplayer_start_session()`) is set, the `MEDIA_CONTROL_READY` handler keeps its existing pending-buffer discard (`pending_size`/`pending_offset`/`pending_eof`/`burst_state` reset, `chapter_barrier = true`) but skips `user_io_set_download(0)`, `user_io_set_download(1)`, `user_io_set_index()` and `user_io_file_info(".M2V")` entirely, leaving `ioctl_download` continuously asserted across the seek, which removes both the MPEG-2 domain rearm and the audio FIFO/scheduler/underrun reset for audio-only sessions while leaving DVD/ISO/Program Stream seeking, chapter/navigation barriers and Audio CD's shared code path otherwise untouched.
 
+Source `39274a8` implements the conditional skip exactly as proposed: `chapter_barrier_poll()`'s `seek_pending`/`MEDIA_CONTROL_READY` handler keeps the unconditional pending-buffer discard and `chapter_barrier = true`, then branches on `audio_visualizer_controls` to either log a retained-download diagnostic or perform the prior full download-reset sequence unchanged for non-audio content.  The change was verified by cloning pinned upstream `Main_MiSTer` at `0a8fb44`, confirming all three Main patches still apply cleanly with `git apply --check`, and inspecting the applied `support/mediaplayer/mediaplayer.cpp` to confirm the intended branch structure.  GNU 10.2.1 (`arm-none-linux-gnueabihf-gcc`) built the stripped ARMv7 `host/build/MiSTer_MediaPlayer`; it is 1,186,780 bytes with SHA-256 `ba3375b28e50eed09755b790e6b8a37b7890ed1e614b6113cd36a62abbbe5086`.  No helper, decoder RTL or RBF changes were made or are required for this fix.
+
 #### Next Steps:
 
-Implement the conditional skip in `chapter_barrier_poll()`, commit the source change, then build and install only the updated `MiSTer_MediaPlayer` Main binary (no helper, RTL or RBF change) for the user to test standalone MP3 seeking and, if convenient, Audio CD seeking/track-skip on the test MiSTer.
+Install only `host/build/MiSTer_MediaPlayer` as executable `/media/fat/MiSTer_MediaPlayer`, retaining the current helper and RBF unchanged, then test standalone MP3/audio-file seeking on the test MiSTer and confirm the full-screen blank/flicker and audio pop no longer occur on seek while playback continues correctly at the new position; also verify `.mpg`/DVD seeking is unaffected, and test Audio CD track/seek skipping if a disc is convenient.
 
 #### Files Modified:
 
@@ -22,7 +24,7 @@ Implement the conditional skip in `chapter_barrier_poll()`, commit the source ch
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
