@@ -615,7 +615,16 @@ wire [7:0] overlay_r = selected_rgba[7:0];
 wire [7:0] overlay_g = selected_rgba[15:8];
 wire [7:0] overlay_b = selected_rgba[23:16];
 wire [7:0] overlay_a = selected_rgba[31:24];
-wire overlay_sample_valid = visible_video && native_active && base_de &&
+// native_active (the decoder's raw interlace flag) used to gate both this
+// and the row-request line below, but this project only ever displays a
+// progressive scanout now (converted .mpg files and the audio UI/
+// visualizer): native_active reads 0 for that content, so the overlay was
+// received and parsed correctly but never actually composited a pixel.
+// h_pos/v_pos already enumerate a straightforward progressive raster here
+// regardless of source interlace, so dropping native_active does not change
+// what row is requested or sampled, only removes a gate that no longer
+// corresponds to how this core is used.
+wire overlay_sample_valid = visible_video && base_de &&
     (h_pos < 12'd720) && (v_pos < 12'd480) &&
     (row_tag_visible[v_pos[0]] == v_pos[8:0]);
 
@@ -730,7 +739,7 @@ always @(posedge video_clk) begin
                     (row_tag_event0 && row_tag_event1 ? 16'd2 : 16'd1);
         end
 
-        if (pixel_ce && native_active && h_pos == 12'd720 &&
+        if (pixel_ce && h_pos == 12'd720 &&
             v_pos < 12'd478) begin
             row_request_value_video[v_pos[0]] <= v_pos[8:0] + 9'd2;
             row_request_toggle_video[v_pos[0]] <=
