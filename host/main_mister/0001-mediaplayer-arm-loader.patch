@@ -919,12 +919,12 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	{
 +		if (!pause_pending)
 +		{
-+			diagnostic_write("unexpected audio pause ready\n");
++			diagnostic_write("unexpected pause ready\n");
 +			stop_with_reason("pause-ready-unexpected");
 +			return 0;
 +		}
 +		pause_ready = true;
-+		diagnostic_write("audio pause helper ready submitted=%llu buffered=%u\n",
++		diagnostic_write("pause helper ready submitted=%llu buffered=%u\n",
 +		                 (unsigned long long)submitted_bytes,
 +		                 pending_size - pending_offset);
 +		return 1;
