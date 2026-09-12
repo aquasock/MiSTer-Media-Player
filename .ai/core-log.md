@@ -1,4 +1,4 @@
-## 977 COMMIT Unreleased ??? 2026-09-12T13:48:48-07:00
+## 977 COMMIT Unreleased 8e72075 2026-09-12T13:48:48-07:00
 
 #### Coming From:
 
@@ -14,7 +14,7 @@ Hardware testing on `af7f570` reproduced a hang after only a few ordinary pause/
 
 #### Next Steps:
 
-Build native and ARM, deploy via the atomic `.new`-then-`mv` pattern, and have the user reproduce the exact repro that hung before (a handful of ordinary pause/resume cycles on both test files) to confirm playback survives; also re-check the file's TOTAL/REMAIN duration estimate for `fellow.mpg`, which showed an implausible ~52 hour figure once the large-file `stat()` fix made it non-zero, and address the confirmed missing lowercase/space glyphs in the restyled progress-strip labels as a follow-up commit.
+Deploy `host/build/MediaPlayer_Helper` via the atomic `.new`-then-`mv` pattern and have the user reproduce the exact repro that hung before (a handful of ordinary pause/resume cycles on both `fellow.mpg` and `01 - Pee Strike.mpg`) to confirm playback survives; also re-check the file's TOTAL/REMAIN duration estimate for `fellow.mpg`, which showed an implausible ~52 hour figure once the large-file `stat()` fix made it non-zero, and address the confirmed missing lowercase/space glyphs in the restyled progress-strip labels as a follow-up commit.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Build native and ARM, deploy via the atomic `.new`-then-`mv` pattern, and have t
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
