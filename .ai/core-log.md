@@ -1,4 +1,4 @@
-## 975 COMMIT Unreleased ??? 2026-09-12T12:33:49-07:00
+## 975 COMMIT Unreleased e7fde30 2026-09-12T12:33:49-07:00
 
 #### Coming From:
 
@@ -14,7 +14,7 @@ A live debugging session chasing the .mpg progress overlay's pause/seek behavior
 
 #### Next Steps:
 
-Re-implement the wall-clock overlay-timing mechanism from scratch on top of `618b197`, matching the design worked out live: `video_overlay_service()`'s idle-hide and refresh-cadence checks switch from `max_video_pts` deltas to `monotonic_us()` deltas (PTS reflects how much of the stream has been parsed/submitted, not real elapsed time, and bursts far ahead of real time whenever the decode pipeline refills - most visibly right after a seek); `video_overlay_mark_activity()` anchors to `monotonic_us()` directly; `video_overlay_publish()` renders with the overlay's actual visibility instead of a hardcoded always-visible, so a background refresh can update pixel content without forcing the overlay on screen; and the pause barrier polls for GO with a wall-clock ten-second deadline (`control_wait_for_go_timed()`), clearing the overlay once idle and falling back to an unbounded wait, since PTS does not advance at all while genuinely paused. This time, commit as soon as it builds clean and is confirmed non-regressive, before any further live iteration.
+Source `e7fde30` re-implements the wall-clock overlay-timing mechanism from scratch on top of `618b197` (which already carried `video_overlay_publish()`'s visibility-aware rendering and the hidden-background-refresh cadence from `a45a67c` - only the PTS-vs-wall-clock timing base needed reconstructing): `video_overlay_service()`'s idle-hide and refresh-cadence checks switch from `max_video_pts` deltas to `monotonic_us()` deltas (PTS reflects how much of the stream has been parsed/submitted, not real elapsed time, and bursts far ahead of real time whenever the decode pipeline refills - most visibly right after a seek); `video_overlay_mark_activity()` anchors to `monotonic_us()` directly; and the pause barrier polls for GO with a wall-clock ten-second deadline (`control_wait_for_go_timed()`, added alongside the existing unbounded `control_wait_for_go()`), clearing the overlay once idle and falling back to an unbounded wait, since PTS does not advance at all while genuinely paused. Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change. Committed immediately on a clean compile, before any further live testing, specifically to not repeat the mistake that lost the original version of this work. `host/build/MediaPlayer_Helper` (SHA-256 `18bd95c55fb91df0acfd3a4907ea5e8e5aa86ad8b809eaf1d2c1c55403d19129`) is built; deliver it (current RBF `5ce3c1f`/seed99 and Main unaffected) for the user to retest pause-reveal, pause auto-hide, and seek timing, and to continue stress-testing for the separately-identified, apparently pre-existing decoder hang (unrelated to this file).
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Re-implement the wall-clock overlay-timing mechanism from scratch on top of `618
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
