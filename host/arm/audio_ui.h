@@ -39,6 +39,21 @@ int audio_ui_render_overlay(struct audio_ui *ui,
                             uint64_t position_pcm_frames,
                             uint8_t *packed_pixels, size_t size);
 
+/*
+ * Render only the elapsed/total/remaining labels and progress bar (no album
+ * art, playlist or transport panel) onto an otherwise-transparent plane, so
+ * it composites over live decoded video through the same overlay channel.
+ * position/length/rate_hz are in the caller's own units (e.g. a 90000 Hz
+ * PTS clock for video), independent of audio_ui_seek's 44100/48000
+ * restriction. total_label replaces "TRACK" ("TOTAL" fits video better).
+ * ui only needs audio_ui_create(); audio_ui_seek/audio_ui_set_track_length
+ * are not required before calling this.
+ */
+int audio_ui_render_progress_overlay(struct audio_ui *ui, uint64_t position,
+                                     uint64_t length, unsigned rate_hz,
+                                     const char *total_label,
+                                     uint8_t *packed_pixels, size_t size);
+
 /* Drain the projected final-duration frame without restarting an open upload. */
 int audio_ui_complete(struct audio_ui *ui, uint64_t emitted_pcm_frames,
                       unsigned rate_hz, audio_ui_record_writer writer,

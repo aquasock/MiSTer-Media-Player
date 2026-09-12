@@ -211,7 +211,7 @@ static uint64_t projected_position(const struct audio_ui *ui,
            (remaining < ui->rate_hz ? remaining : ui->rate_hz);
 }
 
-static unsigned progress_width(const struct audio_ui *ui)
+static unsigned progress_width(uint64_t position, uint64_t length)
 {
     const unsigned width = 652u;
     uint64_t quotient;
@@ -219,24 +219,24 @@ static unsigned progress_width(const struct audio_ui *ui)
     unsigned low = 0;
     unsigned high = width;
 
-    if (!ui->length_pcm_frames)
+    if (!length)
         return 0;
-    if (ui->position_pcm_frames >= ui->length_pcm_frames)
+    if (position >= length)
         return width;
 
     /*
      * Find floor(position * width / length) without overflowing either
-     * 64-bit PCM-frame value.  ceil(length * pixel / width) is decomposed
+     * 64-bit frame/PTS value.  ceil(length * pixel / width) is decomposed
      * before multiplication; pixel never exceeds width.
      */
-    quotient = ui->length_pcm_frames / width;
-    remainder = ui->length_pcm_frames % width;
+    quotient = length / width;
+    remainder = length % width;
     while (low < high) {
         unsigned pixel = (low + high + 1u) / 2u;
         uint64_t threshold = quotient * pixel +
             (remainder * pixel + width - 1u) / width;
 
-        if (ui->position_pcm_frames >= threshold)
+        if (position >= threshold)
             low = pixel;
         else
             high = pixel - 1u;
@@ -263,7 +263,18 @@ static void format_time(char *text, size_t size, uint64_t seconds)
                    (unsigned long long)(seconds % 60u));
 }
 
-static void render_frame(struct audio_ui *ui)
+/*
+ * The elapsed/total/remaining labels and the progress bar beneath them:
+ * shared by the full audio-player layout and the video-progress-only
+ * overlay, since both are just this strip against a different (or absent)
+ * background.  position/length/rate_hz are explicit rather than read from
+ * ui so the caller need not force them through ui's own persistent fields
+ * (audio_ui_seek/audio_ui_set_track_length restrict rate_hz to 44100/48000,
+ * which does not hold for a video PTS clock).
+ */
+static void draw_progress_strip(struct audio_ui *ui, uint64_t position,
+                                uint64_t length, unsigned rate_hz,
+                                const char *total_label)
 {
     char elapsed[32];
     char total[32];
@@ -271,25 +282,52 @@ static void render_frame(struct audio_ui *ui)
     char elapsed_timing[64];
     char total_timing[64];
     char remaining_timing[64];
-    unsigned filled_width = progress_width(ui);
-    unsigned row;
-    uint64_t elapsed_seconds = ui->rate_hz ?
-        ui->position_pcm_frames / ui->rate_hz : 0;
-    uint64_t remaining_frames =
-        ui->length_pcm_frames > ui->position_pcm_frames ?
-        ui->length_pcm_frames - ui->position_pcm_frames : 0;
+    unsigned filled_width = progress_width(position, length);
+    uint64_t elapsed_seconds = rate_hz ? position / rate_hz : 0;
+    uint64_t remaining_frames = length > position ? length - position : 0;
 
     format_time(elapsed, sizeof(elapsed), elapsed_seconds);
-    format_time(total, sizeof(total),
-                rounded_up_seconds(ui->length_pcm_frames, ui->rate_hz));
+    format_time(total, sizeof(total), rounded_up_seconds(length, rate_hz));
     format_time(remaining, sizeof(remaining),
-                rounded_up_seconds(remaining_frames, ui->rate_hz));
+                rounded_up_seconds(remaining_frames, rate_hz));
     (void)snprintf(elapsed_timing, sizeof(elapsed_timing),
                    "ELAPSED %s", elapsed);
     (void)snprintf(total_timing, sizeof(total_timing),
-                   "TRACK %s", total);
+                   "%s %s", total_label, total);
     (void)snprintf(remaining_timing, sizeof(remaining_timing),
                    "REMAIN %s", remaining);
+
+    draw_centered_text(ui, 32, 412, 218, elapsed_timing, 1, UI_TEXT_Y);
+    draw_centered_text(ui, 250, 412, 220, total_timing, 1, UI_TEXT_Y);
+    draw_centered_text(ui, 470, 412, 218, remaining_timing, 1, UI_TEXT_Y);
+
+    /* Absolute decoder-frame position scaled across the track duration. */
+    fill_rect(ui, 32, 438, 656, 14, UI_TRACK_Y, UI_CB, UI_CR);
+    if (filled_width)
+        fill_rect(ui, 34, 441, filled_width, 8,
+                  UI_PROGRESS_Y, UI_PROGRESS_CB, UI_PROGRESS_CR);
+}
+
+static void pack_overlay_plane(const struct audio_ui *ui,
+                               uint8_t *packed_pixels, size_t size)
+{
+    size_t pixel;
+
+    memset(packed_pixels, 0, size);
+    for (pixel = 0; pixel < AUDIO_UI_WIDTH * AUDIO_UI_HEIGHT; ++pixel) {
+        uint8_t y = ui->frame[pixel];
+        unsigned index = y == UI_BG_Y ? 0u :
+                         y <= UI_PANEL_ALT_Y ? 1u :
+                         y <= UI_MUTED_Y ? 2u : 3u;
+        unsigned shift = 6u - (unsigned)(pixel & 3u) * 2u;
+
+        packed_pixels[pixel >> 2] |= (uint8_t)(index << shift);
+    }
+}
+
+static void render_frame(struct audio_ui *ui)
+{
+    unsigned row;
 
     /* Full 4:3 composition, inset for consumer-CRT overscan. */
     fill_rect(ui, 0, 0, AUDIO_UI_WIDTH, AUDIO_UI_HEIGHT,
@@ -352,15 +390,8 @@ static void render_frame(struct audio_ui *ui)
     draw_centered_text(ui, 440, 378, 94, "NEXT", 1, UI_TEXT_Y);
 
     draw_text(ui, 576, 378, "PLAYLIST --:--", 1, UI_MUTED_Y);
-    draw_centered_text(ui, 32, 412, 218, elapsed_timing, 1, UI_TEXT_Y);
-    draw_centered_text(ui, 250, 412, 220, total_timing, 1, UI_TEXT_Y);
-    draw_centered_text(ui, 470, 412, 218, remaining_timing, 1, UI_TEXT_Y);
-
-    /* Absolute decoder-frame position scaled across the track duration. */
-    fill_rect(ui, 32, 438, 656, 14, UI_TRACK_Y, UI_CB, UI_CR);
-    if (filled_width)
-        fill_rect(ui, 34, 441, filled_width, 8,
-                  UI_PROGRESS_Y, UI_PROGRESS_CB, UI_PROGRESS_CR);
+    draw_progress_strip(ui, ui->position_pcm_frames, ui->length_pcm_frames,
+                        ui->rate_hz, "TRACK");
 }
 
 int audio_ui_create(struct audio_ui **result)
@@ -485,22 +516,25 @@ int audio_ui_render_overlay(struct audio_ui *ui,
                             uint64_t position_pcm_frames,
                             uint8_t *packed_pixels, size_t size)
 {
-    size_t pixel;
-
     if (!ui || !packed_pixels || size != AUDIO_UI_OVERLAY_BYTES)
         return -1;
     ui->position_pcm_frames = projected_position(ui, position_pcm_frames);
     render_frame(ui);
-    memset(packed_pixels, 0, size);
-    for (pixel = 0; pixel < AUDIO_UI_WIDTH * AUDIO_UI_HEIGHT; ++pixel) {
-        uint8_t y = ui->frame[pixel];
-        unsigned index = y == UI_BG_Y ? 0u :
-                         y <= UI_PANEL_ALT_Y ? 1u :
-                         y <= UI_MUTED_Y ? 2u : 3u;
-        unsigned shift = 6u - (unsigned)(pixel & 3u) * 2u;
+    pack_overlay_plane(ui, packed_pixels, size);
+    return 0;
+}
 
-        packed_pixels[pixel >> 2] |= (uint8_t)(index << shift);
-    }
+int audio_ui_render_progress_overlay(struct audio_ui *ui, uint64_t position,
+                                     uint64_t length, unsigned rate_hz,
+                                     const char *total_label,
+                                     uint8_t *packed_pixels, size_t size)
+{
+    if (!ui || !total_label || !packed_pixels || size != AUDIO_UI_OVERLAY_BYTES)
+        return -1;
+    fill_rect(ui, 0, 0, AUDIO_UI_WIDTH, AUDIO_UI_HEIGHT,
+              UI_BG_Y, UI_CB, UI_CR);
+    draw_progress_strip(ui, position, length, rate_hz, total_label);
+    pack_overlay_plane(ui, packed_pixels, size);
     return 0;
 }
 

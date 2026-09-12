@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -65,6 +66,9 @@
 #define AUDIO_VISUALIZER_PATH "/media/fat/linux/MediaPlayer_Visualizer.mmpvis"
 #define AUDIO_OVERLAY_RECORDS \
     (2u + (AUDIO_UI_OVERLAY_BYTES + 4095u) / 4096u)
+#define VIDEO_OVERLAY_PTS_RATE_HZ 90000u
+#define VIDEO_OVERLAY_IDLE_TICKS (10u * VIDEO_OVERLAY_PTS_RATE_HZ)
+#define VIDEO_OVERLAY_REFRESH_TICKS VIDEO_OVERLAY_PTS_RATE_HZ
 
 _Static_assert(OUTPUT_ACTIVATION_STAGE_BYTES >=
                    OUTPUT_ACTIVATION_STAGE_DECISION_BYTES +
@@ -257,6 +261,19 @@ struct output_state {
     struct audio_overlay_state audio_overlay;
     uint64_t audio_position_base;
     uint64_t audio_emitted_base;
+    /*
+     * Progress-bar/time overlay for .mpg playback, revealed for ten seconds
+     * on play, pause and seek, matching the standalone audio player's
+     * overlay but drawing only the elapsed/total/remaining strip: see
+     * video_overlay_mark_activity()/video_overlay_service() below.
+     */
+    struct audio_ui *video_overlay_ui;
+    uint8_t *video_overlay_plane;
+    int64_t video_overlay_file_size;
+    int video_overlay_visible;
+    int video_overlay_pending_reveal;
+    uint64_t video_overlay_activity_pts;
+    uint64_t video_overlay_last_render_pts;
     int pcm_non_audio;       /* IEC 61937 burst records, never decoded PCM */
     int scheduler_enabled;
     int scheduler_started;
@@ -1051,6 +1068,102 @@ static int audio_overlay_service(struct output_state *output,
     }
     state->record_index++;
     return 1;
+}
+
+/*
+ * Progress-bar/time overlay for .mpg playback (video_overlay_ui etc. in
+ * struct output_state).  Unlike the audio player's overlay, which is
+ * serviced incrementally across many PCM-record boundaries per second,
+ * process_program_stream()'s loop iterates far less often, so this overlay
+ * is published in one blocking call and only when a state change is
+ * actually due.  It is strictly cosmetic: every failure here is logged and
+ * ignored rather than aborting playback.
+ */
+static void video_overlay_descriptor(const uint8_t *plane,
+                                     struct dvd_spu_overlay *overlay,
+                                     int visible)
+{
+    static const uint8_t palette[4][4] = {
+        {0x00, 0x00, 0x00, 0x00},
+        {0x18, 0x1b, 0x20, 0xa0},
+        {0x68, 0x7d, 0x89, 0xff},
+        {0xee, 0xf2, 0xf4, 0xff}
+    };
+
+    memset(overlay, 0, sizeof(*overlay));
+    overlay->pixels = plane;
+    memcpy(overlay->rgba, palette, sizeof(palette));
+    memcpy(overlay->highlight_rgba, palette, sizeof(palette));
+    overlay->visible = visible;
+}
+
+/*
+ * Best-effort total-duration estimate from the video PTS/byte-offset pair
+ * already tracked for scheduling (max_video_pts/max_video_pts_byte) against
+ * the file's total size, refined every call as more of the file is read -
+ * the same ratio a forward seek scan already relies on.  Returns 0 (unknown,
+ * rendered as 00:00) until at least one video PTS has been observed.
+ */
+static uint64_t video_overlay_estimated_length_pts(
+    const struct output_state *output)
+{
+    if (!output->have_video_pts || !output->max_video_pts_byte ||
+        output->video_overlay_file_size <= 0)
+        return 0;
+    return (uint64_t)((double)output->max_video_pts *
+                      ((double)output->video_overlay_file_size /
+                       (double)output->max_video_pts_byte));
+}
+
+static int video_overlay_publish(struct output_state *output)
+{
+    struct dvd_spu_overlay overlay;
+
+    if (audio_ui_render_progress_overlay(
+            output->video_overlay_ui, output->max_video_pts,
+            video_overlay_estimated_length_pts(output),
+            VIDEO_OVERLAY_PTS_RATE_HZ, "TOTAL",
+            output->video_overlay_plane, AUDIO_UI_OVERLAY_BYTES) < 0)
+        return -1;
+    video_overlay_descriptor(output->video_overlay_plane, &overlay, 1);
+    return emit_overlay_frame(output, &overlay);
+}
+
+/* Reveal on the next service call if not already visible; extend the
+ * ten-second window either way.  Call on play, pause and seek. */
+static void video_overlay_mark_activity(struct output_state *output)
+{
+    if (!output->video_overlay_ui)
+        return;
+    output->video_overlay_activity_pts = output->max_video_pts;
+    if (!output->video_overlay_visible) {
+        output->video_overlay_visible = 1;
+        output->video_overlay_pending_reveal = 1;
+    }
+}
+
+/* Call once per process_program_stream() loop iteration. */
+static void video_overlay_service(struct output_state *output)
+{
+    if (!output->video_overlay_ui || !output->video_overlay_visible)
+        return;
+    if (output->max_video_pts - output->video_overlay_activity_pts >=
+        VIDEO_OVERLAY_IDLE_TICKS) {
+        output->video_overlay_visible = 0;
+        if (emit_overlay_clear(output) < 0)
+            fprintf(stderr,
+                    "media_player_helper: video overlay clear failed\n");
+        return;
+    }
+    if (!output->video_overlay_pending_reveal &&
+        output->max_video_pts - output->video_overlay_last_render_pts <
+            VIDEO_OVERLAY_REFRESH_TICKS)
+        return;
+    output->video_overlay_pending_reveal = 0;
+    output->video_overlay_last_render_pts = output->max_video_pts;
+    if (video_overlay_publish(output) < 0)
+        fprintf(stderr,
+                "media_player_helper: video overlay publish failed\n");
 }
 
 static enum media_source_dvd_command dvd_source_command(int command)
@@ -2227,6 +2340,19 @@ static void reset_output_for_navigation(struct output_state *output,
     FILE *pcm = output->pcm;
     struct output_reserve *reserve = output->reserve;
     struct output_stage *activation_stage = output->activation_stage;
+    /*
+     * The video-progress-overlay allocation and the file size probed once
+     * at startup are resources, not in-flight playback state: preserve them
+     * across the memset below exactly like video/pcm/reserve/
+     * activation_stage, or a seek would leak the allocation and silently
+     * disable the overlay for the rest of the session.  The overlay's own
+     * visible/activity/render-position bookkeeping is transient playback
+     * state and is correctly left at zero; video_overlay_mark_activity()
+     * re-establishes it right after the seek completes.
+     */
+    struct audio_ui *video_overlay_ui = output->video_overlay_ui;
+    uint8_t *video_overlay_plane = output->video_overlay_plane;
+    int64_t video_overlay_file_size = output->video_overlay_file_size;
 
     free(output->hold);
     output->hold = NULL;
@@ -2237,6 +2363,9 @@ static void reset_output_for_navigation(struct output_state *output,
     output->pcm = pcm;
     output->reserve = reserve;
     output->activation_stage = activation_stage;
+    output->video_overlay_ui = video_overlay_ui;
+    output->video_overlay_plane = video_overlay_plane;
+    output->video_overlay_file_size = video_overlay_file_size;
     output->hold_limit = hold_limit;
     output->hold_active = hold_limit != 0;
     output->scheduler_started = !output->hold_active;
@@ -4226,6 +4355,9 @@ static int process_program_stream(struct media_source *input,
 
         if (command < 0)
             return -1;
+        if (command == MEDIA_PLAYER_CONTROL_USER_ACTIVITY)
+            video_overlay_mark_activity(output);
+        video_overlay_service(output);
         {
             int menu_refresh = refresh_dvd_menu_state(
                 input, menu, output, control_fd);
@@ -5100,6 +5232,42 @@ int main(int argc, char **argv)
         fprintf(stderr, "media_player_helper: audio UI 720x480p %s enabled\n",
                 output.visualizer ? "two-bit overlay" : "BT.601 frame");
     }
+    /*
+     * The progress overlay is strictly cosmetic: any allocation failure here
+     * disables it (logged) rather than aborting playback.  Scoped to a
+     * direct .mpg/.mpeg file (seekable_program_stream), not DVD or ISO
+     * sources, matching the seek machinery it reuses activity marks from.
+     */
+    if (seekable_program_stream) {
+        const char *path = source_specification;
+        struct stat file_stat;
+
+        if (!strncmp(path, MEDIA_PLAYER_FILE_PREFIX,
+                    strlen(MEDIA_PLAYER_FILE_PREFIX)))
+            path += strlen(MEDIA_PLAYER_FILE_PREFIX);
+        output.video_overlay_file_size =
+            stat(path, &file_stat) == 0 ? (int64_t)file_stat.st_size : -1;
+        if (audio_ui_create(&output.video_overlay_ui) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: cannot allocate video progress "
+                    "overlay; continuing without it\n");
+        } else {
+            output.video_overlay_plane = malloc(AUDIO_UI_OVERLAY_BYTES);
+            if (!output.video_overlay_plane) {
+                audio_ui_destroy(output.video_overlay_ui);
+                output.video_overlay_ui = NULL;
+                fprintf(stderr,
+                        "media_player_helper: cannot allocate video "
+                        "progress overlay plane; continuing without it\n");
+            } else {
+                fprintf(stderr,
+                        "media_player_helper: video progress overlay "
+                        "enabled file_size=%lld\n",
+                        (long long)output.video_overlay_file_size);
+                video_overlay_mark_activity(&output);
+            }
+        }
+    }
     if (is_idle_visualizer) {
         if (process_idle_visualizer(&output) < 0)
             goto done;
@@ -5201,6 +5369,7 @@ int main(int argc, char **argv)
                         seek_seconds, (unsigned long long)target_pts,
                         (unsigned long long)selected.pts_90k,
                         (long long)selected.source_offset, seek_index.count);
+                video_overlay_mark_activity(&output);
                 continue;
             }
             if ((command == MEDIA_PLAYER_CONTROL_PREVIOUS_CHAPTER ||
@@ -5340,6 +5509,12 @@ done:
         audio_ui_destroy(output.audio_ui);
         output.audio_ui = NULL;
     }
+    if (output.video_overlay_ui) {
+        audio_ui_destroy(output.video_overlay_ui);
+        output.video_overlay_ui = NULL;
+    }
+    free(output.video_overlay_plane);
+    output.video_overlay_plane = NULL;
     if (output.visualizer) {
         fprintf(stderr,
                 "media_player_helper: audio visualizer gops=%llu level=%u\n",
