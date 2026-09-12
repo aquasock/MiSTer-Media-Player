@@ -246,6 +246,16 @@ set_false_path \
 set_false_path \
     -to [get_keepers {*|audio_ui_initial_loading_video_sync[0]}]
 
+# The audio UI/visualizer mode_active level is produced in clk_mpeg2 and read
+# by the HDMI Bob/Weave deinterlace selector in clk_video, so it forces the
+# deinterlacer off whenever the audio UI owns the display regardless of the
+# decoded video's own interlace request.  Sampled by an explicit three-register
+# clk_video synchronizer.  Cut only the asynchronous source -> first sampling
+# stage; the settling stages and the deinterlace-control logic remain timed in
+# clk_video.
+set_false_path \
+    -to [get_keepers {*|audio_ui_mode_active_video_sync[0]}]
+
 # Entry 245: the frozen hardware-cadence snapshot is produced in clk_mpeg2 and
 # remains stable permanently before its trailing ready level can enable the
 # video overlay.  The snapshot bus uses two explicit clk_video sampling stages;

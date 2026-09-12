@@ -981,7 +981,8 @@ mpeg2_hdmi_deinterlace_control mpeg2_hdmi_deinterlace_control
 (
 	.clk                     (clk_video),
 	.reset                   (reset_video),
-	.native_interlaced       (display_native_interlaced),
+	.native_interlaced       (display_native_interlaced &&
+	                          !audio_ui_mode_active_video),
 	.bob_selected_async      (!status[124]),
 	.hdmi_bob_deint          (display_hdmi_bob_deinterlace)
 );
@@ -1245,6 +1246,26 @@ end
 
 wire audio_ui_initial_loading_video =
     audio_ui_initial_loading_video_sync[2];
+// The audio UI/visualizer full-frame buffer is always written progressive
+// (native_interlaced forced 0 below), but the HDMI Bob/Weave deinterlacer is
+// driven from the decoded video's own interlace request and has no way to
+// know the display has switched to this forced-progressive frame instead.
+// Applying Bob motion-adaptive deinterlacing to a frame whose two fields are
+// identical produces a visible vertical bob with no real motion to track.
+// Synchronize the mode flag into the video domain and force the deinterlacer
+// off whenever the audio UI owns the display.
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] audio_ui_mode_active_video_sync;
+
+always @(posedge clk_video) begin
+    if (reset_video)
+        audio_ui_mode_active_video_sync <= 3'b000;
+    else
+        audio_ui_mode_active_video_sync <=
+            {audio_ui_mode_active_video_sync[1:0], audio_ui_mode_active};
+end
+
+wire audio_ui_mode_active_video = audio_ui_mode_active_video_sync[2];
 wire        audio_ui_display_bank;
 wire        audio_ui_picture_publish;
 wire [15:0] audio_ui_committed_frames;
