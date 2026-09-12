@@ -317,7 +317,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,1225 @@
+@@ -0,0 +1,1232 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -1011,22 +1011,29 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +		if (event == MEDIA_CONTROL_READY)
 +		{
 +			seek_pending = false;
-+			if (download_active)
-+			{
-+				user_io_set_download(0);
-+				download_active = 0;
-+			}
 +			pending_size = pending_offset = 0;
 +			pending_eof = false;
 +			burst_state = {};
-+			user_io_set_index(playback_index);
-+			user_io_file_info(".M2V");
-+			user_io_set_download(1);
-+			download_active = 1;
-+			download_assert_us = monotonic_us();
-+			chapter_download_rearmed = true;
 +			chapter_barrier = true;
-+			diagnostic_write("seek target ready; download reset\n");
++			if (audio_visualizer_controls)
++			{
++				diagnostic_write("audio seek target ready; download retained\n");
++			}
++			else
++			{
++				if (download_active)
++				{
++					user_io_set_download(0);
++					download_active = 0;
++				}
++				user_io_set_index(playback_index);
++				user_io_file_info(".M2V");
++				user_io_set_download(1);
++				download_active = 1;
++				download_assert_us = monotonic_us();
++				chapter_download_rearmed = true;
++				diagnostic_write("seek target ready; download reset\n");
++			}
 +		}
 +		else
 +		{
