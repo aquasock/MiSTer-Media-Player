@@ -12,9 +12,11 @@ Fix the .mpg progress-bar overlay never appearing on screen despite `08db78e`'s 
 
 The user reported no visible change on real `.mpg` playback.  A fresh telemetry-enabled log confirmed `08db78e`'s helper code was running (`video progress overlay enabled file_size=...`) and that Main's overlay-trace patch showed `overlay_submit config`/`commit` pairs with a changing content hash roughly once per second, proving the overlay data was being rendered and transmitted correctly end to end.  The bug is in `mpeg2_h262_dvd_overlay.sv`, the FPGA-side DVD-style overlay compositor this feature rides on: `overlay_sample_valid` required `native_active` (the decoder's raw interlace flag, wired from `display_native_interlaced`) to be asserted before compositing any pixel, and the row-fetch request trigger for its line cache carried the same gate, so the cache was never even populated.  The same telemetry log's `H262 restart fields` diagnostic confirmed the user's test file is genuinely `sequence_progressive=1`/`progressive=1` content, so `native_active` reads 0 for it and the overlay is received and parsed correctly but never draws a pixel; the standalone audio player's identical overlay mechanism is unaffected because it does not depend on this signal.  The user confirmed this project no longer plays genuinely interlaced content - only converted progressive `.mpg` files and the progressive audio UI/visualizer - and authorized breaking interlaced/native-passthrough compatibility to fix this.
 
+Source `fa0ebf6` removes `native_active` from both the row-request trigger and the sample-valid gate in `mpeg2_h262_dvd_overlay.sv`; `h_pos`/`v_pos` already enumerate a straightforward progressive raster there regardless of source interlace, so this does not change what row is requested or sampled, only removes a gate that no longer corresponds to how this core is used.  The `native_active` port is left connected but unused rather than touching the module interface.  Following this fix the user set a standing project scope decision: interlaced content, native (unscaled 480i) bypass and Bob/Weave deinterlacing are all now unsupported, since only the user's own progressive `.mpg` encodes and the progressive audio UI/visualizer are played going forward.  All three seeds 26, 33 and 40 compiled with 0 errors; worst-case setup slack was negative 0.137 ns, positive 0.116 ns and negative 0.280 ns respectively, so only seed 33 passes timing.  Seed 33 was delivered as `.ai/current_results/MediaPlayer_progressiveoverlay_seed33.rbf`, SHA-256 `347269119b7e1e4fbbd4f0be433acd21261b2fa87359f8db137826557b320561`.  Main and the helper are unchanged from `966`'s delivered build.
+
 #### Next Steps:
 
-Source `fa0ebf6` removes `native_active` from both the row-request trigger and the sample-valid gate in `mpeg2_h262_dvd_overlay.sv`; `h_pos`/`v_pos` already enumerate a straightforward progressive raster there regardless of source interlace, so this does not change what row is requested or sampled, only removes a gate that no longer corresponds to how this core is used.  The `native_active` port is left connected but unused rather than touching the module interface.  This touches RTL, so a 3-seed Quartus build is required; deliver the RBF plus the already-built `08db78e` Main/helper for the user to retest the `.mpg` progress-bar overlay, and confirm ordinary `.mpg` and audio-player playback are unaffected.
+Install `.ai/current_results/MediaPlayer_progressiveoverlay_seed33.rbf` (Main/helper unchanged from entry 966) and retest the `.mpg` progress-bar overlay: it should now actually draw on screen, appearing for ten seconds on play, pause and seek and then disappearing, with ordinary `.mpg` playback/seeking and the audio player unaffected.
 
 #### Files Modified:
 
@@ -22,7 +24,7 @@ Source `fa0ebf6` removes `native_active` from both the row-request trigger and t
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
