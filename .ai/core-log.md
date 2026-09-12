@@ -16,7 +16,7 @@ Hardware testing of `39274a8`/`adb4f53` traced a second, deeper regression (prem
 
 #### Next Steps:
 
-Run a 3-seed Quartus build (both RTL commits, `1a6297f` and `b0372f6`, touch `MediaPlayer.sv`) and, once at least one seed passes timing, deliver the RBF plus the reverted Main binary for the user to test: standalone MP3 seeking should show no blank/flicker/pop and no premature end-of-stream across repeated seeks, `.mpg` seeking must remain completely unaffected, and the visualizer should no longer show interlace jutter.
+All three seeds 26, 33 and 40 compiled with 0 errors.  Worst-case setup slack: seed 26 at positive 0.198 ns, seed 33 at positive 0.210 ns, seed 40 at negative 0.253 ns (fails timing, on `pll_hdmi`'s output-counter divider) with a TNS of negative 8.186; seed 33 was chosen as `.ai/current_results/MediaPlayer_audioseekunify_seed33.rbf`, SHA-256 `b93110b73214cb406e66f349f8968fd0c52c66d2e4291b7b612c804fc00f04f0`.  Main was rebuilt from the reverted, now-unified patch to `host/build/MiSTer_MediaPlayer`, SHA-256 `dcc00429096182dfaed319b889c99fe2e64dbc58e22f02abea6c2454e03b8e8e`; the helper is unchanged.  Deliver both files for the user to install and test: standalone MP3 seeking should show no blank/flicker/pop and no premature end-of-stream across repeated seeks, `.mpg` seeking must remain completely unaffected, and the visualizer should no longer show interlace jutter.
 
 #### Files Modified:
 
@@ -28,7 +28,7 @@ Run a 3-seed Quartus build (both RTL commits, `1a6297f` and `b0372f6`, touch `Me
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
