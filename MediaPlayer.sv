@@ -1927,11 +1927,26 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .presentation_error          (mpeg2_new_b_presentation_error),
     .debug_state                 (mpeg2_new_b_scheduler_debug_state)
 );
+// The framebuffer's picture-present/generation tracking and this
+// interlace-mode-change detector both used reset_mpeg2 directly, so the
+// Entry 237 rearm pulse on every seek wiped them too, even while the audio
+// UI's own persistent frame is on screen: the DDR content and its validity
+// are completely unaffected by the reset, but mpeg2_luma_framebuffer's
+// "is a picture present yet" state was, producing a visible multi-frame
+// blank/mistimed flash until the next audio UI commit recovered it - the
+// residual flash still seen on seek after Entry NNN's mode_active/
+// display_bank persistence fix, which protects the audio UI module itself
+// but not this separate read-side module. Exempt the rearm-only portion of
+// reset_mpeg2 here while the audio UI owns the display; a true reset still
+// applies unconditionally.
+wire reset_mpeg2_display_domain =
+    reset_mpeg2_base || (!audio_ui_mode_active && mpeg2_download_rearm_reset);
+
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_native_active_sync;
 
 always @(posedge clk_mpeg2) begin
-    if (reset_mpeg2)
+    if (reset_mpeg2_display_domain)
         mpeg2_new_native_active_sync <= 3'b000;
     else
         mpeg2_new_native_active_sync <=
@@ -1942,7 +1957,7 @@ wire mpeg2_new_native_mode_change =
     mpeg2_new_native_active_sync[1] ^ mpeg2_new_native_active_sync[2];
 assign mpeg2_new_native_active_mpeg2 = mpeg2_new_native_active_sync[2];
 wire mpeg2_new_framebuffer_reset =
-    reset_mpeg2 ||
+    reset_mpeg2_display_domain ||
     (mpeg2_new_framebuffer_swap_reset_count != 3'd0) ||
     mpeg2_new_native_mode_change;
 wire mpeg2_new_framebuffer_generation_reset =
