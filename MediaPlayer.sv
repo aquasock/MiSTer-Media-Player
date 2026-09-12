@@ -2134,7 +2134,8 @@ end
 
 mpeg2_h262_audio_ui mpeg2_h262_audio_ui
 (
-    .clk(clk_mpeg2),.reset(reset_mpeg2),
+    .clk(clk_mpeg2),.reset(reset_mpeg2_base),
+    .session_start(mpeg2_download_rearm_reset),
     .record_data(audio_ui_record_data),
     .record_start(audio_ui_record_start),
     .record_last(audio_ui_record_last),

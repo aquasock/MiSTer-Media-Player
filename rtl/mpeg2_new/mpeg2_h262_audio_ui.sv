@@ -6,6 +6,7 @@ module mpeg2_h262_audio_ui
 (
     input  wire        clk,
     input  wire        reset,
+    input  wire        session_start,
     input  wire  [7:0] record_data,
     input  wire        record_start,
     input  wire        record_last,
@@ -56,13 +57,27 @@ assign writer_din=write_word;
 assign writer_be=8'hff;
 assign writer_we=write_pending;
 
+// A per-session rearm (Entry 237, fired on every ioctl_download reassertion,
+// including every seek's download-session reset) must abandon any in-flight
+// BEGIN/DATA/COMMIT record, but must not disturb which bank is currently on
+// screen: real H.262 video is redrawn continuously so a mid-session rearm is
+// invisible there, but this module's committed frame is persistent and the
+// picture data it points at in DDR is untouched by this reset, so clearing
+// mode_active/display_bank here only produced a visible blank/wrong-bank
+// flicker until the next commit. Only a true reset clears them.
+wire soft_reset = reset || session_start;
+
 always @(posedge clk) begin
     if(reset)begin
+        mode_active<=0;
+        display_bank<=0;
+    end
+    if(soft_reset)begin
         current_command<=COMMAND_BEGIN;
         received_bytes<=0;write_word_index<=0;write_byte_lane<=0;
         write_word<=0;write_pending<=0;commit_pending<=0;frame_open<=0;
-        protocol_error<=0;mode_active<=0;loading_active<=0;
-        display_bank<=0;picture_publish<=0;committed_frames<=0;
+        protocol_error<=0;loading_active<=0;
+        picture_publish<=0;committed_frames<=0;
     end else begin
         picture_publish<=1'b0;
         if(writer_accept)begin
