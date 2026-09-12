@@ -499,38 +499,6 @@ static int control_wait_for_go(int fd)
     }
 }
 
-/* Like control_wait_for_go(), but returns 1 (not an error) if timeout_ms
- * elapses without GO arriving, instead of blocking indefinitely - so a
- * pause barrier can act (e.g. auto-hide its overlay) on a wall-clock
- * deadline while still waiting.  Capped well under any real caller's
- * deadline; only exists so the timeout fits an int without pulling in
- * limits.h for a single clamp. */
-static int control_wait_for_go_timed(int fd, uint64_t timeout_ms)
-{
-    struct pollfd descriptor = {fd, POLLIN, 0};
-    int wait_ms = timeout_ms > 60000u ? 60000 : (int)timeout_ms;
-
-    for (;;) {
-        int result = poll(&descriptor, 1, wait_ms);
-        int command;
-
-        if (result < 0 && errno == EINTR)
-            continue;
-        if (!result)
-            return 1;
-        if (result < 0 || !(descriptor.revents & POLLIN))
-            return -1;
-        command = control_read_command(fd);
-        if (command == MEDIA_PLAYER_CONTROL_GO)
-            return 0;
-        if (command < 0)
-            return -1;
-        fprintf(stderr,
-                "media_player_helper: ignoring control 0x%02x while "
-                "waiting for go\n", command);
-    }
-}
-
 static int write_all(FILE *stream, const void *data, size_t size,
                      const char *what)
 {
@@ -1289,20 +1257,22 @@ static void video_overlay_service(struct output_state *output)
  * pause_barrier_finish() requires before it actually asserts
  * playback_paused.
  *
- * The ten-second auto-hide is normally driven by video_overlay_service()
- * comparing wall-clock time, but service() cannot run at all while blocked
- * here waiting for GO.  So this polls for GO with a bounded wall-clock
- * deadline instead: once ten real seconds pass without GO, clear the
- * overlay (flushed immediately, same as the reveal) and fall back to an
- * unbounded wait - matching "reveals for ten seconds, then disappears"
- * even though the video itself is not moving while paused.
+ * Unlike the reveal above, an idle-timeout clear cannot be attempted here:
+ * once PAUSE_READY is sent, Main's mediaplayer_poll() gate
+ * (`if (playback_paused && !stream_boundary_pending) return;`) stops
+ * draining this same bulk pipe, so any later write to it - such as an
+ * overlay-clear record - blocks forever the moment residual buffered bytes
+ * plus the new record exceed the pipe's capacity.  Confirmed on hardware:
+ * a wall-clock idle-hide attempted from inside this wait deadlocked
+ * MediaPlayer_Helper in pipe_write after only a few ordinary pause/resume
+ * cycles.  So the overlay simply stays visible for the whole pause; the
+ * wall-clock idle-hide in video_overlay_service() still applies normally
+ * once resumed, since Main is actively draining the pipe again by then.
  */
 static int video_overlay_pause_barrier(struct output_state *output,
                                        int control_fd)
 {
     int reveal = !output->video_overlay_visible;
-    uint64_t deadline_us;
-    int wait_result;
 
     output->video_overlay_activity_us = monotonic_us();
     output->video_overlay_visible = 1;
@@ -1320,34 +1290,11 @@ static int video_overlay_pause_barrier(struct output_state *output,
                 "publication failed\n");
         return -1;
     }
-    deadline_us = monotonic_us() + (uint64_t)OVERLAY_IDLE_MS * 1000u;
-    for (;;) {
-        uint64_t now_us = monotonic_us();
-        uint64_t remaining_ms = now_us >= deadline_us ? 0 :
-            (deadline_us - now_us) / 1000u;
-
-        wait_result = control_wait_for_go_timed(control_fd, remaining_ms);
-        if (wait_result == 0)
-            break;
-        if (wait_result < 0) {
-            fprintf(stderr,
-                    "media_player_helper: video overlay pause barrier "
-                    "GO failed\n");
-            return -1;
-        }
-        output->video_overlay_visible = 0;
-        if (emit_overlay_clear(output) < 0 ||
-            flush_output(output, "video overlay pause idle clear") < 0)
-            fprintf(stderr,
-                    "media_player_helper: video overlay pause idle clear "
-                    "failed\n");
-        if (control_wait_for_go(control_fd) < 0) {
-            fprintf(stderr,
-                    "media_player_helper: video overlay pause barrier "
-                    "GO failed\n");
-            return -1;
-        }
-        break;
+    if (control_wait_for_go(control_fd) < 0) {
+        fprintf(stderr,
+                "media_player_helper: video overlay pause barrier "
+                "GO failed\n");
+        return -1;
     }
     return 0;
 }
