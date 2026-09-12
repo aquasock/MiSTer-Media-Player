@@ -1811,10 +1811,21 @@ end
 wire [31:0] mpeg2_new_b_scheduler_debug_state;
 wire mpeg2_new_b_cadence_slot_debug;
 wire mpeg2_new_b_candidate_presentable_debug;
+// This module's blank was originally added to hide corrupt video while
+// skipping DVD chapters (a genuine mid-GOP splice glitch crossing program
+// chain segments) and is not needed for a clean .mpg seek, which decodes
+// straight from a GOP boundary. Its reset was reset_mpeg2, which includes
+// the Entry 237 rearm pulse fired on every seek, so it re-armed and
+// re-blanked the screen on every seek too, hiding this project's new .mpg
+// progress-bar overlay for the whole blank window (the overlay compositor
+// also requires base_de, forced low during the blank) and leaving it
+// missing afterward. DVD chapter navigation is out of scope; use
+// reset_mpeg2_base so "startup done" latches once at the true first load
+// and this module never re-blanks the screen on a seek again.
 wire mpeg2_new_startup_swaps_enabled;
 wire mpeg2_new_startup_video_blank;
 mpeg2_h262_native_startup mpeg2_h262_native_startup (
-    .clk_mpeg2(clk_mpeg2), .reset_mpeg2(reset_mpeg2),
+    .clk_mpeg2(clk_mpeg2), .reset_mpeg2(reset_mpeg2_base),
     .clk_video(clk_video), .reset_video(reset_video),
     .presentation_request(mpeg2_new_presentation_request),
     .first_picture_complete(mpeg2_new_first_picture_420_parsed),
