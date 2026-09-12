@@ -1,3 +1,33 @@
+## 969 COMMIT Unreleased 24a6bda 2026-09-12T07:28:33-07:00
+
+#### Coming From:
+
+Unreleased f329dce
+
+#### Purpose:
+
+Fix the `.mpg` progress overlay still only appearing on resume, not on pause itself, despite `f329dce`'s barrier widening.
+
+#### Outcome:
+
+The user confirmed TOTAL/REMAIN now hold steady but the reveal still only showed up on resume.  A fresh telemetry-enabled log pulled from the test MiSTer showed the CONFIG record and `MEDIA_CONTROL_PAUSE_READY` both went out promptly after "pause requested," so the barrier protocol itself was working, but the matching COMMIT record (and most of its ~22 chunked DATA records) did not appear until immediately after "playback resumed," and the helper logged `ignoring unexpected control 0x11 during playback` right after the pause.  The cause: `video_overlay_pause_barrier()` called `video_overlay_service()` inside the barrier, which on a fresh reveal triggers a full `video_overlay_publish()` - CONFIG plus ~22 DATA chunks plus COMMIT, around 88 KiB total.  Main's `pause_pipe_empty` detection can see a momentary gap mid-transfer of that payload and satisfy `pause_barrier_finish()`'s drain check before the trailing records get through, stranding them in the helper's blocked `write()` once Main actually stops draining - the same class of bug as the original fire-and-forget ping, just relocated to a heavier payload racing the same detection.  `audio_pause_barrier()` never has this problem because it only ever sends a single ~41-byte `MEDIA_PLAYER_OVERLAY_STYLE` record inside the barrier, relying on bitmap content already committed from an earlier periodic service call rather than republishing pixel data at pause time.
+
+#### Next Steps:
+
+Source `24a6bda` adds the equivalent `video_overlay_style()` and rewrites `video_overlay_pause_barrier()` to use it exclusively (set `visible`/`activity_pts` directly, send the style toggle only on a fresh reveal, then `PAUSE_READY` and wait for `GO`), relying on the plane already holding a committed bitmap from the unconditional reveal already performed at session start.  Also clears `command` after the barrier so `process_program_stream()`'s unrelated catch-all no longer logs a handled command as unexpected, and genericized Main's remaining "audio pause helper ready"/"unexpected audio pause ready" diagnostic wording now shared with `.mpg` sessions.  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; `host/build/MiSTer_MediaPlayer` (SHA-256 `be3946ba5404dedccdf8b041bad2600b22dc4041eb10f5efc5375f1d531470a1`) and `host/build/MediaPlayer_Helper` (SHA-256 `11bb2a00de4f353fea8f7ef5bd661990353248611f5e150e9ce96768f0c173ad`) are both built; no RTL change, current RBF (`fa0ebf6`, seed 33) unaffected.  Deliver both for the user to retest: the overlay should now reveal immediately on pause, not just on resume.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 968 COMMIT Unreleased f329dce 2026-09-12T07:08:14-07:00
 
 #### Coming From:
@@ -1210,39 +1240,6 @@ After user approval, preserve source `366a227`, the helper, asset, decoder behav
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 929 COMMIT Unreleased 366a227 2026-09-02T22:47:52-07:00
-
-#### Coming From:
-
-Unreleased 9c00a20
-
-#### Purpose:
-
-Keep the standalone-audio player interface visible for its intended first ten seconds by making the optional visualizer stream compatible with the existing native-480i overlay path.
-
-#### Outcome:
-
-Fresh hardware evidence accepts audio playback, the radial animation and its loudness response, while the Main trace proves that the helper commits the opaque player overlay near startup and does not clear it until approximately 10.15 seconds.  Source `366a227` makes every generated visualizer GOP declare an interlaced sequence and three top-field-first interlaced frame pictures so the unchanged native-480i compositor displays that initial plane, and the helper now rejects packs that omit those declarations or signal progressive sequence or picture content.  Strict focused, AddressSanitizer and UndefinedBehaviorSanitizer tests accept the interlaced fixture and reject both progressive flag classes; GCC analyzer passes.  The 3,740,562-byte generated pack contains 160 indexed GOPs, and a deliberately level-switched sample decodes as 60 top-field-first interlaced 720-by-480 pictures at 30000/1001 without FFmpeg errors.  Native and final ARMv7 real-helper runs pass MP3, WAV, FLAC and Ogg with 378 through 381 decoded selected pictures and exactly one ten-second overlay clear, while the final ARM helper rejects the former progressive pack and all four formats retain the full-frame interface fallback.  GNU 10.2.1 produced the 961,956-byte static stripped ARMv7 helper `host/build/MediaPlayer_Helper_Visualizer480i_366a227` at SHA-256 `ea2004223d160dd2377144b85e311c9e594e541fca2ab856e83ce3f99b1291e2`; `host/build/MediaPlayer_Visualizer_366a227.mmpvis` has SHA-256 `448407cdd7e6c79fbe13cbb435241116127f726aca5af9f99d75b32fc2519f47`.  Main, RTL, RBF, decoder, audio transport, timer and accepted animation are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer, replace `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_Visualizer480i_366a227` using executable mode and replace `/media/fat/linux/MediaPlayer_Visualizer.mmpvis` with `host/build/MediaPlayer_Visualizer_366a227.mmpvis`, while preserving the installed Main and timing-qualified RBF.  Play standalone audio and require the normal interface to remain visible for the first ten playback seconds before the visualizer appears; then pause or seek, require immediate interface restoration, resume and require another complete ten-second delay before the visualizer returns.  Confirm clean audio and the accepted animation and loudness response, then return fresh telemetry-enabled results for hardware acceptance.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/audio_visualizer.c
-- tools/generate-audio-visualizer.py
-- tools/test_audio_visualizer.c
 
 #### Status:
 
