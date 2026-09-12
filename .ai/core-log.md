@@ -1,3 +1,35 @@
+## 966 COMMIT Unreleased ??? 2026-09-12T05:45:00-07:00
+
+#### Coming From:
+
+Unreleased 1b1ab7a
+
+#### Purpose:
+
+Add the audio player's progress bar and elapsed/remaining/total time overlay to `.mpg` video playback, revealed for ten seconds on play, pause, and seek exactly as it already works for standalone audio files.
+
+#### Outcome:
+
+Investigation found the audio player's progress overlay is not part of the full-screen audio UI background frame at all: `audio_overlay_render()`/`audio_ui_render_overlay()` renders the same `render_frame()` layout into a separate transparent 720x480 two-bit indexed plane and publishes it through `emit_overlay_frame()`/`emit_overlay_clear()`, the identical DVD-SPU-style overlay-compositing channel already used for real DVD subtitles and menus on top of decoded H.262 video - so no RTL change is needed to composite this overlay on top of `.mpg` playback.  The ten-second auto-hide timer (`audio_visualizer_activity()`/`audio_visualizer_take_overlay_action()` in `host/arm/audio_visualizer.c`) is a simple position-vs-rate threshold, not intrinsically audio-specific.  Program Stream (`.mpg`) pause currently has zero helper involvement - Main's non-audio `MEDIAPLAYER_INPUT_PLAY_PAUSE` fallthrough only toggles `playback_paused` locally - unlike audio's pause, which round-trips through the helper via a blocking barrier because audio's software PCM queue needs flushing; `.mpg` needs no equivalent barrier since Main already gates its own transfer loop on `playback_paused`, so introducing a new blocking barrier for `.mpg` would add risk for no functional benefit.  Seek already reaches `process_program_stream()`'s existing seek-completion point via the established `MEDIA_CONTROL_SEEK_*` control bytes.  `MEDIA_CONTROL_USER_ACTIVITY` (0x10) is already defined in the protocol but currently sent nowhere in Main and only consumed as a plain, non-blocking activity ping on the audio-only paths.
+
+#### Next Steps:
+
+Extract the audio player's existing progress-bar/time-label drawing (`render_frame()`'s bottom strip) into a shared static helper in `host/arm/audio_ui.c`, and add a new public renderer that draws only that strip onto an otherwise-transparent plane (no album art, playlist or transport buttons), using a second `struct audio_ui` instance fed PTS ticks at a 90000 Hz nominal rate so the existing elapsed/remaining/total math needs no changes.  Add `struct audio_ui *video_progress_ui` plus a small activity-timestamp/visibility pair to `output_state`, created only for `is_program_stream` sessions and torn down fail-soft (never aborting playback) alongside the existing `audio_ui_destroy` cleanup.  Mark activity and publish/clear the overlay from `process_program_stream()`'s existing per-iteration command read (recognizing `MEDIA_CONTROL_USER_ACTIVITY`) and from its existing seek-completion point, estimating total duration from `max_video_pts`/`max_video_pts_byte` against the file size, refined each time it is queried.  In Main, extend the non-audio `MEDIAPLAYER_INPUT_PLAY_PAUSE` fallthrough to also send a fire-and-forget `MEDIA_CONTROL_USER_ACTIVITY` byte, with no barrier and no wait for acknowledgement, so `.mpg` pause/resume keeps working exactly as it does today if the helper ignores it.  Build only Main and the helper - no RTL change and no Quartus/RBF rebuild are needed for this feature - and verify `.mpg` playback, seeking and pause remain fully correct with the overlay appearing and disappearing on cue, plus that DVD/audio-file behavior is unaffected.
+
+#### Files Modified:
+
+- host/arm/audio_ui.c
+- host/arm/audio_ui.h
+- host/arm/media_player_helper.c
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 965 COMMIT Unreleased 1b1ab7a 2026-09-12T04:11:45-07:00
 
 #### Coming From:
@@ -1204,35 +1236,6 @@ The fresh telemetry-enabled trace disproves a helper crash: after approximately 
 #### Next Steps:
 
 After user approval, make one helper-only commit containing both diagnosed boundaries.  Generalize terminal DVD-still finalization so any active initial random-access filter with queued video, including a direct Root Menu hop, receives the existing sequence-end and transport-drain tail before waiting; retain activation staging only as the destination publication policy.  Separately give picture-bearing deferred motion-menu staging bounded headroom beyond the existing 4 MiB decision watermark and promote such a destination through the existing staged READY/GO stream-hop path before `ENOSPC`.  Add exact production-path regressions for an unstaged Root Menu one-picture indefinite still, the existing staged terminal still, an over-watermark motion menu with byte-exact post-barrier commit, the accepted 3,797,120-byte finite-still route below the watermark and overlay-only continuation, then run strict native, sanitizer, analyzer, DVD navigation, staging, random-access, overlay, LPCM, audio and seek suites locally and on the build PC before producing one static ARM helper for the specified Big Lebowski and Blazing Saddles hardware routes.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 926 COMMIT Unreleased 6b63c91 2026-09-02T22:10:56-07:00
-
-#### Coming From:
-
-Unreleased 6b63c91
-
-#### Purpose:
-
-Qualify a fresh live Blazing Saddles run and decide whether its preceding unlogged black attempt warrants a bundled source correction.
-
-#### Outcome:
-
-The new telemetry-enabled run is healthy through the live capture endpoint: Blazing Saddles starts `dvdmenu:/dev/sr0`, automatically enters its authored root menu, publishes a complete overlay and responds to a later Root Menu request with `already-root` plus `MENU_CONTINUE`, preserving the resident frame.  Activation leaves the menu, completes the existing READY/GO navigation barrier and begins movie playback; Next Chapter then succeeds from current title 2 part 1 to resolved title 2 part 2 and releases its barrier normally.  At 67.288 seconds Main remains actively reading and transferring helper output, with approximately 56.2 MB submitted and no helper EOF, child exit, control error, staging failure or transport failure.  The checksum-valid schema-21 snapshot measures 200 pictures and 199 swaps over 29.940731 seconds, a completed presentation with no decoder error, zero audio underruns, zero transport blocks and no overlay protocol error.  The visible 1,920-by-1,080 movie screenshot, 2,224,070-byte log and 766-byte sidecar have SHA-256 `98815a3c19614ae4bab11aa350524bf51d519b0de2de5d5b6a069f4a01d2edad`, `615eb08ed3c7eace5cb8809384357af3e3d9d2a1399652adb65be4df3e7fed22` and `f1c4dab826a2e841ae0840776c39e42da3165d40a1cb3777b075de459e1261c6`.  Because a telemetry-active helper crash would ordinarily leave Main's child-wait and exit diagnostics, the earlier attempt's missing log cannot establish a helper crash; the same build and disc now complete the route, so no reproducible Blazing Saddles defect or defensible second code change exists.
-
-#### Next Steps:
-
-Do not bundle a speculative Blazing Saddles change.  Preserve this run as acceptance of its startup, root-menu continuation, title launch and active-program chapter hop, and make the next approved helper boundary only the already-diagnosed Big Lebowski picture-bearing motion-menu staging promotion from entry 924.  Retest Big Lebowski Scene Selection as the primary acceptance route while retaining this exact Blazing Saddles route, Coming to America's finite and indefinite Scene Selection paths, ordinary movie chapters and the forum disc's LPCM-menu behavior; if the black Blazing Saddles attempt recurs with a fresh log, diagnose that trace as a separate reproducible boundary.
 
 #### Files Modified:
 
