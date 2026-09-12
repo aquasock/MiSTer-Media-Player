@@ -1,4 +1,33 @@
-## 961 COMMIT Unreleased ??? 2026-09-04T00:07:31-07:00
+## 962 COMMIT Unreleased ??? 2026-09-12T02:15:36-07:00
+
+#### Coming From:
+
+Unreleased 4116a00
+
+#### Purpose:
+
+Stop standalone audio-file and Audio CD seeking from triggering the FPGA's full new-elementary-stream reset, which the user reports as a full-screen blank and flicker plus an audible pop on every seek in the audio player, matching the same reinitialize behavior seen on a fresh file or core load.
+
+#### Outcome:
+
+Investigation traces the symptom to `MediaPlayer.sv`'s Entry 237 and Entry 410 reset chains: every `ioctl_download` rising edge is treated as a brand new elementary-stream session, rearming the MPEG-2 decode domain and stretching an audio FIFO/scheduler/underrun reset regardless of whether any video content is present.  Standalone `.mp3`/`.wav`/`.flac`/`.ogg` file seeking (`audio_file_complete_seek()`) and Audio CD track/seek repositioning (`cdda_complete_reposition()`) both complete through the shared `MEDIA_PLAYER_CONTROL_READY`/`GO` barrier in `host/main_mister/0001-mediaplayer-arm-loader.patch`'s `chapter_barrier_poll()`, which unconditionally toggles `user_io_set_download(0)` then `(1)` and reasserts `user_io_set_index()`/`file_info(".M2V")` — the same primitive used for a genuinely new file load; existing `.mpg`/DVD Program Stream seeking uses this identical barrier and toggle but is not visibly disruptive because the video decode pipeline is already mid-redecode, whereas standalone audio has no video content to mask the reset, so it is fully visible.  The user has confirmed `.mpg` seeking already works correctly and DVD/menu seeking is out of scope, so the approved fix is Main-only, with no ARM helper protocol changes, no decoder RTL changes and therefore no Quartus/RBF rebuild: in `chapter_barrier_poll()`'s `seek_pending` branch, when the already-available file-scope flag `audio_visualizer_controls` (true for `.mp3`/`.wav`/`.flac`/`.ogg` files and `cdda:` tracks, set in `mediaplayer_start_session()`) is set, the `MEDIA_CONTROL_READY` handler keeps its existing pending-buffer discard (`pending_size`/`pending_offset`/`pending_eof`/`burst_state` reset, `chapter_barrier = true`) but skips `user_io_set_download(0)`, `user_io_set_download(1)`, `user_io_set_index()` and `user_io_file_info(".M2V")` entirely, leaving `ioctl_download` continuously asserted across the seek, which removes both the MPEG-2 domain rearm and the audio FIFO/scheduler/underrun reset for audio-only sessions while leaving DVD/ISO/Program Stream seeking, chapter/navigation barriers and Audio CD's shared code path otherwise untouched.
+
+#### Next Steps:
+
+Implement the conditional skip in `chapter_barrier_poll()`, commit the source change, then build and install only the updated `MiSTer_MediaPlayer` Main binary (no helper, RTL or RBF change) for the user to test standalone MP3 seeking and, if convenient, Audio CD seeking/track-skip on the test MiSTer.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 961 COMMIT Unreleased 4116a00 2026-09-04T00:07:31-07:00
 
 #### Coming From:
 
@@ -10,25 +39,15 @@ Replace marker-file optical launching with a hierarchical loader menu that start
 
 #### Outcome:
 
-The user reports that source `3b2a0ca` successfully plays a physical Audio CD, accepting the new CDDA path for the tested disc.  The approved follow-on will use MiSTer's numbered menu pages for `Load Physical Disc` and `Load Disc Image`, make the physical `Video DVD` and `Audio CD` choices invoke `dvdmenu:/dev/sr0` and `cdda:/dev/sr0` directly through isolated Main, expose only `Video DVD` under the image submenu with an ISO-filtered browser, and leave `Load MPEG-2 Video File` and `Load Audio File` as immediate filtered browsers.  Standard Audio CD image files are deliberately omitted until a later CUE/BIN or equivalent image backend exists, and the obsolete `.dvd` and `.cd` marker assets will be removed without changing the helper, decoder RTL or media protocol.
+This proposal was never implemented or committed; substantial unrelated development proceeded on master afterward without being logged here, per explicit user direction to leave that interim history undocumented and resume the formal propose/log/build/log/test cycle fresh from the repository's current state.  The loader-menu reorganization and direct physical CDDA/DVD launch behavior described above did not happen under this entry and remain open work if still wanted in the future.  This entry is closed as abandoned and superseded, anchored at `4116a00`, the actual repository HEAD at the point formal logging resumes.
 
 #### Next Steps:
 
-Implement explicit MediaPlayer loader identities in the core menu and patched Main, remap every resulting helper stream to FPGA download index one, preserve file-path DVD ISO and standalone media routing, and add static contract coverage for submenu syntax, direct physical sources, ISO-only image selection, marker removal and route isolation.  Update current documentation, apply all Main patches cleanly to the pinned upstream source, rebuild and checksum Main locally, then commit and push the exact source before one clean timing-gated Quartus build on build PC `10.10.0.42` with seed 25 and at most one authorized reseed if timing fails; deliver only the replacement RBF and Main unless validation finds a helper dependency.
+None; this proposal is closed without action.  Any future loader-menu reorganization work should be proposed fresh against the current HEAD rather than resumed from this entry.
 
 #### Files Modified:
 
-- CHANGELOG.md
-- MediaPlayer.sv
-- README.md
-- assets/Audio CD.cd
-- assets/Video DVD.dvd
-- docs/BUILDING.md
-- docs/MEDIA_CONVERSION.md
-- docs/TEST_INSTRUCTIONS.md
-- host/arm/ARCHITECTURE.md
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_main_cdda.py
+None.
 
 #### Status:
 
@@ -1215,36 +1234,3 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 922 COMMIT Unreleased 6b63c91 2026-09-02T20:55:28-07:00
-
-#### Coming From:
-
-Unreleased 3689cca
-
-#### Purpose:
-
-Make DVD chapter controls follow the currently playing authored program chain so menu-launched alternate titles cannot terminate playback.
-
-#### Outcome:
-
-Source `6b63c91` replaces `iso_change_chapter()`'s initial-longest-title equality guard and absolute `dvdnav_part_play()` replay with libdvdnav's relative previous- and next-program operations against the active DVD VM path.  The selected-main-title metadata remains unchanged, while accepted hops still stop and reset the direct-device prefetch, clear the old block and menu state, restart the producer and enter the existing helper/Main reserve-discard plus READY/GO decoder barrier.  Rejected requests leave the source block boundary intact and now report direction, current title and part, buffered-byte count and libdvdnav detail; successful requests report both current and resolved title/part, making a future physical trace conclusive.  The focused production-unit test proves Previous on inventoried title 1, Next on a menu-launched title 7, preservation of the selected-title metadata, rejected-search state retention, menu-domain rejection and invalid-direction rejection.  Strict optimized, UndefinedBehaviorSanitizer, AddressSanitizer with host-incompatible leak scanning disabled, and GCC analyzer checks pass, as do the native helper build, retained AC-3, audio seek, Program Stream seek, DVD random-access, SPU, reserve, staging, menu, overlay-output, LPCM-skip, audio UI and visualizer coverage, real MP3, WAV, FLAC and Ogg integrations with and without the visualizer, one hundred menu/chapter, random-access and staging repetitions, and twenty overlay-output and LPCM-skip repetitions.  Build PC `10.10.0.42` repeats strict sanitizer and analyzer coverage plus one hundred menu/chapter runs, builds the exact native helper, passes all four real standalone-audio seeks and LPCM skip, and the retained Icarus test reconstructs thirteen stream bytes and the exact overlay payload while observing the live sequence end.  Its available fixtures include no DVD-Video image suitable for the alternate-title route.  GNU 10.2.1 builds the stripped static ARMv7 hard-float helper `host/build/MediaPlayer_Helper_ChapterVM_6b63c91`; it is 961,956 bytes, has no dynamic section and has SHA-256 `556b706c8c8b4fc60a4e11c21adb62ebb40daec4201d3f4c0052d8275b59fabb`.  Main, protocol, decoder RTL, visualizer assets and RBF are unchanged.
-
-#### Next Steps:
-
-Install only `host/build/MediaPlayer_Helper_ChapterVM_6b63c91` as `/media/fat/linux/MediaPlayer_Helper` with executable mode, retaining source-`3689cca` Main, the current visualizer pack and timing-qualified RBF; no reboot is required after stopping and relaunching the core, although rebooting is acceptable.  On The Big Lebowski, repeat the menu route that previously launched video and failed at Next Chapter, then require repeated Next and Previous requests to produce successful current/resolved-title diagnostics, READY/GO barrier completion, clean-picture restart and continued input response without `chapter control failed` or `control-error`.  Retest the accepted Coming to America second-visit Scene Selection route, Blazing Saddles root-menu loading and the forum disc's silent LPCM menu followed by supported title audio, then provide a fresh telemetry-enabled log and screenshot for hardware qualification.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_source.c
-- tools/test_dvd_menu_hop.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
