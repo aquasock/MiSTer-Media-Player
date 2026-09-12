@@ -1,3 +1,32 @@
+## 970 COMMIT Unreleased 6ac6895 2026-09-12T07:39:05-07:00
+
+#### Coming From:
+
+Unreleased 24a6bda
+
+#### Purpose:
+
+Fix the `.mpg` progress overlay flashing briefly then going missing after every seek, even though `24a6bda` fixed the pause reveal correctly.
+
+#### Outcome:
+
+The user reported that skipping forward/backward briefly flashes the overlay, then the screen goes black before the video resumes at the new position, after which the overlay is gone.  A screenshot of a paused mid-test frame confirmed the resumed video itself is completely clean, isolating this to the overlay specifically.  Investigation found `mpeg2_h262_native_startup` (instantiated in `MediaPlayer.sv`), a module that blanks the screen (forcing `base_de` low via `mpeg2_new_startup_video_blank`) until either the first picture is shown or a `bypass_event` fires; the DVD-style overlay compositor's `overlay_sample_valid` also requires `base_de`, so nothing can composite during that blank window.  The user identified its origin directly: it was added specifically to hide genuinely corrupt video while skipping DVD chapters (a mid-GOP splice glitch crossing program chain segments), not for `.mpg` seeking.  Its reset was `reset_mpeg2`, which includes the Entry 237 rearm pulse fired on every seek, so this module's "startup done" latch (`decided`/`bypass`/`shown`) re-armed and re-blanked the screen on every plain `.mpg` seek too - the same class of bug already fixed twice tonight for `mpeg2_h262_audio_ui` (`b0372f6`) and the luma framebuffer (`1b1ab7a`).  A literal git revert of the module's history was not practical (three prior commits including a full native-480p rewrite would be unwound); DVD chapter navigation is out of scope for this project now, and a plain `.mpg` seek decodes straight from a GOP boundary and never produces the corruption this blank existed to hide, matching the clean resumed-video screenshot.
+
+#### Next Steps:
+
+Source `6ac6895` changes `mpeg2_h262_native_startup`'s reset from `reset_mpeg2` to `reset_mpeg2_base`, so "startup done" latches once at the true first load and never re-blanks the screen on a seek again; `swaps_enabled` staying permanently true afterward is correct (it only ever gated the first frame swap until a complete picture was ready) and its only other consumer is an unrelated development-only diagnostic condition.  This touches RTL, so a 3-seed Quartus build is required; deliver the RBF for the user to retest: seeking on `.mpg` should no longer blank the screen or lose the progress overlay, while the video itself and ordinary `.mpg`/audio-player behavior remain unaffected.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 969 COMMIT Unreleased 24a6bda 2026-09-12T07:28:33-07:00
 
 #### Coming From:
@@ -1216,32 +1245,3 @@ Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with `ho
 
 - [x] Built
 - [x] Passed
-
----
-
-## 930 COMMIT Unreleased 366a227 2026-09-02T23:10:33-07:00
-
-#### Coming From:
-
-Unreleased 366a227
-
-#### Purpose:
-
-Record the first native-interlaced visualizer result and localize the striped player interface visible during its ten-second cover interval.
-
-#### Outcome:
-
-The user confirms that source `366a227` now preserves the intended state transition: during the first ten seconds the player overlay is selected, and at the timer boundary it clears completely to the accepted visualizer with normal audio.  Hardware rejects the covered presentation because the 423,052-byte screenshot at SHA-256 `00e3908c7dbd9095a8cc7c5400d2d91d2cf68d5b54203b5b640b76481d83fdd5` shows the interface broken into horizontal stripes with the moving visualizer visible between them.  The matching 150,175-byte log at SHA-256 `faf3d160f2e2441ef95773365f4d83111afc30604b4c8334fa2c2f7247384bf4` proves that the helper loads the new pack, publishes one complete 86,400-byte opaque overlay by 0.329255 seconds, keeps it visible through the 5.850755-second capture and starts valid timed refreshes without an early clear or protocol error.  The checksum-valid schema-21 snapshot at SHA-256 `06d2baf746d976507f2de88d1475c2fa59986af06e4a4b371e9db26dc464846f` reports one successful plane and video-domain publication with zero bad commits, but only 14,302 returned overlay row tags and 7,732,126 matched active pixels; at this elapsed native-480i cadence a continuously available plane would have approximately 79,000 row opportunities and 57 million active pixels.  Static localization explains that shortfall: the DDR arbiter grants every simultaneous presentation read ahead of the overlay line-cache reader, so continuous decoded-video readout starves most one-row-ahead overlay fetches, the two parity request slots collapse obsolete rows, and every unmatched row deliberately falls through to base video.  The prior progressive pack merely hid this pre-existing full-motion overlay bandwidth boundary by leaving native overlay composition disabled.
-
-#### Next Steps:
-
-After user approval, preserve source `366a227`, the helper, asset, decoder behavior and ten-second timing while making one bounded RBF-only arbitration correction: allow a pending overlay line-cache read to win one descriptor grant ahead of a simultaneous presentation request, after which the overlay engine must receive its fixed 23-word row and cannot request another until that response completes.  Extend the arbiter regression to prove the single bounded overlay grant and exact response ownership under a continuously asserted display reader, add an integrated native-raster stress test requiring every visible row tag and opaque sample to match while full-motion presentation reads continue, run the retained decoder, DDR, overlay and audio simulations on the build PC, perform a clean timing-qualified Quartus build, then repeat the first-ten-second audio test and require a solid interface with no base-video stripes before the normal clear reveals the visualizer.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
