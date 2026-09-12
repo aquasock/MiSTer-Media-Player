@@ -69,6 +69,7 @@
 #define VIDEO_OVERLAY_PTS_RATE_HZ 90000u
 #define VIDEO_OVERLAY_IDLE_TICKS (10u * VIDEO_OVERLAY_PTS_RATE_HZ)
 #define VIDEO_OVERLAY_REFRESH_TICKS VIDEO_OVERLAY_PTS_RATE_HZ
+#define VIDEO_OVERLAY_BACKGROUND_REFRESH_TICKS (5u * VIDEO_OVERLAY_PTS_RATE_HZ)
 
 _Static_assert(OUTPUT_ACTIVATION_STAGE_BYTES >=
                    OUTPUT_ACTIVATION_STAGE_DECISION_BYTES +
@@ -1102,6 +1103,24 @@ static void video_overlay_descriptor(const uint8_t *plane,
     overlay->visible = visible;
 }
 
+/* A single ~41-byte visibility-only record, not a full CONFIG+DATA+COMMIT
+ * republish: safe to send at pause time because its tiny size makes it
+ * virtually certain to be fully drained by Main in one pass, unlike a full
+ * publish. video_overlay_pause_barrier() uses this exclusively. Relies on
+ * the plane's pixel content already being reasonably fresh, which
+ * video_overlay_service()'s background refresh cadence (while hidden)
+ * guarantees independently of this call. */
+static int video_overlay_style(struct output_state *output, uint8_t command,
+                               int visible)
+{
+    struct dvd_spu_overlay overlay;
+    uint8_t payload[41];
+
+    video_overlay_descriptor(output->video_overlay_plane, &overlay, visible);
+    overlay_style_payload(&overlay, payload);
+    return emit_display_record(output, command, payload, sizeof(payload));
+}
+
 /*
  * Best-effort total-duration estimate from the video PTS/byte-offset pair
  * already tracked for scheduling (max_video_pts/max_video_pts_byte) against
@@ -1128,6 +1147,14 @@ static uint64_t video_overlay_locked_length_pts(struct output_state *output)
     return output->video_overlay_length_pts;
 }
 
+/*
+ * The COMMIT's visibility flag mirrors output->video_overlay_visible rather
+ * than being hardcoded on: video_overlay_service() keeps calling this in
+ * the background on a slower cadence while hidden too (see below), and
+ * those background refreshes must stay invisible - only their pixel
+ * content should update, not bring the overlay back on screen on their
+ * own.
+ */
 static int video_overlay_publish(struct output_state *output)
 {
     struct dvd_spu_overlay overlay;
@@ -1138,7 +1165,8 @@ static int video_overlay_publish(struct output_state *output)
             VIDEO_OVERLAY_PTS_RATE_HZ, "TOTAL",
             output->video_overlay_plane, AUDIO_UI_OVERLAY_BYTES) < 0)
         return -1;
-    video_overlay_descriptor(output->video_overlay_plane, &overlay, 1);
+    video_overlay_descriptor(output->video_overlay_plane, &overlay,
+                             output->video_overlay_visible);
     return emit_overlay_frame(output, &overlay);
 }
 
@@ -1155,22 +1183,34 @@ static void video_overlay_mark_activity(struct output_state *output)
     }
 }
 
-/* Call once per process_program_stream() loop iteration. */
+/*
+ * Call once per process_program_stream() loop iteration.  Keeps publishing
+ * fresh content on a slower cadence even after the ten-second idle timeout
+ * hides the overlay (visible=0, so nothing appears on screen from these) -
+ * without this, the FPGA plane would be left holding whatever content was
+ * rendered right before the hide, possibly minutes stale by the time a
+ * later pause reveals it again with only a lightweight STYLE toggle, which
+ * carries no pixel data of its own.
+ */
 static void video_overlay_service(struct output_state *output)
 {
-    if (!output->video_overlay_ui || !output->video_overlay_visible)
+    unsigned refresh_ticks;
+
+    if (!output->video_overlay_ui)
         return;
-    if (output->max_video_pts - output->video_overlay_activity_pts >=
-        VIDEO_OVERLAY_IDLE_TICKS) {
+    if (output->video_overlay_visible &&
+        output->max_video_pts - output->video_overlay_activity_pts >=
+            VIDEO_OVERLAY_IDLE_TICKS) {
         output->video_overlay_visible = 0;
         if (emit_overlay_clear(output) < 0)
             fprintf(stderr,
                     "media_player_helper: video overlay clear failed\n");
-        return;
     }
+    refresh_ticks = output->video_overlay_visible ?
+        VIDEO_OVERLAY_REFRESH_TICKS : VIDEO_OVERLAY_BACKGROUND_REFRESH_TICKS;
     if (!output->video_overlay_pending_reveal &&
         output->max_video_pts - output->video_overlay_last_render_pts <
-            VIDEO_OVERLAY_REFRESH_TICKS)
+            refresh_ticks)
         return;
     output->video_overlay_pending_reveal = 0;
     output->video_overlay_last_render_pts = output->max_video_pts;
@@ -1180,32 +1220,33 @@ static void video_overlay_service(struct output_state *output)
 }
 
 /*
- * Publish fresh content BEFORE announcing PAUSE_READY, while Main is still
- * draining completely normally - identical to any periodic refresh during
- * active playback, which is already known to be safe.  video_overlay_
- * service() is forced to run via pending_reveal so a hidden overlay is
- * unconditionally redrawn with current TOTAL/ELAPSED/REMAIN, not left
- * showing whatever (possibly very stale, or nothing at all if it had
- * never been drawn this reveal) content the plane last held.  By the time
- * PAUSE_READY is sent below, every byte of that publish has already been
- * handed to the pipe, so there is nothing still in flight for Main's
- * pause_pipe_empty detection to race against - unlike the earlier bug
- * where a full publish happening only after PAUSE_READY could leave a
- * write() blocked once Main actually stopped draining.  Then block until
- * Main has drained whatever was already queued and sends GO.
- * process_program_stream()'s decode loop naturally stops producing new
- * output while blocked here, matching the barrier Main's
+ * Reveal the overlay with a lightweight style-only toggle - never
+ * video_overlay_publish() (see video_overlay_style()'s comment for why: a
+ * full ~88 KiB republish here can still be mid-transfer, in Main's own
+ * read buffer, when Main's independent pause_pipe_empty detection - on a
+ * completely separate control_fd channel from this bulk pipe - decides the
+ * barrier is satisfied and stops draining, stranding the unread remainder
+ * until the next resume; a confirmed failure mode, not a theoretical one).
+ * Then block until Main has drained whatever was already queued and sends
+ * GO.  process_program_stream()'s decode loop naturally stops producing
+ * new output while blocked here, matching the barrier Main's
  * pause_barrier_finish() requires before it actually asserts
  * playback_paused.
  */
 static int video_overlay_pause_barrier(struct output_state *output,
                                        int control_fd)
 {
+    int reveal = !output->video_overlay_visible;
+
     output->video_overlay_activity_pts = output->max_video_pts;
     output->video_overlay_visible = 1;
-    output->video_overlay_pending_reveal = 1;
-    video_overlay_service(output);
-
+    if (reveal &&
+        video_overlay_style(output, MEDIA_PLAYER_OVERLAY_STYLE, 1) < 0) {
+        fprintf(stderr,
+                "media_player_helper: video overlay pause style "
+                "failed\n");
+        return -1;
+    }
     if (control_send(control_fd, MEDIA_PLAYER_CONTROL_PAUSE_READY) < 0) {
         fprintf(stderr,
                 "media_player_helper: video overlay pause barrier "
