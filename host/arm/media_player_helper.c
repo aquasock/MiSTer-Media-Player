@@ -274,6 +274,11 @@ struct output_state {
     int video_overlay_pending_reveal;
     uint64_t video_overlay_activity_pts;
     uint64_t video_overlay_last_render_pts;
+    /* Locked once by video_overlay_length_pts(); a resource, not in-flight
+     * state, so reset_output_for_navigation() preserves it like the fields
+     * above instead of letting a seek re-lock a different estimate. */
+    int video_overlay_length_known;
+    uint64_t video_overlay_length_pts;
     int pcm_non_audio;       /* IEC 61937 burst records, never decoded PCM */
     int scheduler_enabled;
     int scheduler_started;
@@ -1100,19 +1105,27 @@ static void video_overlay_descriptor(const uint8_t *plane,
 /*
  * Best-effort total-duration estimate from the video PTS/byte-offset pair
  * already tracked for scheduling (max_video_pts/max_video_pts_byte) against
- * the file's total size, refined every call as more of the file is read -
- * the same ratio a forward seek scan already relies on.  Returns 0 (unknown,
- * rendered as 00:00) until at least one video PTS has been observed.
+ * the file's total size - the same ratio a forward seek scan already relies
+ * on.  Locked in the first time it can be computed and never recomputed
+ * afterward: the ratio drifts slightly as more of a VBR file is read, and
+ * recomputing it on every publish made TOTAL (and REMAIN, which is derived
+ * from it) visibly jump around instead of counting down smoothly.  Survives
+ * reset_output_for_navigation()'s memset alongside the other video_overlay_*
+ * resources, so a seek does not reset and re-lock a different estimate.
  */
-static uint64_t video_overlay_estimated_length_pts(
-    const struct output_state *output)
+static uint64_t video_overlay_locked_length_pts(struct output_state *output)
 {
-    if (!output->have_video_pts || !output->max_video_pts_byte ||
-        output->video_overlay_file_size <= 0)
-        return 0;
-    return (uint64_t)((double)output->max_video_pts *
-                      ((double)output->video_overlay_file_size /
-                       (double)output->max_video_pts_byte));
+    if (!output->video_overlay_length_known) {
+        if (!output->have_video_pts || !output->max_video_pts_byte ||
+            output->video_overlay_file_size <= 0)
+            return 0;
+        output->video_overlay_length_pts = (uint64_t)(
+            (double)output->max_video_pts *
+            ((double)output->video_overlay_file_size /
+             (double)output->max_video_pts_byte));
+        output->video_overlay_length_known = 1;
+    }
+    return output->video_overlay_length_pts;
 }
 
 static int video_overlay_publish(struct output_state *output)
@@ -1121,7 +1134,7 @@ static int video_overlay_publish(struct output_state *output)
 
     if (audio_ui_render_progress_overlay(
             output->video_overlay_ui, output->max_video_pts,
-            video_overlay_estimated_length_pts(output),
+            video_overlay_locked_length_pts(output),
             VIDEO_OVERLAY_PTS_RATE_HZ, "TOTAL",
             output->video_overlay_plane, AUDIO_UI_OVERLAY_BYTES) < 0)
         return -1;
@@ -1164,6 +1177,35 @@ static void video_overlay_service(struct output_state *output)
     if (video_overlay_publish(output) < 0)
         fprintf(stderr,
                 "media_player_helper: video overlay publish failed\n");
+}
+
+/*
+ * Mirrors audio_pause_barrier(): reveal the overlay, then block until Main
+ * has drained whatever was already queued and sends GO.  process_program_
+ * stream()'s decode loop naturally stops producing new output while blocked
+ * here, matching the barrier Main's pause_barrier_finish() requires before
+ * it actually asserts playback_paused - without this, a pause request that
+ * only pings the overlay (no barrier) races the helper's own output pipe
+ * filling and blocking, and the reveal is only ever seen on the next resume.
+ */
+static int video_overlay_pause_barrier(struct output_state *output,
+                                       int control_fd)
+{
+    video_overlay_mark_activity(output);
+    video_overlay_service(output);
+    if (control_send(control_fd, MEDIA_PLAYER_CONTROL_PAUSE_READY) < 0) {
+        fprintf(stderr,
+                "media_player_helper: video overlay pause barrier "
+                "publication failed\n");
+        return -1;
+    }
+    if (control_wait_for_go(control_fd) < 0) {
+        fprintf(stderr,
+                "media_player_helper: video overlay pause barrier "
+                "GO failed\n");
+        return -1;
+    }
+    return 0;
 }
 
 static enum media_source_dvd_command dvd_source_command(int command)
@@ -2341,18 +2383,22 @@ static void reset_output_for_navigation(struct output_state *output,
     struct output_reserve *reserve = output->reserve;
     struct output_stage *activation_stage = output->activation_stage;
     /*
-     * The video-progress-overlay allocation and the file size probed once
-     * at startup are resources, not in-flight playback state: preserve them
-     * across the memset below exactly like video/pcm/reserve/
-     * activation_stage, or a seek would leak the allocation and silently
-     * disable the overlay for the rest of the session.  The overlay's own
-     * visible/activity/render-position bookkeeping is transient playback
-     * state and is correctly left at zero; video_overlay_mark_activity()
-     * re-establishes it right after the seek completes.
+     * The video-progress-overlay allocation, the file size probed once at
+     * startup, and the locked total-duration estimate are all resources,
+     * not in-flight playback state: preserve them across the memset below
+     * exactly like video/pcm/reserve/activation_stage, or a seek would leak
+     * the allocation and silently disable the overlay for the rest of the
+     * session, and/or re-lock a different (jumpy) duration estimate.  The
+     * overlay's own visible/activity/render-position bookkeeping is
+     * transient playback state and is correctly left at zero;
+     * video_overlay_mark_activity() re-establishes it right after the seek
+     * completes.
      */
     struct audio_ui *video_overlay_ui = output->video_overlay_ui;
     uint8_t *video_overlay_plane = output->video_overlay_plane;
     int64_t video_overlay_file_size = output->video_overlay_file_size;
+    int video_overlay_length_known = output->video_overlay_length_known;
+    uint64_t video_overlay_length_pts = output->video_overlay_length_pts;
 
     free(output->hold);
     output->hold = NULL;
@@ -2366,6 +2412,8 @@ static void reset_output_for_navigation(struct output_state *output,
     output->video_overlay_ui = video_overlay_ui;
     output->video_overlay_plane = video_overlay_plane;
     output->video_overlay_file_size = video_overlay_file_size;
+    output->video_overlay_length_known = video_overlay_length_known;
+    output->video_overlay_length_pts = video_overlay_length_pts;
     output->hold_limit = hold_limit;
     output->hold_active = hold_limit != 0;
     output->scheduler_started = !output->hold_active;
@@ -4355,8 +4403,10 @@ static int process_program_stream(struct media_source *input,
 
         if (command < 0)
             return -1;
-        if (command == MEDIA_PLAYER_CONTROL_USER_ACTIVITY)
-            video_overlay_mark_activity(output);
+        if (command == MEDIA_PLAYER_CONTROL_PAUSE) {
+            if (video_overlay_pause_barrier(output, control_fd) < 0)
+                return -1;
+        }
         video_overlay_service(output);
         {
             int menu_refresh = refresh_dvd_menu_state(

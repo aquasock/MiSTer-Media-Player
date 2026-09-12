@@ -317,7 +317,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733eda6e522e0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,1230 @@
+@@ -0,0 +1,1233 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -1148,7 +1148,15 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	{
 +		if (chapter_barrier || navigation_pending || seek_pending ||
 +		    stream_boundary_pending) return 1;
-+		if (audio_visualizer_controls)
++		// seek_controls covers audio_visualizer_controls (mp3/wav/flac/ogg,
++		// cdda:) plus direct .mpg/.mpeg files, excluding DVD/ISO/menu
++		// content: the barrier below reveals whichever overlay the session
++		// has (audio player or .mpg progress bar) before Main actually
++		// stops draining, so the helper is guaranteed to see MEDIA_CONTROL_
++		// PAUSE and reply before its own output pipe can fill and block it -
++		// a fire-and-forget ping here showed the overlay only on resume,
++		// once the stall from the *previous* pause finally cleared.
++		if (seek_controls)
 +		{
 +			if (playback_paused)
 +			{
@@ -1158,7 +1166,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +					return 1;
 +				}
 +				playback_paused = false;
-+				diagnostic_write("audio playback resumed submitted=%llu\n",
++				diagnostic_write("playback resumed submitted=%llu\n",
 +				                 (unsigned long long)submitted_bytes);
 +				printf("MediaPlayer: resumed\n");
 +				return 1;
@@ -1171,7 +1179,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +				stop_with_reason("pause-command-error");
 +				return 1;
 +			}
-+			diagnostic_write("audio pause requested submitted=%llu\n",
++			diagnostic_write("pause requested submitted=%llu\n",
 +			                 (unsigned long long)submitted_bytes);
 +			return 1;
 +		}
@@ -1180,11 +1188,6 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +		                 playback_paused ? "paused" : "resumed",
 +		                 (unsigned long long)submitted_bytes);
 +		printf("MediaPlayer: %s\n", playback_paused ? "paused" : "resumed");
-+		// Fire-and-forget: no barrier, no wait for acknowledgement, so this
-+		// play/pause toggle keeps working exactly as before if the helper
-+		// ignores it. Reveals the .mpg progress-bar overlay; the helper
-+		// no-ops it for any session without one (DVD, menu, no helper).
-+		send_control(MEDIA_CONTROL_USER_ACTIVITY);
 +		return 1;
 +	}
 +	if (input >= MEDIAPLAYER_INPUT_MENU_UP &&
@@ -1498,7 +1501,7 @@ index 0000000000000000000000000000000000000000..3176b24ac7adff42e9dc0561927733ed
 +	pause_ready = false;
 +	pause_pipe_empty = false;
 +	playback_paused = true;
-+	diagnostic_write("audio playback paused submitted=%llu\n",
++	diagnostic_write("playback paused submitted=%llu\n",
 +	                 (unsigned long long)submitted_bytes);
 +	printf("MediaPlayer: paused\n");
 +}
