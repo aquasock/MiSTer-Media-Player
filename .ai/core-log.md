@@ -1,4 +1,4 @@
-## 17 COMMIT Unreleased ??? 2026-09-13T14:52:23-07:00
+## 17 COMMIT Unreleased dd144a3 2026-09-13T14:52:23-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add user-selected 50 Hz progressive output alongside the accepted 59.94 Hz mode 
 
 #### Outcome:
 
-The user authorizes implementation, regression validation and three clean seed builds. The planned raster reuses 27 MHz with 864x625 total pixels for exact 50 Hz and retains the existing 858x525 default. Only blanking changes; the active picture remains 720x480. A configuration mailbox carries the requested setting into the video domain, applies it only between complete frames and publishes the applied mode to the decoder. Untimestamped presentation uses exact source-rate ratios for each refresh rate without resetting ownership or queued pictures; timestamp and audio timebases remain unchanged. Validation will cover both raster modes, live switching, asynchronous configuration, scanout/cache behavior, cadence and existing OSD/color/audio regressions. HDMI relock remains a hardware check with vsync_adjust=1. DVD, interlacing, 576-line decoding, gamut, gamma and unrelated resource optimizations remain excluded.
+Source dd144a3 adds Refresh rate 59.94 Hz/50 Hz on status bit 6. Both modes use 27 MHz and 720x480 active pixels; total rasters are 858x525 and 864x625. Requests cross through a coherent mailbox and apply only at frame end; a second mailbox publishes the applied mode to the decoder before the next swap window. Exact cadence tests pass for all five source rates at both refresh rates, including 1000 presentations in 2000 windows for 25 fps/50 Hz. Pending-picture ownership and timestamp admission survive mode changes. Full raster tests pass six complete frames with four asynchronous live switches, while both fixed-mode scanout tests deliver all 345600 exact pixels despite DDR stalls and bank resets. Existing OSD, geometry, color arithmetic/control, cadence telemetry and MPG audio regressions pass; the audio oracle retains zero underrun and timestamp error. No audio or PTS clock changes are needed. Deterministic progressive 25/29.97 fps MPG and M2V hardware clips and README are under results/refresh-tests. Source is pushed and clean seeds 52, 61 and 87 are compiling under results/build-dd144a3-20260913-150109, which also retains regression evidence. The fitted audit now requires 108 preserved registers. HDMI relock and user-visible A/V behavior still require hardware validation; there is no DVD, interlaced, 576-line, gamut or gamma expansion.
 
 #### Next Steps:
 
-Implement the refresh selector and applied-mode synchronization, verify pixel geometry and presentation rates with mode switches, commit and push source, then build seeds 52, 61 and 87 and audit every timing corner and fitted CDC register before delivering qualified RBFs for hardware validation.
+Complete the three clean builds, record all four timing corners and resources, and deliver timing-qualified RBFs with the generated refresh checks. Retain hardware-accepted 24d3de0 seed 52 as recovery until the user validates mode switching, 25 fps cadence, OSD controls and audio synchronization with vsync_adjust=1.
 
 #### Files Modified:
 
@@ -27,6 +27,8 @@ Implement the refresh selector and applied-mode synchronization, verify pixel ge
 - tools/test_480p_scanout.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
 - tools/verify_video_sync.py
+- tools/test_refresh_rate.sv
+- tools/make_refresh_tests.py
 - docs/TEST_INSTRUCTIONS.md
 - CHANGELOG.md
 
