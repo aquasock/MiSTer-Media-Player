@@ -1,3 +1,33 @@
+## 986 COMMIT Unreleased e6e5a4c 2026-09-13T00:34:53-07:00
+
+#### Coming From:
+
+Unreleased 3713581
+
+#### Purpose:
+
+Fix the presentation-scheduler deadlock entry 985's hardware telemetry pinned down exactly.
+
+#### Outcome:
+
+Pulled `tools/decode-hardware-telemetry.py --json` on entry 985's stuck screenshot and got the scheduler's full internal register snapshot: `reorder_active=1, run_closed=1, decode_inflight=0, promotion_pending=1, queued_run_active=0`. Tracing `presentation_hold`'s expression against those exact values, plus `deferred_queued_b_start` (not exported to telemetry but inferable from `promotion_pending`'s own clear guard requiring it false), found a genuine circular wait in `mpeg2_h262_b_presentation_scheduler`: `deferred_queued_b_start` asserts `presentation_hold` directly and unconditionally - a separate OR-term, not gated on `promotion_pending` at all - which blocks all further decoder input at the top level (`mpeg2_new_stream_ready`), including the remaining compressed bytes of the very overlap-reference picture whose completion (a `frame_waiting` pulse) is the only thing that can ever clear `deferred_queued_b_start`. Once an early B-picture header defers while its overlap reference (an I/P admitted right after the run closed) is still decoding, nothing can ever resolve it - the exact scenario the hardware hit, and almost certainly the same underlying decoder defect the original freeze investigation from much earlier in this session (on the old helper architecture) never got to the bottom of. Built a standalone Icarus testbench (`tools/test_b_presentation_scheduler_deadlock.sv`) instantiating the real scheduler module and reproduced the exact deadlock before writing any fix: admit and complete two B pictures, admit a P header that closes the run and opens an overlap decode, admit a third B header before ever supplying the overlap reference's `frame_waiting`, then run 320 cadence cycles confirming `presentation_hold` never clears. Fixed by detecting this specific combination at the point the closed run's own future frame is ready to retire, and aborting - matching the module's own stated design philosophy ("any decode or ownership failure aborts the transaction without retaining compressed-stream backpressure") instead of latching `promotion_pending` and hanging forever. The properly-promoted (`queued_run_active`) path and the plain non-deferred path are untouched. The same test now verifies the abort fires and `presentation_hold` actually clears afterward. `quartus_map` on seed99 remains clean, 0 errors, same warning count as before.
+
+#### Next Steps:
+
+Run the full three-seed timing build, deploy, and reload the real `.mpg` via F4. This fix only addresses the specific deadlock the telemetry proved; if playback still stalls, pull fresh telemetry again rather than assuming it is the same root cause, since this scheduler's state space is large and this may not be the only unrecoverable combination in it.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/test_b_presentation_scheduler_deadlock.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 985 COMMIT Unreleased 3713581 2026-09-13T00:08:46-07:00
 
 #### Coming From:
@@ -1192,39 +1222,6 @@ After user approval, distinguish a finite terminal boundary from an automatic si
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 946 COMMIT Unreleased ae533a1 2026-09-03T16:22:52-07:00
-
-#### Coming From:
-
-Unreleased ce5a826
-
-#### Purpose:
-
-Install the patched Main only for MediaPlayer so development testing no longer replaces the official system-wide MiSTer executable.
-
-#### Outcome:
-
-Source `ae533a1` makes `host/build/MiSTer_MediaPlayer` the canonical patched-Main output and adds a merge-only `MiSTer.ini` fragment containing the core-reported `[MediaPlayer]` section and `main=MiSTer_MediaPlayer`.  Current build and hardware-test guidance now installs that executable at `/media/fat/MiSTer_MediaPlayer`, retains `/media/fat/MiSTer` for every other core and explains the automatic return to official Main when the Menu core loads; the published v0.9.0 records remain unchanged as historical package provenance.  The pinned-Main build applies and compiles locally with GNU 10.2.1, shell syntax and the exact fragment contract pass, and the renamed 1,182,692-byte binary is byte-identical to the tested source-`ce5a826` Main at SHA-256 `99084bc5db9062e2984ec93f40158f4bfd4c265300b314c7a7ddbd6e8081f706`; the matched 966,052-byte helper remains SHA-256 `32c9a5846aac94f4c1ce2c1bb36a752b5a1c71bfa4ab0bcf304170ef58645e72`.  The host-only test archive `host/build/MiSTer_MediaPlayer_StreamBoundary_ae533a1.zip` contains the two executables, merge fragment, installation and provenance notes plus a five-entry manifest; ZIP integrity and a fresh-extraction manifest check pass.  It is 1,335,862 bytes at SHA-256 `ab9601a2c1c1f08c42aeec842187d822d0b69ea8bb4ddd697c3a7ec42b18697c`.  Helper behavior, Main behavior, RTL, RBF and visualizer are unchanged from `ce5a826`.
-
-#### Next Steps:
-
-Leave `/media/fat/MiSTer` untouched, extract the test archive, copy `MiSTer_MediaPlayer` and `linux/MediaPlayer_Helper` to the paths in `INSTALL.txt`, merge only its `[MediaPlayer]` fragment at the end of the existing `/media/fat/MiSTer.ini`, set both executables to mode 755 and reboot.  Confirm MediaPlayer enters the alternate Main and returning to the Menu core returns to official Main, then run Futurama disc one through every finite intro still into its automatic menu.  Acceptance requires continued playback after each still, visible background and moving selector, synchronized AC-3, responsive activation and fresh log, screenshot and telemetry evidence from the matched pair.
-
-#### Files Modified:
-
-- README.md
-- assets/MiSTer_MediaPlayer.ini.fragment
-- docs/BUILDING.md
-- docs/TEST_INSTRUCTIONS.md
-- host/build_arm_stack.sh
 
 #### Status:
 
