@@ -13,6 +13,13 @@ module mpeg2_h262_two_picture_probe
     input wire phase1_supported,input wire[13:0] vertical_size,input wire[1:0] intra_dc_precision,input wire intra_vlc_format,input wire frame_pred_frame_dct,
     input wire pipeline_block_done,input wire recon_block_complete,input wire p_persistence_complete,
     input wire p_row_persistence_complete,
+    // Entry 990: one-cycle pulse from mpeg2_h262_b_presentation_scheduler
+    // when it abandons an in-flight overlap reference picture instead of
+    // completing it. Without this, active_frame_bank_reg below would never
+    // advance past that picture (it only advances on a real completion
+    // pulse), freezing on a bank the very next real picture header can
+    // collide with in the top-level P-destination-ownership-hold check.
+    input wire overlap_reference_abandoned,
     output wire slice_header_seen,output wire macroblock_address_seen,output wire first_i_macroblock_seen,
     output wire first_luma_dc_seen,output wire first_luma_block_complete,output wire first_picture_420_parsed,
     output wire second_picture_420_parsed,output wire picture_420_complete,output wire[1:0] active_frame_bank,
@@ -188,6 +195,18 @@ always @(posedge clk)begin
    b_picture_inflight<=0;
    b_persistence_verified<=0;
   end
+
+  // Entry 990: the scheduler gave up on the in-flight I/P overlap
+  // reference without ever supplying its completion pulse. Advance
+  // active_frame_bank_reg exactly as a real completion would, so the next
+  // real picture header targets a fresh bank instead of colliding with
+  // this one forever in the top-level ownership-hold check. Deliberately
+  // does not touch completed_frame_bank_reg, picture_count_reg,
+  // reference_frame_valid_reg, reference_frame_bank_reg or
+  // reference_promotion_count_reg: this picture was never actually
+  // reconstructed, so it must never be published as a usable reference.
+  if(overlap_reference_abandoned)
+   active_frame_bank_reg<=(active_frame_bank_reg==2'd2)?2'd0:(active_frame_bank_reg+1'b1);
  end
 end
 

@@ -49,6 +49,7 @@ wire [2:0] framebuffer_swap_reset_count;
 wire reference_overlap_header, presentation_hold;
 wire scratch_available, promotion_active;
 wire presentation_complete, presentation_error;
+wire overlap_reference_abandoned;
 wire [31:0] debug_state;
 
 always #5 clk = ~clk;
@@ -81,6 +82,7 @@ mpeg2_h262_b_presentation_scheduler dut(
     .reference_overlap_header(reference_overlap_header), .presentation_hold(presentation_hold),
     .scratch_available(scratch_available), .promotion_active(promotion_active),
     .presentation_complete(presentation_complete), .presentation_error(presentation_error),
+    .overlap_reference_abandoned(overlap_reference_abandoned),
     .debug_state(debug_state)
 );
 
@@ -102,6 +104,9 @@ end
 endtask
 
 integer i;
+
+reg seen_abandon_pulse = 0;
+always @(posedge clk) if (overlap_reference_abandoned) seen_abandon_pulse <= 1;
 
 initial begin
     @(negedge clk); reset=1;
@@ -158,6 +163,14 @@ initial begin
         fail("deferred_queued_b_start was not cleared by the abort");
     if (dut.overlap_decode_open)
         fail("overlap_decode_open was not cleared by the abort");
+
+    // Entry 990: the abort must also pulse overlap_reference_abandoned for
+    // exactly one cycle, so the picture bookkeeper (a separate module) can
+    // advance past the abandoned picture's bank instead of freezing on it.
+    if (!seen_abandon_pulse)
+        fail("overlap_reference_abandoned did not pulse during the abort");
+    if (overlap_reference_abandoned)
+        fail("overlap_reference_abandoned is still asserted after the abort - it must be a one-cycle pulse, not a level");
 
     // Critically, presentation_hold itself must clear once the abort
     // registers land (one more cycle for the combinational expression to

@@ -66,6 +66,20 @@ module mpeg2_h262_b_presentation_scheduler
     // clears it until that run's scratch pictures and future reference retire.
     output reg  presentation_complete,
     output reg  presentation_error,
+    // Entry 990: one-cycle pulse, high the same cycle presentation_error is
+    // first asserted for the deferred_queued_b_start+overlap_decode_open
+    // abort specifically. The overlap reference this abort abandons never
+    // reaches picture_420_complete/p_persisted_now in the picture bookkeeper
+    // (mpeg2_h262_two_picture_probe_p_chain.sv), so without this pulse that
+    // module's active_frame_bank_reg freezes on the abandoned picture's bank
+    // forever - the next real picture header then collides with it in the
+    // P-destination-ownership-hold check (MediaPlayer.sv), which can only
+    // release once display moves off that bank, which requires a new
+    // candidate this same freeze prevents. A second, distinct deadlock from
+    // the first (entry 985/986), confirmed on real hardware after that fix
+    // shipped: presentation_hold correctly cleared, but the transfer stalled
+    // permanently a few hundred KB later with zero burst credit.
+    output reg  overlap_reference_abandoned,
     // Entry 311: passive state export for the development cadence snapshot.
     // No bit feeds scheduler control or timing decisions.
     output wire [31:0] debug_state
@@ -370,9 +384,11 @@ always @(posedge clk) begin
         ordinary_resume_pending<=0;
         ordinary_terminal_drain_pending<=0;
         run_picture_count<=0;presentation_complete<=1;presentation_error<=0;
+        overlap_reference_abandoned<=0;
         native_fields_elapsed<=0;
         native_field_q<=native_field;
     end else begin
+        overlap_reference_abandoned<=0;
         b_user_success_d<=b_user_success;
         if(b_picture_start&&ordinary_b_header_wait)
             deferred_ordinary_b_start<=1;
@@ -873,6 +889,9 @@ always @(posedge clk) begin
                     overlap_decode_open<=0;
                     overlap_frame_pending<=0;
                     presentation_error<=1;
+                    // Entry 990: tell the picture bookkeeper this overlap
+                    // reference is abandoned, not merely delayed.
+                    overlap_reference_abandoned<=1;
                 end else if(queued_run_active||deferred_queued_b_start)begin
                     // Retire the visible generation first.  Promotion waits
                     // for any queued B completion edge so that ownership can

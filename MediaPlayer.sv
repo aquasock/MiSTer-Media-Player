@@ -1202,6 +1202,10 @@ wire        mpeg2_new_second_picture_420_parsed;
 wire        mpeg2_new_picture_420_complete;
 wire [1:0]  mpeg2_new_active_frame_bank;
 wire [1:0]  mpeg2_new_completed_frame_bank;
+// Entry 990: pulses from the scheduler's abort back to the picture
+// bookkeeper (see mpeg2_h262_two_picture_probe_p_chain.sv and
+// mpeg2_h262_b_presentation_scheduler.sv for the full explanation).
+wire        mpeg2_new_overlap_reference_abandoned;
 wire [7:0]  mpeg2_new_picture_count;
 wire        mpeg2_new_reference_frame_valid;
 wire [1:0]  mpeg2_new_reference_frame_bank;
@@ -1463,6 +1467,7 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.recon_block_complete        (mpeg2_new_recon_block_complete),
 	.p_persistence_complete      (mpeg2_new_pred_persisted_seen),
 	.p_row_persistence_complete  (mpeg2_new_pred_row_persisted),
+	.overlap_reference_abandoned (mpeg2_new_overlap_reference_abandoned),
 	.slice_header_seen           (mpeg2_new_slice_header_seen),
 	.macroblock_address_seen     (mpeg2_new_macroblock_address_seen),
 	.first_i_macroblock_seen     (mpeg2_new_first_i_macroblock_seen),
@@ -2009,6 +2014,7 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .promotion_active            (mpeg2_new_b_promotion_active),
     .presentation_complete       (mpeg2_new_b_presentation_complete),
     .presentation_error          (mpeg2_new_b_presentation_error),
+    .overlap_reference_abandoned (mpeg2_new_overlap_reference_abandoned),
     .debug_state                 (mpeg2_new_b_scheduler_debug_state)
 );
 // The framebuffer's picture-present/generation tracking and this
