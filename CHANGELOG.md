@@ -8,40 +8,17 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
-- Changed standalone-audio pause ordering so the first Space or Start press
-  reveals the player overlay, drains that in-band style update, and only then
-  holds audio and visualizer transport at a helper/Main pause barrier. Resume
-  releases the held helper with the existing `GO`; DVD and MPEG-2 pause remain
-  the original immediate Main-side transport hold.
-- Replaced whole-GOP audio-visualizer grade steps with version-two transition
-  GOPs. Each adjacent rise or fall now crosses between grades over three
-  frames while preserving the eight-level RMS response, native-interlaced
-  closed-GOP stream safety and compatibility with existing version-one packs.
-- Replaced marker-file optical launching with `Load Physical Disc` and
-  `Load Disc Image` submenus. Patched Main now starts physical Video DVD and
-  Audio CD media directly, the image submenu exposes only DVD ISO files, and
-  separate MPEG-2 video and audio choices open their filtered browsers
-  immediately.
-
-### Added
-
-- Added an always-on idle visualizer lifecycle without changing the FPGA. When
-  the MediaPlayer core is loaded, isolated Main starts the existing visualizer
-  pack through a monotonic-time helper source; DVD or MPEG-2 playback replaces
-  it, audio retains the ten-second player overlay, and the idle loop returns
-  after playback. A failed idle launch is not retried until a media cycle or
-  core reload prevents a missing helper or pack from causing a restart loop.
-- Added direct Audio CD playback from `/dev/sr0`. The helper inventories audio
-  tracks, skips data tracks, reads CDDA
-  sectors as 44.1 kHz stereo PCM, and reuses the standalone-audio interface,
-  visualizer, fixed seeking, pause/replay lifecycle and previous/next controls.
-- Added an experimental MediaPlayer-only NTSC 480i direct-HDMI mode to the
-  isolated patched Main. With `direct_video=1` in the `[MediaPlayer]` INI
-  section, the ADV7513 consumes the core's proven native 525-line raster at a
-  divided 27 MHz input clock, advertises VIC 6 or 7 with BT.601 and limited RGB,
-  reports two samples per content pixel, and uses matching 48/96 kHz audio CTS.
-  This first boundary targets HDMI-to-SDI lock testing and does not add PAL,
-  576i, HD-SDI, or a live Bob/Weave/Raw menu switch.
+- Return runtime sources to hardware-accepted `a57079f` for progressive video
+  playback using stock MiSTer Main, removing helper and custom-Main sources.
+- Restore MPG video demultiplexing with MPEG-1/2 pack/PES headers, elastic
+  output backpressure, first-stream selection and terminal video flushing.
+- Retain 800x600 output and encoded cadence. MP2 decoding, A/V synchronization
+  and native progressive 720x480 output are subsequent stages; movie audio
+  is skipped in this candidate.
+- Source `9233f07` passes clean Quartus 17.0.2 and focused timing with seeds
+  11 and 52. Seed 33 was stopped at the user's request. Hardware validation
+  of the new ingress is pending. Earlier unreleased DVD/visualizer work is
+  retained in Git history preceding the progressive restoration.
 
 ## [0.9.0] - 2026-09-03 — DVD navigation, native video and consumer-audio milestone
 
