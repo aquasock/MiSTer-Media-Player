@@ -1,3 +1,32 @@
+## 987 COMMIT Unreleased e6e5a4c 2026-09-13T00:54:32-07:00
+
+#### Coming From:
+
+Unreleased e6e5a4c
+
+#### Purpose:
+
+Build and deploy entry 986's presentation-scheduler deadlock fix for hardware testing.
+
+#### Outcome:
+
+Ran the three-seed timing build. seed26 failed setup timing this time; seed33 and seed99 both passed cleanly, seed33 with the better margin (+0.399ns worst case vs seed99's +0.320ns). Installed seed33's RBF (`.ai/current_results/MediaPlayer_stageB_schedfix_seed33.rbf`, SHA-256 `e98b442d884daa19893256313624534261a22db1bc17bb3b6969278c5b7c2c7d`) onto the test MiSTer via `tools/mister.sh install`, replacing the prior `MediaPlayer_stageB_legacyfix_seed26.rbf` file (confirmed by the installed checksum). Main is unchanged from entry 983 and was not reinstalled. Not yet tested.
+
+#### Next Steps:
+
+Reload the real `.mpg` via F4 and check whether video now actually plays through. If it stalls again, pull fresh telemetry (`tools/decode-hardware-telemetry.py --json`) immediately rather than assuming the same root cause - this scheduler's state space is large and entry 986's fix only addresses the one specific combination the previous snapshot proved.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 986 COMMIT Unreleased e6e5a4c 2026-09-13T00:34:53-07:00
 
 #### Coming From:
@@ -1193,35 +1222,6 @@ Leave `/media/fat/MiSTer` untouched, install the archive's `MiSTer_MediaPlayer` 
 - host/arm/ARCHITECTURE.md
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - tools/test_main_seek_lifecycle.cpp
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 947 COMMIT Unreleased ae533a1 2026-09-03T16:48:14-07:00
-
-#### Coming From:
-
-Unreleased ae533a1
-
-#### Purpose:
-
-Qualify the isolated-Main stream-boundary build on Futurama disc one and isolate its first finite-still freeze.
-
-#### Outcome:
-
-The physical source-`ae533a1` run confirms that the per-core Main selection works, but rejects the stream-boundary handshake as implemented.  Main starts the `MediaPlayer` core through its alternate executable and the helper completes the first authored ten-second FBI still, sends the autonomous boundary event and waits for GO.  Main receives that event at 20.234007 seconds after submitting 224,682 bytes, but retains one buffered byte and never records `DVD stream boundary released after drain`; more than four million later would-block polls submit no additional data through the 227-second capture endpoint.  The visible FBI frame and checksum-valid schema-21 snapshot show that this is a host-handshake deadlock rather than a decoder failure: the FPGA accepted 224,669 decoder bytes, exactly the 224,665-byte authored video plus the four-byte sequence end, completed and displayed its one I picture, reports sequence end, presentation complete and session quiet, and has zero decoder errors, transport blocks, PCM samples or audio underruns.  The five following zero bytes are implementation-only transport drain; four crossed Main before the terminal decoder stopped returning input credit and the fifth remains in Main's pipe buffer, so the current requirement that every boundary byte receive FPGA credit can never become true.  The 5,630,162-byte log, 685,317-byte screenshot and 441-byte telemetry sidecar have SHA-256 `24ff68036d13b73d674dca1bf349a5fb2041d4de4343ef3f0bbe8ac041732d45`, `afcb6905c04398c9bcf6f2aef795d55bbcc85c990000d90908b6bc88f6c84f3e` and `dfb936ef46bc9eb7324357e82d356be24c3f7646d4bc6183ba5e07e7880bfa52`.
-
-#### Next Steps:
-
-After user approval, distinguish a finite terminal boundary from an automatic silent-menu boundary on the control channel and give only the terminal form an explicit five-byte discardable-tail contract.  Main must continue submitting all meaningful queued media, then after pipe quiescence accept at most the declared number of remaining zero tail bytes, record their exact count, reset download once and send GO; a nonzero byte, an oversized remainder or any residue on the automatic boundary must fail rather than be hidden.  Extend the Main regression with the observed one-byte no-credit remainder plus zero-, partial- and malformed-tail cases, retain the helper production-path and sanitizer suites, rebuild the patched per-core Main and static ARM helper locally, and retest Futurama through every finite intro still into its moving menu without changing the RBF or RTL.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
