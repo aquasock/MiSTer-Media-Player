@@ -1,4 +1,4 @@
-## 998 COMMIT Unreleased ??? 2026-09-13T06:39:28-07:00
+## 998 COMMIT Unreleased 9fd1829 2026-09-13T07:17:37-07:00
 
 #### Coming From:
 
@@ -10,15 +10,58 @@ Add FPGA MPEG-1 Layer II audio decoding and synchronized progressive MPG playbac
 
 #### Outcome:
 
-The user approved proceeding after accepting seed 52 with the generated 30-second MPG. Development will retain stock Main, progressive decode and the existing output raster, reuse the proven PCM output path, and implement compressed audio in FPGA logic. Historical audio decoding ran on ARM and is reference evidence rather than reusable FPGA codec logic. An isolated source export under /home/vash/builds/mp2-stage2 will establish decoder arithmetic against FFmpeg before installation and clean builds. The initial test content uses 48 kHz stereo MP2 at 192 or 320 kb/s. No hardware or audio-decoder validation is claimed by this proposal.
+Implemented 48 kHz stereo/dual/joint-stereo MP2 at 112–384 kb/s with a bounded frame parser, serial requantization and polyphase synthesis, an independent compressed-video DDR ring, ordered PES metadata binding, PCM timestamp scheduling and schema-eight audio telemetry. Stock Main and the accepted progressive decoder/output raster remain; raw video bypasses the new DDR queue. CRC-protected frames, other rates/codecs, mono and timestamp-discontinuity recovery are not supported by this first audio profile. All 17 quantizers and all joint-stereo bounds pass FFmpeg comparison after increasing requantization coefficients from Q24 to Q30; eight quality fixtures pass two reset-separated, backpressured sessions with maximum PCM error 0–2 sample units, and six unsupported/truncated fixtures fail explicitly. A timed MPG test plays 24192 sample pairs from 21 frames without underrun or timestamp error, agrees with FFmpeg PCM within one unit, preserves 152679 video bytes and binds all 15 picture timestamps correctly. That harness models a bounded PCM FIFO and does not claim complete H.262 or vendor CDC simulation. DDR stress passes 5000 words with 8014 competing responses; legacy arbiter, raw/PS ingress, PCM baseline, PES split-prefix and telemetry checks pass. An early synthesis estimate fits at 38562 ALMs and 68 DSP elements before the final precision/telemetry changes, but full build/timing qualification is pending. Sources are installed from the isolated development export; no hardware acceptance is claimed.
 
 #### Next Steps:
 
-Implement and simulate Layer II frame parsing, requantization, subband synthesis, bounded compressed/PCM buffering and timestamp association, checking audio quality against FFmpeg plus reset, backpressure, end-of-file and A/V startup behavior. Install the reviewed source, commit and push it, then run three independent Quartus compiles including successful seed 52 and two new seeds, review timing, and supply passing RBF paths and an executable test-content script. Progressive native 720x480 output follows synchronized audio acceptance.
+Push this source and run independent clean Quartus builds with seeds 52, 61 and 87, reviewing standard and focused timing before delivering RBFs. Provide the executable flash/beep and movie-content generator, then require audible synchronized MPG playback, exact audio completion counters, repeated raw/MPG loads and a longer-file synchronization test on hardware. Native progressive 720x480 output follows audio acceptance.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer_av.svh
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_06.svh
+- MediaPlayer_top_07.svh
+- README.md
+- docs/ARCHITECTURE.md
+- docs/BUILDING.md
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/audio/av_stream_fifo.sv
+- rtl/audio/mp2_cos.hex
+- rtl/audio/mp2_decoder.sv
+- rtl/audio/mp2_pcm_fifo.sv
+- rtl/audio/mp2_pcm_output.sv
+- rtl/audio/mp2_scale.hex
+- rtl/audio/mp2_synthesis.sv
+- rtl/audio/mp2_window.hex
+- rtl/mpeg2_new/mpeg2_av_ddr_fifo.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_new/mpeg2_pes_metadata_expand.sv
+- rtl/mpeg2_new/mpeg2_pes_picture_pts.sv
+- rtl/mpeg2_new/mpeg2_program_stream_ingress.sv
+- tools/generate_mp2_tables.py
+- tools/make_mpg_audio_test.sh
+- tools/mp2_fixtures.py
+- tools/mp2_model.py
+- tools/reference/LICENSE.pl_mpeg
+- tools/reference/README.md
+- tools/reference/pl_mpeg.h
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h262_ddram_arbiter.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/test_av_ddr_fifo.sv
+- tools/test_mp2_decoder.sv
+- tools/test_mp2_pcm_output.sv
+- tools/test_mp2_synthesis.sv
+- tools/test_mpg_audio_ingress.sv
+- tools/test_mpg_audio_playback.sv
+- tools/test_pes_picture_pts.sv
+- tools/verify_mp2.py
+- tools/verify_mpg_audio.py
 
 #### Status:
 
