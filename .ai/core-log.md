@@ -1,4 +1,4 @@
-## 23 COMMIT Unreleased ??? 2026-09-13T16:01:34-07:00
+## 23 COMMIT Unreleased 6da4771 2026-09-13T16:01:34-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Generate deterministic motion-focused media for visual refresh-rate qualificatio
 
 #### Outcome:
 
-The user authorizes generating media that makes the 50/59.94 Hz switch easy to assess. The planned generator produces progressive 720x480 clips at 25 and 30000/1001 fps with sharp constant-speed moving bars, a panning fence and visible frame IDs, plus clear comparison instructions. Matching raw M2V and MPG files exercise both cadence paths. The source rate and traversal speed will remain fixed while users switch output refresh; no new core change or FPGA build is needed.
+Implemented the reproducible motion-test generator and produced approximately 60-second progressive 720x480 clips at 25 and 30000/1001 fps, each in raw M2V and silent-audio MPG form. Sharp constant-speed bars, panning fences and frame IDs expose uneven frame holds while keeping source speed fixed during refresh switches. All four files pass complete FFmpeg decoding and ffprobe checks for exact rate, progressive geometry and expected frame count (1500 or 1798). Representative frames were visually inspected. Media, comparison instructions, previews and SHA-256 manifests are under results/cadence-motion-tests. Python syntax and git whitespace checks pass. No RTL changed or FPGA build was required; hardware comparison of these new clips remains pending.
 
 #### Next Steps:
 
-Generate the clips, verify rates and progressive geometry, inspect representative frames and decode integrity, commit the reproducible generator and instructions, then deliver the files for visual A/B testing.
+Have the user compare the same 25 fps clip at 50 and 59.94 Hz, then use the 29.97 fps clip as the reverse control; close the OSD and keep filters constant during each observation. Confirm actual output refresh with display signal information when available.
 
 #### Files Modified:
 
