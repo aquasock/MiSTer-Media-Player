@@ -853,7 +853,27 @@ always @(posedge clk) begin
             end else if(future_waiting)begin
                 future_frame_pending<=0;
                 future_reference_pending<=0;
-                if(queued_run_active||deferred_queued_b_start)begin
+                if(deferred_queued_b_start&&overlap_decode_open)begin
+                    // Entry 985: hardware telemetry confirmed this exact
+                    // combination is an unrecoverable circular wait, not a
+                    // recoverable one. deferred_queued_b_start's own clear
+                    // condition needs a frame_waiting pulse from this same
+                    // still-open overlap reference, but presentation_hold
+                    // (asserted unconditionally by deferred_queued_b_start,
+                    // independent of promotion_pending) blocks all further
+                    // decoder input at the top level - including the rest
+                    // of that very reference's compressed data. Retiring
+                    // this generation via promotion_pending here would only
+                    // extend the same hold under a different name. Abort
+                    // instead, matching this module's own stated recovery
+                    // policy of failing forward rather than hanging.
+                    reorder_active<=0;run_closed<=0;decode_inflight<=0;
+                    scratch0_pending<=0;scratch1_pending<=0;
+                    deferred_queued_b_start<=0;
+                    overlap_decode_open<=0;
+                    overlap_frame_pending<=0;
+                    presentation_error<=1;
+                end else if(queued_run_active||deferred_queued_b_start)begin
                     // Retire the visible generation first.  Promotion waits
                     // for any queued B completion edge so that ownership can
                     // never be lost on a coincident cadence window.
