@@ -1,3 +1,32 @@
+## 004 COMMIT Unreleased f8bebcd 2026-09-13T10:35:05-07:00
+
+#### Coming From:
+
+Unreleased f8bebcd
+
+#### Purpose:
+
+Record the completed progressive-sync repair batch, remaining timing defects and the user's preliminary playback observation.
+
+#### Outcome:
+
+All three f8bebcd builds compiled and produced RBFs, but none passed timing. Seed 52 completed in 1431 seconds with setup -2.173 ns, hold -0.104 ns, decoder setup -0.061 ns and 40480 ALMs; seed 61 completed in 1834 seconds with setup -2.284 ns, hold +0.202 ns, decoder setup +0.442 ns and 40578 ALMs; seed 87 completed in 1669 seconds with setup -2.343 ns, hold +0.202 ns, decoder setup -0.476 ns and 40862 ALMs. All used 472 RAM blocks and 69 DSP blocks, and all passed recovery, removal and pulse-width checks. Same-clock video margins were +12.517, +11.337 and +11.794 ns respectively. Seed 52's detailed reports reveal that Quartus inferred RAM shift registers from newly added request and VS synchronization chains, causing first-stage register constraints to match nothing; its worst path is aspect_config request into an inferred shift RAM. Remaining direct platform configuration crossings include LFB_EN and HDMI_PR, while lowlat into ASCAL i_mode causes the hold failure. Thus the prior synchronization changes are incomplete in synthesized hardware despite passing RTL simulations. The user reports that audio and video look and sound good, but the tested seed and explicit disappearance of lingering-frame flicker have not been confirmed. Two screenshot commands over responsive FTP produced no capture within their polling windows, so current telemetry and the prior audio timestamp flag remain unverified. Detailed reports, RBF hashes, regression evidence and the preliminary user observation are stored under /home/vash/builds/f8bebcd-20260913-100007. No source changes or replacement builds were started while the user tests. Built records successful compilation only; Passed remains unchecked pending hardware acceptance.
+
+#### Next Steps:
+
+Let the user finish the current test and confirm the seed and flicker behavior, then obtain fresh telemetry when screenshot commands respond. Preserve actual flip-flop synchronization stages through synthesis, verify that constraints match their intended endpoints, and finish remaining configuration crossings before another timing batch; retain 1750154 seed 87 as the timing-passed and hardware-accepted rollback reference.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 003 COMMIT Unreleased f8bebcd 2026-09-13T09:59:54-07:00
 
 #### Coming From:
@@ -1252,35 +1281,6 @@ All three seeds 26, 33 and 40 compiled with 0 errors.  Worst-case setup slack: s
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - rtl/mpeg2_new/mpeg2_h262_audio_ui.sv
 - tools/test_mpeg2_audio_ui.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 963 COMMIT Unreleased adb4f53 2026-09-12T02:40:53-07:00
-
-#### Coming From:
-
-Unreleased 39274a8
-
-#### Purpose:
-
-Fix a regression from `39274a8` where the audio player's screen no longer blanked on seek but audio instead stopped and the display froze after roughly one seek.
-
-#### Outcome:
-
-Hardware testing of `39274a8` on `10.10.0.45` reproduced the new symptom on a single MP3 seek, and `/tmp/MediaPlayer_ARM.log` was pulled and inspected: `t=6923223 chapter barrier released discarded=53764` proves `chapter_barrier_poll()`'s shared fallthrough path fired for this audio seek, which it should not have.  The cause is that `39274a8`'s `audio_visualizer_controls` branch skipped the manual `user_io_set_download(0)`/`(1)` toggle but never set `chapter_download_rearmed`, so the shared `if (!chapter_download_rearmed)` block below still ran `user_io_set_index()`, `user_io_file_info(".M2V")` and `user_io_set_download(1)` for every audio seek.  Reading pristine upstream `user_io.cpp` confirms `user_io_set_download()` sends its `FIO_FILE_TX` SPI assert unconditionally on every call regardless of Main's own `download_active` mirror, so this still reasserted a fresh download session to the FPGA, just without the preceding low pulse.  The log shows the remainder of the test file's audio, roughly 38 seconds' worth following the seek target, was consumed in only about 5.6 real seconds before a premature clean end-of-stream, consistent with the reassert disturbing FPGA-side burst credit/byte accounting and defeating playback pacing; Main's resulting hold-last-frame/stop-audio end-of-stream handling is what was observed as a freeze.  Source `adb4f53` sets `chapter_download_rearmed = true` in the audio branch, mirroring the non-audio branch, so the shared reassert is fully suppressed and an audio-only seek makes no download-related FPGA call at all.  The patch was reverified against pinned upstream `Main_MiSTer` `0a8fb44` with `git apply --check` and rebuilt; GNU 10.2.1 produced the stripped ARMv7 `host/build/MiSTer_MediaPlayer`, 1,186,780 bytes, SHA-256 `38430997604e44972cb434d782c39dbf3e5e91980546a12f3f644e4203652f71`.  No helper, decoder RTL or RBF changes were made or are required.
-
-#### Next Steps:
-
-Install `host/build/MiSTer_MediaPlayer` as executable `/media/fat/MiSTer_MediaPlayer` in place of the `39274a8` build, then repeat standalone MP3 seeking, including multiple repeated seeks in one session, and confirm no screen blank/flicker, no audio pop, no premature stop/freeze, and that playback continues correctly at normal pace from the seek target through to the file's true end; also recheck `.mpg`/DVD seeking is unaffected.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
 
 #### Status:
 
