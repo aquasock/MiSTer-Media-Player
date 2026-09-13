@@ -1,3 +1,32 @@
+## 18 COMMIT Unreleased dd144a3 2026-09-13T15:26:03-07:00
+
+#### Coming From:
+
+Unreleased dd144a3
+
+#### Purpose:
+
+Record completed manual-refresh builds, the timing-qualified candidate and the resource review requested during compilation.
+
+#### Outcome:
+
+All three clean source-dd144a3 builds compile and pass the 108-register fitted CDC audit. Seed 52 passes every timing category at all four operating corners, with minimum setup +0.114 ns, hold +0.018 ns, recovery +2.714 ns, removal +0.186 ns and pulse width +0.925 ns. It uses 41215 ALMs, 57400 registers, 480 RAM blocks and 69 DSP blocks; its RBF SHA-256 is 6a0720e4623c77c65e1736a729686b7c9165ef10c42265311a029dd57131de45. Seed 61 uses 41082 ALMs and fails setup at -0.004 ns in ASCAL, while seed 87 uses 41279 ALMs and fails setup at -4.958 ns from the prediction fetcher descriptor count into a reference-cache tag; their other timing classes pass. Build plus timing durations are 1353, 1267 and 1421 seconds for seeds 52, 61 and 87 respectively. Source synthesis adds 157 combinational ALUTs and 24 registers versus 24d3de0, with unchanged memory bits, DSPs and PLLs; the smaller fitted seed-52 ALM total reflects placement and is not an architectural saving. Complete evidence is under results/build-dd144a3-20260913-150109 and copied RBFs with hashes and explicit qualification status are under results/hardware-test-dd144a3. The user was given seed 52 and results/refresh-tests/README.txt; hardware acceptance is pending. During compilation the user requested resource and removable-telemetry analysis. The accepted 24d3de0 seed-52 hierarchy attributes approximately 3110 ALMs, 65 RAM blocks and 12 DSPs to identifiable audio blocks excluding shared A/V logic, and 2612 ALMs to the observational cadence profiler alone. Detailed ranked-gap history, per-picture stall and overlapping hold counters, DDR performance totals and scheduler dumps are candidates for a smaller diagnostic profile, while errors, basic cadence, audio counts/status and transport health should remain. No telemetry removal or RAM-storage redesign was authorized or implemented.
+
+#### Next Steps:
+
+Have the user validate the preferred dd144a3 seed 52 using the generated 25/29.97 fps MPG and M2V controls, manual refresh switches, display-rate confirmation with vsync_adjust=1, OSD/aspect/matrix/filter operation and A/V synchronization. Retain 24d3de0 seed 52 as recovery and do not present seeds 61 or 87 as timing-qualified. Further telemetry reduction remains a proposal requiring user direction and measured synthesis savings.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 17 COMMIT Unreleased dd144a3 2026-09-13T14:52:23-07:00
 
 #### Coming From:
@@ -1306,35 +1335,6 @@ Superseded before its timing build finished: the user decided, in the same sessi
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 977 COMMIT Unreleased 8e72075 2026-09-12T13:48:48-07:00
-
-#### Coming From:
-
-Unreleased af7f570
-
-#### Purpose:
-
-Remove the reconstructed idle-hide-while-paused overlay clear, which writes to the bulk output pipe after Main has already stopped draining it, and confirmed as a reproducible deadlock on hardware.
-
-#### Outcome:
-
-Hardware testing on `af7f570` reproduced a hang after only a few ordinary pause/resume cycles on both `fellow.mpg` and the baseline `01 - Pee Strike.mpg`, surviving a full core reboot and fresh reload. Diagnosis via `/proc/<pid>/wchan` caught `MediaPlayer_Helper` parked in `pipe_write` while `MiSTer_MediaPlayer` (Main) sat busy at 36-52% CPU without draining, and the ARM diagnostic log confirmed no further bytes were read after the hang point even after a fresh SSH-triggered refetch. `video_overlay_pause_barrier()`'s idle-timeout branch, reconstructed at entry 975 from a lost live-debug session, calls `emit_overlay_clear()` and `flush_output()` on the same buffered stdout pipe Main reads for bulk audio/video/overlay data - but this call happens strictly after `MEDIA_PLAYER_CONTROL_PAUSE_READY` is sent and acknowledged, at which point Main's own `mediaplayer_poll()` gate (`if (playback_paused && !stream_boundary_pending) return;`) has already stopped servicing that pipe, so the write blocks forever once residual buffered bytes plus the clear record exceed the pipe's capacity. This differs from the reveal-on-pause write immediately above it in the same function, which is safe only because it is sent before Main's gate engages - a distinction the function's own preceding comment already documented for the reveal case without recognizing the idle-clear case violates it. The fix removes the wall-clock idle-timeout loop and `control_wait_for_go_timed()` entirely, restoring an unconditional `control_wait_for_go()` block after publishing `PAUSE_READY`, so the overlay simply stays visible for the full duration of any pause instead of auto-hiding after ten seconds; the wall-clock idle-hide introduced at entry 975 for the actively-playing case is unaffected, since Main continues draining the pipe throughout normal playback.
-
-#### Next Steps:
-
-Deploy `host/build/MediaPlayer_Helper` via the atomic `.new`-then-`mv` pattern and have the user reproduce the exact repro that hung before (a handful of ordinary pause/resume cycles on both `fellow.mpg` and `01 - Pee Strike.mpg`) to confirm playback survives; also re-check the file's TOTAL/REMAIN duration estimate for `fellow.mpg`, which showed an implausible ~52 hour figure once the large-file `stat()` fix made it non-zero, and address the confirmed missing lowercase/space glyphs in the restyled progress-strip labels as a follow-up commit.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
