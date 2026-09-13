@@ -1,3 +1,32 @@
+## 989 COMMIT Unreleased 2967e0b 2026-09-13T01:50:32-07:00
+
+#### Coming From:
+
+Unreleased 5764dd4
+
+#### Purpose:
+
+Exclude the two remaining sources still latching the transport gate's fatal-error kill switch after entry 988's partial fix.
+
+#### Outcome:
+
+Deployed entry 988's build (excluding only `mpeg2_new_b_presentation_error`) and asked the user to reload the file. Fresh telemetry confirmed `presentation_hold=False` throughout (entry 986's deadlock fix is genuinely working) but `presentation_error=True` with `error_flags=518` still latched, and a fresh Main log pull showed the same unthrottled full-speed drain pattern as before (`credit` pegged at max, ~2020 bytes consumed per poll, matching entry 987's `sent=887078912`-at-completion rate) with the screen staying black - the exact `fatal_error_latched` symptom, this time tripped by `phase1_probe_error`/`pred_error`, which entry 988 deliberately left in the fatal-error list pending evidence. Reading `rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv` found that evidence directly: two of `probe_error`'s five OR-terms, `publication_error` and `reference_progress_error`, are consistency checks against `reference_frame_bank`/`reference_frame_valid`/`reference_promotion_count` - the exact picture-bookkeeping state entry 986's scheduler abort resets in its own module without this separate bookkeeper module ever being told. `mpeg2_new_pred_error`'s source module (`mpeg2_h262_p_frame_predictor` wiring at `MediaPlayer.sv:1650-1697`) reads those same bookkeeper outputs (`reference_frame_valid`, `reference_frame_bank`, `destination_frame_bank`). Both are therefore the expected knock-on of the same recoverable abort, not independent faults. Source `2967e0b` removes both from `mpeg2_new_transport_fatal_error` in `MediaPlayer.sv`, leaving `mpeg2_new_syntax_error`, both `inverse_quant` flags, `idct`, `recon`, and both `ddr` flags untouched, since none of them read the reference-bank bookkeeping and each represents a genuinely distinct failure mode. `quartus_map` on seed99 is clean, 0 errors, 156 warnings, matching prior baselines.
+
+#### Next Steps:
+
+Sync to all three seed build directories, run the full three-seed timing build, deploy the best-passing seed, and ask the user to reload the file again. If it still does not play, pull fresh telemetry and check `error_flags` again - if all nine remaining sources are clear and `presentation_error` alone is the only bit set, the transport gate should no longer latch at all, and any remaining failure is a different, new symptom, not a continuation of this one. If some other error flag now appears instead, it should be treated as a distinct root cause, not assumed to be the same bookkeeping-desync issue.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 988 COMMIT Unreleased 5764dd4 2026-09-13T01:22:47-07:00
 
 #### Coming From:
@@ -1156,66 +1185,6 @@ The physical source-`0df8570` run validates the continuous decoder correction bu
 #### Next Steps:
 
 After user approval, preserve the source-`0df8570` continuous decoder/menu transition and normal advancing-PTS scheduler, but add an automatic-menu-only PCM fallback for an exhausted timestamp target: after startup, when decoded audio exceeds the existing reserve and the video horizon schedules nothing, emit the excess in bounded batches through the unchanged PCM transport so FPGA FIFO credit supplies the real-time 48 kHz backpressure instead of allowing an unbounded host queue.  Add a hard bounded-hold invariant and diagnostics, extend the production regression with repeated or nonadvancing menu video PTS plus sustained decoded PCM to prove continuous exact sample delivery, bounded memory, byte-exact video and unchanged advancing-PTS behavior, rerun strict native, analyzer, sanitizer and retained DVD/audio suites, then build only a new static ARM helper for another Futurama menu test; Main, protocol, RTL and RBF should remain unchanged.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 950 COMMIT Unreleased 0df8570 2026-09-03T17:53:57-07:00
-
-#### Coming From:
-
-Unreleased d7d5ab2
-
-#### Purpose:
-
-Carry a live silent-video decoder session continuously into an automatic DVD menu while starting a fresh synchronized helper scheduling epoch.
-
-#### Outcome:
-
-Source `0df8570` removes the automatic silent-video-to-menu READY/GO boundary while retaining every finite-still and explicit-navigation decoder boundary.  Silent-video release now includes the H.262 compatibility filter's pending byte in its capacity decision and flushes that byte through the bounded queue before switching to immediate output, preserving exact order.  Automatic menu entry keeps the live FPGA decoder and resident frame, rearms only helper audio and bounded scheduling state, leaves the initial sequence/I/reference filter disabled, and establishes one explicit PTS offset shared by menu video and audio above the preceding DVD timestamp.  The production regression releases a near-2 MiB silent first-play fixture byte-exactly, then schedules more than 2 MiB of picture-bearing menu video with no new sequence header alongside synchronized AC-3 without reaching the lookahead limit.  Optimized, AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer builds pass, as do the strict native static helper and retained DVD random-access, menu-hop, SPU, reserve, staging, unsupported-LPCM, audio UI, visualizer and seek tests.  GNU 10.2.1 builds the 966,052-byte stripped static ARMv7 helper `host/build/MediaPlayer_Helper` with SHA-256 `af73f0d5ae8104ef05fa3270b51a5da3bf92b39189cd32fc9219b5d2ac0efb6c`; Main remains source `d7d5ab2`, and the protocol, decoder RTL and RBF are unchanged.
-
-#### Next Steps:
-
-Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`0df8570` artifact, retain the source-`d7d5ab2` per-core Main and existing RBF, then rerun Futurama disc one through all finite intro stills, the complete 20th Century animation and the moving menu.  Confirm that menu entry produces the new `DVD automatic menu scheduling epoch continued` and `DVD automatic menu PTS epoch` diagnostics, no fourth Main decoder boundary, no `video lookahead limit exceeded`, visible menu motion and selector response; return the resulting log, screenshot and telemetry for hardware qualification.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 949 COMMIT Unreleased d7d5ab2 2026-09-03T17:49:51-07:00
-
-#### Coming From:
-
-Unreleased d7d5ab2
-
-#### Purpose:
-
-Qualify the boundary odd-byte correction on Futurama disc one and isolate the later black failure during its 20th Century transition.
-
-#### Outcome:
-
-The physical source-`d7d5ab2` run validates the corrected Main boundary path but rejects the complete host behavior.  All three finite first-play stills now finish and cross one decoder boundary each, the first two observed odd tails each log `pipe quiescent odd_tail=1` and submit their final byte, and every boundary reaches `released after drain`; the third session then qualifies a normal sequence/I/P restart group, releases 2,096,389 queued silent-video bytes and visibly advances into the 20th Century animation.  At 40.445047 seconds libdvdnav enters menu space while that live video session is still progressing, and the helper requests a fourth decoder boundary; Main drains 76,372 remaining bytes, resets the healthy decoder at 41.727776 seconds and leaves a black display.  The fresh menu epoch emits no H.262 restart diagnostic because its next 2,097,152 bytes never contain the sequence-header/I/reference combination required only after a decoder reset, although the helper accepts AC-3, publishes nine complete 86,400-byte overlay planes and remains responsive to an Up command that changes button one to four.  At 85.968714 seconds the queued video reaches the implementation guard and `video lookahead limit exceeded` deliberately exits the helper with code one.  Checksum-valid schema-21 telemetry confirms zero pictures and swaps in the reset session, nine valid overlay commits with no protocol error, and no audio underrun or transport block; the black 1,920-by-1,080 screenshot retains only the telemetry raster.  The 1,707,301-byte log, 1,557-byte screenshot and 480-byte telemetry sidecar have SHA-256 `9ec5ac166630067398f71e8226ed2c2b7a49f0cc68639ce43effc59bd3101789`, `5b3b2acf3c879c741b48e7d7a9c6c89b2ffc73f65b7ad1af633f7903491c421b` and `c5c1c9ba9f37749c4f0fa08b16d9ad56761fc12579b5b63b3739cd0509618f`.
-
-#### Next Steps:
-
-After user approval, preserve all finite-still decoder boundaries and the source-`d7d5ab2` Main correction, but stop resetting the already-live FPGA decoder solely because the continuous first-play video enters menu space.  Replace that automatic boundary with a helper-only audio and scheduling epoch transition that drains any pending H.262 normalization byte in original order, retains continuous decoder context and the resident picture, does not re-enable the initial random-access filter, and keeps the new menu's audio/video PTS relationship valid without a backward FPGA timestamp.  Add a production-path regression whose post-transition video exceeds 2 MiB without a new sequence header, proving byte-exact continuous delivery, bounded scheduling, synchronized AC-3 admission, overlay continuation and no Main READY/GO; retain finite-still boundaries, explicit navigation hops, late-audio rejection and sanitizer coverage, then build only a new ARM helper and retest Futurama through the complete animation into its moving menu.  Main, protocol, RTL and RBF should remain unchanged.
 
 #### Files Modified:
 
