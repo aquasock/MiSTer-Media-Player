@@ -7,11 +7,12 @@
 // accepted compressed-stream bytes.  Any decode or ownership failure aborts
 // the transaction without retaining compressed-stream backpressure.
 //============================================================================
-module mpeg2_h262_b_presentation_scheduler
+module mpeg2_h262_b_presentation_scheduler #(parameter ENABLE_REFRESH_SELECTION=0)
 (
     input  wire clk,
     input  wire reset,
     input  wire swap_window_pulse,
+    input  wire refresh_50,
     input  wire [3:0] frame_rate_code,
     // Entry 389: when the next retained picture owns a timestamp, its modulo
     // PTS comparison replaces only the cadence admission gate.  Untimestamped
@@ -111,6 +112,8 @@ localparam [25:0] CADENCE_DUE_30FPS =
     CADENCE_LIMIT_30FPS-CADENCE_STEP_30FPS;
 reg [25:0] cadence_credit;
 reg [3:0] cadence_rate_code_q;
+wire cadence_50 = ENABLE_REFRESH_SELECTION ? refresh_50 : 1'b0;
+reg cadence_50_q;
 
 wire b_user_success_edge=b_user_success&&!b_user_success_d;
 wire scratch_waiting=next_present_scratch_bank?scratch1_pending:scratch0_pending;
@@ -134,20 +137,33 @@ wire cadence_30000_1001=(frame_rate_code==4'h4);
 wire cadence_30fps=(frame_rate_code==4'h5);
 wire cadence_supported=cadence_24000_1001||cadence_24fps||cadence_25fps||
                        cadence_30000_1001||cadence_30fps;
-wire [25:0] cadence_limit=cadence_24000_1001?CADENCE_LIMIT_24000_1001:
+wire [25:0] cadence_limit_5994=cadence_24000_1001?CADENCE_LIMIT_24000_1001:
                           cadence_30000_1001?CADENCE_LIMIT_30000_1001:
                           CADENCE_LIMIT_24FPS;
-wire [25:0] cadence_step=cadence_24000_1001?CADENCE_STEP_24000_1001:
+wire [25:0] cadence_step_5994=cadence_24000_1001?CADENCE_STEP_24000_1001:
                          cadence_24fps?CADENCE_STEP_24FPS:
                          cadence_25fps?CADENCE_STEP_25FPS:
                          cadence_30000_1001?CADENCE_STEP_30000_1001:
                                              CADENCE_STEP_30FPS;
-wire [25:0] cadence_due=cadence_24000_1001?CADENCE_DUE_24000_1001:
+wire [25:0] cadence_due_5994=cadence_24000_1001?CADENCE_DUE_24000_1001:
                         cadence_24fps?CADENCE_DUE_24FPS:
                         cadence_25fps?CADENCE_DUE_25FPS:
                         cadence_30000_1001?CADENCE_DUE_30000_1001:
                                             CADENCE_DUE_30FPS;
-wire cadence_scale_changed=
+// At 50 Hz use a common 50050 denominator: exact rates for all five
+// accepted progressive source codes, including 25 fps = one picture / 2 frames.
+wire [25:0] cadence_step_50 = cadence_24000_1001 ? 26'd24000 :
+                              cadence_24fps ? 26'd24024 :
+                              cadence_25fps ? 26'd25025 :
+                              cadence_30000_1001 ? 26'd30000 : 26'd30030;
+wire [25:0] cadence_due_50 = cadence_24000_1001 ? 26'd26050 :
+                             cadence_24fps ? 26'd26026 :
+                             cadence_25fps ? 26'd25025 :
+                             cadence_30000_1001 ? 26'd20050 : 26'd20020;
+wire [25:0] cadence_limit = cadence_50 ? 26'd50050 : cadence_limit_5994;
+wire [25:0] cadence_step = cadence_50 ? cadence_step_50 : cadence_step_5994;
+wire [25:0] cadence_due = cadence_50 ? cadence_due_50 : cadence_due_5994;
+wire cadence_scale_changed=(cadence_50 != cadence_50_q)||
     (cadence_24000_1001!=(cadence_rate_code_q==4'h1))||
     (cadence_30000_1001!=(cadence_rate_code_q==4'h4));
 wire cadence_slot=!cadence_scale_changed&&
@@ -253,10 +269,11 @@ always @(posedge clk) begin
         last_bound_reference_valid<=0;last_bound_reference_bank<=0;
         last_bound_reference_count<=0;
         run_picture_count<=0;presentation_complete<=1;presentation_error<=0;
-        cadence_credit<=CADENCE_DUE_24FPS;cadence_rate_code_q<=0;
+        cadence_credit<=CADENCE_DUE_24FPS;cadence_rate_code_q<=0;cadence_50_q<=0;
     end else begin
         b_user_success_d<=b_user_success;
         cadence_rate_code_q<=frame_rate_code;
+        cadence_50_q<=cadence_50;
 
         // Seed the generation comparison from the first published reference.
         // Thereafter only a B future binding advances it, so a later bank wrap

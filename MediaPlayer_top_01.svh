@@ -1,7 +1,19 @@
-mpeg2_video_720x480p mpeg2_video_720x480p
+// Requested mode crosses coherently, then the raster applies it at frame end.
+// Publish the applied mode (not the menu request) to presentation scheduling.
+wire refresh_50_video_request, refresh_50_video_active, refresh_50_decoder;
+video_config_cdc refresh_request_config(
+ .src_clk(clk_sys),.dst_clk(clk_video),.src_data(status[6]),
+ .dst_data(refresh_50_video_request));
+video_config_cdc refresh_applied_config(
+ .src_clk(clk_video),.dst_clk(clk_mpeg2),.src_data(refresh_50_video_active),
+ .dst_data(refresh_50_decoder));
+
+mpeg2_video_720x480p #(.ENABLE_REFRESH_SELECTION(1)) mpeg2_video_720x480p
 (
 	.clk      (clk_video),
 	.reset    (reset_video),
+	.refresh_50_request(refresh_50_video_request),
+	.refresh_50_active(refresh_50_video_active),
 	.h_pos    (display_h_pos),
 	.v_pos    (display_v_pos),
 	.pixel_en (display_pixel_en),

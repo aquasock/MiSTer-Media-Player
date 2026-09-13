@@ -69,3 +69,29 @@ check OSD responsiveness, and reload the 601 clip after restoring Auto.
 Run `python3 tools/verify_color_matrix.py --output /tmp/color.json` for metadata,
 frame ownership, frame-boundary CDC, colored stalled-DDR scanout and exhaustive
 matrix arithmetic. Matrix selection adds no gamut or transfer-curve conversion.
+
+
+## Manual 50 Hz progressive output
+
+Generate checks with `python3 tools/make_refresh_tests.py --output results/refresh-tests`
+and follow that directory's README. Use a timing-qualified refresh build; the
+hardware-accepted `24d3de0` seed 52 is the recovery baseline. This new mode still
+needs hardware acceptance.
+
+**Refresh rate** defaults to **59.94 Hz**; choose **50 Hz** for progressive 25 fps
+material. The setting is manual and does not inspect the file's frame rate.
+It persists across file reload and the core's Reset command. It changes neither
+playback speed nor audio sample rate. Use `[MediaPlayer] vsync_adjust=1` to let
+HDMI follow the core refresh, and verify the display's reported signal rate.
+The active core raster remains 720x480: at 27 MHz the totals are 858x525 for
+59.94 Hz and 864x625 for exact 50 Hz. The latter is an internal scaler raster
+with extended blanking, not 576-line playback or a claim of a standard direct
+video mode. The configured HDMI resolution remains the scaler's responsibility.
+
+During 25 fps MPG and M2V playback, switch 50/59.94 repeatedly and check continuous
+file progression, unchanged audio pitch/speed, and no lasting A/V drift.
+Brief display blanking during HDMI relock is possible. Verify even two-refresh
+picture spacing at 25 fps/50 Hz, compare the 29.97 fps/59.94 Hz control, exercise
+OSD/filter/aspect/color controls, file replacement, Reset and EOF. Record source
+SHA, seed and observed display refresh. Simulation covers geometry, exact
+cadence and queue ownership; it does not prove HDMI/display relock behavior.

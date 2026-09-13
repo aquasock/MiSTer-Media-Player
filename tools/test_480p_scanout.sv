@@ -3,12 +3,21 @@
 // variable DDR response stalls and a bank reset during vertical blanking.
 // No H.262 decoding or HDMI scaler capture is simulated here.
 module test_480p_scanout;
+`ifdef TEST_REFRESH_50
+localparam TEST_50=1;
+`else
+localparam TEST_50=0;
+`endif
+localparam HT=TEST_50?864:858, VT=TEST_50?625:525;
+localparam HS_BEGIN=TEST_50?732:736, HS_END=TEST_50?796:798;
+wire applied_50;
 reg vc=0,mc=0,reset=1,complete=0,swap_reset=0;
 wire fb_reset=reset|swap_reset;
 always #18.518519 vc=~vc;
 always #8.333333 mc=~mc;
 wire [11:0] h,v;wire en,hs,vs;
-mpeg2_video_720x480p timing(vc,reset,h,v,en,hs,vs);
+mpeg2_video_720x480p #(.ENABLE_REFRESH_SELECTION(1)) timing(.clk(vc),.reset(reset),.h_pos(h),.v_pos(v),
+ .pixel_en(en),.h_sync(hs),.v_sync(vs),.refresh_50_request(TEST_50!=0),.refresh_50_active(applied_50));
 wire [7:0] burst;wire [28:0] addr;wire rd;reg [63:0] data=0;reg valid=0;
 integer remaining=0,cyc=0;reg [28:0] next_addr;
 wire busy=(remaining!=0)||(cyc%7==0);
@@ -48,25 +57,25 @@ always @(posedge vc) begin
  x=h;y=v;
  if(!reset)begin
   if(x!=eh||y!=ev)$fatal(1,"raster counter mismatch");
-  eh=eh+1;if(eh==858)begin eh=0;ev=ev+1;if(ev==525)ev=0;end
-  if(en!=(x<720&&y<480)||hs!=!(x>=736&&x<798)||vs!=!(y>=489&&y<495))$fatal(1,"timing geometry");
-  if(x==0&&y==0&&fb.picture_present_rd)check=1;
+  eh=eh+1;if(eh==(applied_50?864:858))begin eh=0;ev=ev+1;if(ev==(applied_50?625:525))ev=0;end
+  if(en!=(x<720&&y<480)||hs!=!(x>=(applied_50?732:736)&&x<(applied_50?796:798))||vs!=!(y>=489&&y<495))$fatal(1,"timing geometry");
+  if(x==0&&y==0&&fb.picture_present_rd&&(applied_50==TEST_50))check=1;
   #1;
   if(check)begin
    if(de!=last_en||oh!=last_hs||ov!=last_vs)$fatal(1,"sync/data pipeline alignment");
    if(de)begin
-    gray=(298*(luminance((x==0?857:x-1),(x==0?(y==0?524:y-1):y))-16)+128)>>>8;
+    gray=(298*(luminance((x==0?HT-1:x-1),(x==0?(y==0?VT-1:y-1):y))-16)+128)>>>8;
     if(r!==gray[7:0]||g!==gray[7:0]||b!==gray[7:0])$fatal(1,"pixel at h=%0d v=%0d rgb=%0d,%0d,%0d expected %0d",x,y,r,g,b,gray);
     pixels=pixels+1;
    end
    n=n+1;
-   if(n==858*525)begin
+   if(n==HT*VT)begin
     if(pixels!=720*480||error)$fatal(1,"pixel count/cache error %0d",pixels);
     if(!swap_tested)$fatal(1,"missing frame-bank reset");
-    $display("PASS frame-bank reset preserves continuous sync/DE; 480p: 450450 pixel clocks, 345600 exact pixels, negative sync, stalled DDR, line refills and edge alignment");$finish;
+    $display("PASS frame-bank reset preserves continuous sync/DE; 480p: exact frame pixel clocks, 345600 exact pixels, negative sync, stalled DDR, line refills and edge alignment");$finish;
    end
   end
-  last_en=(x<720&&y<480);last_hs=!(x>=736&&x<798);last_vs=!(y>=489&&y<495);
+  last_en=(x<720&&y<480);last_hs=!(x>=(applied_50?732:736)&&x<(applied_50?796:798));last_vs=!(y>=489&&y<495);
  end
 end
 initial begin repeat(6)@(negedge vc);reset=0;repeat(4)@(negedge mc);complete=1;@(negedge mc);complete=0;#100000000;$fatal(1,"timeout");end

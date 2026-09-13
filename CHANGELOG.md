@@ -8,6 +8,9 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Manual 59.94/50 Hz progressive refresh selection with unchanged 720x480 active video, frame-boundary switching, and exact untimestamped cadence at both rates; audio and PTS clocks retain playback speed. Hardware qualification pending.
+- Deterministic 25/29.97 fps motion and stereo flash/beep checks from `tools/make_refresh_tests.py`.
+
 - Frame-associated BT.601/BT.709 color matrix selection with Auto and manual OSD overrides; untagged or unsupported matrices retain the BT.601 compatibility fallback.
 - Deterministic matching color clips and exhaustive RGB conversion tests, including exact legacy BT.601 output and BT.709 error bounded to one RGB code value.
 

@@ -4,6 +4,7 @@ module tb_h262_b_presentation_scheduler;
     reg clk=0,reset=1,swap=0,frame_waiting=0;reg[1:0] completed_bank=0,reference_bank=1;
     reg b_start=0,non_b_start=0,i_start=0,p_start=0,sequence_end=0,b_success=0,b_error=0;
     reg [3:0] frame_rate_code=4'h3;
+    reg refresh_50=0;
     reg timestamp_candidate_active=0,timestamp_candidate_due=0;
     reg[7:0] reference_count=0;
     wire[1:0] display_bank;wire display_scratch,display_scratch_bank,decode_scratch_bank;
@@ -14,7 +15,8 @@ module tb_h262_b_presentation_scheduler;
     integer last_pulse_count=0;
 
     always #5 clk=~clk;
-    mpeg2_h262_b_presentation_scheduler dut(
+    mpeg2_h262_b_presentation_scheduler #(.ENABLE_REFRESH_SELECTION(1)) dut(
+        .refresh_50(refresh_50),
         .clk(clk),.reset(reset),.swap_window_pulse(swap),
         .frame_rate_code(frame_rate_code),
         .timestamp_candidate_active(timestamp_candidate_active),
@@ -57,7 +59,7 @@ module tb_h262_b_presentation_scheduler;
             if(dut_presents) begin
                 // Exact 30 fps slightly exceeds half of 59.94 Hz: occasional
                 // adjacent refreshes are necessary for its correct average rate.
-                if(last_present_index>=0 && frame_rate_code!=4'h5) begin
+                if(last_present_index>=0 && frame_rate_code!=4'h5 && !(refresh_50 && frame_rate_code==4'h4)) begin
                     if(swap_window_index-last_present_index<min_present_gap)
                         min_present_gap = swap_window_index-last_present_index;
                     if(swap_window_index-last_present_index<2)
@@ -647,6 +649,33 @@ module tb_h262_b_presentation_scheduler;
             $fatal(1,"30000/1001 rate change did not re-seed credit code=%0d credit=%0d",
                    dut.cadence_rate_code_q,dut.cadence_credit);
 
+        refresh_50=1;
+        verify_cadence_rate(4'h1,1001,480);
+        verify_cadence_rate(4'h2,2500,1200);
+        verify_cadence_rate(4'h3,2000,1000);
+        verify_cadence_rate(4'h4,1001,600);
+        verify_cadence_rate(4'h5,2000,1200);
+
+        // Switch with a retained candidate: ownership must survive; only the
+        // credit scale changes. Timestamp admission still overrides cadence.
+        frame_rate_code=4'h3;reset_scheduler();
+        completed_bank=2'd1;
+        @(negedge clk);frame_waiting=1;
+        @(negedge clk);frame_waiting=0;
+        pulse_close();
+        repeat(3) begin
+            @(negedge clk);refresh_50=~refresh_50;
+            @(posedge clk);#1;
+            if(!dut.pending_frame_valid || dut.cadence_credit!=dut.cadence_due)
+                $fatal(1,"refresh switch lost candidate or failed to rebase credit");
+            timestamp_candidate_active=1;timestamp_candidate_due=0;
+            pulse_window();
+            if(!dut.pending_frame_valid)$fatal(1,"refresh switch bypassed PTS wait");
+        end
+        timestamp_candidate_due=1;pulse_window();
+        if(display_bank!=2'd1||dut.pending_frame_valid)
+            $fatal(1,"retained timestamped picture did not present after refresh switch");
+        $display("PASS refresh modes: exact cadence for five source rates at 59.94/50; pending ownership and PTS admission survive switching");
         $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=23.976/24/25/29.97/30 timestamp_wait_due=1 missing_fallback=1 no_burst=1 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=early/active fail_open=1",min_present_gap);
         $finish;
     end

@@ -17,6 +17,7 @@ raster = ['tools/test_480p_scanout.sv', 'rtl/mpeg2_video_720x480p.sv',
 tests = [
     ('test_osd_playback', ['tools/test_osd_playback.sv', 'sys/osd.v', 'rtl/video_config_cdc.sv']),
     ('test_480p_scanout', raster),
+    ('test_refresh_rate', ['tools/test_refresh_rate.sv', 'rtl/mpeg2_video_720x480p.sv', 'rtl/video_config_cdc.sv']),
     ('test_video_config_cdc', ['tools/test_video_config_cdc.sv', 'rtl/video_config_cdc.sv']),
     ('test_mpeg2_progressive_framebuffer', ['tools/test_mpeg2_progressive_framebuffer.sv', 'rtl/mpeg2_progressive_geometry.sv']),
     ('tb_h262_b_presentation_scheduler', ['tools/streams/tb_h262_b_presentation_scheduler.sv', 'rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv']),
@@ -24,19 +25,21 @@ tests = [
 ]
 results = {}
 with tempfile.TemporaryDirectory(prefix='video-sync-') as tmp:
-    def run(name, sources, expect_failure=False):
+    wiring = (root/'MediaPlayer_top_01.svh').read_text().split('///////////////////////')[0]
+    (Path(tmp)/'refresh_wiring.svh').write_text(wiring)
+    def run(name, sources, expect_failure=False, defines=()):
         binary = str(Path(tmp) / name)
-        if name == 'test_osd_playback':
+        if name in ('test_osd_playback', 'test_refresh_rate'):
             # Tens of full raster frames are much faster in compiled simulation.
             obj = str(Path(tmp) / 'osd_obj')
             compiled = subprocess.run(['verilator', '--binary', '--timing', '-j', '6',
-                '-Wno-fatal', '--top-module', name, '--Mdir', obj, *sources],
+                '-Wno-fatal', '-I'+tmp, '--top-module', name, '--Mdir', obj, *sources],
                 cwd=root, text=True, capture_output=True)
             if compiled.returncode:
                 raise RuntimeError(compiled.stdout + compiled.stderr)
             command = [str(Path(obj) / ('V' + name))]
         else:
-            subprocess.run(['iverilog', '-g2012', '-s', name, '-o', binary, *sources], cwd=root, check=True)
+            subprocess.run(['iverilog', '-g2012', *defines, '-s', name, '-o', binary, *sources], cwd=root, check=True)
             command = ['vvp', binary]
         result = subprocess.run(command, cwd=root, text=True, capture_output=True, timeout=180)
         output = result.stdout + result.stderr
@@ -48,6 +51,7 @@ with tempfile.TemporaryDirectory(prefix='video-sync-') as tmp:
         return {'exit': result.returncode, 'output': output}
     for name, sources in tests:
         results[name] = run(name, sources)
+    results['test_50hz_scanout'] = run('test_480p_scanout', raster, defines=('-DTEST_REFRESH_50',))
     subprocess.run(['iverilog', '-g2012', '-s', 'osd', '-o', str(Path(tmp)/'osd'),
                     'sys/osd.v', 'rtl/video_config_cdc.sv'], cwd=root, check=True)
     results['osd_elaboration'] = 'pass'

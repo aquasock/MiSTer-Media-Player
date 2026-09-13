@@ -141,11 +141,12 @@ mpeg2_h262_pts_presentation_timeline mpeg2_h262_pts_presentation_timeline
     .candidate_due    (mpeg2_new_timestamp_candidate_due)
 );
 
-mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
+mpeg2_h262_b_presentation_scheduler #(.ENABLE_REFRESH_SELECTION(1)) mpeg2_h262_b_presentation_scheduler
 (
     .clk                         (clk_mpeg2),
     .reset                       (reset_mpeg2),
     .swap_window_pulse           (mpeg2_new_swap_window_pulse),
+    .refresh_50                  (refresh_50_decoder),
     .frame_rate_code             (mpeg2_new_frame_rate_code),
     .timestamp_candidate_active  (mpeg2_new_timestamp_candidate_active),
     .timestamp_candidate_due     (mpeg2_new_timestamp_candidate_due),
