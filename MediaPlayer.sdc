@@ -51,6 +51,17 @@ set_false_path \
     -from [get_keepers {*|mpeg2_new_framebuffer_generation[*]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|framebuffer_generation_r1[*]}]
 
+# mpeg2_new_framebuffer_reset (the async reset driving rd_reset_sync) is
+# gated in part by audio_ui_mode_active - a 60 MHz register that only
+# changes on a genuine audio-visualizer/video mode switch, a rare
+# user-driven event with no per-frame timing requirement. rd_reset_sync's
+# own synchronous-release stages still enforce a clean, glitch-free reset
+# release into the 54 MHz domain; only the recovery/removal relationship
+# between the assertion source and that first async-reset stage is cut.
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_audio_ui:mpeg2_h262_audio_ui|mode_active}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
+
 # Entry 809: authored-menu overlay stable-bus/toggle handshakes cross between
 # the 60 MHz DDR service and 54 MHz video domains through explicit sampling
 # stages.  Cut only each source -> first-stage path.  The second sampling
