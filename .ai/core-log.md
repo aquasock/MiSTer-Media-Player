@@ -1,3 +1,46 @@
+## 011 COMMIT Unreleased ??? 2026-09-13T12:11:46-07:00
+
+#### Coming From:
+
+Unreleased 07b8688
+
+#### Purpose:
+
+Implement stock-Main mounted-file playback with interactive OSD access and session foundations for future pause and seeking.
+
+#### Outcome:
+
+The user approved docs/OSD_PLAYBACK_PLAN.md and requested implementation plus three clean cores while independently testing the timing-qualified 07b8688 seed-87 RBF. The proposed implementation replaces the blocking F1 file download with bounded mounted-file sector reads, explicit byte-stream EOF, complete-response buffering and coordinated restart/flush across the host, decoder and DDR boundaries. A nonzero reader start offset and request suspension boundary support later seeking and pause development; actual user pause and seek controls are deferred. No hardware files or Main binary will be changed during the user's test.
+
+#### Next Steps:
+
+Implement and test the reader and session controller, byte-exact EOF and restart behavior, DDR response draining and CDC preservation. Extend diagnostic evidence and the timing helper to enumerate all operating corners. Run existing playback/video/OSD regressions, commit and push the source, then build clean seeds 52, 61 and 87 and report timing and RBF candidates. Hardware acceptance requires uninterrupted playback while opening the stock Main OSD and adjusting filters.
+
+#### Files Modified:
+
+- docs/OSD_PLAYBACK_PLAN.md
+- rtl/media_file_reader.sv
+- rtl/media_session_control.sv
+- rtl/mpeg2_stream_fifo.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_06.svh
+- MediaPlayer_top_07.svh
+- files.qip
+- MediaPlayer.sdc
+- tools/phase1p_timing.tcl
+- tools/verify_media_file_reader.py
+- tools/test_media_file_reader.sv
+- tools/test_media_session_control.sv
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 010 COMMIT Unreleased 07b8688 2026-09-13T12:09:39-07:00
 
 #### Coming From:
@@ -1254,35 +1297,6 @@ Install `.ai/current_results/MediaPlayer_nativemoderemoval_seed99.rbf` (Main/hel
 
 - [x] Built
 - [x] Passed
-
----
-
-## 970 COMMIT Unreleased 6ac6895 2026-09-12T07:39:05-07:00
-
-#### Coming From:
-
-Unreleased 24a6bda
-
-#### Purpose:
-
-Fix the `.mpg` progress overlay flashing briefly then going missing after every seek, even though `24a6bda` fixed the pause reveal correctly.
-
-#### Outcome:
-
-The user reported that skipping forward/backward briefly flashes the overlay, then the screen goes black before the video resumes at the new position, after which the overlay is gone.  A screenshot of a paused mid-test frame confirmed the resumed video itself is completely clean, isolating this to the overlay specifically.  Investigation found `mpeg2_h262_native_startup` (instantiated in `MediaPlayer.sv`), a module that blanks the screen (forcing `base_de` low via `mpeg2_new_startup_video_blank`) until either the first picture is shown or a `bypass_event` fires; the DVD-style overlay compositor's `overlay_sample_valid` also requires `base_de`, so nothing can composite during that blank window.  The user identified its origin directly: it was added specifically to hide genuinely corrupt video while skipping DVD chapters (a mid-GOP splice glitch crossing program chain segments), not for `.mpg` seeking.  Its reset was `reset_mpeg2`, which includes the Entry 237 rearm pulse fired on every seek, so this module's "startup done" latch (`decided`/`bypass`/`shown`) re-armed and re-blanked the screen on every plain `.mpg` seek too - the same class of bug already fixed twice tonight for `mpeg2_h262_audio_ui` (`b0372f6`) and the luma framebuffer (`1b1ab7a`).  A literal git revert of the module's history was not practical (three prior commits including a full native-480p rewrite would be unwound); DVD chapter navigation is out of scope for this project now, and a plain `.mpg` seek decodes straight from a GOP boundary and never produces the corruption this blank existed to hide, matching the clean resumed-video screenshot.  Source `6ac6895` changes `mpeg2_h262_native_startup`'s reset from `reset_mpeg2` to `reset_mpeg2_base`, so "startup done" latches once at the true first load and never re-blanks the screen on a seek again; `swaps_enabled` staying permanently true afterward is correct (it only ever gated the first frame swap until a complete picture was ready) and its only other consumer is an unrelated development-only diagnostic condition.  All three seeds 26, 33 and 40 compiled with 0 errors; worst-case setup slack was positive 0.050 ns, negative 0.027 ns and negative 0.334 ns respectively, so only seed 26 passes timing - margins are noticeably tighter than recent builds, consistent with the resource-cleanup motivation behind the native/interlace removal pass queued up next.  Seed 26 was delivered as `.ai/current_results/MediaPlayer_nativestartupfix_seed26.rbf`, SHA-256 `b8964507eacf87fe73f97715860de7020549ca3acbd48e5e45af56d15b4250bf`.  Main and the helper are unchanged from `24a6bda`'s delivered build.
-
-#### Next Steps:
-
-Install `.ai/current_results/MediaPlayer_nativestartupfix_seed26.rbf` (Main/helper unchanged from entry `24a6bda`) and retest: seeking on `.mpg` should no longer blank the screen or lose the progress overlay, while the video itself and ordinary `.mpg`/audio-player behavior remain unaffected.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
