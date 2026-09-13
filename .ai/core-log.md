@@ -1,3 +1,38 @@
+## 19 COMMIT Unreleased ??? 2026-09-13T15:28:53-07:00
+
+#### Coming From:
+
+Unreleased dd144a3
+
+#### Purpose:
+
+Reduce default observational telemetry logic while retaining essential playback-health diagnostics and an optional detailed profile.
+
+#### Outcome:
+
+The user authorizes telemetry cuts while testing the timing-qualified dd144a3 refresh core. The planned compact schema uses 25 words instead of 49, retaining byte/time counts, picture counts and source metadata, errors, snapshot reason, one maximum gap and outlier count, basic terminal ownership, audio counts/status and all transport-health words. Per-picture and aggregate stall histories, overlapping hold totals, DDR performance totals, ranked-gap metadata and full scheduler dumps will be excluded from the default synthesized profile. A compile-time detailed option retains the existing schema-9 profiler for diagnosis. The screenshot decoder will support the new schema and old captures, identify omitted fields as unavailable and validate parity/checksum. This cycle changes only observational telemetry and its tooling; it does not change decode, playback ownership, audio timing, refresh selection or filters. No RAM-backed snapshot redesign is included until the savings from these cuts are measured.
+
+#### Next Steps:
+
+Implement the compact profile and decoder support, prove retained snapshots against the detailed profile with EOF, fatal, no-progress and reset cases, round-trip actual RTL overlay pixels through the screenshot decoder, run existing video regressions, then commit and push the source and build seeds 52, 61 and 87 to measure resource savings and qualify all timing corners.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- MediaPlayer_top_07.svh
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/verify_video_sync.py
+- docs/TEST_INSTRUCTIONS.md
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 18 COMMIT Unreleased dd144a3 2026-09-13T15:26:03-07:00
 
 #### Coming From:
@@ -1302,39 +1337,6 @@ Stage B: reroute Main to stream raw `.mpg` file bytes directly (no helper proces
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 978 COMMIT Unreleased 39df52e 2026-09-12T20:29:13-07:00
-
-#### Coming From:
-
-Unreleased 8e72075
-
-#### Purpose:
-
-Add a continuously-live decode/display progress and ownership-hold probe so the next physical freeze can be diagnosed directly from a screenshot instead of inferred from static code reading.
-
-#### Outcome:
-
-Entry 977's ARM-side pipe-write deadlock fix did not resolve the freeze: hardware testing after that fix still hung after a handful of ordinary pause/resume cycles on the baseline `01 - Pee Strike.mpg`, with two screenshots ten seconds apart byte-identical, `MiSTer_MediaPlayer` pinned at ~50% CPU with `wchan=0` (a busy userspace loop, not a kernel wait), and `MediaPlayer_Helper` blocked in `pipe_write` with no active pause in the log. Tracing the chain from `fpga_spi_write_ack_impl()`'s untimed SSPI-ACK busy-wait (`host/main_mister/0001-mediaplayer-arm-loader.patch`, patched into `fpga_io.cpp`) back through `hps_io`'s `ioctl_wait`, `mpeg2_stream_fifo`'s `wr_full`, and `mpeg2_new_stream_ready`'s gate on `mpeg2_new_p_destination_ownership_hold` and `mpeg2_new_b_presentation_hold` (`MediaPlayer.sv`) identified a plausible circular-wait design flaw: the P-only ownership hold (`MediaPlayer.sv:1699-1747`) only releases once display moves off the bank decode wants to reuse, but display can only move there once decode supplies a new completed picture - which decode cannot do while held. Building a rigorous Icarus simulation of that hypothesis was judged not worth the risk of an unfaithful model, since `mpeg2_h262_b_presentation_scheduler.sv` turned out to be a 1016-line, heavily-evolved B-reordering state machine far more intricate than its two hold outputs suggested. Instead, added `mpeg2_h262_live_deadlock_probe`, a new module inserted last in the video chain (after the existing one-shot `mpeg2_h262_hardware_cadence_profiler`, which only arms once at the first overlay commit after boot and never re-arms) that redraws two small always-live data words every video frame from raw mpeg2-domain state: `mpeg2_stream_full`, `mpeg2_burst_ready`, both ownership holds, the active/display frame banks, and two independent free-running counters that increment on `mpeg2_new_picture_420_complete` and on any change to the display bank/scratch state, so a screenshot taken during a live hang shows directly whether decode or display (or both) have actually stopped advancing. A standalone Icarus unit test (`tools/test_live_deadlock_probe.sv`) confirms the box passes the base color through outside its fixed corner region, both rows draw the fixed alignment prefix, the two words decode to the expected live field values, and the two progress counters advance independently; `tools/decode-live-deadlock-probe.py` was verified against a synthetic PNG built with the same bit layout before trusting it on real hardware screenshots. `MediaPlayer.sv`, `files.qip` and the new RTL/test/tool files build cleanly under Icarus; no Quartus timing build has been run yet.
-
-#### Next Steps:
-
-Superseded before its timing build finished: the user decided, in the same session, to drop DVD/CD and the standalone audio-file player entirely and rebuild the project as `.mpg`-only with Program Stream demux, MP2 audio decode and overlay text rendering moved into the FPGA core, eliminating the custom Main patches and the ARM helper process outright - see entry 979. The three seed compiles this entry's Next Steps called for were killed unstarted-to-timing-closure; this probe and the freeze it was built to diagnose are abandoned along with the architecture that has the bug, not carried forward.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_live_deadlock_probe.sv
-- tools/decode-live-deadlock-probe.py
-- tools/test_live_deadlock_probe.sv
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
