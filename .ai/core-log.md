@@ -1,3 +1,50 @@
+## 002 COMMIT Unreleased ??? 2026-09-13T09:12:17-07:00
+
+#### Coming From:
+
+Unreleased 1750154
+
+#### Purpose:
+
+Restore native 720x480 progressive output while retaining the hardware-accepted I/P/B decoder, FPGA MP2 audio and screen telemetry.
+
+#### Outcome:
+
+The user accepted 1750154 seed 87 and authorized continuing the progressive output plan. That baseline passed setup +0.257 ns, hold +0.248 ns, recovery +3.716 ns, removal +0.641 ns and pulse +1.122 ns, using 40132 ALMs and 470 RAM blocks; seed 61 also passed timing, while seed 52's fitter exited unexpectedly with Quartus error 293007. This cycle reuses progressive raster geometry and centered-picture policy from b3626a6 without importing its interlace or helper architecture. Prepared changes select a 27 MHz pixel clock, 858x525 total raster with 720x480 active pixels at 60000/1001 Hz, negative sync, a 480-line blanking swap boundary and exact fallback cadence ratios. Decoder and MP2 clocks remain unchanged. A full raster/cache simulation verifies all 345600 visible pixels with varied DDR stalls and two-stage DE/sync alignment; centered geometry and scheduler regressions pass all five frame rates, B reordering, timestamp waits, terminal draining and ownership cases. Exact 30 fps requires occasional adjacent refreshes because it exceeds half the output refresh rate. Schema-eight telemetry moves to line 312; its RTL regression passes, and the Python decoder round-trips native and prior SVGA layouts. Original aspect follows 4:3 versus default 16:9 sequence signalling. Direct analog is progressive 480p/31 kHz, not a newly implemented 15 kHz mode. Static timing and hardware validation of these prepared changes remain pending.
+
+#### Next Steps:
+
+Commit the prepared changes, run three clean Quartus seeds and require all standard and focused timing reports including the new 27 MHz video clock and HDMI scaler. Preserve the accepted 1750154 seed-87 RBF, compare frame edges, aspect and audio synchronization on hardware, and revisit the previously recorded video cadence outlier using retained telemetry.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer.sdc
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_04.svh
+- README.md
+- files.qip
+- rtl/mpeg2_luma_framebuffer.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_progressive_geometry.sv
+- rtl/mpeg2_video_720x480p.sv
+- rtl/pll/pll_0002.v
+- tools/phase1p_timing.tcl
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/test_480p_scanout.sv
+- tools/test_mpeg2_progressive_framebuffer.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 001 COMMIT Unreleased 1750154 2026-09-13T08:38:36-07:00
 
 #### Coming From:
@@ -1229,35 +1276,6 @@ Install only `host/build/MiSTer_MediaPlayer` as executable `/media/fat/MiSTer_Me
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 961 COMMIT Unreleased 4116a00 2026-09-04T00:07:31-07:00
-
-#### Coming From:
-
-Unreleased 3b2a0ca
-
-#### Purpose:
-
-Replace marker-file optical launching with a hierarchical loader menu that starts physical DVD and Audio CD media directly while retaining separate DVD ISO, MPEG-2 video and audio file pickers.
-
-#### Outcome:
-
-This proposal was never implemented or committed; substantial unrelated development proceeded on master afterward without being logged here, per explicit user direction to leave that interim history undocumented and resume the formal propose/log/build/log/test cycle fresh from the repository's current state.  The loader-menu reorganization and direct physical CDDA/DVD launch behavior described above did not happen under this entry and remain open work if still wanted in the future.  This entry is closed as abandoned and superseded, anchored at `4116a00`, the actual repository HEAD at the point formal logging resumes.
-
-#### Next Steps:
-
-None; this proposal is closed without action.  Any future loader-menu reorganization work should be proposed fresh against the current HEAD rather than resumed from this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
