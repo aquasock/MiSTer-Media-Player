@@ -1,4 +1,4 @@
-## 19 COMMIT Unreleased ??? 2026-09-13T15:28:53-07:00
+## 19 COMMIT Unreleased 0b6eb0e 2026-09-13T15:28:53-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Reduce default observational telemetry logic while retaining essential playback-
 
 #### Outcome:
 
-The user authorizes telemetry cuts while testing the timing-qualified dd144a3 refresh core. The planned compact schema uses 25 words instead of 49, retaining byte/time counts, picture counts and source metadata, errors, snapshot reason, one maximum gap and outlier count, basic terminal ownership, audio counts/status and all transport-health words. Per-picture and aggregate stall histories, overlapping hold totals, DDR performance totals, ranked-gap metadata and full scheduler dumps will be excluded from the default synthesized profile. A compile-time detailed option retains the existing schema-9 profiler for diagnosis. The screenshot decoder will support the new schema and old captures, identify omitted fields as unavailable and validate parity/checksum. This cycle changes only observational telemetry and its tooling; it does not change decode, playback ownership, audio timing, refresh selection or filters. No RAM-backed snapshot redesign is included until the savings from these cuts are measured.
+Source 0b6eb0e implements compact schema 10 with 25 words instead of 49, retaining the approved byte/time/picture metadata, errors, one maximum gap and outlier count, basic terminal state, audio and transport-health words. Only detailed-performance outputs are excluded from the default synthesis cone; their equations remain available under MMP_DETAILED_TELEMETRY for schema-9 diagnostic builds. The overlay remains at (8,280) but is 100 pixels tall instead of 196. Side-by-side RTL tests prove every retained word equals the detailed profile at quiet EOF, all supported cadence codes, terminal timeout, fatal error, no-progress capture and pre-decode transport failure. The new verifier decodes actual compact RTL overlay RGB pixels, rejects corrupted cells, checks the command-line report, and confirms schema 7/8/9 compatibility at every retained overlay origin. Removed diagnostics are explicitly unavailable/null; the host checksum field now correctly uses the last word for every schema. Existing video, OSD, scanout, cadence, geometry, CDC, 50 Hz switching and profiler regressions pass. Decoder, audio and presentation-control RTL are unchanged. Source is pushed and seeds 52, 61 and 87 are compiling under results/build-0b6eb0e-20260913-153453, which retains regression evidence. Resource savings and timing remain pending; the user is separately testing the preceding dd144a3 seed-52 refresh build.
 
 #### Next Steps:
 
-Implement the compact profile and decoder support, prove retained snapshots against the detailed profile with EOF, fatal, no-progress and reset cases, round-trip actual RTL overlay pixels through the screenshot decoder, run existing video regressions, then commit and push the source and build seeds 52, 61 and 87 to measure resource savings and qualify all timing corners.
+Measure synthesized and fitted savings against dd144a3, complete all four timing corners and the unchanged 108-register audit for all three seeds, then deliver timing-qualified compact RBFs and capture instructions. Record the user's dd144a3 hardware feedback separately when it arrives; do not conflate that acceptance with this telemetry build.
 
 #### Files Modified:
 
@@ -22,7 +22,8 @@ Implement the compact profile and decoder support, prove retained snapshots agai
 - MediaPlayer_top_07.svh
 - tools/streams/decode_hardware_cadence.py
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/verify_video_sync.py
+- tools/verify_compact_telemetry.py
+- tools/streams/run_hardware_cadence.py
 - docs/TEST_INSTRUCTIONS.md
 - CHANGELOG.md
 
