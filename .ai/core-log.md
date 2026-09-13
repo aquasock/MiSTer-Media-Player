@@ -1,3 +1,61 @@
+## 23 COMMIT Unreleased ??? 2026-09-13T16:01:34-07:00
+
+#### Coming From:
+
+Unreleased 0b6eb0e
+
+#### Purpose:
+
+Generate deterministic motion-focused media for visual refresh-rate qualification.
+
+#### Outcome:
+
+The user authorizes generating media that makes the 50/59.94 Hz switch easy to assess. The planned generator produces progressive 720x480 clips at 25 and 30000/1001 fps with sharp constant-speed moving bars, a panning fence and visible frame IDs, plus clear comparison instructions. Matching raw M2V and MPG files exercise both cadence paths. The source rate and traversal speed will remain fixed while users switch output refresh; no new core change or FPGA build is needed.
+
+#### Next Steps:
+
+Generate the clips, verify rates and progressive geometry, inspect representative frames and decode integrity, commit the reproducible generator and instructions, then deliver the files for visual A/B testing.
+
+#### Files Modified:
+
+- tools/make_cadence_motion_tests.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 22 COMMIT Unreleased 0b6eb0e 2026-09-13T16:01:34-07:00
+
+#### Coming From:
+
+Unreleased 0b6eb0e
+
+#### Purpose:
+
+Record user acceptance of the compact core and withdraw the reported hang as a core defect.
+
+#### Outcome:
+
+The user states that they caused the reported hang and instructs the agent to ignore it, then reports the new core works perfectly like the preceding core. This accepts ordinary hardware behavior of the delivered compact seed 87 by handoff context; no running hash was independently captured. The earlier freeze is no longer an open core defect. The user is still qualifying the visible refresh-rate benefit and requests more discriminating test media because the existing clips make the difference difficult to see.
+
+#### Next Steps:
+
+Retain compact source 0b6eb0e seed 87 as the hardware-accepted baseline and produce motion-focused media to compare 25 fps at 50/59.94 Hz.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 21 COMMIT Unreleased 0b6eb0e 2026-09-13T15:55:39-07:00
 
 #### Coming From:
@@ -1272,65 +1330,6 @@ Install this corrected Main binary (RBF unchanged from entry 982's seed99 build)
 #### Files Modified:
 
 - host/main_mister/0004-mediaplayer-plain-video-generic-load.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 982 COMMIT Unreleased 709c5cd 2026-09-12T22:53:53-07:00
-
-#### Coming From:
-
-Unreleased 4d23624
-
-#### Purpose:
-
-Close the recovery-timing failure entry 981's probe removal exposed, and identify a passing seed for hardware testing of stage B.
-
-#### Outcome:
-
-Entry 981's probe removal fixed setup timing completely but exposed a second, smaller failure: all six available seeds (26, 33, 40, 7, 52, 99) failed recovery/removal analysis on the identical path, `mpeg2_h262_audio_ui|mode_active` (60MHz decoder clock) to `mpeg2_luma_framebuffer|rd_reset_sync` (54MHz video clock's async reset), by a consistent -1.4 to -1.9ns margin (one outlier at -0.012). Tracing the mechanism found `mode_active` feeds `mpeg2_new_framebuffer_reset` (`MediaPlayer.sv:2011-2014`), the async reset for that synchronizer - a path with no real timing requirement, since it only fires on a rare, user-driven audio-visualizer/video mode switch, not per-frame. Since six-seed variance had already been exhausted without finding a pass, added a targeted `set_false_path` exception in `MediaPlayer.sdc` for exactly that register pair, following the file's existing per-signal CDC exception convention. Verified the fix without a full re-fit: re-ran `quartus_sta` alone against each seed's already-placed netlist (a false-path exception only relaxes analysis, it cannot change a placement already found valid under the stricter constraint) and found seed26, seed52 and seed99 now pass timing completely with no critical warning; seed33, seed40 and seed7 still fail on an unrelated, pre-existing HDMI-PLL setup margin that has always been seed-sensitive in this project, unrelated to any of today's changes. Selected seed99 (`output_files/MediaPlayer.rbf`, SHA-256 `a24b8bedb58cc7783e6f32e45a1d925c8a5e51bb99e164694e1cf95fad894d85`, 4,465,740 bytes) as the best candidate: best margin among the three passers and the seed this project has used for prior milestones. Also, while builds ran earlier, audited RTL for resources recoverable from the disabled interlaced/Bob-Weave/native-bypass paths (see entry 981) - found nothing recoverable, since that logic was already cheap and the real M10K consumers are all load-bearing decode logic.
-
-#### Next Steps:
-
-Install seed99's RBF alongside the four-patch Main stack (`host/build_arm_stack.sh`'s `main_patches`) on the test MiSTer and confirm silent (audio-muted) video-only playback of a real `.mpg` file loaded via F4, watching for anything the synthetic Icarus demux test didn't exercise. Once hardware-confirmed, proceed to stage C: an MP2 audio decoder consuming the demux's audio elementary output, budgeting carefully against the ~3% M10K headroom entry 981 measured.
-
-#### Files Modified:
-
-- MediaPlayer.sdc
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 981 COMMIT Unreleased 4d23624 2026-09-12T21:52:06-07:00
-
-#### Coming From:
-
-Unreleased b1864ab
-
-#### Purpose:
-
-Diagnose and fix the timing failure found by the three-seed build of entry 980's stage B RTL, and check FPGA resource headroom for stage C's MP2 decoder while builds ran.
-
-#### Outcome:
-
-All three seeds (26, 33, 99) failed timing identically: `quartus_sh --flow compile` reported "Timing requirements not met" with worst-case setup slack -2.929/-2.873/-3.058ns respectively, each on the same path - `mpeg2_h262_b_presentation_scheduler` (60MHz decoder clock) to `mpeg2_h262_live_deadlock_probe|word0_sync1` (54MHz video clock), confirmed via `tools/phase1p_timing.tcl`'s detailed path report. The identical failure across three independent placement seeds (rather than the small slack variance normal seed-search accounts for) pointed to a structural gap rather than placement luck: entry 977/978's diagnostic probe crosses its two live words from the mpeg2 clock domain into the video clock domain with a plain double-flop synchronizer and no SDC exception, so TimeQuest tried to close setup timing between two unrelated clocks as though they were synchronous. Since the freeze investigation that probe was built for is already abandoned in favor of entry 979's rewrite, removed the probe outright (`MediaPlayer.sv`, `files.qip`, and its RTL/tool/test files) rather than add a false-path exception to preserve a feature nothing needs anymore. Separately, while the seed builds ran, audited the RTL for resources recoverable from the already-disabled interlaced/Bob-Weave/native-bypass paths per seed99's completed fit report: current usage is 538/553 M10K blocks (97%) and 35,010/41,910 ALMs (84%), but the tied-off interlaced/native logic (`HDMI_BOB_DEINT`, `interlaced_request_async`) turned out cheap already - `mpeg2_luma_framebuffer`'s native-interlaced-aware paths account for only ~26 of 553 blocks, and `mpeg2_video_output_timing` has no RAM at all. The real top M10K consumers - `mpeg2_h262_two_picture_probe` (170 blocks), `mpeg2_h262_reference_read_probe` (162), three "probe"/"diagnostic_controller"-named P/B motion-vector and residual decode modules (85 each, 255 total), and residual coefficient storage (76) - are all load-bearing H.262 decode logic despite diagnostic-sounding names, confirmed by reading `mpeg2_h262_p_diagnostic_controller_rearm.sv` directly; none are safe removal candidates. No RAM-recovery change was made.
-
-#### Next Steps:
-
-Re-sync the corrected RTL (with the probe removed) to all three seed directories and rerun the three-seed timing build; if it passes, install the RBF and the four-patch Main and get a real hardware test of silent video-only `.mpg` playback via F4. Separately, `audio_pcm_fifo`'s 70 M10K blocks exist only for the legacy helper's already-decoded PCM path - revisit whether stage C's MP2 decoder can reuse it once stage E removes the helper, since a fresh 97%-utilized M10K budget leaves little room for a new audio FIFO of its own.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-- files.qip
 
 #### Status:
 
