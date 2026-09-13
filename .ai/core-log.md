@@ -1,3 +1,32 @@
+## 992 COMMIT Unreleased 2f413b4 2026-09-13T03:48:42-07:00
+
+#### Coming From:
+
+Unreleased 14af685
+
+#### Purpose:
+
+Fix the actual stall entry 991's live diagnostic pinpointed: parse_hold stuck inside mpeg2_h262_b_core_probe, not either hold already fixed this session.
+
+#### Outcome:
+
+Deployed entry 991's stall-diagnostic build (seed33, +0.039ns margin) and asked the user to reload and let it stall past the 3-second arm threshold. `stall_diag_valid=true` with `stall_diag_b_parse_hold=true`, `stall_diag_b_candidate=true`, `stall_diag_b_error=true`, `stall_diag_b_seen=false`, `stall_diag_b_picture_inflight=false`, all other flags (parser_ready=true, p_hold_raw/p_hold_effective=false, b_persistence_wait=false) clear - decoder_stream_ready held low purely by mpeg2_h262_b_core_probe's own parse_hold, not by anything entries 986 or 990 touched. Traced the module (spread across mpeg2_h262_b_core_probe_part0-5.svh) and found parse_hold's only release paths are the row-completion state (R_FINISH) receiving external row_retired credit, or a fresh slice start reaching a rearm branch at the bottom of the FSM. Several `replay_error` assignment sites set the module's error output without also clearing parse_hold, unlike the `parser_error` sites, which consistently pair the two. If parse_hold is already asserted (waiting on row_retired) when one of these fires, nothing clears it: row_retired's only source is a downstream B-prediction engine (`mpeg2_h262_reference_pipeline_probe_rearm.sv`) that itself only activates via `b_motion_transport` from this same module - a signal needing the forward progress parse_hold is blocking. Worse, the rearm branch that could otherwise recover sits inside a `stream_valid`-gated block, which never fires again once stream_ready (derived from parse_hold) has gone permanently low - no further bytes ever arrive to reach it. Source `2f413b4` adds one unconditional statement at the very end of the module's always block, deliberately outside the stream_valid gate so it keeps evaluating with no new bytes arriving: whenever `parser_error`, `replay_error` or `prior_error` is latched, clear `parse_hold`. Matches this module's own stated design intent ("a failed B parser/replay transaction must never retain ownership of the compressed-stream path") and the identical recovery pattern the wrapper already applies one layer up for `b_picture_inflight`/`b_persistence_verified` on `b_error`. Attempted an Icarus reproduction feeding the real file's demuxed bytes directly into this module in isolation; it never left its idle state for reasons not fully understood (likely a sequencing precondition the narrow harness didn't model), so the reproduction was inconclusive and the exploratory testbench was not committed - this fix rests on the real hardware diagnostic's precise bit-level evidence plus the code-level tracing above, not a verified simulation. `quartus_map` on seed99 is clean, 0 errors, same warning count, negligible logic change.
+
+#### Next Steps:
+
+Sync to all three seed build directories, run the full timing build (margins have been thin the last two cycles - seed99 alone passed at +0.001ns two cycles ago, then failed entirely last cycle while seed26/seed33 passed near +0.01-0.04ns; watch for the possibility that none pass this time and a margin-recovery pass becomes necessary before any further hardware test), deploy the best-passing seed, and ask the user to reload the file. If `mpeg2_new_decoder_stream_ready` still stalls, pull fresh telemetry - `stall_diag_valid`/`stall_diag_b_parse_hold` should now read differently (either clear, confirming the fix, or the stall should shift to a new signal, which would mean this fix was necessary but not sufficient and the next blocker needs identifying from fresh evidence, not assumed to be a variant of this one). If decode proceeds past this point, watch for whether video actually starts displaying, since this is the first fix in this whole session that touches the path required to reach a first real picture at all.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 991 COMMIT Unreleased 14af685 2026-09-13T03:08:33-07:00
 
 #### Coming From:
@@ -1075,66 +1104,6 @@ Replace only `/media/fat/MiSTer_MediaPlayer`, retain the accepted helper and RBF
 - host/build_arm_stack.sh
 - host/main_mister/0003-mediaplayer-ntsc-480i-hdmi.patch
 - tools/test_main_ntsc_480i.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 956 COMMIT Unreleased f93c6ba 2026-09-03T20:32:38-07:00
-
-#### Coming From:
-
-Unreleased 67ce19d
-
-#### Purpose:
-
-Keep automatic-menu PCM below its safety ceiling without recreating the long downstream audio lead.
-
-#### Outcome:
-
-Source `f93c6ba` retains source `67ce19d`'s reserve-drain pacing boundary and replaces its fixed one-batch fallback ceiling with pressure-driven 2,048-frame runs.  Each stalled-timestamp automatic-menu pass drains held PCM to a low watermark equal to half the configured hold limit when that is above the existing 8,192-frame scheduling reserve, which is 96,000 frames at the default four-second limit; the normal advancing-timestamp scheduler, ordinary title reserve, overlay priority and transport byte order remain unchanged.  This gives the default route two seconds of hold-limit headroom, bounds the initial sink-paced catch-up from the observed 183,808 frames to approximately 1.83 seconds, and makes subsequent work proportional to each newly decoded Program Stream audio burst instead of permitting a net-growing hold.  The production fixture proves that one fallback pass drains 48,000 held frames to its 24,000-frame test watermark through the real reserve, then absorbs a further 12,000-frame burst while preserving the watermark and every emitted sample; the retained long-menu and advancing-PTS controls pass.  Strict optimized, AddressSanitizer with leak detection disabled for the ptrace environment, UndefinedBehaviorSanitizer and GCC analyzer checks pass apart from the known audio-overlay allocation false positive, as do the native helper capability probe, retained DVD random-access, SPU, menu-hop, overlay, stage, output-reserve, AC-3, LPCM-skip, audio UI, visualizer and seek tests.  Twenty repeated production runs, one hundred menu-hop runs, fifty output-reserve runs and twenty LPCM-skip integrations pass, and real MP3, WAV, FLAC and Ogg seek integrations pass with and without the visualizer.  GNU 10.2.1 builds the 970,148-byte stripped static ARMv7 helper `host/build/MediaPlayer_Helper` with SHA-256 `70cfc0c59957bfaf8ca1b536f3746537c76e4108551a4b28c359a3ebcefa8785`; Main, protocol, RTL and RBF are unchanged.
-
-#### Next Steps:
-
-Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`f93c6ba` artifact and retain the current per-core Main, RBF and visualizer.  Let Futurama run through all intros into its root menu, require one fallback diagnostic containing `watermark=96000 reserve=8192 paced_batch=2048`, and confirm the menu appears and animates with continuous intelligible audio, a responsive selector, no hold-limit diagnostic and no helper termination.  Exercise its nested episode menu and selected-title playback, then repeat automatic-menu entry on several other discs and return the updated log, screenshot and telemetry for hardware qualification.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 955 COMMIT Unreleased 67ce19d 2026-09-03T20:28:11-07:00
-
-#### Coming From:
-
-Unreleased 67ce19d
-
-#### Purpose:
-
-Qualify source `67ce19d` on Futurama's automatic root-menu transition and isolate its failure before menu playback.
-
-#### Outcome:
-
-The physical source-`67ce19d` run rejects the one-batch fallback admission policy while validating its sink-pacing boundary.  All three finite intro boundaries complete, the silent-video lookahead classifies and releases, the automatic menu inherits the continuous scheduling epoch at 41.085422 seconds, the first translated audio and video horizon remains fixed at PTS 647,273, and a valid 86,400-byte overlay plane commits without ordering error.  Fallback activates at 41.376416 seconds with 183,808 held PCM frames and no timestamp-derived audio due; draining the output reserve before each scheduled run succeeds, but admitting only one 2,048-frame batch per Program Stream scheduler pass is slightly slower than the disc's decoded AC-3 bursts.  Held PCM consequently rises to 193,024 frames, crosses the unchanged 192,000-frame safety ceiling about 4.37 seconds later, and deliberately terminates the helper with exit status one at 45.764969 seconds before the menu can play.  Main reports `helper-error`; there is no reserve-pacing failure, audio underrun, PCM protocol error, decoder error or overlay ordering error.  The checksum-valid schema-21 snapshot is an earlier settled-overlay capture with 127 displayed pictures, 126 swaps, zero decoder and PCM errors, zero underruns and one valid visible menu overlay; the later screenshot shows the black post-exit diagnostic display.  The 1,083,151-byte log, 11,711-byte screenshot and 844-byte telemetry sidecar have SHA-256 `c74ffb51e544a2ab233fc66164d2ec00694e6c14fba86c4b3c4757e3a842add0`, `915763d7b660d4b82ef007c02f78f655c43c59c3dff4eccea59c6769a9c1b4f8` and `335b0923d031579f9cfb03c19d8320563c5089243b762857569ca1a72ad05f46`.
-
-#### Next Steps:
-
-Retain the source-`67ce19d` reserve-drain pacing boundary but replace its fixed one-batch ceiling after user approval with a pressure-driven bounded burst that emits sink-paced 2,048-frame runs until held PCM reaches a safe low watermark below the four-second ceiling.  Bound each admission interval so menu input remains responsive, add production regressions in which a single Program Stream packet decodes more PCM than one batch and verify that held audio falls rather than grows under a stalled timestamp, then rerun strict native, analyzer, sanitizer and retained DVD/audio suites and build only a new static ARM helper for Futurama plus the broader physical-disc menu test.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
