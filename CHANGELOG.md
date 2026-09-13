@@ -8,6 +8,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Stock-Main mounted MPG/M2V playback using bounded sector reads, leaving menu input available during playback; hardware OSD/filter validation pending.
+- Coordinated playback-session restart with DDR response draining, exact byte/EOF transport, startup prefill, and reader offset/suspension interfaces for later pause and seeking.
+- Telemetry schema 9 reports file-read requests/completions, maximum response wait, byte position, session generation, reservoir minimum and transport status; decoder retains older capture support.
+
 - FPGA MPEG-1 Layer II decoding for 48 kHz stereo MPG, serialized subband
   synthesis, PCM timestamp scheduling and an independent DDR video reservoir.
 - PES-to-picture timestamp binding and audio frame/sample/error telemetry.
@@ -15,6 +19,7 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Fixed
 
+- Enumerate every available Quartus operating corner in timing reports instead of relying on `-multi_corner` with file output.
 - Hide Main's loading-message overlay once playback starts, preserving normal menus.
 - Preserve configuration and VS synchronizer flip-flops through synthesis and
   transfer platform aspect and scaler mode settings into their consuming clocks.

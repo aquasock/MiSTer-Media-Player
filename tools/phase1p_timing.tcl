@@ -66,7 +66,7 @@ update_timing_netlist
 # Check every stage of each required instance, not just a wildcard that could
 # accidentally match one surviving synchronizer elsewhere in the design.
 set cdc_audit [open "$output_dir/configuration_cdc_audit.rpt" w]
-foreach instance {aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
+foreach instance {media_prefill_config media_fatal_config media_telemetry_config aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
     if {[string first "|" $instance] < 0} {
         set prefix "*video_config_cdc:$instance"
     } else {
@@ -87,6 +87,14 @@ foreach chain {hdmi_vs_sys_sync core_vs_sys_sync} {
         set count [get_collection_size [get_registers $pattern]]
         puts $cdc_audit "$pattern: $count registers"
         if {$count != 1} {error "Expected one preserved VS synchronizer register: $pattern, found $count"}
+    }
+}
+foreach chain {req_sync ack_sync} {
+    for {set stage 0} {$stage < 3} {incr stage} {
+        set pattern [format {*|media_session_control:*|%s[%d]} $chain $stage]
+        set count [get_collection_size [get_registers $pattern]]
+        puts $cdc_audit "$pattern: $count registers"
+        if {$count != 1} {error "Missing session synchronizer: $pattern"}
     }
 }
 close $cdc_audit
@@ -128,7 +136,6 @@ report_timing \
     -nworst 5 \
     -detail full_path \
     -show_routing \
-    -multi_corner \
     -file "$output_dir/phase1p_decoder_setup.rpt"
 
 report_timing \
@@ -137,7 +144,6 @@ report_timing \
     -npaths 50 \
     -nworst 1 \
     -detail path_and_clock \
-    -multi_corner \
     -file "$output_dir/phase1p_decoder_setup_diverse.rpt"
 
 # ---------------------------------------------------------------------------
@@ -156,7 +162,6 @@ report_timing \
     -nworst 5 \
     -detail full_path \
     -show_routing \
-    -multi_corner \
     -file "$output_dir/phase1p_decoder_same_clock_setup.rpt"
 
 report_timing \
@@ -166,7 +171,6 @@ report_timing \
     -npaths 100 \
     -nworst 1 \
     -detail path_and_clock \
-    -multi_corner \
     -file "$output_dir/phase1p_decoder_same_clock_setup_diverse.rpt"
 
 # The existing build also has a recovery violation on the decoder clock.
@@ -179,7 +183,6 @@ report_timing \
     -nworst 5 \
     -detail full_path \
     -show_routing \
-    -multi_corner \
     -file "$output_dir/phase1p_decoder_recovery.rpt"
 
 # ---------------------------------------------------------------------------
@@ -196,7 +199,6 @@ report_timing \
     -nworst 5 \
     -detail full_path \
     -show_routing \
-    -multi_corner \
     -file "$output_dir/phase1p_video_setup.rpt"
 
 report_timing \
@@ -207,7 +209,6 @@ report_timing \
     -nworst 5 \
     -detail full_path \
     -show_routing \
-    -multi_corner \
     -file "$output_dir/phase1p_video_same_clock_setup.rpt"
 
 report_timing \
@@ -217,7 +218,6 @@ report_timing \
     -npaths 80 \
     -nworst 1 \
     -detail path_and_clock \
-    -multi_corner \
     -file "$output_dir/phase1p_video_same_clock_setup_diverse.rpt"
 
 puts ""
@@ -239,10 +239,31 @@ puts ""
 # Include HDMI scaler paths and global hold failures in every build report.
 set hdmi_clock [get_clocks {pll_hdmi|pll_hdmi_inst|altera_pll_i|cyclonev_pll|counter[0].output_counter|divclk}]
 report_timing -setup -from_clock $hdmi_clock -to_clock $hdmi_clock \
-    -npaths 50 -nworst 3 -detail full_path -show_routing -multi_corner \
+    -npaths 50 -nworst 3 -detail full_path -show_routing \
     -file "$output_dir/phase1p_hdmi_same_clock_setup.rpt"
 report_timing -hold -npaths 30 -nworst 3 -detail full_path -show_routing \
-    -multi_corner -file "$output_dir/phase1p_global_hold.rpt"
+    -file "$output_dir/phase1p_global_hold.rpt"
+
+# Quartus ignores -multi_corner for file reports. Enumerate every model.
+set output_dir corner_timing_reports
+file mkdir $output_dir
+set index 0
+foreach_in_collection op [get_available_operating_conditions] {
+    set_operating_conditions $op
+    update_timing_netlist
+    set model [get_operating_conditions_info $op -model]
+    puts "CHECK_CORNER $index $model"
+    foreach kind {setup hold recovery removal mpw} {
+        create_timing_summary -$kind -file "$output_dir/corner${index}_${kind}.rpt"
+    }
+    foreach kind {setup hold recovery removal} {
+        report_timing -$kind -npaths 20 -nworst 3 -detail full_path -show_routing \
+            -file "$output_dir/corner${index}_${kind}_paths.rpt"
+    }
+    report_min_pulse_width -nworst 20 -file "$output_dir/corner${index}_mpw_paths.rpt"
+    incr index
+}
+puts "CHECKED_CORNERS $index"
 
 delete_timing_netlist
 project_close

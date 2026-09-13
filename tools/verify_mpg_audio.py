@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix='mpg-audio-') as td:
     rtl+=['rtl/mpeg2_new/'+x+'.sv' for x in ('mpeg2_program_stream_ingress','mpeg2_h262_program_stream_demux',
         'mpeg2_av_ddr_fifo','mpeg2_pes_metadata_expand','mpeg2_h262_inband_metadata','mpeg2_pes_picture_pts')]
     run('verilator','--binary','--timing','-j','8','-Wno-fatal','--top-module','test_mpg_audio_playback','--Mdir',sim,
-        'tools/test_mpg_audio_playback.sv',*rtl)
+        'tools/test_mpg_audio_playback.sv','rtl/media_file_reader.sv',*rtl)
     log=run(sim/'Vtest_mpg_audio_playback','+input='+str(src),'+output='+str(out));print(log)
     run('ffmpeg','-v','error','-i',src,'-map','0:a:0','-f','s16le','-y',td/'reference.pcm')
     run('ffmpeg','-v','error','-i',src,'-map','0:v:0','-c','copy','-f','mpeg2video','-y',td/'reference.m2v')
@@ -38,6 +38,6 @@ with tempfile.TemporaryDirectory(prefix='mpg-audio-') as td:
     for offset,stamp in pts: assert packets[offsets.index(offset)].get('pts')==stamp
     result={'played_sample_pairs':len(x),'max_sample_error':float(np.max(abs(x-y))),
         'video_bytes':len(video),'picture_pts_checked':len(pts),'underrun':False,'timestamp_error':False,
-        'scope':'Timed ingress + ideal bounded PCM FIFO + sink; no full video decoder or vendor CDC simulation'}
+        'scope':'Mounted-file reader with periodic 2 ms host stalls + ideal bounded ingress/PCM FIFOs + timed sink; no full video decoder or vendor CDC simulation'}
     print(json.dumps(result,indent=2))
     if len(sys.argv)>1:Path(sys.argv[1]).write_text(json.dumps(result,indent=2)+'\n')

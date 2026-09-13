@@ -54,14 +54,6 @@ set_false_path \
     -from [get_keepers {*|mpeg2_new_swap_window_video}] \
     -to   [get_keepers {*|mpeg2_new_swap_window_sync[0]}]
 
-# Entry 238: ioctl_download is registered in clk_sys and sampled only by the
-# first stage of an explicit three-register clk_mpeg2 synchronizer.  Cut that
-# asynchronous source-to-stage-zero path only; both later synchronizer stages
-# and all rearm control remain timed in clk_mpeg2.
-set_false_path \
-    -from [get_keepers {*|hps_io:hps_io|ioctl_download}] \
-    -to   [get_keepers {*|mpeg2_h262_download_rearm:*|download_sync[0]}]
-
 # Entry 245: the frozen hardware-cadence snapshot is produced in clk_mpeg2 and
 # remains stable permanently before its trailing ready level can enable the
 # video overlay.  The snapshot bus uses two explicit clk_video sampling stages;
@@ -128,7 +120,7 @@ set_false_path \
 # chain boundary; release inside rd_reset_sync and all ordinary crossings stay
 # fully timed.
 set_false_path \
-    -from [get_keepers {*|mpeg2_h262_download_rearm:*|*}] \
+    -from [get_keepers {*|media_session_control:*|decoder_reset}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
 
 # Intel documents these first-stage DCFIFO ACLR exceptions when both
@@ -152,3 +144,7 @@ set_false_path -to [get_keepers {*video_config_cdc:*|ack_sync[0]}]
 # Asynchronous VS levels enter system-clock edge detectors through three stages.
 set_false_path -to [get_keepers {*hdmi_vs_sys_sync[0]}]
 set_false_path -to [get_keepers {*core_vs_sys_sync[0]}]
+
+# Session restart levels use preserved three-stage synchronizers.
+set_false_path -to [get_keepers {*|media_session_control:*|req_sync[0]}]
+set_false_path -to [get_keepers {*|media_session_control:*|ack_sync[0]}]

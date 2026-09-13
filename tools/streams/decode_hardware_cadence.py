@@ -37,8 +37,8 @@ def _cell_bit(image: Image.Image, column: int, row: int, origin_y: int = Y0) -> 
 def decode_words(path: Path | str) -> list[int]:
     image = Image.open(path).convert("RGB")
     origin_y, count = None, None
-    # Native 480p schema 8, prior SVGA schema 8, and legacy SVGA schema 7.
-    for candidate_y, candidate_count in ((312, 41), (432, 41), (444, 38)):
+    # Native schema 9/8, prior SVGA schema 8, and legacy schema 7.
+    for candidate_y, candidate_count in ((280, 49), (312, 41), (432, 41), (444, 38)):
         if image.width < X0 + 43 * CELL or image.height < candidate_y + candidate_count * CELL:
             continue
         probe = [_cell_bit(image, column, 0, candidate_y) for column in range(43)]
@@ -194,10 +194,18 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "final_temporal_reference": (metadata >> 15) & 0x3FF,
         "reference_picture_count": (metadata >> 7) & 0xFF,
         "error_flags": (words[19] >> 16) & 0xFFFF,
-        "audio_frames_decoded": words[37] if len(words) == 41 else None,
-        "audio_samples_played": words[38] if len(words) == 41 else None,
-        "audio_status": words[39] if len(words) == 41 else None,
-        "audio_finished": bool(words[39] & 8) if len(words) == 41 else None,
+        "audio_frames_decoded": words[37] if len(words) >= 41 else None,
+        "audio_samples_played": words[38] if len(words) >= 41 else None,
+        "audio_status": words[39] if len(words) >= 41 else None,
+        "audio_finished": bool(words[39] & 8) if len(words) >= 41 else None,
+        "transport_requests": words[40] if len(words) == 49 else None,
+        "transport_completions": words[41] if len(words) == 49 else None,
+        "transport_max_wait_sys_cycles": words[42] if len(words) == 49 else None,
+        "transport_byte_position": (words[43] | words[44] << 32) if len(words) == 49 else None,
+        "transport_generation": words[45] if len(words) == 49 else None,
+        "transport_reservoir_min_bytes": words[46] if len(words) == 49 else None,
+        "transport_status": words[47] if len(words) == 49 else None,
+        "transport_error": (words[47] & 15) if len(words) == 49 else None,
         "mp2_decode_error": bool(words[19] & (1 << 27)),
         "mp2_underrun": bool(words[19] & (1 << 28)),
         "mp2_timestamp_error": bool(words[19] & (1 << 29)),

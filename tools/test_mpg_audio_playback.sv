@@ -7,6 +7,48 @@ wire ir,ve,vv,vr,apv,av,ar,vpv,ps,de;
 wire [7:0] vb,ab;wire [32:0] vp,ap;
 reg [7:0] bytes[0:16777215];integer size,fd,vfd,afd,pfd,idx=0,cycles=0,n=0;
 reg [1023:0] path,outpath;reg [31:0] rng=32'h795137ba;
+// Actual mounted-file reader at 20 MHz, with an ideal bounded byte/EOF CDC
+// reservoir. Host service includes periodic 2 ms scheduling delays.
+reg sys_clk=0;always #25 sys_clk=~sys_clk;
+reg source_start=0,host_ack=0,host_wr=0;
+reg [12:0] host_addr=0;reg [15:0] host_data=0;
+wire [31:0] host_lba;wire [5:0] host_blocks;wire host_rd;
+wire [8:0] source_data;wire source_valid;wire [3:0] source_error;
+reg [8:0] source_queue[0:32767];integer source_head=0,source_tail=0;
+reg source_prefill=0;
+media_file_reader source_reader(.clk(sys_clk),.reset(reset),.start(source_start),
+ .cancel(1'b0),.suspend(1'b0),.file_size({32'd0,size[31:0]}),.start_offset(64'd0),
+ .sd_lba(host_lba),.sd_blk_cnt(host_blocks),.sd_rd(host_rd),.sd_ack(host_ack),
+ .sd_buff_wr(host_wr),.sd_buff_addr(host_addr),.sd_buff_dout(host_data),
+ .stream_data(source_data),.stream_valid(source_valid),
+ .stream_ready(source_tail-source_head<32768),.error(source_error));
+always @(posedge sys_clk) if(!reset && source_valid && source_tail-source_head<32768) begin
+ source_queue[source_tail%32768]<=source_data;source_tail<=source_tail+1;
+ if(source_tail-source_head>=4095 || source_data[8]) source_prefill<=1;
+end
+always @* begin
+ iv=!reset && source_prefill && source_head<source_tail && !source_queue[source_head%32768][8];
+ ib=source_queue[source_head%32768][7:0];
+end
+always @(posedge clk) if(!reset && source_prefill && source_head<source_tail) begin
+ if(source_queue[source_head%32768][8]) begin ie<=1;source_head<=source_head+1;end
+ else if(ir) begin source_head<=source_head+1;idx<=idx+1;end
+end
+integer host_n,host_base,host_j,host_requests=0;
+initial forever begin
+ wait(host_rd);
+ host_n=(host_blocks+1)*256;host_base=host_lba*512;host_requests=host_requests+1;
+ repeat(host_requests%10==0 ? 40000 : 200) @(negedge sys_clk);
+ host_ack=1;
+ for(host_j=0;host_j<host_n;host_j=host_j+1) begin
+  @(negedge sys_clk);host_wr=0;
+  @(negedge sys_clk);host_addr=host_j;
+  host_data={host_base+host_j*2+1<size?bytes[host_base+host_j*2+1]:8'd0,
+             host_base+host_j*2<size?bytes[host_base+host_j*2]:8'd0};host_wr=1;
+ end
+ @(negedge sys_clk);host_wr=0;host_ack=0;
+ repeat(10) @(negedge sys_clk);
+end
 mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1)) ingress(clk,reset,ib,iv,ir,ie,vb,vv,vr,ve,vp,vpv,ab,av,ar,ap,apv,ps,de);
 wire [41:0] aq;wire aqv,aqr,ae;
 av_stream_fifo audio_fifo(clk,reset,{apv,ap,ab},av,ar,aq,aqv,aqr,ae);
@@ -59,6 +101,7 @@ integer voffset=0;
 always @(posedge clk) if(!reset) begin
  cycles<=cycles+1;
  if(cycles>100000000) $fatal(1,"timeout input %0d/%0d frames %0d",idx,size,frames);
+ if(source_error) $fatal(1,"mounted source error %d",source_error);
  if(de||pe) $fatal(1,"error demux %d audio %d",de,pe);
  if(pv&&ready) n<=n+1;
  if(sv) begin $fwrite(vfd,"%c",sb);voffset<=voffset+1;end
@@ -70,11 +113,7 @@ initial begin
  fd=$fopen(path,"rb");size=$fread(bytes,fd);$fclose(fd);
  vfd=$fopen({$sformatf("%0s",outpath),".m2v"},"wb");afd=$fopen({$sformatf("%0s",outpath),".pcm.txt"},"w");pfd=$fopen({$sformatf("%0s",outpath),".pts.txt"},"w");
  repeat(5) @(negedge clk);reset=0;
- while(idx<size) begin
-  @(negedge clk);iv=1;ib=bytes[idx];
-  @(posedge clk);if(ir) idx=idx+1;
- end
- @(negedge clk);iv=0;ie=1;
+ @(negedge sys_clk);source_start=1;@(negedge sys_clk);source_start=0;
  wait(ve&&ae&&pi&&ee&&finished);repeat(20) @(negedge clk);
  if(under||terr||played!=frames*1152) $fatal(1,"playback errors underrun=%d timestamp=%d played=%0d frames=%0d",under,terr,played,frames);
  $fclose(vfd);$fclose(afd);$fclose(pfd);

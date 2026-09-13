@@ -85,7 +85,7 @@ assign VIDEO_ARY = (!ar) ? (picture_4_3_sync[2] ? 12'd3 : 12'd9) : 12'd0;
 `include "build_id.v"
 localparam CONF_STR = {
 	"MediaPlayer;;",
-	"F1,M2VMPG,Open MPEG-2 Video;",
+	"S0,M2VMPG,Open MPEG-2 Video;",
 	"-;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
@@ -102,14 +102,76 @@ wire   [1:0] buttons;
 wire [127:0] status;
 wire  [10:0] ps2_key;
 
-// Stock Main supplies raw file bytes. Container selection and demultiplexing
-// happen after the existing asynchronous FIFO, in clk_mpeg2. Audio packets
-// are drained for this video-only milestone; no helper or custom Main is used.
-wire        ioctl_download;
-wire [15:0] ioctl_index;
-wire        ioctl_wr;
-wire [26:0] ioctl_addr;
-wire [15:0] ioctl_dout;
+// Mounted-file sector reads leave stock Main's menu polling responsive.
+wire [0:0] media_img_mounted;
+wire [63:0] media_img_size;
+wire [31:0] media_sd_lba[1];
+wire [5:0] media_sd_blocks[1];
+wire [0:0] media_sd_rd,media_sd_ack;
+wire [12:0] media_sd_addr;
+wire [15:0] media_sd_data;
+wire [15:0] media_sd_unused[1];
+assign media_sd_unused[0]=16'd0;
+wire media_sd_wr;
+wire [8:0] media_stream_data,media_fifo_data;
+wire [14:0] media_fifo_used;
+wire [15:0] media_fifo_occupancy=mpeg2_stream_full ? 16'd32768 : {1'b0,media_fifo_used};
+wire media_stream_valid,media_reader_idle;
+wire media_prefill_mpeg,media_fatal_sys;
+reg media_prefill=0;
+reg [15:0] media_reservoir_min=16'hffff;
+wire media_reader_cancel,media_fifo_reset,media_reader_start;
+wire media_decoder_reset,media_quiesce,media_ddr_idle;
+wire [63:0] media_byte_position;
+wire [31:0] media_requests,media_completions,media_max_wait,media_generation;
+wire [3:0] media_error;
+reg media_mount_d=0,media_user_reset_d=0;
+reg [63:0] media_file_size=0;
+wire media_user_reset=status[0] | buttons[1];
+wire media_restart=(media_img_mounted[0] && !media_mount_d) ||
+                   (media_user_reset && !media_user_reset_d);
+always @(posedge clk_sys) begin
+    media_mount_d<=media_img_mounted[0];media_user_reset_d<=media_user_reset;
+    if(RESET) media_file_size<=0;
+    else if(media_img_mounted[0]) media_file_size<=media_img_size;
+end
+media_session_control media_session_control (
+ .clk_sys(clk_sys),.clk_mpeg2(clk_mpeg2),.reset(RESET),.restart(media_restart),
+ .reader_idle(media_reader_idle),.ddr_idle(media_ddr_idle),
+ .reader_cancel(media_reader_cancel),.fifo_reset(media_fifo_reset),
+ .reader_start(media_reader_start),.quiesce(media_quiesce),
+ .decoder_reset(media_decoder_reset),.generation(media_generation)
+);
+media_file_reader media_file_reader (
+ .clk(clk_sys),.reset(RESET),.start(media_reader_start && media_file_size!=0),
+ .cancel(media_reader_cancel || media_fatal_sys),.suspend(1'b0),
+ .file_size(media_file_size),.start_offset(64'd0),
+ .sd_lba(media_sd_lba[0]),.sd_blk_cnt(media_sd_blocks[0]),.sd_rd(media_sd_rd[0]),
+ .sd_ack(media_sd_ack[0]),.sd_buff_wr(media_sd_wr),
+ .sd_buff_addr(media_sd_addr),.sd_buff_dout(media_sd_data),
+ .stream_data(media_stream_data),.stream_valid(media_stream_valid),
+ .stream_ready(!mpeg2_stream_full && !media_fifo_reset),.idle(media_reader_idle),
+ .byte_position(media_byte_position),.requests(media_requests),
+ .completions(media_completions),.max_wait(media_max_wait),.error(media_error)
+);
+always @(posedge clk_sys) begin
+ if(media_fifo_reset) begin media_prefill<=0;media_reservoir_min<=16'hffff;end
+ else begin
+  if(media_fifo_used>=4096 || (media_stream_valid && media_stream_data[8])) media_prefill<=1;
+  if(media_prefill && media_fifo_occupancy<media_reservoir_min)
+   media_reservoir_min<=media_fifo_occupancy;
+ end
+end
+video_config_cdc #(.WIDTH(1)) media_prefill_config (
+ .src_clk(clk_sys),.dst_clk(clk_mpeg2),.src_data(media_prefill),.dst_data(media_prefill_mpeg));
+video_config_cdc #(.WIDTH(1)) media_fatal_config (
+ .src_clk(clk_mpeg2),.dst_clk(clk_sys),.src_data(mpeg2_new_transport_fatal_error),.dst_data(media_fatal_sys));
+wire [255:0] media_telemetry;
+video_config_cdc #(.WIDTH(256)) media_telemetry_config (
+ .src_clk(clk_sys),.dst_clk(clk_mpeg2),
+ .src_data({{26'd0,media_reader_cancel,media_reader_idle,media_error},
+            {16'd0,media_reservoir_min},media_generation,media_byte_position,
+            media_max_wait,media_completions,media_requests}),.dst_data(media_telemetry));
 wire        mpeg2_stream_full;
 wire        mpeg2_stream_empty;
 wire [7:0]  mpeg2_fifo_data;
@@ -138,13 +200,13 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.status_menumask(0),
 	.ps2_key(ps2_key),
 
-	.ioctl_download(ioctl_download),
-	.ioctl_index(ioctl_index),
-	.ioctl_wr(ioctl_wr),
-	.ioctl_addr(ioctl_addr),
-	.ioctl_dout(ioctl_dout),
+    .img_mounted(media_img_mounted),.img_size(media_img_size),
+    .sd_lba(media_sd_lba),.sd_blk_cnt(media_sd_blocks),
+    .sd_rd(media_sd_rd),.sd_wr(1'b0),.sd_ack(media_sd_ack),
+    .sd_buff_addr(media_sd_addr),.sd_buff_dout(media_sd_data),
+    .sd_buff_din(media_sd_unused),.sd_buff_wr(media_sd_wr),
+    .ioctl_wait(1'b0)
 
-	.ioctl_wait(ioctl_download && mpeg2_stream_full)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
@@ -179,7 +241,8 @@ pll pll
 // is stretched until the destination clock has observed it.
 //
 // This is an implementation/timing-safety change, not an H.262 requirement.
-wire reset_request = RESET | status[0] | buttons[1];
+// User reset restarts a session through the DDR-drain handshake.
+wire reset_request = RESET;
 
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] reset_mpeg2_sync;
@@ -203,21 +266,7 @@ end
 wire reset_mpeg2_base = reset_mpeg2_sync[2];
 wire reset_video = reset_video_sync[2];
 
-// Entry 237: every ioctl_download rising edge is a new elementary-stream
-// session.  Rearm all MPEG-domain state for the same behavior as a first load,
-// while leaving the dual-clock FIFO and video timing on their existing reset
-// boundaries.  The rearm output is also an input-read gate below, preventing
-// the first newly visible FIFO byte from being consumed on a reset edge.
-wire mpeg2_download_rearm_reset;
-mpeg2_h262_download_rearm mpeg2_h262_download_rearm
-(
-	.clk            (clk_mpeg2),
-	.reset          (reset_mpeg2_base),
-	.download_async (ioctl_download),
-	.rearm_reset    (mpeg2_download_rearm_reset)
-);
-
-wire reset_mpeg2 = reset_mpeg2_base || mpeg2_download_rearm_reset;
+wire reset_mpeg2 = reset_mpeg2_base || media_decoder_reset;
 
 // The first scheduled frame starts playback. Keep message suppression through
 // subsequent bank swaps and EOF, clearing it only at reset or a fresh load.
@@ -472,11 +521,16 @@ audio_pcm_output_adapter audio_pcm_output_adapter
 // Before the first slice is selected, bytes flow continuously for start-code/header
 // parsing.  During slice parsing the bitreader stalls this FIFO whenever its
 // current payload byte has not been fully consumed, including IQ/IDCT waits.
-assign mpeg2_stream_wr =
-	ioctl_download &&
-	ioctl_wr &&
-	(ioctl_index[5:0] == 6'd1) &&
-	!mpeg2_stream_full;
+assign mpeg2_stream_wr = media_stream_valid && !mpeg2_stream_full && !media_fifo_reset;
+assign mpeg2_fifo_data=media_fifo_data[7:0];
+wire media_eof_at_head=!mpeg2_stream_empty && media_fifo_data[8];
+wire media_data_read;
+reg media_eof_seen=0;
+always @(posedge clk_mpeg2) begin
+    if(reset_mpeg2) media_eof_seen<=0;
+    else if(media_prefill_mpeg && media_eof_at_head) media_eof_seen<=1;
+end
+assign mpeg2_stream_rd=!reset_mpeg2 && media_prefill_mpeg && (media_eof_at_head || media_data_read);
 
 // Phase 1V: the decoder owns syntax/persistence backpressure, while the top
 // level additionally pauses between a persisted B and completion of its proven
@@ -486,34 +540,13 @@ assign mpeg2_stream_wr =
 // picture header has been consumed and classified.  It never blocks the header
 // needed to distinguish a consecutive P from a following B.
 assign mpeg2_new_stream_ready =
-	!mpeg2_download_rearm_reset &&
+	!media_decoder_reset &&
 	mpeg2_new_decoder_stream_ready &&
 	!mpeg2_new_b_presentation_hold &&
 	!mpeg2_new_p_destination_ownership_hold;
 
-// Entry 217: downstream raster and DDR errors are sticky, but their engines
-// cannot produce the persistence acknowledgement that normally releases the
-// parser.  Drain the transport after any such fatal result without presenting
-// discarded bytes as valid decoder input.  This lets ioctl_download retire so
-// the existing post-load LED snapshot can report the first failure.
-// Entry 369: synchronise the file-transfer lifetime into the decoder domain
-// so the metadata extractor can flush its residual window.  Without this
-// the final three bytes of every stream would stay in the window and the
-// sequence_end_code would never reach the decoder.
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [2:0] mpeg2_download_active_sync;
-always @(posedge clk_mpeg2 or posedge reset_mpeg2_base) begin
-	if (reset_mpeg2_base)
-		mpeg2_download_active_sync <= 3'b000;
-	else
-		mpeg2_download_active_sync <=
-			{mpeg2_download_active_sync[1:0],ioctl_download};
-end
-
-wire mpeg2_new_system_input_end =
-	!mpeg2_download_active_sync[2] &&
-	!mpeg2_download_rearm_reset &&
-	mpeg2_stream_empty;
+// EOF is an ordered FIFO token, never a gap between host sector requests.
+wire mpeg2_new_system_input_end = media_eof_seen && !reset_mpeg2;
 
 wire [7:0] mpeg2_ingress_data;
 wire mpeg2_ingress_valid, mpeg2_ingress_ready, mpeg2_ingress_end;
@@ -536,14 +569,14 @@ mpeg2_h262_stream_transport_gate mpeg2_h262_stream_transport_gate
 (
 	.clk              (clk_mpeg2),
 	.reset            (reset_mpeg2),
-	.fifo_empty       (mpeg2_stream_empty),
+	.fifo_empty       (mpeg2_stream_empty || media_eof_at_head || reset_mpeg2 || !media_prefill_mpeg),
 	.decoder_ready    (mpeg2_new_system_input_ready),
 	.fatal_error      (mpeg2_new_transport_fatal_error),
-	.fifo_read        (mpeg2_stream_rd),
+	.fifo_read        (media_data_read),
 	.decoder_valid    (mpeg2_new_system_input_valid)
 );
 
-// Stock Main's acknowledged file transfer and FIFO CDC remain unchanged.
+// Container parsing consumes the same ordered bytes from the new transport.
 wire [7:0] av_video_byte, av_audio_byte;
 wire av_video_valid,av_video_ready,av_ingress_end,av_is_ps;
 wire [32:0] av_video_pts,av_audio_pts;
@@ -585,16 +618,17 @@ mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 mpeg2_stream_fifo mpeg2_stream_fifo
 (
 	// kate - DCFIFO owns reset-release synchronization for wr_clk and rd_clk.
-	.reset    (reset_request),
+	.reset    (media_fifo_reset),
 
 	.wr_clk   (clk_sys),
-	.wr_data  (mpeg2_stream_wr ? ioctl_dout : 16'd0),
+	.wr_data  (media_stream_data),
 	.wr_en    (mpeg2_stream_wr),
 	.wr_full  (mpeg2_stream_full),
+    .wr_used(media_fifo_used),
 
 	.rd_clk   (clk_mpeg2),
 	.rd_en    (mpeg2_stream_rd),
-	.rd_data  (mpeg2_fifo_data),
+	.rd_data  (media_fifo_data),
 	.rd_empty (mpeg2_stream_empty)
 );
 

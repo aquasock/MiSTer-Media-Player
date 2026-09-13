@@ -32,10 +32,12 @@
 `define H262_PREDICTION_DESCRIPTOR_DEPTH 4
 `endif
 
-module mpeg2_h262_ddram_arbiter
+module mpeg2_h262_ddram_arbiter #(parameter ENABLE_QUIESCE=0)
 (
     input  wire        clk,
     input  wire        reset,
+    input wire quiesce,
+    output wire idle,
 
     input  wire [7:0]  writer_burstcnt,
     input  wire [28:0] writer_addr,
@@ -99,32 +101,35 @@ wire read_descriptor_room=(read_descriptor_count<DESCRIPTOR_DEPTH)||
 wire writer_targets_reader_region =
     reader_bank_valid && (writer_addr[18:16] == reader_frame_region);
 
+wire stopping=ENABLE_QUIESCE ? quiesce : 1'b0;
+assign idle=!read_outstanding && !ddram_busy;
+
 wire grant_reader =
-    read_descriptor_room && reader_rd;
+    !stopping && read_descriptor_room && reader_rd;
 
 wire grant_prediction =
-    read_descriptor_room && !reader_rd && prediction_rd;
+    !stopping && read_descriptor_room && !reader_rd && prediction_rd;
 
 wire grant_writer =
-    !read_outstanding && !reader_rd && !prediction_rd &&
+    !stopping && !read_outstanding && !reader_rd && !prediction_rd &&
     writer_we && !writer_targets_reader_region;
 
-wire grant_stream_read = read_descriptor_room && !reader_rd &&
+wire grant_stream_read = !stopping && read_descriptor_room && !reader_rd &&
     !prediction_rd && !grant_writer && stream_rd;
-wire grant_stream_write = !read_outstanding && !reader_rd &&
+wire grant_stream_write = !stopping && !read_outstanding && !reader_rd &&
     !prediction_rd && !grant_writer && !stream_rd && stream_we;
-assign stream_busy = ddram_busy || reader_rd || prediction_rd || grant_writer ||
+assign stream_busy = stopping || ddram_busy || reader_rd || prediction_rd || grant_writer ||
     (stream_rd ? !read_descriptor_room : read_outstanding);
 
 // Busy reports capacity/priority independently of the corresponding request.
 // This is a ready/valid boundary: acceptance below remains request-qualified,
 // but no client valid may feed back combinationally into its own readiness.
-assign reader_busy = !read_descriptor_room||ddram_busy;
+assign reader_busy = stopping || !read_descriptor_room||ddram_busy;
 
 assign prediction_busy =
-    !read_descriptor_room||reader_rd||ddram_busy;
+    stopping||!read_descriptor_room||reader_rd||ddram_busy;
 
-assign writer_busy = read_outstanding||reader_rd||prediction_rd||
+assign writer_busy = stopping||read_outstanding||reader_rd||prediction_rd||
     writer_targets_reader_region||ddram_busy;
 
 assign ddram_burstcnt =

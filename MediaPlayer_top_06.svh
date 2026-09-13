@@ -46,10 +46,11 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .video_vs       (fb_video_vs)
 );
 
-mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
+mpeg2_h262_ddram_arbiter #(.ENABLE_QUIESCE(1)) mpeg2_h262_ddram_arbiter
 (
     .clk             (clk_mpeg2),
     .reset           (reset_mpeg2),
+    .quiesce(media_quiesce),.idle(media_ddr_idle),
     .writer_burstcnt (mpeg2_new_ddr_wr_burstcnt),
     .writer_addr     (mpeg2_new_ddr_wr_addr),
     .writer_rd       (mpeg2_new_ddr_wr_rd),

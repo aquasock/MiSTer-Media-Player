@@ -25,7 +25,7 @@ wire mpeg2_new_cadence_session_quiet =
     (!av_is_ps || mp2_finished_sync[2]);
 
 wire [15:0] mpeg2_new_cadence_error_flags = {
-    2'd0,
+    1'b0,(|media_telemetry[227:224]),
     mp2_timestamp_error_sync[2],
     mp2_underrun_sync[2],
     mp2_error,
@@ -51,6 +51,7 @@ end
 mpeg2_h262_hardware_cadence_profiler
 mpeg2_h262_hardware_cadence_profiler
 (
+    .transport_status(media_telemetry),
     .audio_frames(mp2_frames_decoded),.audio_samples(mp2_samples_count),
     .audio_status({25'd0,mp2_timestamp_error_sync[2],mp2_underrun_sync[2],mp2_error,
         mp2_finished_sync[2],mp2_eof_queued,mp2_idle,av_is_ps}),
