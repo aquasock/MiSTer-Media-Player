@@ -1,4 +1,4 @@
-## 011 COMMIT Unreleased ??? 2026-09-13T12:11:46-07:00
+## 011 COMMIT Unreleased a0f153a 2026-09-13T12:11:46-07:00
 
 #### Coming From:
 
@@ -10,29 +10,37 @@ Implement stock-Main mounted-file playback with interactive OSD access and sessi
 
 #### Outcome:
 
-The user approved docs/OSD_PLAYBACK_PLAN.md and requested implementation plus three clean cores while independently testing the timing-qualified 07b8688 seed-87 RBF. The proposed implementation replaces the blocking F1 file download with bounded mounted-file sector reads, explicit byte-stream EOF, complete-response buffering and coordinated restart/flush across the host, decoder and DDR boundaries. A nonzero reader start offset and request suspension boundary support later seeking and pause development; actual user pause and seek controls are deferred. No hardware files or Main binary will be changed during the user's test.
+The approved implementation was committed and pushed as a0f153a before three clean seed builds. Stock Main now mounts MPG/M2V files through S0; a 4 KiB sector staging RAM feeds a 32 KiB byte/EOF FIFO with prefill and exact final-byte handling. The session controller stops DDR grants, drains descriptor-owned responses and waits for host retirement before restarting clients and releasing FIFO reset. Tests passed 102757 exact bytes across tails, nonzero offsets, stalls, cancellation, malformed responses and timeout quarantine, plus actual hps_io status/WIDE transfer checks and DDR/session restart ordering. Timed mounted-reader MPG simulation with periodic 2 ms host delays matched 152679 video bytes, 15 picture timestamps and 24192 stereo sample pairs against FFmpeg with maximum one-unit PCM error and no underrun or timestamp error. Existing video/OSD/cadence, ingress and arbiter regressions passed. Schema 9 adds transport diagnostics and preserves older capture decoding, including capture of a first-read failure before any decoded byte. A synthesis preflight compiled and the post-map audit preserved all 84 required synchronizer registers. Formal fitted builds remain pending. Read-offset and request-suspension primitives are implemented and tested for future seeking/pause; user-facing controls and their timeline logic are deferred. No hardware files, Main binary or ini were touched during the user's baseline test.
 
 #### Next Steps:
 
-Implement and test the reader and session controller, byte-exact EOF and restart behavior, DDR response draining and CDC preservation. Extend diagnostic evidence and the timing helper to enumerate all operating corners. Run existing playback/video/OSD regressions, commit and push the source, then build clean seeds 52, 61 and 87 and report timing and RBF candidates. Hardware acceptance requires uninterrupted playback while opening the stock Main OSD and adjusting filters.
+Finish clean seeds 52, 61 and 87 from a0f153a, require the fitted 84-register audit and all four explicit operating corners, then report RBF candidates and retained evidence. Hardware acceptance must verify stock Main identity, menu responsiveness, filter adjustment during uninterrupted playback, repeated loads/reset and EOF. The simulation queues are ideal bounded models and do not establish physical CDC behavior or full video reconstruction.
 
 #### Files Modified:
 
-- docs/OSD_PLAYBACK_PLAN.md
-- rtl/media_file_reader.sv
-- rtl/media_session_control.sv
-- rtl/mpeg2_stream_fifo.sv
-- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- CHANGELOG.md
+- MediaPlayer.sdc
 - MediaPlayer_top_00.svh
 - MediaPlayer_top_06.svh
 - MediaPlayer_top_07.svh
+- docs/OSD_PLAYBACK_PLAN.md
+- docs/TEST_INSTRUCTIONS.md
 - files.qip
-- MediaPlayer.sdc
+- rtl/media_file_reader.sv
+- rtl/media_session_control.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_stream_fifo.sv
+- tools/build_three_seeds.py
 - tools/phase1p_timing.tcl
-- tools/verify_media_file_reader.py
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
 - tools/test_media_file_reader.sv
+- tools/test_media_hps_io.sv
 - tools/test_media_session_control.sv
-- CHANGELOG.md
+- tools/test_mpg_audio_playback.sv
+- tools/verify_media_file_reader.py
+- tools/verify_mpg_audio.py
 
 #### Status:
 
