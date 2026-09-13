@@ -1,4 +1,4 @@
-## 13 COMMIT Unreleased ??? 2026-09-13T13:05:36-07:00
+## 13 COMMIT Unreleased 62baf08 2026-09-13T13:05:36-07:00
 
 #### Coming From:
 
@@ -10,21 +10,24 @@ Provide manual 4:3 and 16:9 aspect selection and repair the observed decoder and
 
 #### Outcome:
 
-The user approved aspect switching and the proposed timing cleanup, then explicitly limited the menu to manual 4:3 and 16:9 with no stream-metadata selection. The user reports neither existing choice changes the displayed shape. Preserve accepted mounted-file OSD and filter operation, progressive playback and existing audio behavior.
+Committed and pushed 62baf08 with exactly two user-selected aspect choices, 4:3 and 16:9; removed sequence-aspect synchronization and its obsolete exception. The actual core mailbox and platform rectangle test passes six switches across 1080p and 5:4 outputs. B-frame coordinate snapshots split launch-address arithmetic without changing request latency. The final scaler fraction step occupies an existing delay stage and registered blanking preserves transition cycles. Extracted production VHDL matches a0f153a for 250000 randomized cycles at FRAC 4, 6 and 8 across every consumed fraction stage and resolution-blanking transition; the complete scaler also analyzes successfully in GHDL. The mixed I/P/B oracle checks 423936 samples with zero tolerance violations and maximum delta two, matching a0f153a cycle counts, request counts and prefetch activity. The old bench referenced a removed arbiter diagnostic and had a one-cycle stale depth-four total; both were corrected against the baseline. OSD/raster/CDC/cadence/telemetry and mounted-reader/session regressions pass. Timed MPG audio checks 24192 stereo pairs with maximum error one, 152679 video bytes and 15 timestamps without underrun. Clean seeds 52, 61 and 87 are running under results/build-62baf08-20260913-131350; timing and hardware acceptance remain pending.
 
 #### Next Steps:
 
-Trace menu status through the scaler rectangle, implement the two explicit ratios, and validate switching independently of sequence metadata. Shorten the B-frame address and HDMI scaler arithmetic/control paths while preserving decoded values, filter precision and pixel alignment. Run relevant regressions, commit and push the source, then build seeds 52, 61 and 87 and check all four timing corners and the fitted CDC audit before delivering hardware candidates.
+Complete all three clean builds and the fitted 84-register CDC audit, inspect every setup/hold/recovery/removal/pulse-width operating corner, and deliver clearly labeled hardware candidates. Verify manual aspect changes and continued OSD/filter operation during playback on hardware. Do not describe a seed as timing-qualified before all corners pass.
 
 #### Files Modified:
 
-- MediaPlayer_top_00.svh
+- CHANGELOG.md
 - MediaPlayer.sdc
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- MediaPlayer_top_00.svh
+- docs/TEST_INSTRUCTIONS.md
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - sys/ascal.vhd
-- tools/verify_video_sync.py
-- CHANGELOG.md
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/verify_decoder_timing.py
+- tools/verify_manual_aspect.py
+- tools/verify_scaler_timing.py
 
 #### Status:
 
