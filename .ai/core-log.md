@@ -1,3 +1,33 @@
+## 981 COMMIT Unreleased 4d23624 2026-09-12T21:52:06-07:00
+
+#### Coming From:
+
+Unreleased b1864ab
+
+#### Purpose:
+
+Diagnose and fix the timing failure found by the three-seed build of entry 980's stage B RTL, and check FPGA resource headroom for stage C's MP2 decoder while builds ran.
+
+#### Outcome:
+
+All three seeds (26, 33, 99) failed timing identically: `quartus_sh --flow compile` reported "Timing requirements not met" with worst-case setup slack -2.929/-2.873/-3.058ns respectively, each on the same path - `mpeg2_h262_b_presentation_scheduler` (60MHz decoder clock) to `mpeg2_h262_live_deadlock_probe|word0_sync1` (54MHz video clock), confirmed via `tools/phase1p_timing.tcl`'s detailed path report. The identical failure across three independent placement seeds (rather than the small slack variance normal seed-search accounts for) pointed to a structural gap rather than placement luck: entry 977/978's diagnostic probe crosses its two live words from the mpeg2 clock domain into the video clock domain with a plain double-flop synchronizer and no SDC exception, so TimeQuest tried to close setup timing between two unrelated clocks as though they were synchronous. Since the freeze investigation that probe was built for is already abandoned in favor of entry 979's rewrite, removed the probe outright (`MediaPlayer.sv`, `files.qip`, and its RTL/tool/test files) rather than add a false-path exception to preserve a feature nothing needs anymore. Separately, while the seed builds ran, audited the RTL for resources recoverable from the already-disabled interlaced/Bob-Weave/native-bypass paths per seed99's completed fit report: current usage is 538/553 M10K blocks (97%) and 35,010/41,910 ALMs (84%), but the tied-off interlaced/native logic (`HDMI_BOB_DEINT`, `interlaced_request_async`) turned out cheap already - `mpeg2_luma_framebuffer`'s native-interlaced-aware paths account for only ~26 of 553 blocks, and `mpeg2_video_output_timing` has no RAM at all. The real top M10K consumers - `mpeg2_h262_two_picture_probe` (170 blocks), `mpeg2_h262_reference_read_probe` (162), three "probe"/"diagnostic_controller"-named P/B motion-vector and residual decode modules (85 each, 255 total), and residual coefficient storage (76) - are all load-bearing H.262 decode logic despite diagnostic-sounding names, confirmed by reading `mpeg2_h262_p_diagnostic_controller_rearm.sv` directly; none are safe removal candidates. No RAM-recovery change was made.
+
+#### Next Steps:
+
+Re-sync the corrected RTL (with the probe removed) to all three seed directories and rerun the three-seed timing build; if it passes, install the RBF and the four-patch Main and get a real hardware test of silent video-only `.mpg` playback via F4. Separately, `audio_pcm_fifo`'s 70 M10K blocks exist only for the legacy helper's already-decoded PCM path - revisit whether stage C's MP2 decoder can reuse it once stage E removes the helper, since a fresh 97%-utilized M10K budget leaves little room for a new audio FIFO of its own.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+- files.qip
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 980 COMMIT Unreleased b1864ab 2026-09-12T21:25:48-07:00
 
 #### Coming From:
@@ -1205,36 +1235,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 941 COMMIT Unreleased 401148e 2026-09-03T04:56:54-07:00
-
-#### Coming From:
-
-v0.9.0 b1a6dcb
-
-#### Purpose:
-
-Instrument and reproduce Futurama's late-menu-audio rejection so the permanent silent-video classification can be corrected without hiding an A/V synchronization failure.
-
-#### Outcome:
-
-The fresh `FUTURAMA_S1D1` physical-disc capture reaches its authored menu, publishes one valid still and selector overlay, and then leaves that frame resident after the helper exits normally with status one.  The checksum-valid schema-21 snapshot reports one completed and displayed I picture, sequence-end and presentation completion, zero decoder error flags, zero transport blocks and zero audio underruns.  The helper log identifies the software boundary: before any audio PES appears, the bounded 2 MiB video queue fills and `scheduler_release_silent_video()` irreversibly disables scheduling; the later valid AC-3 private substream `0x80` reaches the deliberate late-audio rejection, after which Main drains the already-reserved bytes and observes helper EOF.  Source `401148e` preserves that fail-fast behavior and every media byte while logging the exact silent-release queue, released and total-video counts, picture count and final video PTS horizon, followed by the late MPEG Layer II, AC-3 or DTS packet's PTS validity, value, horizon relation and absolute 90 kHz delta.  The focused production-translation-unit regression forces the 2 MiB boundary, proves its queued video remains byte-identical and verifies ahead, behind and untimestamped late-audio diagnostics.  Strict optimized compilation, focused GCC analyzer, AddressSanitizer, UndefinedBehaviorSanitizer, DVD random-access, SPU, overlay, reserve, output-stage, menu-hop, private-LPCM-skip, AC-3 recovery, Program Stream seek, audio UI, visualizer and audio-seek tests pass.  Real MP3, WAV, FLAC and Ogg integrations pass against both native and final ARM helpers with 378 or 381 pictures and one clear record per file.  Local GNU 10.2.1 produced the 966,052-byte static stripped ARMv7 EABI5 helper `host/build/MediaPlayer_Helper_LateAudioDiag_401148e` with SHA-256 `19020ff3e785718854fe399f23462720428012129082335f9c3c61414fa371c7`; its protocol-one capability probe passes and it has no dynamic section.  Main, decoder, RBF, visualizer and RTL are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_LateAudioDiag_401148e`, preserving executable mode and the installed Main, RBF and visualizer.  Enable telemetry, launch Futurama disc one, wait until the menu and selector appear and allow the helper to reach its expected clean rejection without needing to press a direction.  Return the fresh helper log; its `video lookahead classified silent` and expanded `AC-3 audio begins beyond` records will establish whether the first audio PTS is ahead of, equal to or behind the already-released video horizon.  Do not suppress the rejection or increase the queue from this diagnostic evidence alone; use the measured temporal relationship to propose the bounded state transition that retains genuinely silent Program Streams and synchronized late-starting DVD audio.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
