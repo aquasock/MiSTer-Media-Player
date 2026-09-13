@@ -1,3 +1,40 @@
+## 995 COMMIT Unreleased ??? 2026-09-13T05:59:28-07:00
+
+#### Coming From:
+
+Unreleased 8b6ed49
+
+#### Purpose:
+
+Restore progressive stock-Main file playback on the hardware-accepted a57079f baseline with MPEG Program Stream video ingress.
+
+#### Outcome:
+
+The user accepted the rebuilt a57079f seed-11 RBF on hardware and approved restoring MPG demultiplexing, then FPGA MP2 decoding and A/V synchronization, then progressive 720x480 output, with interlace, Bob/Weave, DVD and helper/custom-Main dependencies out of scope. The original three-seed rebuild passed standard and focused timing for seeds 11 and 33; seed 26 was stopped at the user's request. Seed 11 has +0.441 ns worst setup and is a new build, not a claim of byte-identical historical reproduction. Earlier recovery incorrectly described a57079f as retaining a Program Stream demux; commit 3771f19 had removed it, and the stale README caused that error. The candidate returns runtime sources to a57079f while preserving Git history and current project-control memory. It recovers the demux from 3713581, fixes held-output backpressure, selects the first video/audio IDs, detects raw versus Program Stream input, skips audio in this stage, and appends a missing video sequence-end only after Program Stream EOF drains. Raw private metadata and encoded cadence remain; direct PES-to-picture timestamp binding is deferred to A/V integration. Deterministic and real-file Icarus tests pass, including 4675731 real video bytes matching FFmpeg under randomized stalls and repeated sessions; baseline metadata and PCM verification also pass. Source changes are prepared for installation and a fresh three-seed Quartus batch. This build PC hosts the project at /run/media/vash/GIT/MiSTer-Media-Player and the test MiSTer is 10.10.0.45.
+
+#### Next Steps:
+
+Commit the reviewed candidate as a new master revision, build independent tracked-source exports with seeds 11, 33 and 52, review standard and focused timing, and deliver a passing RBF plus a short progressive MPG/MP2 conversion command. The user will test raw regression, silent MPG video, EOF and repeated loads before MP2 implementation starts. Reuse historical implementations and their failure evidence where appropriate without reintroducing the old architecture.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_07.svh
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
+- rtl/mpeg2_new/mpeg2_program_stream_ingress.sv
+- tools/test_program_stream_demux.sv
+- tools/test_program_stream_ingress.sv
+- tools/verify_program_stream_ingress.py
+- tools/build.sh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 994 STATUS Unreleased 8b6ed49 2026-09-13T05:05:48-07:00
 
 #### Coming From:
