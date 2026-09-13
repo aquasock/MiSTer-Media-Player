@@ -1,3 +1,42 @@
+## 17 COMMIT Unreleased ??? 2026-09-13T14:52:23-07:00
+
+#### Coming From:
+
+Unreleased 24d3de0
+
+#### Purpose:
+
+Add user-selected 50 Hz progressive output alongside the accepted 59.94 Hz mode while retaining 720x480 decoding.
+
+#### Outcome:
+
+The user authorizes implementation, regression validation and three clean seed builds. The planned raster reuses 27 MHz with 864x625 total pixels for exact 50 Hz and retains the existing 858x525 default. Only blanking changes; the active picture remains 720x480. A configuration mailbox carries the requested setting into the video domain, applies it only between complete frames and publishes the applied mode to the decoder. Untimestamped presentation uses exact source-rate ratios for each refresh rate without resetting ownership or queued pictures; timestamp and audio timebases remain unchanged. Validation will cover both raster modes, live switching, asynchronous configuration, scanout/cache behavior, cadence and existing OSD/color/audio regressions. HDMI relock remains a hardware check with vsync_adjust=1. DVD, interlacing, 576-line decoding, gamut, gamma and unrelated resource optimizations remain excluded.
+
+#### Next Steps:
+
+Implement the refresh selector and applied-mode synchronization, verify pixel geometry and presentation rates with mode switches, commit and push source, then build seeds 52, 61 and 87 and audit every timing corner and fitted CDC register before delivering qualified RBFs for hardware validation.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_05.svh
+- rtl/mpeg2_video_720x480p.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/phase1p_timing.tcl
+- tools/test_480p_scanout.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/verify_video_sync.py
+- docs/TEST_INSTRUCTIONS.md
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 16 COMMIT Unreleased 24d3de0 2026-09-13T14:25:07-07:00
 
 #### Coming From:
@@ -1289,37 +1328,6 @@ Deploy `host/build/MediaPlayer_Helper` via the atomic `.new`-then-`mv` pattern a
 
 #### Files Modified:
 
-- host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 976 COMMIT Unreleased af7f570 2026-09-12T12:52:53-07:00
-
-#### Coming From:
-
-Unreleased e7fde30
-
-#### Purpose:
-
-Fix the video progress overlay showing TOTAL/REMAIN as 00:00 on a large (~4 GiB) `.mpg` file, and restyle the progress-strip labels to "Label: HH:MM:SS" moved closer to the bar.
-
-#### Outcome:
-
-The user tested a second, much longer `.mpg` file (24fps, ~4.06 GiB) and found pausing showed `TOTAL 00:00`/`REMAIN 00:00` while the progress bar itself still filled correctly.  The ARM diagnostic log showed `video progress overlay enabled file_size=-1` at session start - the file-size `stat()` call was failing.  The file is 4,359,360,512 bytes, past the boundary a 32-bit `off_t`/`struct stat` can represent; without large-file support, glibc's `stat()` on the ARM target returns `EOVERFLOW` instead of a size for any file at or beyond that boundary (roughly 2-4 GiB depending on signedness).  `video_overlay_locked_length_pts()` treats `video_overlay_file_size <= 0` as "can't compute a duration yet" and returns 0 forever once locked that way, which is why TOTAL/REMAIN stayed at zero while the bar (driven by absolute PTS position, not the locked duration) still moved normally.  Separately, the user asked to restyle the progress strip: "Elapsed:"/"Remaining:"/"Total:" (colon, mixed case) instead of "ELAPSED"/"REMAIN"/the bare label, `HH:MM:SS` instead of `MM:SS`, and the whole strip moved down closer to the progress bar.
-
-#### Next Steps:
-
-Source `af7f570` adds `-D_FILE_OFFSET_BITS=64` to `host/arm/Makefile`'s default `CPPFLAGS` (applies to every translation unit in both the native and ARM builds, harmless no-op on x86_64 where `off_t` is already 64-bit by default) so `stat()` correctly reports sizes for files past the 32-bit boundary instead of failing.  `host/arm/audio_ui.c`'s `format_time()` now formats `HH:MM:SS`; `draw_progress_strip()`'s three labels became `"Elapsed: %s"`, `"%s: %s"` (caller-supplied label, now passed capitalized - `"Total"` for the video overlay, `"Track"` for the audio player's own full UI), and `"Remaining: %s"`, and their Y position moved from 412 to 422 (closer to the progress bar at 438).  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  Committed immediately on a clean compile, before deployment.  `host/build/MediaPlayer_Helper` (SHA-256 `059bef4d4208356f747eaaf66b54ba177f6df35daa864e2dec7b7e0fac1bcabf`) is built; deliver it (current RBF `5ce3c1f`/seed99 and Main unaffected) for the user to retest the large file's TOTAL/REMAIN and the restyled labels/positioning, and to continue stress-testing for the separately-identified, apparently pre-existing decoder hang (unrelated to this fix).
-
-#### Files Modified:
-
-- host/arm/Makefile
-- host/arm/audio_ui.c
 - host/arm/media_player_helper.c
 
 #### Status:
