@@ -48,8 +48,13 @@ always @(posedge clk_video) begin
     telemetry_v_d <= display_v_pos; telemetry_v <= telemetry_v_d;
 end
 
-mpeg2_h262_hardware_cadence_profiler
-mpeg2_h262_hardware_cadence_profiler
+mpeg2_h262_hardware_cadence_profiler #(
+`ifdef MMP_DETAILED_TELEMETRY
+    .DETAILED_TELEMETRY(1)
+`else
+    .DETAILED_TELEMETRY(0)
+`endif
+) mpeg2_h262_hardware_cadence_profiler
 (
     .transport_status(media_telemetry),
     .audio_frames(mp2_frames_decoded),.audio_samples(mp2_samples_count),

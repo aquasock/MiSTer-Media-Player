@@ -95,3 +95,30 @@ picture spacing at 25 fps/50 Hz, compare the 29.97 fps/59.94 Hz control, exercis
 OSD/filter/aspect/color controls, file replacement, Reset and EOF. Record source
 SHA, seed and observed display refresh. Simulation covers geometry, exact
 cadence and queue ownership; it does not prove HDMI/display relock behavior.
+
+
+## Compact telemetry profile
+
+Default builds use schema 10: 25 words at overlay origin (8,280), 172x100 pixels.
+The capture still appears at settled EOF, fatal error, terminal timeout or no
+progress. It retains accepted bytes, elapsed/presentation cycles, picture counts,
+source metadata, error flags, snapshot reason, maximum completed display gap,
+outlier count, basic terminal state, audio frame/sample/status words and all
+transport status fields. Picture counters still wrap at 256, so derived FPS is
+not reliable for long clips; this change does not widen those counters.
+
+Detailed stall/hold/DDR totals, two additional ranked gaps, gap context and full
+scheduler state are omitted. Use the updated `tools/streams/decode_hardware_cadence.py`
+for captures: absent diagnostics are `null`/unavailable, not measured zero.
+Schemas 7, 8 and 9 remain readable. Compare retained EOF, error, audio and reader
+results with the prior build; verify ordinary playback and 50/59.94 switching,
+OSD/filter/aspect/color controls and repeated loads remain unchanged. No custom
+Main or MiSTer.ini changes are needed.
+
+For a dedicated diagnostic build, add
+`set_global_assignment -name VERILOG_MACRO MMP_DETAILED_TELEMETRY` to its build
+copy's QSF. This restores the 49-word schema-9 profiler and its higher resource
+cost; qualify that build separately. The normal three-seed builds are compact.
+Run `python3 tools/verify_compact_telemetry.py --output /tmp/compact-telemetry`
+to compare retained fields against the detailed RTL and round-trip actual compact
+overlay pixels through the screenshot decoder, including corruption rejection.

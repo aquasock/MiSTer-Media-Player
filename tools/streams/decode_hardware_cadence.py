@@ -37,8 +37,9 @@ def _cell_bit(image: Image.Image, column: int, row: int, origin_y: int = Y0) -> 
 def decode_words(path: Path | str) -> list[int]:
     image = Image.open(path).convert("RGB")
     origin_y, count = None, None
-    # Native schema 9/8, prior SVGA schema 8, and legacy schema 7.
-    for candidate_y, candidate_count in ((280, 49), (312, 41), (432, 41), (444, 38)):
+    # Read the header count so compact and detailed profiles share an origin.
+    for candidate_y in (280, 312, 432, 444):
+        candidate_count = 2
         if image.width < X0 + 43 * CELL or image.height < candidate_y + candidate_count * CELL:
             continue
         probe = [_cell_bit(image, column, 0, candidate_y) for column in range(43)]
@@ -46,6 +47,15 @@ def decode_words(path: Path | str) -> list[int]:
         for bit in probe[10:42]:
             magic = (magic << 1) | bit
         if tuple(probe[:4]) == ROW_PREFIX and magic == MAGIC:
+            header = 0
+            for column in range(10,42):
+                header = (header << 1) | _cell_bit(image, column, 1, candidate_y)
+            candidate_count = (header >> 16) & 255
+            version = header >> 24
+            if candidate_count not in (25,38,41,49) or (candidate_count == 25 and version != 10):
+                raise TelemetryDecodeError(f"unsupported snapshot format 0x{header:08x}")
+            if image.height < candidate_y + candidate_count * CELL:
+                raise TelemetryDecodeError("truncated telemetry image")
             origin_y, count = candidate_y, candidate_count
             break
     if origin_y is None:
@@ -88,6 +98,34 @@ def decode_words(path: Path | str) -> list[int]:
 
 
 def parse_words(words: list[int]) -> dict[str, Any]:
+    if len(words) < 2:
+        raise TelemetryDecodeError("truncated telemetry header")
+    if words[1] >> 24 == 10:
+        if len(words) != 25 or (words[1] >> 16) & 255 != 25:
+            raise TelemetryDecodeError("schema 10 requires 25 words")
+        # Reuse established field decoding, then mark unavailable diagnostics
+        # explicitly. Zero expansion is internal only, never evidence of zero stalls.
+        indices = [0,1,2,3,4,5,6,17,18,19,25,26,35,37,38,39,*range(40,48)]
+        expanded = [0] * 49
+        for index, value in zip(indices, words[:-1]):
+            expanded[index] = value
+        expanded[1] = (9 << 24) | (49 << 16) | (words[1] & 0xffff)
+        expanded[48] = words[-1]
+        result = parse_words(expanded)
+        result.update(schema_version=10, snapshot_words=25, telemetry_profile="compact", checksum=words[-1])
+        unavailable = ["decoder_stall_cycles", "presentation_stall_cycles", "destination_stall_cycles",
+            "i_stall_cycles", "p_stall_cycles", "b_stall_cycles", "prediction_requests",
+            "prediction_request_wait_cycles", "prediction_response_cycles", "writer_wait_cycles",
+            "presentation_hold_total_cycles", "destination_hold_total_cycles", "hold_overlap_cycles",
+            "hold_scratch_available_cycles", "hold_promotion_pending_cycles", "scheduler_debug_word", "scheduler_flags"]
+        for name in unavailable:
+            result[name] = None
+        result["unavailable_fields"] = unavailable
+        result["largest_display_gaps"] = [{key: result["largest_display_gaps"][0][key]
+                                          for key in ("rank", "cycles", "seconds")}]
+        return result
+    if len(words) not in (38,41,49):
+        raise TelemetryDecodeError("unsupported telemetry word count")
     format_word = words[1]
     clock_hz = (format_word & 0xFFFF) * 1000
     counts = words[17]
@@ -252,7 +290,7 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "presentation_error": bool((terminal >> 19) & 1),
         "scheduler_debug_word": scheduler,
         "scheduler_flags": scheduler_flags(scheduler),
-        "checksum": words[37],
+        "checksum": words[-1],
     }
 
 
@@ -327,27 +365,30 @@ def main() -> int:
             f"{result['cadence_seconds']:.6f} s = "
             f"{result['delivered_fps']:.6f} fps"
         )
-        print(
-            "stalls: decoder={decoder_stall_cycles} "
-            "presentation={presentation_stall_cycles} "
-            "destination={destination_stall_cycles} "
-            "I/P/B={i_stall_cycles}/{p_stall_cycles}/{b_stall_cycles}".format(
-                **result
+        if result.get("telemetry_profile") == "compact":
+            print("compact telemetry: detailed stall, DDR and scheduler history unavailable")
+        else:
+            print(
+                "stalls: decoder={decoder_stall_cycles} "
+                "presentation={presentation_stall_cycles} "
+                "destination={destination_stall_cycles} "
+                "I/P/B={i_stall_cycles}/{p_stall_cycles}/{b_stall_cycles}".format(
+                    **result
+                )
             )
-        )
-        print(
-            "prediction: requests={prediction_requests} "
-            "request_wait={prediction_request_wait_cycles} "
-            "response={prediction_response_cycles}; "
-            "writer_wait={writer_wait_cycles}".format(**result)
-        )
-        print(
-            "holds: presentation={presentation_hold_total_cycles} "
-            "destination={destination_hold_total_cycles} "
-            "overlap={hold_overlap_cycles} "
-            "scratch_free={hold_scratch_available_cycles} "
-            "promotion={hold_promotion_pending_cycles}".format(**result)
-        )
+            print(
+                "prediction: requests={prediction_requests} "
+                "request_wait={prediction_request_wait_cycles} "
+                "response={prediction_response_cycles}; "
+                "writer_wait={writer_wait_cycles}".format(**result)
+            )
+            print(
+                "holds: presentation={presentation_hold_total_cycles} "
+                "destination={destination_hold_total_cycles} "
+                "overlap={hold_overlap_cycles} "
+                "scratch_free={hold_scratch_available_cycles} "
+                "promotion={hold_promotion_pending_cycles}".format(**result)
+            )
         print(
             "snapshot: {snapshot_reason}; outlier_gaps={gap_outlier_count}; "
             "terminal completed/display={completed_frame_bank}/{display_frame_bank} "
@@ -359,9 +400,7 @@ def main() -> int:
         print(
             "largest gaps: "
             + ", ".join(
-                "#{display_picture_ordinal}={cycles}cy/{seconds:.6f}s".format(
-                    **gap
-                )
+                f"{gap['cycles']}cy/{gap['seconds']:.6f}s"
                 for gap in result["largest_display_gaps"]
             )
         )

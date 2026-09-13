@@ -7,6 +7,7 @@
 //============================================================================
 `timescale 1ns/1ps
 module mpeg2_h262_hardware_cadence_profiler #(
+    parameter DETAILED_TELEMETRY = 0,
     parameter [23:0] TERMINAL_SNAPSHOT_DELAY = 24'd15000000,
     parameter [26:0] NO_PROGRESS_SNAPSHOT_DELAY = 27'd60000000,
     parameter [31:0] OUTLIER_GAP_CYCLES = 32'd3000000
@@ -51,16 +52,17 @@ module mpeg2_h262_hardware_cadence_profiler #(
     output reg [7:0] video_b,output wire snapshot_ready
 );
 
-localparam integer SNAPSHOT_WORDS=49;
+localparam integer SNAPSHOT_WORDS=DETAILED_TELEMETRY ? 49 : 25;
 localparam integer SNAPSHOT_BITS=SNAPSHOT_WORDS*32;
 localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
     TERMINAL_SNAPSHOT_DELAY-24'd1;
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd9,8'd49,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT=DETAILED_TELEMETRY ?
+    {8'd9,8'd49,16'd60000} : {8'd10,8'd25,16'd60000};
 localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd280;
-localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd196;
+localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=SNAPSHOT_WORDS*4;
 
 reg session_active;
 reg fifo_pending_q,decoder_ready_q,presentation_hold_q,destination_hold_q;
@@ -212,8 +214,14 @@ wire [31:0] snapshot_word_48=snapshot_word_00^snapshot_word_01^
     snapshot_word_30^snapshot_word_31^snapshot_word_32^snapshot_word_33^
     snapshot_word_34^snapshot_word_35^snapshot_word_36^snapshot_word_37^snapshot_word_38^snapshot_word_39^snapshot_word_40^snapshot_word_41^snapshot_word_42^snapshot_word_43^snapshot_word_44^snapshot_word_45^snapshot_word_46^snapshot_word_47;
 
+// Compact schema 10: omit detailed-only words from the output cone so
+// Quartus removes their counters, ranking history, snapshot flops and muxes.
+// Keep the detailed equations for optional schema-9 diagnostic builds.
+wire [31:0] compact_checksum = snapshot_word_00^snapshot_word_01^snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^snapshot_word_06^snapshot_word_17^snapshot_word_18^snapshot_word_19^snapshot_word_25^snapshot_word_26^snapshot_word_35^snapshot_word_37^snapshot_word_38^snapshot_word_39^snapshot_word_40^snapshot_word_41^snapshot_word_42^snapshot_word_43^snapshot_word_44^snapshot_word_45^snapshot_word_46^snapshot_word_47;
+
 task capture_snapshot;
 begin
+    if(DETAILED_TELEMETRY)
     snapshot_mpeg2<={snapshot_word_48,snapshot_word_47,snapshot_word_46,snapshot_word_45,snapshot_word_44,snapshot_word_43,snapshot_word_42,snapshot_word_41,snapshot_word_40,snapshot_word_39,snapshot_word_38,snapshot_word_37,snapshot_word_36,snapshot_word_35,
         snapshot_word_34,snapshot_word_33,snapshot_word_32,
         snapshot_word_31,snapshot_word_30,snapshot_word_29,snapshot_word_28,
@@ -224,6 +232,8 @@ begin
         snapshot_word_11,snapshot_word_10,snapshot_word_09,snapshot_word_08,
         snapshot_word_07,snapshot_word_06,snapshot_word_05,snapshot_word_04,
         snapshot_word_03,snapshot_word_02,snapshot_word_01,snapshot_word_00};
+    else
+    snapshot_mpeg2<={compact_checksum,snapshot_word_47,snapshot_word_46,snapshot_word_45,snapshot_word_44,snapshot_word_43,snapshot_word_42,snapshot_word_41,snapshot_word_40,snapshot_word_39,snapshot_word_38,snapshot_word_37,snapshot_word_35,snapshot_word_26,snapshot_word_25,snapshot_word_19,snapshot_word_18,snapshot_word_17,snapshot_word_06,snapshot_word_05,snapshot_word_04,snapshot_word_03,snapshot_word_02,snapshot_word_01,snapshot_word_00};
     snapshot_ready_mpeg2<=1'b1;
 end
 endtask
@@ -441,59 +451,12 @@ reg [42:0] overlay_shift;
 reg [31:0] overlay_row_word;
 wire [11:0] overlay_row_offset=(v_pos-OVERLAY_Y)>>2;
 wire [5:0] overlay_row_index=overlay_row_offset[5:0];
+// Word-addressed mux: width follows the selected schema, avoiding unused
+// high slices in the compact profile. The index is bounded before selection.
 always @* begin
-    case(overlay_row_index)
-    0:overlay_row_word=snapshot_sync_2[31:0];
-    1:overlay_row_word=snapshot_sync_2[63:32];
-    2:overlay_row_word=snapshot_sync_2[95:64];
-    3:overlay_row_word=snapshot_sync_2[127:96];
-    4:overlay_row_word=snapshot_sync_2[159:128];
-    5:overlay_row_word=snapshot_sync_2[191:160];
-    6:overlay_row_word=snapshot_sync_2[223:192];
-    7:overlay_row_word=snapshot_sync_2[255:224];
-    8:overlay_row_word=snapshot_sync_2[287:256];
-    9:overlay_row_word=snapshot_sync_2[319:288];
-    10:overlay_row_word=snapshot_sync_2[351:320];
-    11:overlay_row_word=snapshot_sync_2[383:352];
-    12:overlay_row_word=snapshot_sync_2[415:384];
-    13:overlay_row_word=snapshot_sync_2[447:416];
-    14:overlay_row_word=snapshot_sync_2[479:448];
-    15:overlay_row_word=snapshot_sync_2[511:480];
-    16:overlay_row_word=snapshot_sync_2[543:512];
-    17:overlay_row_word=snapshot_sync_2[575:544];
-    18:overlay_row_word=snapshot_sync_2[607:576];
-    19:overlay_row_word=snapshot_sync_2[639:608];
-    20:overlay_row_word=snapshot_sync_2[671:640];
-    21:overlay_row_word=snapshot_sync_2[703:672];
-    22:overlay_row_word=snapshot_sync_2[735:704];
-    23:overlay_row_word=snapshot_sync_2[767:736];
-    24:overlay_row_word=snapshot_sync_2[799:768];
-    25:overlay_row_word=snapshot_sync_2[831:800];
-    26:overlay_row_word=snapshot_sync_2[863:832];
-    27:overlay_row_word=snapshot_sync_2[895:864];
-    28:overlay_row_word=snapshot_sync_2[927:896];
-    29:overlay_row_word=snapshot_sync_2[959:928];
-    30:overlay_row_word=snapshot_sync_2[991:960];
-    31:overlay_row_word=snapshot_sync_2[1023:992];
-    32:overlay_row_word=snapshot_sync_2[1055:1024];
-    33:overlay_row_word=snapshot_sync_2[1087:1056];
-    34:overlay_row_word=snapshot_sync_2[1119:1088];
-    35:overlay_row_word=snapshot_sync_2[1151:1120];
-    36:overlay_row_word=snapshot_sync_2[1183:1152];
-    37:overlay_row_word=snapshot_sync_2[1215:1184];
-    38:overlay_row_word=snapshot_sync_2[1247:1216];
-    39:overlay_row_word=snapshot_sync_2[1279:1248];
-    40:overlay_row_word=snapshot_sync_2[1311:1280];
-    41:overlay_row_word=snapshot_sync_2[1343:1312];
-    42:overlay_row_word=snapshot_sync_2[1375:1344];
-    43:overlay_row_word=snapshot_sync_2[1407:1376];
-    44:overlay_row_word=snapshot_sync_2[1439:1408];
-    45:overlay_row_word=snapshot_sync_2[1471:1440];
-    46:overlay_row_word=snapshot_sync_2[1503:1472];
-    47:overlay_row_word=snapshot_sync_2[1535:1504];
-    48:overlay_row_word=snapshot_sync_2[1567:1536];
-    default:overlay_row_word=0;
-    endcase
+    overlay_row_word=0;
+    if(overlay_row_index<SNAPSHOT_WORDS)
+        overlay_row_word=snapshot_sync_2[overlay_row_index*32+:32];
 end
 always @(posedge clk_video)begin
     if(reset_video)overlay_shift<=0;

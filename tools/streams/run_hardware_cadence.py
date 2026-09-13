@@ -209,18 +209,21 @@ def main() -> int:
                 f"{result['cadence_seconds']:.6f} s, "
                 f"{result['delivered_fps']:.6f} fps"
             )
-            print(
-                "decoder/presentation/destination stalls: "
-                f"{result['decoder_stall_cycles']}/"
-                f"{result['presentation_stall_cycles']}/"
-                f"{result['destination_stall_cycles']}"
-            )
-            print(
-                "I/P/B decoder stalls: "
-                f"{result['i_stall_cycles']}/"
-                f"{result['p_stall_cycles']}/"
-                f"{result['b_stall_cycles']}"
-            )
+            if result.get("telemetry_profile") == "compact":
+                print("compact telemetry: detailed stall counters unavailable")
+            else:
+                print(
+                    "decoder/presentation/destination stalls: "
+                    f"{result['decoder_stall_cycles']}/"
+                    f"{result['presentation_stall_cycles']}/"
+                    f"{result['destination_stall_cycles']}"
+                )
+                print(
+                    "I/P/B decoder stalls: "
+                    f"{result['i_stall_cycles']}/"
+                    f"{result['p_stall_cycles']}/"
+                    f"{result['b_stall_cycles']}"
+                )
             for failure in failures:
                 print(f"FAIL: {failure}")
         return int(bool(failures))

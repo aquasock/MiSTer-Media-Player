@@ -8,6 +8,9 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Compact 25-word telemetry schema 10 retains playback errors, basic cadence, audio and transport health while removing detailed performance history from default synthesis; compile-time detailed schema 9 remains available.
+- Screenshot decoding supports compact and legacy profiles, marks omitted diagnostics unavailable, and reports the correct final checksum word for each schema.
+
 - Manual 59.94/50 Hz progressive refresh selection with unchanged 720x480 active video, frame-boundary switching, and exact untimestamped cadence at both rates; audio and PTS clocks retain playback speed. Hardware qualification pending.
 - Deterministic 25/29.97 fps motion and stereo flash/beep checks from `tools/make_refresh_tests.py`.
 
