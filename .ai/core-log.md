@@ -1,3 +1,35 @@
+## 999 COMMIT Unreleased ??? 2026-09-13T07:53:13-07:00
+
+#### Coming From:
+
+Unreleased 9fd1829
+
+#### Purpose:
+
+Separate the registered reference-cache response word for the P and B prediction engines to repair the MP2 candidate's localized video routing failure.
+
+#### Outcome:
+
+The user requested stopping the two remaining Quartus builds and implementing the proposed handoff fix. Source 9fd1829 seed 87 compiled and completed focused timing in 1471 seconds, using 40824 ALMs, 55768 registers, 474 RAM blocks and 69 DSP blocks, but it is not timing-qualified: setup is -0.354 ns with four violations from shared_engine_dout_q[32] to B-fetcher word_data slots 11, 16, 4 and 24, totaling -0.745 ns. Other standard slacks are hold +0.245 ns, recovery +3.449 ns, removal +0.528 ns and pulse +1.122 ns; focused video setup is +7.825 ns and decoder recovery +9.400 ns. Seeds 52 and 61 were canceled by the user's instruction after 1952 seconds, and both process groups were confirmed exited. The prior handoff registration in ebf372e documents the same routing-dominated topology; this change will keep its one-cycle response latency and ownership rule while giving each consumer an independent data register. No RBF from this batch is recommended for hardware testing.
+
+#### Next Steps:
+
+Implement separate owner-enabled response registers, verify observable data/valid equivalence across ownership changes and resets, and run the existing prediction-fetcher regression with direct and delayed responses. Commit the tested fix and run a fresh three-seed build batch, retaining seed 87 for a direct timing comparison and seeds 52 and 61 for placement alternatives. Require standard and focused timing before delivering an audio candidate.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_response_handoff.sv
+- files.qip
+- tools/streams/tb_h262_reference_response_handoff.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 998 COMMIT Unreleased 9fd1829 2026-09-13T07:17:37-07:00
 
 #### Coming From:
@@ -1235,42 +1267,6 @@ Exit MediaPlayer, install `host/build/MediaPlayer_20260903.rbf` as `/media/fat/M
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 959 COMMIT Unreleased 5fc7a1e 2026-09-03T22:22:02-07:00
-
-#### Coming From:
-
-Unreleased d34c292
-
-#### Purpose:
-
-Rename the DVD picker and physical-drive launcher to concise user-facing labels without changing playback routing.
-
-#### Outcome:
-
-Source `5fc7a1e` replaces the core-menu label `Run DVD-Video` with `Load Disk`, renames the tracked launcher from `USB DVD Drive.dvd` to `Video DVD.dvd`, and updates current setup and testing documentation plus the Unreleased changelog.  Patched Main continues mapping every selected `.dvd` file to `dvdmenu:/dev/sr0`, so the helper protocol, source selection and DVD playback behavior remain unchanged; the immutable v0.9.0 release manifests and package hashes retain the historical launcher name they actually shipped.  Static checks confirm the new menu string, asset contents and extension routing, and the source commit is pushed without staging the user's unrelated local changes.
-
-#### Next Steps:
-
-Retain source `5fc7a1e` as the naming boundary and incorporate its pending RBF change into the approved Audio CD development cycle rather than performing a separate Quartus compile.  The combined cycle should add `.cd` picker support and physical CDDA playback, rebuild the affected Main and helper, then perform one clean timing-gated Quartus build with the established seed unless timing requires the single authorized reseed.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sv
-- README.md
-- assets/USB DVD Drive.dvd
-- assets/Video DVD.dvd
-- docs/BUILDING.md
-- docs/MEDIA_CONVERSION.md
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
