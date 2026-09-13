@@ -1,3 +1,36 @@
+## 991 COMMIT Unreleased 14af685 2026-09-13T03:08:33-07:00
+
+#### Coming From:
+
+Unreleased 03b033f
+
+#### Purpose:
+
+Get precise live evidence of what is actually blocking decode, instead of continuing to guess from code reading after entry 990's targeted fix retested unchanged.
+
+#### Outcome:
+
+Deployed entry 990's build (seed99, only passing seed this cycle at a razor-thin +0.001ns margin; seed26/33/40/7/52 all failed timing) and asked the user to reload. Same symptom: `sent` frozen near 143588 bytes, `credit=0` held for 670,000+ poll cycles - functionally identical to the pre-990 stall. Rather than assume the fix was ineffective, pulled fresh telemetry and compared its *live* counter fields (decoder_stall_cycles, presentation_stall_cycles, destination_stall_cycles, b_stall_cycles - these keep incrementing until the one-shot arms, unlike the frozen scheduler_flags/error_flags fields) against a second screenshot: `presentation_stall_cycles` totaled only ~2.8M cycles and `destination_stall_cycles` was exactly 0 across the whole ~30-second session, while `decoder_stall_cycles`/`b_stall_cycles` accounted for nearly all of it (~1.79-1.8 billion cycles, matching the corner telemetry's 30-second no-commit fallback arm). This proves neither hold this session fixed (entry 986's `b_presentation_hold`, entry 990's `p_destination_ownership_hold`) has been the dominant blocker - both fixes are real and correct, but something else, further upstream, has actually been stalling decode almost since the start. That points at `mpeg2_new_decoder_stream_ready` itself, the picture bookkeeper's own `stream_ready` output in `mpeg2_h262_two_picture_probe_p_chain.sv`, gated by its internal `parser_ready`/`p_hold_effective`/`b_parse_hold`/`b_persistence_wait` terms. Traced one candidate (`p_implicit_reconstruct_request` disqualifying the persistence-tracking engine select) by code reading alone and found it was a dead end - implicit-reconstruct macroblocks complete through a separate signal (`reconstructed_seen`), not `persisted_seen`. Rather than keep guessing, asked the user how to proceed; they chose building a live diagnostic. Source `14af685` bundles the four gating terms plus their own sub-signals (`b_picture_inflight`, `b_seen`, `b_persistence_verified`, `b_error`, `b_candidate`, `b_transport`, `p_error_raw` - 12 bits total) into a new `stall_probe_debug` output from the bookkeeper, and adds a small one-shot capture in `MediaPlayer.sv` (mirroring this project's established armed-once-per-session pattern, not a live/continuously-updating signal, to avoid the CDC/timing risk that got the earlier `mpeg2_h262_live_deadlock_probe` removed) that arms after ~3 seconds of sustained real stall and latches that bundle plus `stream_ready`, both top-level holds, and the active/display frame banks. Published as corner-telemetry snapshot word 58, replacing a hardwired zero confirmed unused in this build's `DEADLINE_DIAGNOSTICS=1` configuration (the python decoder's only reads of words 58-62 are gated at schema versions this build's `SNAPSHOT_FORMAT` never reaches). `tools/test_telemetry_visibility.sv` (the profiler's existing regression) and `tools/test_two_picture_probe_abandon.sv` (entry 990's regression) both still pass unchanged against the real modules. `quartus_map` on seed99 is clean, 0 errors, same warning count; logic cells rose modestly (88426->88692), consistent with one new counter/register/comparator, not a structural change.
+
+#### Next Steps:
+
+Sync to all seed build directories and run the full timing build - given entry 990's cycle already left only one of six seeds passing (seed99, +0.001ns), this addition's extra logic may push even that seed over the edge; if all six fail, that needs its own resolution before any further hardware test. Once a passing seed deploys, ask the user to reload the file, let it run past 3 seconds of stall, and pull fresh telemetry - `stall_diag_valid` true means word 58 has real content; decode `stall_diag_*` to see exactly which of parser_ready/p_hold_effective/b_parse_hold/b_persistence_wait (and their own sub-terms) is false, and fix that specific mechanism next instead of the two already-fixed holds.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- tools/decode-hardware-telemetry.py
+- tools/test_telemetry_visibility.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 990 COMMIT Unreleased 03b033f 2026-09-13T02:28:44-07:00
 
 #### Coming From:
@@ -1107,66 +1140,6 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 954 COMMIT Unreleased 67ce19d 2026-09-03T20:08:11-07:00
-
-#### Coming From:
-
-Unreleased 5f1cf92
-
-#### Purpose:
-
-Bound automatic-menu fallback output latency across physical DVDs without weakening normal title buffering.
-
-#### Outcome:
-
-Source `67ce19d` adds one fallback-aware PCM emission boundary: while a physical DVD's automatic menu is using sink pacing, each scheduled PCM run first drains the asynchronous output reserve, and the fallback itself admits at most one 2,048-frame batch per scheduler pass.  This prevents the four-megabyte normal lane from absorbing approximately twenty seconds of decoded PCM and lets the pipe and unchanged FPGA FIFO credit establish delivery rate, while ordinary advancing-timestamp scheduling, normal title use of the complete optical-stall reserve, overlay priority and byte order remain unchanged.  The production regression starts with 24,000 held frames, proves the first exhausted-target pass emits exactly one batch, repeatedly reaches the exact 8,192-frame reserve and reconstructs all 15,808 emitted stereo frames sample-for-sample through the real reserve; its advancing-PTS control restores the original scheduler.  Strict optimized, AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer checks pass, as do the native helper capability probe, retained DVD random-access, SPU, menu-hop, overlay, stage, output-reserve, AC-3, LPCM-skip, audio UI, visualizer and seek tests, twenty repeated production runs, one hundred menu-hop runs and fifty output-reserve runs.  Real MP3, WAV, FLAC and Ogg seek integrations pass with and without the visualizer.  GNU 10.2.1 builds the 970,148-byte stripped static ARMv7 helper `host/build/MediaPlayer_Helper` with SHA-256 `6b7524f082e81e3b6f9e49064deea7950804438485bed366e7089b1b434b2da7`; Main, protocol, RTL and RBF are unchanged.
-
-#### Next Steps:
-
-Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`67ce19d` artifact and retain the current per-core Main, RBF and visualizer.  Test Futurama plus several other physical DVDs that previously delayed at automatic menus; each affected route should log one fallback activation containing `paced_batch=2048`, reach moving menu video and a usable selector without the prior long apparent freeze, retain continuous intelligible audio and show no pacing failure, hold-limit diagnostic, underrun or helper termination.  Launch titles and exercise chapter navigation on at least one disc to confirm the unchanged ordinary reserve path, then return the updated log, screenshot and telemetry for hardware qualification.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 953 COMMIT Unreleased 5f1cf92 2026-09-03T19:51:25-07:00
-
-#### Coming From:
-
-Unreleased 5f1cf92
-
-#### Purpose:
-
-Qualify source `5f1cf92` across Futurama's automatic root menu, nested episode-selection menus and selected-title playback.
-
-#### Outcome:
-
-The physical source-`5f1cf92` run passes hardware validation.  All three finite intro boundaries drain and release, automatic menu entry at 35.059491 seconds preserves the continuous decoder epoch, and the bounded fallback activates with 183,808 held PCM frames before settling near its 8,192-frame reserve without a hold-limit diagnostic, signal-nine termination or audio underrun.  The root menu initially appears frozen while the output path consumes an approximately 1.16 to 1.21 million-frame PCM scheduling lead, about 24 to 25 seconds, but then animates normally and accepts directional input; this is observable catch-up latency rather than a decoder deadlock.  Root-menu activation, nested episode-selection transitions and their overlay transactions complete, the final selection leaves the menu at 327.905704 seconds, and the chosen episode sustains advancing presentation timestamps for more than ninety seconds with over 77 MiB of helper video delivered.  The user confirms the menus are navigable and the selected episode looks and sounds good.  The checksum-valid schema-21 snapshot reports 128 displayed pictures, 127 swaps, zero decoder and PCM protocol errors, zero audio underruns and a valid overlay, while the updated screenshot visibly captures episode playback.  The 17,823,653-byte log, 1,386,067-byte screenshot and 818-byte telemetry sidecar have SHA-256 `4e31c76f52ab03fa55a38027c314064306d4ff9ac8d8b5a3056666d35e41eea7`, `e6511bd6c54ccab344419b1c703b38d61430c1073790293f1d11fef66e0273ce` and `9e6ede6ae979d7a24a16133f9ec1237dc3c4f4dda7bc444c4a84494f26052633`.
-
-#### Next Steps:
-
-Retain source `5f1cf92` and its helper as the accepted hardware baseline.  Treat the initial automatic-menu catch-up as a future latency optimization rather than reopening the functional fix, and broaden physical-disc regression to other automatic menus, still menus and supported title audio before the next release boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
