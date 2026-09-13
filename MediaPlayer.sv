@@ -2441,59 +2441,9 @@ assign VGA_DE = presentation_base_de;
 assign VGA_HS = presentation_base_hs;
 assign VGA_VS = presentation_base_vs;
 
-// Entry 977: a continuously-live (never armed, never latched) probe of
-// decode/display progress and both picture-ownership holds, drawn last so
-// it is never obscured, for diagnosing a hang the one-shot cadence-profiler
-// snapshot cannot see because it never re-arms after boot.
-reg [1:0] live_probe_display_frame_bank_q;
-reg       live_probe_display_scratch_q;
-reg       live_probe_display_scratch_bank_q;
-wire live_probe_display_swap_pulse =
-    (mpeg2_new_display_frame_bank != live_probe_display_frame_bank_q) ||
-    (mpeg2_new_display_scratch != live_probe_display_scratch_q) ||
-    (mpeg2_new_display_scratch_bank != live_probe_display_scratch_bank_q);
-always @(posedge clk_mpeg2) begin
-    if (reset_mpeg2) begin
-        live_probe_display_frame_bank_q   <= 2'd0;
-        live_probe_display_scratch_q      <= 1'b0;
-        live_probe_display_scratch_bank_q <= 1'b0;
-    end else begin
-        live_probe_display_frame_bank_q   <= mpeg2_new_display_frame_bank;
-        live_probe_display_scratch_q      <= mpeg2_new_display_scratch;
-        live_probe_display_scratch_bank_q <= mpeg2_new_display_scratch_bank;
-    end
-end
-
-wire [7:0] live_probe_video_r, live_probe_video_g, live_probe_video_b;
-mpeg2_h262_live_deadlock_probe mpeg2_h262_live_deadlock_probe
-(
-    .clk_mpeg2                    (clk_mpeg2),
-    .reset_mpeg2                  (reset_mpeg2),
-    .clk_video                    (clk_video),
-    .reset_video                  (reset_video),
-    .pixel_ce                     (display_pixel_ce),
-    .h_pos                        (display_h_pos),
-    .v_pos                        (display_v_pos),
-    .base_r                       (cadence_video_r),
-    .base_g                       (cadence_video_g),
-    .base_b                       (cadence_video_b),
-    .stream_full                  (mpeg2_stream_full),
-    .burst_ready                  (mpeg2_burst_ready),
-    .p_destination_ownership_hold (mpeg2_new_p_destination_ownership_hold),
-    .b_presentation_hold          (mpeg2_new_b_presentation_hold),
-    .active_frame_bank            (mpeg2_new_active_frame_bank),
-    .display_frame_bank           (mpeg2_new_display_frame_bank),
-    .display_scratch              (mpeg2_new_display_scratch),
-    .picture_complete_pulse       (mpeg2_new_picture_420_complete),
-    .display_swap_pulse           (live_probe_display_swap_pulse),
-    .video_r                      (live_probe_video_r),
-    .video_g                      (live_probe_video_g),
-    .video_b                      (live_probe_video_b)
-);
-
-assign VGA_R = live_probe_video_r;
-assign VGA_G = live_probe_video_g;
-assign VGA_B = live_probe_video_b;
+assign VGA_R = cadence_video_r;
+assign VGA_G = cadence_video_g;
+assign VGA_B = cadence_video_b;
 
 assign presentation_base_r = dvd_overlay_video_r;
 assign presentation_base_g = dvd_overlay_video_g;
