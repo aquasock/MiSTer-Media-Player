@@ -1,4 +1,4 @@
-## 001 COMMIT Unreleased ??? 2026-09-13T08:38:36-07:00
+## 001 COMMIT Unreleased 1750154 2026-09-13T08:38:36-07:00
 
 #### Coming From:
 
@@ -14,7 +14,7 @@ The user authorized these changes and three builds. Prior source ace6b7b complet
 
 #### Next Steps:
 
-Install the prepared changes, inspect synthesis for removal of ALSA, LED diagnostics and extended-width scaler storage, then run clean seeds 87, 52 and 61 with standard and focused timing reports including HDMI setup and global hold. Compare fitted resources with ace6b7b and require new hardware playback validation; preserve the prior user-tested RBF.
+Changes are committed. Inspect synthesis for removal of ALSA, LED diagnostics and extended-width scaler storage, then run clean seeds 87, 52 and 61 with standard and focused timing reports including HDMI setup and global hold. Compare fitted resources with ace6b7b and require new hardware playback validation; preserve the prior user-tested RBF.
 
 #### Files Modified:
 
