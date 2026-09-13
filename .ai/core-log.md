@@ -1,3 +1,32 @@
+## 20 COMMIT Unreleased dd144a3 2026-09-13T15:46:46-07:00
+
+#### Coming From:
+
+Unreleased 0b6eb0e
+
+#### Purpose:
+
+Record the user's long-movie freeze report and preserve non-disruptive hardware evidence during the telemetry builds.
+
+#### Outcome:
+
+While separately testing the dd144a3 refresh candidate, the user reports a whole-movie file froze well into playback at 50 Hz, that other files worked at both refresh rates, and that the OSD still opens. Two fresh FTP-triggered captures 26.5 seconds apart are pixel-identical across all 720x480 pixels, confirming a stationary movie picture while Main remains responsive. Evidence is retained under results/telemetry-20260913-154407 and results/telemetry-20260913-154434, including comparison.json. Both images decode a valid schema-9 snapshot with source rate code 2 (24 fps), audio-underrun flag 0x1000, no decoder/presentation/file-reader error, no EOF, 7380 decoded MP2 frames and 8501760 played sample pairs, and audio STC 177 seconds. The profiler latches at the first triggering event, so this may be an earlier underrun snapshot rather than the freeze state; neither 177 seconds nor the wrapped FPS/cycle/picture counters establishes the freeze time or cause. The RTL underrun flag does not gate transport or playback. Large file size and 50 Hz are not established causes. No reset, file reload, deployment or mode change was performed. This is partial refresh validation with an unresolved long-file playback failure, not overall hardware acceptance; compact-telemetry source 0b6eb0e continues compiling separately and has not been installed.
+
+#### Next Steps:
+
+Preserve the detailed dd144a3 candidate and captured evidence for investigation, distinguish the current stall from the previously latched snapshot, and obtain a reproducible file/position or fresh live diagnostic evidence before choosing a playback fix. Complete the already authorized compact-telemetry builds and report their resources and timing without treating them as a fix for this freeze.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 19 COMMIT Unreleased 0b6eb0e 2026-09-13T15:28:53-07:00
 
 #### Coming From:
@@ -1304,36 +1333,6 @@ Run a full three-seed timing-checked Quartus build of this RTL, install the resu
 - MediaPlayer.sv
 - host/build_arm_stack.sh
 - host/main_mister/0004-mediaplayer-plain-video-generic-load.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 979 COMMIT Unreleased 8527df9 2026-09-12T20:55:15-07:00
-
-#### Coming From:
-
-Unreleased 39df52e
-
-#### Purpose:
-
-Adopt a `.mpg`-only architecture that moves Program Stream demux, MP2 audio decode and progress-bar overlay rendering into the FPGA core, eliminating the ARM helper process and the custom Main patches entirely.
-
-#### Outcome:
-
-While diagnosing entry 978's freeze, the user reconsidered why a custom ARM helper and heavily patched Main exist at all: originally for DVD/CD navigation and multi-format audio, neither of which is wanted any more. The user confirmed three scoping decisions: (1) drop the standalone MP3/FLAC/WAV/Ogg audio-file player entirely, (2) support MP2 (MPEG-1 Layer II) audio only, no AC-3, matching `core-reference.md`'s already-adopted H.222.0 Program Stream/PES records (H222-001 through H222-010) and the project's existing ARM-side MP2 decode experience, and (3) abandon entry 978's freeze investigation once this rebuilt RBF exists, since the bug lives entirely inside the cross-process pipe/SPI architecture being replaced, not in the H.262 decode pipeline itself. The target end state plays a `.mpg` file the same way a ROM-loading MiSTer core plays a ROM: stock Main streams the raw file bytes into the FPGA via the existing generic `ioctl_download` path, and the FPGA does everything downstream - Program Stream/PES demux, H.262 video decode (unchanged, already proven), a new MP2 subband decoder, a new glyph-based overlay text renderer, and pause/seek handled natively in RTL without a control-socket handshake to a separate process. Deleted at completion: all of `host/arm/` (11,016 lines), all three `host/main_mister/*.patch` files, the DVD-only RTL (`mpeg2_h262_dvd_overlay.sv` and the DVD leg of `mpeg2_h262_display_record_router.sv`), and the vendored libdvdnav/libdvdread/libdvdcss/liba52/minimp3 dependencies. Stage A landed in the same commit as this entry's resolution: `mpeg2_h262_program_stream_demux`, a from-scratch RTL module parsing MPEG-1/MPEG-2 pack headers, PES framing via `PES_packet_length`, and the MPEG-2-style PES optional header, producing independent ready/valid video and audio elementary-byte streams each with a directly-attached PTS (no in-band metadata escape protocol needed, unlike the ARM helper's scheme). Verified in Icarus against a synthetic but spec-accurate Program Stream covering a stuffed pack header, a video PES, a skipped private stream, an audio PES, and the program end code, including a backpressure test confirming `in_ready` correctly gates the whole input on whichever elementary output is stalled. Not yet wired into `MediaPlayer.sv` or exercised against a real captured `.mpg` byte sequence.
-
-#### Next Steps:
-
-Stage B: reroute Main to stream raw `.mpg` file bytes directly (no helper process) into `mpeg2_h262_program_stream_demux`, wire its video-elementary output into the existing H.262 decode pipeline in place of `mpeg2_h262_inband_metadata`'s video leg, and confirm silent (audio-muted) video-only playback on hardware. Then stage (C): an MP2 audio decoder module, verified in simulation against reference PCM before wiring to the audio output path, then confirmed on hardware; (D) an RTL overlay text renderer replacing `audio_ui.c`'s glyph drawing, plus native pause/seek input handling in place of the control-socket protocol; (E) delete the ARM helper, the three Main patches, DVD-only RTL and the now-unused vendored dependencies, and update `files.qip` and the build scripts accordingly. Do not delete the current working (if buggy) helper/Main architecture until stage (C) is hardware-confirmed, so there is a fallback playable build throughout.
-
-#### Files Modified:
-
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
 
 #### Status:
 
