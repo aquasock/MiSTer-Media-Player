@@ -1,3 +1,32 @@
+## 21 COMMIT Unreleased 0b6eb0e 2026-09-13T15:55:39-07:00
+
+#### Coming From:
+
+Unreleased dd144a3
+
+#### Purpose:
+
+Record completed compact-telemetry builds, measured resource savings and the clarified whole-movie failure context.
+
+#### Outcome:
+
+All three clean source-0b6eb0e seeds compile and pass the unchanged 108-register CDC audit. Seed 87 passes every timing category at all four corners, with minimum setup +0.082 ns, hold +0.100 ns, recovery +3.007 ns, removal +0.199 ns and pulse width +0.925 ns. Its fitted use is 37548 ALMs, 54191 registers, 480 RAM blocks and 69 DSP blocks, leaving 4362 ALMs free; its RBF SHA-256 is 17e0b04eb91fe7d75538338f171da9c8cf8e6a8d57e1c395e6fd3ad8b3137507. Seed 52 uses 40372 ALMs and fails setup at -0.011 ns in the ASCAL vertical polyphase path; seed 61 uses 40247 ALMs and fails setup at -0.493 ns in ASCAL vertical filtering. Both other seeds pass hold, recovery, removal and pulse width. Compile plus timing durations are 1119, 1081 and 1162 seconds for seeds 52, 61 and 87. Compared with dd144a3, source synthesis saves 1803 combinational ALUTs and 3021 registers without changing memory bits, DSPs or PLLs; the profiler alone falls from 3290 to 1515 synthesized ALUTs and from 5449 to 2429 registers, while fitted seed-87 profiler use is 894 ALMs. The larger reduction between the preceding qualified seed 52 and this qualified seed 87 includes placement effects. Complete evidence, regression results and copied RBFs with explicit timing status are under results/build-0b6eb0e-20260913-153453 and results/hardware-test-0b6eb0e. Separately, the user clarifies the freeze occurred in fellow.mpg at fixed 50 Hz without a switch, and this was the first test that far into the file. FTP reports 4359360512 bytes at /media/fat/games/MediaPlayer/fellow.mpg, exactly matching the historical large-file case in af7f570. That old fix enabled 64-bit ARM-helper stat() for Total/Remaining labels and did not resolve the separately noted decoder hang. The current reader uses 64-bit size and position; the saved snapshot already read 110306058 bytes, exceeding the 64393216-byte low-32-bit size, so simple size truncation does not explain that captured progress. Actual filesystem type was not established by the FTP proc-file read, and the /media/fat name is not evidence of FAT32. No freeze cause or refresh regression has been established, and no compact RBF has been deployed or hardware-accepted.
+
+#### Next Steps:
+
+Offer source-0b6eb0e seed 87 for compact-telemetry hardware validation with the updated decoder, retaining the detailed dd144a3 candidate and saved freeze captures for diagnosis. Confirm normal playback, retained EOF/error/audio/transport fields and OSD controls before accepting telemetry cuts. Investigate fellow.mpg separately, using reproducible position and a 59.94 Hz comparison or fresh live-state diagnostics; do not present telemetry cuts as a freeze fix. Do not use timing-failed seeds 52 or 61 as qualified artifacts.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 20 COMMIT Unreleased dd144a3 2026-09-13T15:46:46-07:00
 
 #### Coming From:
@@ -1302,37 +1331,6 @@ Re-sync the corrected RTL (with the probe removed) to all three seed directories
 
 - MediaPlayer.sv
 - files.qip
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 980 COMMIT Unreleased b1864ab 2026-09-12T21:25:48-07:00
-
-#### Coming From:
-
-Unreleased 8527df9
-
-#### Purpose:
-
-Wire entry 979's Program Stream demux into MediaPlayer.sv and reroute Main so a plain .mpg file loads with no ARM helper process at all.
-
-#### Outcome:
-
-Instantiated `mpeg2_h262_program_stream_demux` alongside the existing `mpeg2_h262_inband_metadata`, muxed on a new `mpeg2_new_direct_demux_active` flag latched per-download-session from `ioctl_index`: index 1 (the legacy ARM helper channel) keeps using `mpeg2_h262_inband_metadata` unchanged, while index 4 (`MEDIAPLAYER_LOADER_VIDEO_FILE`, the existing F4 "Load MPEG-2 Video File" OSD slot) now feeds the new demux directly. Both share one `mpeg2_stream_fifo`; `mpeg2_stream_wr` and the `hps_io` burst-ready/`wr_attempt` gating were extended to accept either index, and the inactive consumer's input is gated to always-invalid so it stays completely inert regardless of which path is selected. On the Main side, cloned the pinned `Main_MiSTer` commit referenced by `host/build_arm_stack.sh`, applied all three existing patches, and added a fourth, `0004-mediaplayer-plain-video-generic-load.patch`: a plain `.mpg`/`.m2v`/`.mpeg` file selected via F4 now routes through the ordinary `user_io_file_tx()` path any ROM-loading core uses instead of launching the ARM helper, verified by a real ARM cross-compile of the four-patch stack with zero errors or warnings from the changed files. DVD/ISO/VOB and the standalone audio-file player are untouched and still route through the helper via F5 or the physical-loader path. Audio is not yet decoded anywhere on the new path - stage C's MP2 decoder does not exist yet - so the demux's audio elementary output is sunk with `audio_ready` tied high. `quartus_map` (analysis & synthesis) on seed99 completed with 0 errors and no warnings traced to any of the new or changed signals, confirming the wiring elaborates cleanly; no full timing-closed build or hardware test has been run yet, and the demux has only been exercised against synthetic Icarus test data, never a real captured `.mpg` byte sequence.
-
-#### Next Steps:
-
-Run a full three-seed timing-checked Quartus build of this RTL, install the resulting RBF and the four-patch Main alongside the still-functional helper-based `.rbf`/binary, and confirm silent (audio-muted) video-only playback of a real `.mpg` file loaded via F4 on hardware - watching in particular for anything the synthetic Icarus stream didn't exercise (unusual pack header placement, multiple audio streams, non-PTS-bearing PES packets). Once that is hardware-confirmed, proceed to stage C: an MP2 audio decoder consuming the demux's audio elementary output.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-- host/build_arm_stack.sh
-- host/main_mister/0004-mediaplayer-plain-video-generic-load.patch
 
 #### Status:
 
