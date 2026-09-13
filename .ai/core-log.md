@@ -1,4 +1,4 @@
-## 14 COMMIT Unreleased ??? 2026-09-13T13:28:53-07:00
+## 14 COMMIT Unreleased 24d3de0 2026-09-13T13:28:53-07:00
 
 #### Coming From:
 
@@ -10,25 +10,32 @@ Implement frame-associated BT.601/BT.709 color matrix selection with user overri
 
 #### Outcome:
 
-The user approved starting the investigated matrix correction while the three 62baf08 aspect/timing seeds finish. The active core ignores sequence color metadata and always converts with BT.601; a tagged BT.709 patch produced RGB 72,198,99 versus FFmpeg 62,179,96. The current encoding helper correctly converted the tested tagged source to BT.601 under local FFmpeg 8.0.1, so no helper failure was established. The investigation is retained in results/color-investigation-20260913/report.md. The approved scope is matrix selection, not gamut/gamma management, HDR, DVD support or interlaced playback; aspect remains manually selected 4:3 or 16:9.
+Committed and pushed 24d3de0 with optional sequence-display color-matrix parsing, frame-associated reference/scratch matrix context, Auto/BT.601/BT.709 overrides and frame-boundary application through two acknowledged mailboxes. Missing/unspecified/unsupported tags use the documented BT.601 compatibility fallback. Exhaustive simulation covers all 16777216 input triples: BT.601 is exact against 62baf08 and BT.709 differs from the BT.709-6 reference by at most one RGB code. Metadata, reset, repeated/truncated descriptions, all 256 tag values, queued B pictures, simultaneous header/commit and override CDC tests pass. Colored stalled-DDR scanout checks 345600 exact pixels and continuous sync; existing video/OSD/cadence and integrated mixed I/P/B regressions also pass. Deterministic 601/709 matching clips and an untagged 709 clip are generated under results/color-matrix-tests. The consulted BT.709-6 items 3.2 through 3.4 are added to core-reference.md with notification to the user; the H.262 metadata interpretation uses the already-controlled 02/2000 baseline. Gamut and gamma conversion are explicitly excluded by the user. The independent 62baf08 seeds are now complete: seed 61 passes all four operating corners with setup +0.395 ns, hold +0.103 ns, recovery +3.149 ns, removal +0.152 ns and pulse width +0.925 ns, and all 84 audited synchronizer registers. Its RBF SHA-256 is 1d0b6dfcb917df72f567f760956280638696d866fa190362fe7f3d03357c47ff, with 41267 ALMs, 57463 registers, 480 RAM blocks and 69 DSP blocks. Seed 52 fails setup at -0.159 ns on a P-frame address path and seed 87 at -0.032 ns on scaler vertical interpolation; other timing classes and audits pass. All three files are under results/hardware-test-62baf08/, with seed 61 delivered as the timing-qualified aspect/OSD candidate and no hardware acceptance yet. Clean color seeds 52, 61 and 87 are running under results/build-24d3de0-20260913-134011; the fitted audit now requires 96 synchronizer registers. No matrix-enabled hardware result is available yet.
 
 #### Next Steps:
 
-Parse sequence color-description fields, retain color context with reference and scratch pictures, transfer the displayed context safely, and provide Auto, BT.601 and BT.709 menu choices with a documented BT.601 compatibility fallback. Preserve existing 601 output, filter and sync alignment, and validate metadata/reset/reordering, matrix arithmetic, menu overrides and visual matching clips. Continue monitoring the existing seeds and report their independent timing results. Commit tested color source before its own clean builds and require fitted timing and CDC checks without extra frame buffers or relaxed constraints.
+Complete the three color builds, require all four operating-corner timing classes and all 96 audited registers, compare resource use against 62baf08 and provide timing-qualified candidates. Hardware should validate Auto on both tagged clips, the manual override on the untagged clip, frame-boundary changes, subsequent file reload and uninterrupted OSD/filter/aspect behavior. Continue using the delivered 62baf08 seed 61 for the independent aspect/timing hardware test.
 
 #### Files Modified:
 
+- CHANGELOG.md
 - MediaPlayer_top_00.svh
 - MediaPlayer_top_01.svh
 - MediaPlayer_top_02.svh
 - MediaPlayer_top_05.svh
 - MediaPlayer_top_06.svh
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- rtl/mpeg2_luma_framebuffer.sv
-- files.qip
-- tools/phase1p_timing.tcl
-- CHANGELOG.md
 - docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/media_color_control.sv
+- rtl/mpeg2_luma_framebuffer.sv
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- rtl/mpeg2_new/mpeg2_h262_picture_color.sv
+- rtl/mpeg2_new/mpeg2_ycbcr_to_rgb_bt601.sv
+- tools/make_color_matrix_tests.py
+- tools/phase1p_timing.tcl
+- tools/test_media_color_control.sv
+- tools/test_picture_color.sv
+- tools/verify_color_matrix.py
 
 #### Status:
 
