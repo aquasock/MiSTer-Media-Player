@@ -42,6 +42,12 @@ wire [15:0] mpeg2_new_cadence_error_flags = {
     mpeg2_new_syntax_error
 };
 
+reg [11:0] telemetry_h_d,telemetry_h,telemetry_v_d,telemetry_v;
+always @(posedge clk_video) begin
+    telemetry_h_d <= display_h_pos; telemetry_h <= telemetry_h_d;
+    telemetry_v_d <= display_v_pos; telemetry_v <= telemetry_v_d;
+end
+
 mpeg2_h262_hardware_cadence_profiler
 mpeg2_h262_hardware_cadence_profiler
 (
@@ -86,8 +92,8 @@ mpeg2_h262_hardware_cadence_profiler
     .sequence_end_seen         (mpeg2_new_sequence_end_seen),
     .session_quiet             (mpeg2_new_cadence_session_quiet),
     .error_flags               (mpeg2_new_cadence_error_flags),
-    .h_pos                     (display_h_pos),
-    .v_pos                     (display_v_pos),
+    .h_pos                     (telemetry_h),
+    .v_pos                     (telemetry_v),
     .base_r                    (fb_video_r),
     .base_g                    (fb_video_g),
     .base_b                    (fb_video_b),

@@ -739,6 +739,13 @@ mpeg2_ycbcr_to_rgb_bt601 mpeg2_ycbcr_to_rgb_bt601
     .b  (rgb_b)
 );
 
+// Raster timing is continuous across frame-bank/cache resets. In particular,
+// negative sync must never be forced low by a picture-swap reset.
+always @(posedge rd_clk) begin
+    pixel_en_d <= pixel_en; h_sync_d <= h_sync; v_sync_d <= v_sync;
+    video_de <= pixel_en_d; video_hs <= h_sync_d; video_vs <= v_sync_d;
+end
+
 always @(posedge rd_clk) begin
     if (rd_reset) begin
         y_byte_lane_d             <= 3'd0;
@@ -748,21 +755,12 @@ always @(posedge rd_clk) begin
         video_r                   <= 8'd0;
         video_g                   <= 8'd0;
         video_b                   <= 8'd0;
-        pixel_en_d <= 1'b0; h_sync_d <= 1'b1; v_sync_d <= 1'b1;
-        video_de                  <= 1'b0;
-        video_hs                  <= 1'b0;
-        video_vs                  <= 1'b0;
     end
     else begin
         y_byte_lane_d            <= y_byte_lane;
         c_byte_lane_d            <= c_byte_lane;
         source_window_d          <= source_window;
         decoded_picture_window_d <= decoded_picture_window;
-
-        pixel_en_d <= pixel_en; h_sync_d <= h_sync; v_sync_d <= v_sync;
-        video_de <= pixel_en_d;
-        video_hs <= h_sync_d;
-        video_vs <= v_sync_d;
 
         if (decoded_picture_window_d) begin
             video_r <= rgb_r;

@@ -13,6 +13,15 @@ This project is still in active pre-release development. Published milestone rel
 - PES-to-picture timestamp binding and audio frame/sample/error telemetry.
 - FFmpeg audio-oracle regressions and an executable A/V flash/beep test script.
 
+### Fixed
+
+- Keep HS/VS/DE continuous across frame-buffer bank resets, preventing extra
+  negative-sync pulses during progressive playback.
+- Transfer OSD and aspect settings through acknowledged clock-domain mailboxes;
+  synchronize system-clock VS edge detectors and remove configuration gating
+  from the HDMI adjustment circuit's input video clock.
+- Align telemetry coordinates with the framebuffer RGB/DE pipeline.
+
 ### Changed
 
 - Restore progressive video from `a57079f` using stock MiSTer Main. Source

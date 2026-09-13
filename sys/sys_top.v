@@ -541,19 +541,27 @@ always@(posedge clk_sys) begin
 				^ ary[7:0] ^ ary[11:8];
 `endif
 
-	vs_d0 <= HDMI_TX_VS;
-	if(vs_d0 == HDMI_TX_VS) vs_d1 <= vs_d0;
+	vs_d0 <= hdmi_vs_sys_sync[2];
+	vs_d1 <= vs_d0;
 
 	vs_d2 <= vs_d1;
 	if(~vs_d2 & vs_d1) vs_wait <= 0;
 end
 
+// Resynchronize VS levels before system-clock edge detection. Never compare
+// the asynchronous pin against the first synchronizer stage.
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] hdmi_vs_sys_sync = 0, core_vs_sys_sync = 0;
+always @(posedge clk_sys) begin
+ hdmi_vs_sys_sync <= {hdmi_vs_sys_sync[1:0], HDMI_TX_VS};
+ core_vs_sys_sync <= {core_vs_sys_sync[1:0], vs_fix};
+end
 reg [7:0] frame_cnt;
 always @(posedge clk_sys) begin
 	reg vs_r, vs_old;
 	
-	vs_r <= vs_fix;
-	if(vs_r == vs_fix) vs_old <= vs_r;
+	vs_r <= core_vs_sys_sync[2];
+	vs_old <= vs_r;
 	if(~vs_old & vs_r) frame_cnt <= frame_cnt + 1'd1;
 end
 
@@ -1010,8 +1018,8 @@ end
 		.clk(FPGA_CLK1_50),
 		.reset_na(~reset_req),
 
-		.llena(lowlat),
-		.lltune({16{cfg_done}} & lltune),
+		.llena(lowlat && cfg_done),
+		.lltune(lltune),
 		.locked(led_locked),
 		.i_waitrequest(adj_waitrequest),
 		.i_write(adj_write),
@@ -1097,7 +1105,7 @@ reg  [31:0] adj_data;
 		reg vsd, vsd2;
 		if(~cfg_ready || ~cfg_set) cfg_got <= cfg_set;
 		else begin
-			vsd  <= HDMI_TX_VS;
+			vsd  <= hdmi_vs_sys_sync[2];
 			vsd2 <= vsd;
 			if(~vsd2 & vsd) cfg_got <= cfg_set;
 		end

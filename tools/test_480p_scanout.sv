@@ -1,8 +1,10 @@
 `timescale 1ns/1ps
 // End-to-end raster/cache check with an ideal dual-clock RAM model and
-// variable DDR response stalls. No H.262 decoding is simulated here.
+// variable DDR response stalls and a bank reset during vertical blanking.
+// No H.262 decoding or HDMI scaler capture is simulated here.
 module test_480p_scanout;
-reg vc=0,mc=0,reset=1,complete=0;
+reg vc=0,mc=0,reset=1,complete=0,swap_reset=0;
+wire fb_reset=reset|swap_reset;
 always #18.518519 vc=~vc;
 always #8.333333 mc=~mc;
 wire [11:0] h,v;wire en,hs,vs;
@@ -11,7 +13,7 @@ wire [7:0] burst;wire [28:0] addr;wire rd;reg [63:0] data=0;reg valid=0;
 integer remaining=0,cyc=0;reg [28:0] next_addr;
 wire busy=(remaining!=0)||(cyc%7==0);
 wire ready,seen,error;wire [7:0] r,g,b;wire de,oh,ov;
-mpeg2_luma_framebuffer fb(.reset(reset),.mem_clk(mc),.picture_complete(complete),
+mpeg2_luma_framebuffer fb(.reset(fb_reset),.mem_clk(mc),.picture_complete(complete),
  .horizontal_size(14'd720),.vertical_size(14'd480),.ddram_busy(busy),
  .ddram_dout(data),.ddram_dout_ready(valid),.ddram_burstcnt(burst),
  .ddram_addr(addr),.ddram_rd(rd),.cache_ready(ready),.read_seen(seen),.cache_error(error),
@@ -23,7 +25,7 @@ endfunction
 integer j,offset;
 always @(posedge mc) begin
  cyc<=cyc+1;valid<=0;
- if(reset)remaining<=0;
+ if(fb_reset)remaining<=0;
  else if(rd&&!busy)begin remaining<=burst;next_addr<=addr;end
  else if(remaining>0 && cyc%5!=0)begin
   for(j=0;j<8;j=j+1)begin
@@ -34,6 +36,11 @@ always @(posedge mc) begin
   end
   valid<=1;next_addr<=next_addr+1;remaining<=remaining-1;
  end
+end
+reg swap_tested=0;
+always @(negedge vc) begin
+ if(check && v==480 && h==16)begin swap_reset=1;swap_tested=1;end
+ if(v==480 && h==24)swap_reset=0;
 end
 integer x,y,n=0,pixels=0,lines=0,hs_ticks=0,vs_ticks=0;
 integer eh=0,ev=0,gray;reg last_en=0,last_hs=1,last_vs=1,check=0;
@@ -55,7 +62,8 @@ always @(posedge vc) begin
    n=n+1;
    if(n==858*525)begin
     if(pixels!=720*480||error)$fatal(1,"pixel count/cache error %0d",pixels);
-    $display("PASS 480p: 450450 pixel clocks, 345600 exact pixels, negative sync, stalled DDR, line refills and edge alignment");$finish;
+    if(!swap_tested)$fatal(1,"missing frame-bank reset");
+    $display("PASS frame-bank reset preserves continuous sync/DE; 480p: 450450 pixel clocks, 345600 exact pixels, negative sync, stalled DDR, line refills and edge alignment");$finish;
    end
   end
   last_en=(x<720&&y<480);last_hs=!(x>=736&&x<798);last_vs=!(y>=489&&y<495);

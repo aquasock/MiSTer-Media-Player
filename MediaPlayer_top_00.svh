@@ -65,7 +65,11 @@ assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////
 
-wire [1:0] ar = status[122:121];
+wire [1:0] ar;
+video_config_cdc #(.WIDTH(2)) aspect_config (
+ .src_clk(clk_sys), .dst_clk(clk_video),
+ .src_data(status[122:121]), .dst_data(ar)
+);
 
 // Sequence aspect is stable during playback; synchronize the slow 4:3 flag.
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)

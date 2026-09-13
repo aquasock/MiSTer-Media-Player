@@ -79,3 +79,5 @@ set_global_assignment -name HEX_FILE rtl/audio/mp2_scale.hex
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_reference_response_handoff.sv
 
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_progressive_geometry.sv
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/video_config_cdc.sv
