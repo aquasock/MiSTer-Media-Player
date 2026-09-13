@@ -1,3 +1,32 @@
+## 008 COMMIT Unreleased 0710e81 2026-09-13T11:44:14-07:00
+
+#### Coming From:
+
+Unreleased 0710e81
+
+#### Purpose:
+
+Record the completed timing-repair batch and identify the final shared subcarrier configuration crossing.
+
+#### Outcome:
+
+All three clean 0710e81 builds compiled and passed the fitted 54-register synchronizer audit. Seeds 52, 61 and 87 finished compilation and focused timing in 1052, 1176 and 1112 seconds, using 40441, 40540 and 40304 ALMs respectively; each used 472 RAM blocks and 69 DSP blocks. Setup remained -1.656, -1.702 and -1.525 ns, with the shared worst path from the system-clock subcarrier flag to video-clock subcarrier_out. All passed hold at +0.243, +0.241 and +0.238 ns, recovery at +3.790, +2.242 and +3.476 ns, removal at +0.418, +0.551 and +0.390 ns, and pulse width at +0.925 ns. Focused decoder setup was -0.237, +0.173 and +0.143 ns; HDMI setup was +0.013, +0.214 and +0.390 ns, while same-clock video setup was +16.635, +15.933 and +17.190 ns. Thus seeds 61 and 87 now fail only the remaining shared configuration crossing among the reported paths; seed 52 also has a smaller decoder setup violation. The old request, VS, LFB_EN, HDMI_PR and lowlat failures were removed. No new hardware candidate is timing-qualified. All reports, RBF hashes and regression evidence are retained under results/build-0710e81-20260913-112410/.
+
+#### Next Steps:
+
+Within the approved remaining-configuration-crossing repair scope, transfer subcarrier through the verified mailbox and extend the fitted audit to its six control stages. Verify the mailbox behavior, commit and push, then run clean seeds 52, 61 and 87 again. Require positive standard and focused timing before delivering the loading-overlay repair for hardware testing; audio remains unchanged.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 007 COMMIT Unreleased 0710e81 2026-09-13T11:24:43-07:00
 
 #### Coming From:
@@ -1250,37 +1279,6 @@ Source `f329dce` widens the pause-barrier gate from `audio_visualizer_controls` 
 
 - host/arm/media_player_helper.c
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 967 COMMIT Unreleased fa0ebf6 2026-09-12T06:19:27-07:00
-
-#### Coming From:
-
-Unreleased 08db78e
-
-#### Purpose:
-
-Fix the .mpg progress-bar overlay never appearing on screen despite `08db78e`'s ARM/Main changes transmitting it correctly.
-
-#### Outcome:
-
-The user reported no visible change on real `.mpg` playback.  A fresh telemetry-enabled log confirmed `08db78e`'s helper code was running (`video progress overlay enabled file_size=...`) and that Main's overlay-trace patch showed `overlay_submit config`/`commit` pairs with a changing content hash roughly once per second, proving the overlay data was being rendered and transmitted correctly end to end.  The bug is in `mpeg2_h262_dvd_overlay.sv`, the FPGA-side DVD-style overlay compositor this feature rides on: `overlay_sample_valid` required `native_active` (the decoder's raw interlace flag, wired from `display_native_interlaced`) to be asserted before compositing any pixel, and the row-fetch request trigger for its line cache carried the same gate, so the cache was never even populated.  The same telemetry log's `H262 restart fields` diagnostic confirmed the user's test file is genuinely `sequence_progressive=1`/`progressive=1` content, so `native_active` reads 0 for it and the overlay is received and parsed correctly but never draws a pixel; the standalone audio player's identical overlay mechanism is unaffected because it does not depend on this signal.  The user confirmed this project no longer plays genuinely interlaced content - only converted progressive `.mpg` files and the progressive audio UI/visualizer - and authorized breaking interlaced/native-passthrough compatibility to fix this.
-
-Source `fa0ebf6` removes `native_active` from both the row-request trigger and the sample-valid gate in `mpeg2_h262_dvd_overlay.sv`; `h_pos`/`v_pos` already enumerate a straightforward progressive raster there regardless of source interlace, so this does not change what row is requested or sampled, only removes a gate that no longer corresponds to how this core is used.  The `native_active` port is left connected but unused rather than touching the module interface.  Following this fix the user set a standing project scope decision: interlaced content, native (unscaled 480i) bypass and Bob/Weave deinterlacing are all now unsupported, since only the user's own progressive `.mpg` encodes and the progressive audio UI/visualizer are played going forward.  All three seeds 26, 33 and 40 compiled with 0 errors; worst-case setup slack was negative 0.137 ns, positive 0.116 ns and negative 0.280 ns respectively, so only seed 33 passes timing.  Seed 33 was delivered as `.ai/current_results/MediaPlayer_progressiveoverlay_seed33.rbf`, SHA-256 `347269119b7e1e4fbbd4f0be433acd21261b2fa87359f8db137826557b320561`.  Main and the helper are unchanged from `966`'s delivered build.
-
-#### Next Steps:
-
-Install `.ai/current_results/MediaPlayer_progressiveoverlay_seed33.rbf` (Main/helper unchanged from entry 966) and retest the `.mpg` progress-bar overlay: it should now actually draw on screen, appearing for ten seconds on play, pause and seek and then disappearing, with ordinary `.mpg` playback/seeking and the audio player unaffected.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_dvd_overlay.sv
 
 #### Status:
 
