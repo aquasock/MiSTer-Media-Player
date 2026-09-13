@@ -783,8 +783,21 @@ wire mpeg2_new_transport_fatal_error =
 	mpeg2_new_idct_error ||
 	mpeg2_new_recon_error ||
 	mpeg2_new_ddr_store_error ||
-	mpeg2_new_ddr_cache_error ||
-	mpeg2_new_b_presentation_error;
+	mpeg2_new_ddr_cache_error;
+	// Entry 988: mpeg2_new_b_presentation_error deliberately excluded.
+	// mpeg2_h262_stream_transport_gate latches fatal_error permanently
+	// (mpeg2_h262_stream_transport_gate.sv's fatal_error_latched only
+	// clears on reset_mpeg2), draining the rest of the file without ever
+	// feeding the decoder again once tripped. mpeg2_h262_b_presentation_
+	// scheduler's own header states its aborts are intentionally
+	// recoverable ("fails the transaction without retaining compressed-
+	// stream backpressure") and it already resets its own bookkeeping to
+	// a clean idle state on presentation_error - feeding that same signal
+	// into a project-wide permanent kill switch contradicted the
+	// scheduler's own documented design and, on real content that hits
+	// entry 986's fixed deadlock condition more than once, silently
+	// discarded the entire remainder of the file after the first
+	// occurrence.
 
 mpeg2_h262_stream_transport_gate mpeg2_h262_stream_transport_gate
 (
