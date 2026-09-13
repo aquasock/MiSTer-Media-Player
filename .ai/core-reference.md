@@ -59,6 +59,14 @@ rules:
     - "motion compensation, residuals, slices and macroblocks"
     - "frame-rate signalling and cadence"
 
+- source_id: BT709
+  priority: P0
+  authority: ITU-R
+  document: "ITU-R BT.709-6 (06/2015) — Parameter values for the HDTV standards for production and international programme exchange"
+  consulted_url: "https://www.itu.int/dms_pubrec/itu-r/rec/bt/R-REC-BT.709-6-201506-I!!PDF-E.pdf"
+  use_for:
+    - "BT.709 YCbCr matrix coefficients and nominal digital coding"
+
 - source_id: H222
   priority: P0
   authority: ITU-T / ISO/IEC
@@ -438,6 +446,26 @@ All records in this section are `VERIFIED`, `HIGH` confidence, and apply to the 
   controlled_conclusion: "An intra macroblock without concealment motion vectors resets all motion-vector predictors to zero."
   conformance_effect: "Clear forward and backward components before subsequent prediction."
 
+- record_id: H262-041
+  source_id: H262
+  title: "Optional sequence color-matrix description"
+  source_reference: "02/2000 baseline, 6.2.2.4; 6.3.6; Table 6-9"
+  controlled_conclusion: "Sequence display extension identifier 2 optionally carries three color-description bytes. Matrix value 1 denotes BT.709; values 5 and 6 use the BT.601-family luma weights. Absent description is application-defined, not universally BT.709 or BT.601."
+  conformance_effect: "Distinguish explicit metadata from a chosen application fallback; the description does not itself specify a display process."
+
+```
+
+---
+
+## 5.1. Presentation color matrix
+
+```yaml
+- record_id: BT709-001
+  source_id: BT709
+  title: "BT.709 matrix and nominal digital sample coding"
+  source_reference: "BT.709-6, items 3.2, 3.3 and 3.4"
+  controlled_conclusion: "The luma weights are Kr=0.2126, Kg=0.7152 and Kb=0.0722. At eight bits nominal digital coding uses luma scale 219 and offset 16, and color-difference scale 224 and offset 128."
+  conformance_effect: "Invert the documented matrix and sample coding when presenting BT.709 YCbCr as RGB; arithmetic precision and RGB output clipping remain implementation choices."
 ```
 
 ---
