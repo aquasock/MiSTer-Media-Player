@@ -1,3 +1,38 @@
+## 13 COMMIT Unreleased ??? 2026-09-13T13:05:36-07:00
+
+#### Coming From:
+
+Unreleased a0f153a
+
+#### Purpose:
+
+Provide manual 4:3 and 16:9 aspect selection and repair the observed decoder and scaler setup paths.
+
+#### Outcome:
+
+The user approved aspect switching and the proposed timing cleanup, then explicitly limited the menu to manual 4:3 and 16:9 with no stream-metadata selection. The user reports neither existing choice changes the displayed shape. Preserve accepted mounted-file OSD and filter operation, progressive playback and existing audio behavior.
+
+#### Next Steps:
+
+Trace menu status through the scaler rectangle, implement the two explicit ratios, and validate switching independently of sequence metadata. Shorten the B-frame address and HDMI scaler arithmetic/control paths while preserving decoded values, filter precision and pixel alignment. Run relevant regressions, commit and push the source, then build seeds 52, 61 and 87 and check all four timing corners and the fitted CDC audit before delivering hardware candidates.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer.sdc
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- sys/ascal.vhd
+- tools/verify_video_sync.py
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 012 COMMIT Unreleased a0f153a 2026-09-13T12:54:32-07:00
 
 #### Coming From:
@@ -1270,35 +1305,6 @@ Reverted `video_overlay_pause_barrier()` back to the small `video_overlay_style(
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 972 COMMIT Unreleased 016f1e2 2026-09-12T10:13:02-07:00
-
-#### Coming From:
-
-Unreleased 5ce3c1f
-
-#### Purpose:
-
-Fix the `.mpg` progress overlay still only appearing on resume, not on pause, despite `24a6bda`'s lightweight style-toggle fix - the user's own repro (wait for auto-hide, then pause) showed nothing at all on screen while paused.
-
-#### Outcome:
-
-The user reported the exact `24a6bda`-era symptom again ("shows up on resume, not pause") on a fresh install of the current build.  Checking the actual installed binaries found the deployed `MediaPlayer_Helper` still hashed to `f329dce`'s build, not `24a6bda`'s - the fix had never actually reached the test hardware.  Reinstalling the correct `24a6bda` helper (`chmod +x` and atomic rename over the running, text-busy binary, since the process had it open) did not fix the symptom, so the bug is real, not a stale-binary artifact.  With telemetry enabled, a live ARM diagnostic log captured the exact failing pause event (`pause requested` -> `pause helper ready` -> `playback paused`, no errors) but this traced to a genuine structural bug in `video_overlay_pause_barrier()`: it calls `control_wait_for_go()`, which blocks for the entire pause duration, on the line *before* `video_overlay_service()` - the only function that renders fresh content and performs the actual CONFIG+DATA+COMMIT publish - ever gets to run in `process_program_stream()`'s loop.  The barrier's own lightweight `MEDIA_PLAYER_OVERLAY_STYLE` toggle (added in `24a6bda`) only flips a visibility/palette flag; it carries no pixel data, so on a reveal-from-hidden it can only re-show whatever was last actually committed to the FPGA plane - which service() never got to refresh, since it's blocked from running until the barrier returns after resume.  The reason `24a6bda` avoided calling `video_overlay_publish()` (the full ~88 KiB republish) from inside the barrier was a real race with Main's `pause_pipe_empty` detection, but that race is specifically about a write still in flight when Main stops draining *after* `pause_ready` becomes true - not about doing the publish before `PAUSE_READY` is even sent, while Main is still draining completely normally exactly as it does for any other periodic mid-playback refresh.
-
-#### Next Steps:
-
-Source `016f1e2` restructures `video_overlay_pause_barrier()` to force `video_overlay_service()` to run (via `pending_reveal`) *before* sending `PAUSE_READY`, so a full fresh publish completes and is fully handed to the pipe while Main is still in normal-drain mode, then only afterward announces ready and blocks for GO.  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  Delivered and the user retested with telemetry enabled: the symptom was unchanged, and a live ARM diagnostic log pinpointed why - Main's own `overlay_submit` trace showed the CONFIG record of the reveal-triggered publish arriving, but no matching COMMIT ever appeared, even though the helper is fully synchronous and cannot send `PAUSE_READY` until the entire publish's writes have already returned.  The real race is not about ordering within the helper at all: `PAUSE_READY` arrives on a small, separate `control_fd` channel that Main can process independently of how far its own asynchronous drain loop has gotten through the ~88 KiB already sitting in the bulk pipe, so `pause_barrier_finish()` can fire (and Main stop draining) while most of a large publish is still unread and gets abandoned.  Superseded by the fix logged in entry 973.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
