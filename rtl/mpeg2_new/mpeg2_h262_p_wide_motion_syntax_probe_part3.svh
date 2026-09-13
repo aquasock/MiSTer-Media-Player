@@ -545,6 +545,21 @@
                 end
             end
         end
+
+        // Entry 993: same class of bug as entry 992's mpeg2_h262_b_core_probe
+        // fix, found by direct code comparison after live hardware evidence
+        // moved the same stall to this module (mpeg2_h262_p_diagnostic_
+        // controller_rearm.sv's wide_parse_hold, one of stream_hold's four
+        // OR-terms). Two probe_error<=1 sites above (detail 30, both
+        // occurrences) do not also clear parse_hold, unlike every other
+        // probe_error site in this file. If parse_hold is already asserted
+        // when one of those specific sites fires, nothing else clears it,
+        // for the identical reason entry 992 documents: this statement must
+        // stay outside the `if(stream_valid)` gate above, since no further
+        // bytes ever arrive once stream_hold (derived from parse_hold) has
+        // blocked the top-level stream_ready that would supply them.
+        if (probe_error)
+            parse_hold <= 1'b0;
     end
 end
 
