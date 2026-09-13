@@ -57,6 +57,12 @@ module mpeg2_h262_ddram_arbiter
     output wire        prediction_busy,
     output wire        prediction_dout_ready,
 
+    // Low-priority compressed stream reservoir; never claims a frame bank.
+    input wire [28:0] stream_addr,
+    input wire [63:0] stream_din,
+    input wire stream_rd, stream_we,
+    output wire stream_busy, stream_dout_ready,
+
     input  wire        ddram_busy,
     input  wire        ddram_dout_ready,
     output wire [7:0]  ddram_burstcnt,
@@ -75,14 +81,14 @@ localparam integer DESCRIPTOR_COUNT_WIDTH=$clog2(DESCRIPTOR_DEPTH+1);
 reg [DESCRIPTOR_COUNT_WIDTH-1:0] read_descriptor_count;
 reg [DESCRIPTOR_POINTER_WIDTH-1:0]
     read_descriptor_head,read_descriptor_tail;
-reg       read_descriptor_owner [0:DESCRIPTOR_DEPTH-1];
+reg [1:0] read_descriptor_owner [0:DESCRIPTOR_DEPTH-1];
 reg [7:0] read_descriptor_words [0:DESCRIPTOR_DEPTH-1];
 reg       reader_bank_valid;
 reg [2:0] reader_frame_region;
 
 wire read_outstanding=(read_descriptor_count!=0);
-wire read_owner_prediction=read_outstanding?
-    read_descriptor_owner[read_descriptor_head]:1'b0;
+wire [1:0] read_owner=read_outstanding?
+    read_descriptor_owner[read_descriptor_head]:2'd0;
 wire [7:0] read_words_remaining=read_outstanding?
     read_descriptor_words[read_descriptor_head]:8'd0;
 wire response_existing=ddram_dout_ready&&read_outstanding;
@@ -103,6 +109,13 @@ wire grant_writer =
     !read_outstanding && !reader_rd && !prediction_rd &&
     writer_we && !writer_targets_reader_region;
 
+wire grant_stream_read = read_descriptor_room && !reader_rd &&
+    !prediction_rd && !grant_writer && stream_rd;
+wire grant_stream_write = !read_outstanding && !reader_rd &&
+    !prediction_rd && !grant_writer && !stream_rd && stream_we;
+assign stream_busy = ddram_busy || reader_rd || prediction_rd || grant_writer ||
+    (stream_rd ? !read_descriptor_room : read_outstanding);
+
 // Busy reports capacity/priority independently of the corresponding request.
 // This is a ready/valid boundary: acceptance below remains request-qualified,
 // but no client valid may feed back combinationally into its own readiness.
@@ -117,32 +130,35 @@ assign writer_busy = read_outstanding||reader_rd||prediction_rd||
 assign ddram_burstcnt =
     grant_reader ? reader_burstcnt :
     grant_prediction ? prediction_burstcnt :
-    grant_writer ? writer_burstcnt : 8'd0;
+    grant_writer ? writer_burstcnt :
+    (grant_stream_read || grant_stream_write) ? 8'd1 : 8'd0;
 
 assign ddram_addr =
     grant_reader ? reader_addr :
     grant_prediction ? prediction_addr :
-    grant_writer ? writer_addr : 29'd0;
+    grant_writer ? writer_addr :
+    (grant_stream_read || grant_stream_write) ? stream_addr : 29'd0;
 
 assign ddram_rd =
     grant_reader ? 1'b1 :
-    grant_prediction ? 1'b1 : 1'b0;
+    grant_prediction ? 1'b1 : grant_stream_read;
 
 assign ddram_din =
-    grant_writer ? writer_din : 64'd0;
+    grant_writer ? writer_din : stream_din;
 
 assign ddram_be =
     grant_writer ? writer_be : 8'hFF;
 
 assign ddram_we =
-    grant_writer ? writer_we : 1'b0;
+    grant_writer ? writer_we : grant_stream_write;
 
 wire reader_accept=grant_reader&&!ddram_busy;
 wire prediction_accept=grant_prediction&&!ddram_busy;
-wire read_accept=reader_accept||prediction_accept;
-wire accepted_owner_prediction=prediction_accept;
+wire stream_accept=grant_stream_read&&!ddram_busy;
+wire read_accept=reader_accept||prediction_accept||stream_accept;
+wire [1:0] accepted_owner=reader_accept?2'd0:prediction_accept?2'd1:2'd2;
 wire [7:0] accepted_words=reader_accept?
-    reader_burstcnt:prediction_burstcnt;
+    reader_burstcnt:prediction_accept?prediction_burstcnt:8'd1;
 wire direct_response=ddram_dout_ready&&!read_outstanding&&read_accept;
 wire direct_response_finishes=direct_response&&(accepted_words<=8'd1);
 wire descriptor_push=read_accept&&!direct_response_finishes;
@@ -157,12 +173,15 @@ wire [DESCRIPTOR_POINTER_WIDTH-1:0] read_descriptor_tail_next=
     {DESCRIPTOR_POINTER_WIDTH{1'b0}}:read_descriptor_tail+1'b1;
 
 assign reader_dout_ready =
-    (response_existing&&!read_owner_prediction)||
+    (response_existing&&(read_owner==0))||
     (direct_response&&reader_accept);
 
 assign prediction_dout_ready =
-    (response_existing&&read_owner_prediction)||
+    (response_existing&&(read_owner==1))||
     (direct_response&&prediction_accept);
+
+assign stream_dout_ready =
+    (response_existing&&(read_owner==2))||(direct_response&&stream_accept);
 
 integer descriptor_index;
 always @(posedge clk) begin
@@ -172,7 +191,7 @@ always @(posedge clk) begin
         read_descriptor_tail  <= {DESCRIPTOR_POINTER_WIDTH{1'b0}};
         for(descriptor_index=0;descriptor_index<DESCRIPTOR_DEPTH;
             descriptor_index=descriptor_index+1)begin
-            read_descriptor_owner[descriptor_index] <= 1'b0;
+            read_descriptor_owner[descriptor_index] <= 2'd0;
             read_descriptor_words[descriptor_index] <= 8'd0;
         end
         reader_bank_valid     <= 1'b0;
@@ -181,7 +200,7 @@ always @(posedge clk) begin
     else begin
         if(descriptor_push)begin
             read_descriptor_owner[read_descriptor_tail]<=
-                accepted_owner_prediction;
+                accepted_owner;
             read_descriptor_words[read_descriptor_tail]<=pushed_words;
             read_descriptor_tail<=read_descriptor_tail_next;
         end

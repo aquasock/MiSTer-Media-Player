@@ -4,21 +4,23 @@ All notable project milestones are documented here.
 
 This project is still in active pre-release development. Published milestone releases use semantic version numbers, while unreleased work remains organized by development phase.
 
-## Unreleased
+## [Unreleased]
+
+### Added
+
+- FPGA MPEG-1 Layer II decoding for 48 kHz stereo MPG, serialized subband
+  synthesis, PCM timestamp scheduling and an independent DDR video reservoir.
+- PES-to-picture timestamp binding and audio frame/sample/error telemetry.
+- FFmpeg audio-oracle regressions and an executable A/V flash/beep test script.
 
 ### Changed
 
-- Return runtime sources to hardware-accepted `a57079f` for progressive video
-  playback using stock MiSTer Main, removing helper and custom-Main sources.
-- Restore MPG video demultiplexing with MPEG-1/2 pack/PES headers, elastic
-  output backpressure, first-stream selection and terminal video flushing.
-- Retain 800x600 output and encoded cadence. MP2 decoding, A/V synchronization
-  and native progressive 720x480 output are subsequent stages; movie audio
-  is skipped in this candidate.
-- Source `9233f07` passes clean Quartus 17.0.2 and focused timing with seeds
-  11 and 52. Seed 33 was stopped at the user's request. Hardware validation
-  of the new ingress is pending. Earlier unreleased DVD/visualizer work is
-  retained in Git history preceding the progressive restoration.
+- Restore progressive video from `a57079f` using stock MiSTer Main. Source
+  `9233f07` seed 52 was hardware-accepted with the generated 30-second MPG.
+- Keep the 800x600 output raster for this audio milestone; native progressive
+  720x480 output follows synchronized-audio hardware acceptance.
+- The current audio candidate awaits its own build and hardware qualification.
+  Earlier DVD/helper/custom-Main implementations remain in Git history.
 
 ## [0.9.0] - 2026-09-03 — DVD navigation, native video and consumer-audio milestone
 

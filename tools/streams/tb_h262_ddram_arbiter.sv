@@ -53,6 +53,8 @@ module tb_h262_ddram_arbiter;
         .prediction_addr(prediction_addr),.prediction_rd(prediction_rd),
         .prediction_busy(prediction_busy),
         .prediction_dout_ready(prediction_dout_ready),
+        .stream_addr(29'd0),.stream_din(64'd0),.stream_rd(1'b0),.stream_we(1'b0),
+        .stream_busy(),.stream_dout_ready(),
         .ddram_busy(ddram_busy),.ddram_dout_ready(ddram_dout_ready),
         .ddram_burstcnt(ddram_burstcnt),.ddram_addr(ddram_addr),
         .ddram_rd(ddram_rd),.ddram_din(ddram_din),

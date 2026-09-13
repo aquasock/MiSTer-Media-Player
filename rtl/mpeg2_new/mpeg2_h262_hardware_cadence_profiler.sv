@@ -11,6 +11,7 @@ module mpeg2_h262_hardware_cadence_profiler #(
     parameter [26:0] NO_PROGRESS_SNAPSHOT_DELAY = 27'd60000000,
     parameter [31:0] OUTLIER_GAP_CYCLES = 32'd3000000
 )(
+    input wire [31:0] audio_frames,audio_samples,audio_status,
     input wire clk_mpeg2,input wire reset_mpeg2,
     input wire clk_video,input wire reset_video,
     input wire fifo_pending,input wire decoder_ready,
@@ -49,16 +50,16 @@ module mpeg2_h262_hardware_cadence_profiler #(
     output reg [7:0] video_b,output wire snapshot_ready
 );
 
-localparam integer SNAPSHOT_WORDS=38;
+localparam integer SNAPSHOT_WORDS=41;
 localparam integer SNAPSHOT_BITS=SNAPSHOT_WORDS*32;
 localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
     TERMINAL_SNAPSHOT_DELAY-24'd1;
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd7,8'd38,16'd60000};
-localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd444;
-localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd152;
+localparam [31:0] SNAPSHOT_FORMAT={8'd8,8'd41,16'd60000};
+localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd432;
+localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd164;
 
 reg session_active;
 reg fifo_pending_q,decoder_ready_q,presentation_hold_q,destination_hold_q;
@@ -188,7 +189,10 @@ wire [31:0] snapshot_word_35={completed_frame_bank_q,display_frame_bank_q,
     sequence_end_seen_q,presentation_complete_q,presentation_error_q,
     associated_count_q,display_pts_q[10:0]};
 wire [31:0] snapshot_word_36=scheduler_debug_state_q;
-wire [31:0] snapshot_word_37=snapshot_word_00^snapshot_word_01^
+wire [31:0] snapshot_word_37=audio_frames;
+wire [31:0] snapshot_word_38=audio_samples;
+wire [31:0] snapshot_word_39=audio_status;
+wire [31:0] snapshot_word_40=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
     snapshot_word_06^snapshot_word_07^snapshot_word_08^snapshot_word_09^
     snapshot_word_10^snapshot_word_11^snapshot_word_12^snapshot_word_13^
@@ -197,11 +201,11 @@ wire [31:0] snapshot_word_37=snapshot_word_00^snapshot_word_01^
     snapshot_word_22^snapshot_word_23^snapshot_word_24^snapshot_word_25^
     snapshot_word_26^snapshot_word_27^snapshot_word_28^snapshot_word_29^
     snapshot_word_30^snapshot_word_31^snapshot_word_32^snapshot_word_33^
-    snapshot_word_34^snapshot_word_35^snapshot_word_36;
+    snapshot_word_34^snapshot_word_35^snapshot_word_36^snapshot_word_37^snapshot_word_38^snapshot_word_39;
 
 task capture_snapshot;
 begin
-    snapshot_mpeg2<={snapshot_word_37,snapshot_word_36,snapshot_word_35,
+    snapshot_mpeg2<={snapshot_word_40,snapshot_word_39,snapshot_word_38,snapshot_word_37,snapshot_word_36,snapshot_word_35,
         snapshot_word_34,snapshot_word_33,snapshot_word_32,
         snapshot_word_31,snapshot_word_30,snapshot_word_29,snapshot_word_28,
         snapshot_word_27,snapshot_word_26,snapshot_word_25,snapshot_word_24,
@@ -468,6 +472,9 @@ always @* begin
     35:overlay_row_word=snapshot_sync_2[1151:1120];
     36:overlay_row_word=snapshot_sync_2[1183:1152];
     37:overlay_row_word=snapshot_sync_2[1215:1184];
+    38:overlay_row_word=snapshot_sync_2[1247:1216];
+    39:overlay_row_word=snapshot_sync_2[1279:1248];
+    40:overlay_row_word=snapshot_sync_2[1311:1280];
     default:overlay_row_word=0;
     endcase
 end

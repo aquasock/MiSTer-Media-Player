@@ -41,6 +41,7 @@ mpeg2_h262_hardware_cadence_profiler #(
     .NO_PROGRESS_SNAPSHOT_DELAY(64),
     .OUTLIER_GAP_CYCLES(32'd10)
 ) dut(
+    .audio_frames(32'd1250),.audio_samples(32'd1440000),.audio_status(32'd15),
     .clk_mpeg2(clk_mpeg2),.reset_mpeg2(reset_mpeg2),
     .clk_video(clk_video),.reset_video(reset_video),
     .fifo_pending(fifo_pending),.decoder_ready(decoder_ready),
@@ -112,12 +113,14 @@ endtask
 
 task verify_checksum;
 begin
+    if(dut.snapshot_sync_2[1215:1184]!=1250||dut.snapshot_sync_2[1247:1216]!=1440000||dut.snapshot_sync_2[1279:1248]!=15)
+        $fatal(1,"audio telemetry missing");
     checksum=0;
-    for(i=0;i<37;i=i+1)
+    for(i=0;i<40;i=i+1)
         checksum=checksum^dut.snapshot_sync_2[i*32+:32];
-    if(checksum!==dut.snapshot_sync_2[1215:1184])
+    if(checksum!==dut.snapshot_sync_2[1311:1280])
         $fatal(1,"checksum mismatch %h/%h",checksum,
-               dut.snapshot_sync_2[1215:1184]);
+               dut.snapshot_sync_2[1311:1280]);
 end
 endtask
 
@@ -160,7 +163,7 @@ initial begin
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h0726ea60)
+    if(dut.snapshot_sync_2[63:32]!==32'h0829ea60)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.snapshot_sync_2[831:830]!==2'd1)
         $fatal(1,"quiet snapshot reason missing");
@@ -301,7 +304,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=7 gap-state+forced+fatal+no-progress checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=8 gap-state+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end

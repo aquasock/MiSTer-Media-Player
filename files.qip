@@ -62,3 +62,16 @@ set_global_assignment -name SYSTEMVERILOG_FILE MediaPlayer.sv
 # Progressive file playback through stock Main; no host-side demultiplexer.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_program_stream_ingress.sv
+
+# FPGA MP2 and independent compressed-video reservoir
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/mp2_decoder.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/mp2_synthesis.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/av_stream_fifo.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/mp2_pcm_fifo.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/mp2_pcm_output.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_av_ddr_fifo.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_pes_metadata_expand.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_pes_picture_pts.sv
+set_global_assignment -name HEX_FILE rtl/audio/mp2_cos.hex
+set_global_assignment -name HEX_FILE rtl/audio/mp2_window.hex
+set_global_assignment -name HEX_FILE rtl/audio/mp2_scale.hex

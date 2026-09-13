@@ -26,3 +26,17 @@ pass-through, both headers, stream selection, packet splits, stalls, EOF and
 reset. Real-media video is compared byte-for-byte with FFmpeg extraction.
 Existing metadata and PCM checks remain under `tools/streams/`.
 No helper or custom Main is built or installed.
+
+## FPGA MP2 validation
+
+Run `python3 tools/verify_mp2.py` (FFmpeg, NumPy and Verilator required).
+It compares RTL PCM against FFmpeg for all 17 quantizers, all joint-stereo
+bounds, several bitrates, broadband noise and silence, with output stalls and
+two reset-separated sessions. Unsupported/truncated frames must fail explicitly.
+`tools/generate_mp2_tables.py` deterministically regenerates the committed ROMs.
+`tools/test_mpg_audio_ingress.sv` exercises PS, the DDR reservoir, metadata and
+MP2 together; it does not simulate the entire H.262 reconstruction engine.
+
+The accepted fitter seed is 52. The next clean qualification batch uses
+52, 61 and 87 in independent source exports. A synthesis estimate is not a
+passing fitter or timing result.

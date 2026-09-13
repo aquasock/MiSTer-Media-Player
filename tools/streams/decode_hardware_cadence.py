@@ -23,9 +23,9 @@ class TelemetryDecodeError(RuntimeError):
     pass
 
 
-def _cell_bit(image: Image.Image, column: int, row: int) -> int:
+def _cell_bit(image: Image.Image, column: int, row: int, origin_y: int = Y0) -> int:
     x0 = X0 + column * CELL + 1
-    y0 = Y0 + row * CELL + 1
+    y0 = origin_y + row * CELL + 1
     pixels = []
     for y in range(y0, y0 + 2):
         for x in range(x0, x0 + 2):
@@ -42,9 +42,16 @@ def decode_words(path: Path | str) -> list[int]:
             "MiSTer screenshot is required"
         )
 
+    origin_y, count = Y0, WORDS
+    # Schema eight adds audio counters and moves the taller barcode upward.
+    probe = [_cell_bit(image, column, 0, 432) for column in range(43)]
+    magic = 0
+    for bit in probe[10:42]: magic = (magic << 1) | bit
+    if tuple(probe[:4]) == ROW_PREFIX and magic == MAGIC:
+        origin_y, count = 432, 41
     words: list[int] = []
-    for row in range(WORDS):
-        bits = [_cell_bit(image, column, row) for column in range(43)]
+    for row in range(count):
+        bits = [_cell_bit(image, column, row, origin_y) for column in range(43)]
         if tuple(bits[:4]) != ROW_PREFIX:
             raise TelemetryDecodeError(
                 f"row {row}: telemetry prefix absent ({bits[:4]})"
@@ -65,9 +72,9 @@ def decode_words(path: Path | str) -> list[int]:
 
     if words[0] != MAGIC:
         raise TelemetryDecodeError(f"bad magic 0x{words[0]:08x}")
-    if ((words[1] >> 16) & 0xFF) != WORDS:
+    if ((words[1] >> 16) & 0xFF) != count:
         raise TelemetryDecodeError(
-            f"snapshot declares {(words[1] >> 16) & 0xFF} words, expected {WORDS}"
+            f"snapshot declares {(words[1] >> 16) & 0xFF} words, expected {count}"
         )
     checksum = 0
     for word in words[:-1]:
@@ -186,6 +193,13 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "final_temporal_reference": (metadata >> 15) & 0x3FF,
         "reference_picture_count": (metadata >> 7) & 0xFF,
         "error_flags": (words[19] >> 16) & 0xFFFF,
+        "audio_frames_decoded": words[37] if len(words) == 41 else None,
+        "audio_samples_played": words[38] if len(words) == 41 else None,
+        "audio_status": words[39] if len(words) == 41 else None,
+        "audio_finished": bool(words[39] & 8) if len(words) == 41 else None,
+        "mp2_decode_error": bool(words[19] & (1 << 27)),
+        "mp2_underrun": bool(words[19] & (1 << 28)),
+        "mp2_timestamp_error": bool(words[19] & (1 << 29)),
         # Entry 365 (schema 5): the formerly reserved low half of word 19
         # carries the presentation-clock seconds count and the two field
         # flags.  Neither flag is consumed by presentation yet.

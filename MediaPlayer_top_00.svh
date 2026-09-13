@@ -234,7 +234,7 @@ always @(posedge clk_sys or posedge reset_request) begin
 end
 
 wire audio_fifo_reset_request =
-	reset_request || (audio_fifo_reset_stretch != 5'd0);
+	reset_request || reset_mpeg2 || (audio_fifo_reset_stretch != 5'd0);
 
 reg  [2:0] audio_mode_pending_data;
 reg        audio_mode_pending_valid;
@@ -245,7 +245,7 @@ wire       audio_mode_src_wr;
 wire       audio_mode_src_rd;
 wire       audio_restart_out_full;
 wire       audio_restart_out_empty;
-wire       audio_restart_out_data;
+wire [2:0] audio_restart_out_data;
 wire       audio_restart_out_wr;
 wire       audio_restart_out_rd;
 
@@ -312,7 +312,7 @@ dcfifo #(
 	.lpm_numwords         (4),
 	.lpm_showahead        ("ON"),
 	.lpm_type             ("dcfifo"),
-	.lpm_width            (1),
+	.lpm_width            (3),
 	.lpm_widthu           (2),
 	.overflow_checking    ("ON"),
 	.underflow_checking   ("ON"),
@@ -324,7 +324,7 @@ dcfifo #(
 ) audio_restart_out_fifo
 (
 	.aclr    (reset_request),
-	.data    (1'b1),
+	.data    (audio_mode_pending_data),
 	.wrclk   (clk_sys),
 	.wrreq   (audio_restart_out_wr),
 	.wrfull  (audio_restart_out_full),
@@ -362,9 +362,10 @@ wire reset_audio_src =
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] reset_audio_out_sync;
 reg [6:0] audio_out_reset_count;
+reg [2:0] audio_mode_out;
 
-always @(posedge CLK_AUDIO or posedge reset_request) begin
-	if (reset_request)
+always @(posedge CLK_AUDIO or posedge audio_fifo_reset_request) begin
+	if (audio_fifo_reset_request)
 		reset_audio_out_sync <= 3'b111;
 	else
 		reset_audio_out_sync <= {reset_audio_out_sync[1:0], 1'b0};
@@ -373,6 +374,8 @@ end
 wire reset_audio_out_system = reset_audio_out_sync[2];
 
 always @(posedge CLK_AUDIO) begin
+    if (stc_audio_reset) audio_mode_out<=0;
+    else if (!audio_restart_out_empty) audio_mode_out<=audio_restart_out_data;
 	if (reset_audio_out_system)
 		audio_out_reset_count <= 7'd127;
 	else if (!audio_restart_out_empty)
@@ -424,6 +427,7 @@ audio_pcm_fifo audio_pcm_fifo
 	.rd_empty (audio_pcm_fifo_empty)
 );
 
+wire [15:0] audio_test_output_l, audio_test_output_r;
 audio_pcm_output_adapter audio_pcm_output_adapter
 (
 	.clk        (CLK_AUDIO),
@@ -431,8 +435,8 @@ audio_pcm_output_adapter audio_pcm_output_adapter
 	.fifo_data  (audio_pcm_fifo_data),
 	.fifo_empty (audio_pcm_fifo_empty),
 	.fifo_rd    (audio_pcm_fifo_rd),
-	.audio_l    (audio_pcm_output_l),
-	.audio_r    (audio_pcm_output_r),
+	.audio_l    (audio_test_output_l),
+	.audio_r    (audio_test_output_r),
 	.underrun   (audio_pcm_underrun)
 );
 
@@ -491,7 +495,7 @@ wire mpeg2_ingress_valid, mpeg2_ingress_ready, mpeg2_ingress_end;
 wire mpeg2_demux_error;
 
 wire mpeg2_new_transport_fatal_error =
-    mpeg2_demux_error ||
+    mpeg2_demux_error || mp2_error ||
 	mpeg2_new_syntax_error ||
 	mpeg2_new_phase1_probe_error ||
 	mpeg2_new_pred_error ||
@@ -515,14 +519,23 @@ mpeg2_h262_stream_transport_gate mpeg2_h262_stream_transport_gate
 );
 
 // Stock Main's acknowledged file transfer and FIFO CDC remain unchanged.
-mpeg2_program_stream_ingress mpeg2_program_stream_ingress (
+wire [7:0] av_video_byte, av_audio_byte;
+wire av_video_valid,av_video_ready,av_ingress_end,av_is_ps;
+wire [32:0] av_video_pts,av_audio_pts;
+wire av_video_pts_valid,av_audio_pts_valid,av_audio_valid,av_audio_ready;
+mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1)) mpeg2_program_stream_ingress (
     .clk(clk_mpeg2), .reset(reset_mpeg2),
     .input_data(mpeg2_fifo_data), .input_valid(mpeg2_new_system_input_valid),
     .input_ready(mpeg2_new_system_input_ready), .input_end(mpeg2_new_system_input_end),
-    .output_data(mpeg2_ingress_data), .output_valid(mpeg2_ingress_valid),
-    .output_ready(mpeg2_ingress_ready), .output_end(mpeg2_ingress_end),
+    .output_data(av_video_byte), .output_valid(av_video_valid),
+    .output_ready(av_video_ready), .output_end(av_ingress_end),
+    .video_pts(av_video_pts),.video_pts_valid(av_video_pts_valid),
+    .audio_data(av_audio_byte),.audio_valid(av_audio_valid),.audio_ready(av_audio_ready),
+    .audio_pts(av_audio_pts),.audio_pts_valid(av_audio_pts_valid),.is_program_stream(av_is_ps),
     .demux_error(mpeg2_demux_error)
 );
+
+`include "MediaPlayer_av.svh"
 
 mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 (

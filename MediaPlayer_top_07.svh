@@ -21,10 +21,14 @@ wire mpeg2_new_cadence_session_quiet =
     !mpeg2_new_b_presentation_hold &&
     !mpeg2_new_p_destination_ownership_hold &&
     !mpeg2_new_pred_rd &&
-    !mpeg2_new_ddr_wr_we;
+    !mpeg2_new_ddr_wr_we &&
+    (!av_is_ps || mp2_finished_sync[2]);
 
 wire [15:0] mpeg2_new_cadence_error_flags = {
-    5'd0,
+    2'd0,
+    mp2_timestamp_error_sync[2],
+    mp2_underrun_sync[2],
+    mp2_error,
     mpeg2_demux_error,
     mpeg2_new_b_presentation_error,
     mpeg2_new_ddr_cache_error,
@@ -41,6 +45,9 @@ wire [15:0] mpeg2_new_cadence_error_flags = {
 mpeg2_h262_hardware_cadence_profiler
 mpeg2_h262_hardware_cadence_profiler
 (
+    .audio_frames(mp2_frames_decoded),.audio_samples(mp2_samples_count),
+    .audio_status({25'd0,mp2_timestamp_error_sync[2],mp2_underrun_sync[2],mp2_error,
+        mp2_finished_sync[2],mp2_eof_queued,mp2_idle,av_is_ps}),
     .clk_mpeg2                 (clk_mpeg2),
     .reset_mpeg2               (reset_mpeg2),
     .clk_video                 (clk_video),

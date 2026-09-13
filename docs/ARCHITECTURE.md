@@ -1,30 +1,50 @@
-# Progressive player architecture
+# Progressive MPG and FPGA MP2 architecture
 
-The runtime starts from `a57079f`, whose seed-11 rebuild was accepted on
-hardware on 2026-09-13. Stock Main owns normal file selection and acknowledged
-16-bit file transfers. The 32 KiB asynchronous FIFO, hps_io, reset crossings,
-DDR ownership and decoder retain the baseline implementation.
+The hardware-accepted video boundary is `9233f07` seed 52, recovered from
+`a57079f`. Stock Main owns file selection and acknowledged 16-bit transfers.
+The 32 KiB input CDC FIFO, H.262 decoder and 800x600 output remain the baseline.
 
-`mpeg2_program_stream_ingress` detects a four-byte pack prefix or replays all
-bytes as raw elementary video. Its demultiplexer comes from `3713581`, with
-elastic output registers added so withdrawing ready cannot discard a byte.
-The first video/audio IDs are selected independently; extra tracks are skipped.
-Compressed audio is drained without decoding in this stage.
+The Program Stream demux selects the first video and audio IDs. Raw video
+bypasses the new reservoirs. MPG video enters an 8 MiB DDR ring at physical
+0x30400000–0x30bfffff, above the framebuffer regions ending at 0x3027ffff.
+Each word carries one compressed byte, a sparse PTS tag, or EOF; capacity is
+1 MiB of compressed video. This allows input to reach audio packets while
+video presentation is blocked. The existing arbiter retains display,
+prediction and frame-write priority, with a fourth low-priority stream client
+and explicit response ownership. No new DDR timing exception is added.
 
-The baseline metadata extractor converts valid/ready to the decoder's
-accepted-byte pulse contract. Raw private timestamp records retain their old
-behavior. PES timestamps are not yet bound to pictures; presentation uses
-encoded cadence. Correct PES-to-picture association and audio synchronization
-belong to MP2 integration, not to attaching a timestamp to whichever picture
-happens to be decoding when a PES arrives.
+Queued PTS tags expand into the existing internal metadata format. The metadata
+extractor preserves the decoder's accepted-byte pulse contract. A separate
+binder watches picture prefixes at that accepted-byte boundary, so a PES that
+starts inside a preceding picture header cannot timestamp that picture. A
+prefix split across PES packets belongs to the packet containing its first
+byte. Existing picture-bank ownership carries bound timestamps through B-frame
+reordering. Missing individual picture PTS use the established cadence fallback.
 
-Physical EOF drains retained bytes before appending a missing video sequence
-end; raw streams are unchanged. The metadata window flushes normally and the
-B-picture scheduler can release its final reference. Demux errors join the
-existing fatal transport drain and cadence error flags bit 10.
+A 1,024-word compressed-audio FIFO feeds the MP2 decoder's bounded frame buffer.
+The decoder parses allocation, SCFSI and scalefactors, unpacks grouped samples,
+requantizes, and performs serialized cosine-matrix/polyphase synthesis.
+Shared arithmetic takes about 0.6 million 60 MHz cycles per 1,152-sample frame,
+against a 1.44 million-cycle 48 kHz playback budget. Coefficients use Q30
+requantization and Q16 cosine/window values; subbands/history use Q20.
+The derived window retains its MIT PL_MPEG attribution under tools/reference.
+The Python reference and FFmpeg are test tools, never runtime components.
 
-H.262 parsing, inverse quantization, IDCT, I/P/B reconstruction and planar
-DDR3 frame storage/readback retain the accepted baseline. Decode is 60 MHz;
-the 800x600 raster is 40 MHz. PCM test output uses 24.576 MHz. No new clock
-domain or timing exception is introduced. Supported video is progressive
-4:2:0 through 720x480 at codes 1–5. Native progressive 480p is a later stage.
+A 4,096-word PCM CDC FIFO carries stereo samples and frame timestamps into
+24.576 MHz CLK_AUDIO. A one-shot origin FIFO initializes its clock to the same
+first-video-PTS-minus-100-ms origin used by video presentation. Output waits
+for the first audio PTS and consumes one sample pair every 512 clocks. Both
+clocks derive from CLK_AUDIO; crossing latency is less than a 90 kHz tick.
+The initial preroll is a bounded implementation choice, not general adaptive
+buffering. Underflow and late frame timestamps are sticky diagnostics; arbitrary
+seeks/discontinuities are not recovered. Session reset flushes compressed data,
+PCM, synthesis history, timestamps and counters. Test-tone selection uses the
+existing independent PCM path and does not flush movie decoding.
+
+EOF is ordered behind video in DDR and behind the final PCM sample. Missing
+H.262 sequence end is inserted for Program Streams only. Audio EOF silences the
+sink without reporting a normal end as an underrun. Schema-eight telemetry
+adds decoded MP2 frames, actually consumed sample pairs, and audio status.
+Sample-consumption events cross domains as a single-bit toggle, not a torn
+multi-bit count. Error bits 10–13 report demux, MP2 decode, underrun and timestamp
+failures respectively. Raw schema-seven screen captures remain decodable.
