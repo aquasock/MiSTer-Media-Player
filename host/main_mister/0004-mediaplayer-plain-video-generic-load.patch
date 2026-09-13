@@ -1,5 +1,5 @@
 diff --git a/menu.cpp b/menu.cpp
-index 4603529..c6411d4 100644
+index 4603529..c6d2196 100644
 --- a/menu.cpp
 +++ b/menu.cpp
 @@ -2759,7 +2759,12 @@ void HandleUI(void)
@@ -10,17 +10,17 @@ index 4603529..c6411d4 100644
 +						if (mediaplayer_is_core() && mediaplayer_is_plain_video_file(selPath))
 +						{
 +							mediaplayer_stop();
-+							user_io_file_tx(selPath, idx, opensave, 0, 0, load_addr);
++							mediaplayer_start_plain_video_file(selPath, idx);
 +						}
 +						else if (mediaplayer_is_core() && mediaplayer_handles_file(selPath))
  						{
  							if (!mediaplayer_start(selPath, idx)) Info("MediaPlayer ARM helper failed to start");
  						}
 diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
-index 10c7dd7..68c9185 100644
+index 10c7dd7..91491c1 100644
 --- a/support/mediaplayer/mediaplayer.cpp
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -330,6 +330,24 @@ int mediaplayer_handles_file(const char *path)
+@@ -330,6 +330,125 @@ int mediaplayer_handles_file(const char *path)
  	                     !strcasecmp(extension, ".ogg"));
  }
  
@@ -42,18 +42,138 @@ index 10c7dd7..68c9185 100644
 +	                     !strcasecmp(extension, ".mpeg"));
 +}
 +
++// Rewrite stage B follow-up: two bugs found testing on real hardware.
++//
++// First, user_io_file_tx_data() is the plain, ACK-per-word blocking
++// primitive (fpga_spi_write_ack_impl on the FPGA-facing side) - it has no
++// idea about this project's MEDIA_BURST credit protocol at all, so bytes
++// sent through it never satisfy mpeg2_stream_fifo's burst_ready gate and
++// the decoder never receives a byte, producing a black screen even after
++// user_io_file_tx_data() itself returns having "sent" the whole file.
++// user_io_file_tx_data_step() is the correct primitive: it negotiates
++// MEDIA_BURST credit and fast-writes only as many bytes as the FPGA has
++// room for, exactly like the ARM helper's own transfer loop already does
++// (see mediaplayer_poll_inner() below) - and critically, it never blocks:
++// a call with no credit available just returns 0 consumed immediately.
++//
++// Second, calling it in a tight loop (as this function originally did)
++// still starves Main's own top-level poll (user_io_poll/input_poll/
++// HandleUI) for the file's entire transfer, which - because this
++// project's Program Stream demux backpressures the transfer to real-time
++// decode consumption - can be the video's entire runtime. The fix is
++// structural, not another loop: plain_video_poll() below is called once
++// per mediaplayer_poll() tick, exactly like the helper-pipe transfer path
++// it sits beside, so Main's normal loop keeps running between calls.
++//
++// user_io_file_info() also now passes the literal ".M2V" rather than the
++// file's real extension, matching every other call site in this file -
++// the FPGA/OSD side expects that literal regardless of the source file's
++// actual name, exactly as it does for the helper-driven paths below.
++static fileTYPE plain_video_file = {};
++static bool plain_video_active = false;
++static media_burst_state plain_video_burst_state = {};
++
++static void plain_video_finish(const char *reason)
++{
++	FileClose(&plain_video_file);
++	if (download_active)
++	{
++		user_io_set_download(0);
++		download_active = 0;
++	}
++	plain_video_active = false;
++	pending_size = pending_offset = 0;
++	pending_eof = false;
++	printf("MediaPlayer: plain video transfer %s\n", reason);
++}
++
++static void plain_video_poll()
++{
++	if (pending_size - pending_offset < 2 && !pending_eof)
++	{
++		const uint32_t remaining = pending_size - pending_offset;
++		if (remaining) pending_buffer[0] = pending_buffer[pending_offset];
++		pending_size = remaining; pending_offset = 0;
++
++		const int count = FileReadAdv(&plain_video_file, pending_buffer + remaining,
++		                              sizeof(pending_buffer) - remaining);
++		if (count > 0) pending_size += (uint32_t)count;
++		else pending_eof = true;
++	}
++
++	if (pending_eof && pending_size == pending_offset)
++	{
++		plain_video_finish("complete");
++		return;
++	}
++
++	uint32_t available = pending_size - pending_offset;
++	if (!pending_eof) available &= ~1u;
++	if (!available) return;
++
++	media_burst_stats burst = {};
++	uint32_t consumed = 0;
++	const int valid = user_io_file_tx_data_step(pending_buffer + pending_offset,
++	    available, &plain_video_burst_state, &burst, &consumed, NULL);
++	if (!valid || consumed > available)
++	{
++		plain_video_finish("transport-fault");
++		return;
++	}
++	if (!consumed) return; // No credit yet: leave the bytes for next poll.
++	pending_offset += consumed;
++}
++
++int mediaplayer_start_plain_video_file(const char *path, unsigned char index)
++{
++	if (!FileOpen(&plain_video_file, path)) return 0;
++
++	printf("MediaPlayer: starting plain video file %s with %llu bytes for index %d\n",
++	       path, (unsigned long long)plain_video_file.size, index);
++
++	user_io_set_index(index);
++	user_io_file_info(".M2V");
++	user_io_set_download(1, 0);
++	download_active = 1;
++
++	pending_size = pending_offset = 0;
++	pending_eof = false;
++	plain_video_burst_state = {};
++	plain_video_active = true;
++	return 1;
++}
++
  static void finish_download(const char *reason, bool release_download)
  {
  	const bool was_idle = idle_session;
+@@ -1272,11 +1391,17 @@ void mediaplayer_poll()
+ 	{
+ 		if (helper_fd >= 0 || helper_pid > 0 || download_active)
+ 			stop_with_reason("core-changed");
++		if (plain_video_active) plain_video_finish("core-changed");
+ 		idle_retry_blocked = false;
+ 		replay_ready = false;
+ 		playback_source_spec.clear();
+ 		return;
+ 	}
++	if (plain_video_active)
++	{
++		plain_video_poll();
++		return;
++	}
+ 	if (helper_fd < 0)
+ 	{
+ 		if (!idle_retry_blocked && !mediaplayer_start_idle())
 diff --git a/support/mediaplayer/mediaplayer.h b/support/mediaplayer/mediaplayer.h
-index 7d8eb80..f7d6b3c 100644
+index 7d8eb80..72e1330 100644
 --- a/support/mediaplayer/mediaplayer.h
 +++ b/support/mediaplayer/mediaplayer.h
-@@ -16,6 +16,7 @@ enum
+@@ -16,6 +16,8 @@ enum
  int mediaplayer_is_core();
  int mediaplayer_is_physical_loader(unsigned char index);
  int mediaplayer_handles_file(const char *path);
 +int mediaplayer_is_plain_video_file(const char *path);
++int mediaplayer_start_plain_video_file(const char *path, unsigned char index);
  int mediaplayer_start(const char *path, unsigned char index);
  int mediaplayer_start_physical(unsigned char index);
  int mediaplayer_start_source(const char *source_spec, unsigned char index);
