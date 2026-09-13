@@ -1,3 +1,33 @@
+## 007 COMMIT Unreleased 0710e81 2026-09-13T11:24:43-07:00
+
+#### Coming From:
+
+Unreleased 9c6ccbb
+
+#### Purpose:
+
+Correct top-level synchronizer constraint matching before fitting the loading-overlay repair.
+
+#### Outcome:
+
+All three 9c6ccbb clean exports completed synthesis successfully in approximately 150 seconds, but inspection found the existing hierarchy-separator prefix excluded top-level VS registers and the new top-level mailboxes from timing exceptions. The three fitting jobs and their supervisor were terminated before completion; they produced no accepted build. A post-map TimeQuest audit reproduced rejection of the old platform_aspect_config pattern, then passed with the corrected patterns: all 54 required control registers were present, with eight request stage-zero endpoints, eight acknowledgement stage-zero endpoints, each VS stage-zero endpoint and 267 held/destination data bits matched. Source 0710e81 changes only constraint and audit patterns; the 9c6ccbb RTL regressions remain applicable. The correction was committed and pushed before restarting clean seeds 52, 61 and 87 with six workers each under results/build-0710e81-20260913-112410/. The prior batch and its cancellation record remain under results/build-9c6ccbb-20260913-111811/. No replacement RBF has been delivered or installed.
+
+#### Next Steps:
+
+Finish all three clean builds, require the fitted 54-register audit and standard and focused timing reports, then deliver a timing-passing candidate for user validation of loading-overlay suppression, video, audio and repeated loads. Preserve the hardware-accepted 1750154 seed-87 rollback reference and keep the earlier inaudible audio underrun outside this cycle as directed.
+
+#### Files Modified:
+
+- MediaPlayer.sdc
+- tools/phase1p_timing.tcl
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 006 COMMIT Unreleased 9c6ccbb 2026-09-13T11:04:15-07:00
 
 #### Coming From:
@@ -1251,40 +1281,6 @@ Install `.ai/current_results/MediaPlayer_progressiveoverlay_seed33.rbf` (Main/he
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_dvd_overlay.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 966 COMMIT Unreleased 08db78e 2026-09-12T05:45:00-07:00
-
-#### Coming From:
-
-Unreleased 1b1ab7a
-
-#### Purpose:
-
-Add the audio player's progress bar and elapsed/remaining/total time overlay to `.mpg` video playback, revealed for ten seconds on play, pause, and seek exactly as it already works for standalone audio files.
-
-#### Outcome:
-
-Investigation found the audio player's progress overlay is not part of the full-screen audio UI background frame at all: `audio_overlay_render()`/`audio_ui_render_overlay()` renders the same `render_frame()` layout into a separate transparent 720x480 two-bit indexed plane and publishes it through `emit_overlay_frame()`/`emit_overlay_clear()`, the identical DVD-SPU-style overlay-compositing channel already used for real DVD subtitles and menus on top of decoded H.262 video - so no RTL change is needed to composite this overlay on top of `.mpg` playback.  The ten-second auto-hide timer (`audio_visualizer_activity()`/`audio_visualizer_take_overlay_action()` in `host/arm/audio_visualizer.c`) is a simple position-vs-rate threshold, not intrinsically audio-specific.  Program Stream (`.mpg`) pause currently has zero helper involvement - Main's non-audio `MEDIAPLAYER_INPUT_PLAY_PAUSE` fallthrough only toggles `playback_paused` locally - unlike audio's pause, which round-trips through the helper via a blocking barrier because audio's software PCM queue needs flushing; `.mpg` needs no equivalent barrier since Main already gates its own transfer loop on `playback_paused`, so introducing a new blocking barrier for `.mpg` would add risk for no functional benefit.  Seek already reaches `process_program_stream()`'s existing seek-completion point via the established `MEDIA_CONTROL_SEEK_*` control bytes.  `MEDIA_CONTROL_USER_ACTIVITY` (0x10) is already defined in the protocol but currently sent nowhere in Main and only consumed as a plain, non-blocking activity ping on the audio-only paths.
-
-Source `08db78e` implements the plan as proposed.  `host/arm/audio_ui.c`'s `render_frame()`'s bottom strip is extracted into `draw_progress_strip()`, taking position/length/rate_hz as explicit parameters rather than reading persistent `ui` fields, since `audio_ui_seek()`/`audio_ui_set_track_length()` restrict `rate_hz` to 44100/48000, which does not hold for a 90000 Hz video PTS clock; the new public `audio_ui_render_progress_overlay()` draws only that strip onto an otherwise-transparent plane using the same `struct audio_ui`.  `struct output_state` gains `video_overlay_ui`/`video_overlay_plane`/`video_overlay_file_size`, created only for `seekable_program_stream` sessions (direct `.mpg`/`.mpeg` files, not DVD/ISO) and, critically, added to the small set of fields `reset_output_for_navigation()` preserves across its `memset(output, 0, ...)` on every seek - alongside the pre-existing `video`/`pcm`/`reserve`/`activation_stage` - since without that the allocation would leak and the overlay would silently disable itself after the first seek.  `video_overlay_mark_activity()`/`video_overlay_service()` are wired into `process_program_stream()`'s existing per-iteration command read and its seek-completion point; Main's non-audio pause fallthrough now sends a fire-and-forget `MEDIA_CONTROL_USER_ACTIVITY` byte.  Both the native and ARM cross-compiled helper builds pass `-Wall -Wextra -Werror` clean; `host/build/MiSTer_MediaPlayer` (SHA-256 `d4c1f1d3ed66c2186e15acf967cb5510a3de8164a1eebf102e5a1fbbf25046f6`) and `host/build/MediaPlayer_Helper` (SHA-256 `15a7934f647794f5dab4be9fcac614f3fa0695b827c6daf7a59a377697eecdf5`) are both built.  No RTL change; the current RBF is unaffected.
-
-#### Next Steps:
-
-Install `host/build/MiSTer_MediaPlayer` and `host/build/MediaPlayer_Helper` (RBF unchanged) and verify on `.mpg` playback: the progress bar and elapsed/total/remaining times appear for ten seconds on play, pause and seek and then disappear, `.mpg` seeking and playback are otherwise unaffected, and standalone audio-file and DVD behavior are unaffected.
-
-#### Files Modified:
-
-- host/arm/audio_ui.c
-- host/arm/audio_ui.h
-- host/arm/media_player_helper.c
-- host/main_mister/0001-mediaplayer-arm-loader.patch
 
 #### Status:
 
