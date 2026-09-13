@@ -1,3 +1,36 @@
+## 978 COMMIT Unreleased ??? 2026-09-12T20:29:13-07:00
+
+#### Coming From:
+
+Unreleased 8e72075
+
+#### Purpose:
+
+Add a continuously-live decode/display progress and ownership-hold probe so the next physical freeze can be diagnosed directly from a screenshot instead of inferred from static code reading.
+
+#### Outcome:
+
+Entry 977's ARM-side pipe-write deadlock fix did not resolve the freeze: hardware testing after that fix still hung after a handful of ordinary pause/resume cycles on the baseline `01 - Pee Strike.mpg`, with two screenshots ten seconds apart byte-identical, `MiSTer_MediaPlayer` pinned at ~50% CPU with `wchan=0` (a busy userspace loop, not a kernel wait), and `MediaPlayer_Helper` blocked in `pipe_write` with no active pause in the log. Tracing the chain from `fpga_spi_write_ack_impl()`'s untimed SSPI-ACK busy-wait (`host/main_mister/0001-mediaplayer-arm-loader.patch`, patched into `fpga_io.cpp`) back through `hps_io`'s `ioctl_wait`, `mpeg2_stream_fifo`'s `wr_full`, and `mpeg2_new_stream_ready`'s gate on `mpeg2_new_p_destination_ownership_hold` and `mpeg2_new_b_presentation_hold` (`MediaPlayer.sv`) identified a plausible circular-wait design flaw: the P-only ownership hold (`MediaPlayer.sv:1699-1747`) only releases once display moves off the bank decode wants to reuse, but display can only move there once decode supplies a new completed picture - which decode cannot do while held. Building a rigorous Icarus simulation of that hypothesis was judged not worth the risk of an unfaithful model, since `mpeg2_h262_b_presentation_scheduler.sv` turned out to be a 1016-line, heavily-evolved B-reordering state machine far more intricate than its two hold outputs suggested. Instead, added `mpeg2_h262_live_deadlock_probe`, a new module inserted last in the video chain (after the existing one-shot `mpeg2_h262_hardware_cadence_profiler`, which only arms once at the first overlay commit after boot and never re-arms) that redraws two small always-live data words every video frame from raw mpeg2-domain state: `mpeg2_stream_full`, `mpeg2_burst_ready`, both ownership holds, the active/display frame banks, and two independent free-running counters that increment on `mpeg2_new_picture_420_complete` and on any change to the display bank/scratch state, so a screenshot taken during a live hang shows directly whether decode or display (or both) have actually stopped advancing. A standalone Icarus unit test (`tools/test_live_deadlock_probe.sv`) confirms the box passes the base color through outside its fixed corner region, both rows draw the fixed alignment prefix, the two words decode to the expected live field values, and the two progress counters advance independently; `tools/decode-live-deadlock-probe.py` was verified against a synthetic PNG built with the same bit layout before trusting it on real hardware screenshots. `MediaPlayer.sv`, `files.qip` and the new RTL/test/tool files build cleanly under Icarus; no Quartus timing build has been run yet.
+
+#### Next Steps:
+
+Run the standard three-seed timing-checked Quartus build, deploy the resulting RBF, and have the user reproduce the same pause/resume hang; take a screenshot mid-hang, decode it with `tools/decode-live-deadlock-probe.py`, and compare the two progress counters and both hold bits against a screenshot taken a few seconds later to determine definitively whether decode, display, or neither has stopped advancing, and whether the suspected P-destination-ownership hold is the one actually latched. Use that direct evidence to scope the real fix rather than guessing further from source reading alone.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_live_deadlock_probe.sv
+- tools/decode-live-deadlock-probe.py
+- tools/test_live_deadlock_probe.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 977 COMMIT Unreleased 8e72075 2026-09-12T13:48:48-07:00
 
 #### Coming From:
@@ -1213,34 +1246,3 @@ Complete the user's functional and regression matrix, then perform the required 
 
 ---
 
-## 938 COMMIT Unreleased 0f1165c 2026-09-03T02:28:26-07:00
-
-#### Coming From:
-
-Unreleased 490dc02
-
-#### Purpose:
-
-Normalize each qualifying malformed DVD H.262 sequence boundary across PES fragmentation instead of correcting only the session's initial random-access group.
-
-#### Outcome:
-
-Source `0f1165c` replaces the startup-only correction boundary with a DVD/ISO elementary-video compatibility filter that carries sequence, picture and extension syntax state across PES payloads and delays exactly one byte.  That lookahead validates `progressive_frame` before conditionally setting the preceding zero `chroma_420_type` bit on only the first valid complete-frame I picture after a 4:2:0 sequence header; stream length, byte order, offsets and timestamp-record order remain exact, navigation reset discards the old held suffix, and authored-still or ordinary stream completion flushes it.  Every correction logs its cumulative elementary-stream offset and before/after byte.  The focused C regression joins two captured malformed Big Lebowski prefixes and proves exactly offsets 185 and 380 change from `0xc0` to `0xc1` under every possible single split and one-byte fragmentation, while conforming, non-4:2:0, non-I, field and interlaced controls remain byte-identical.  Icarus reproduces source 21 on the original prefix and admits two consecutive corrected stills with supported film fields and no syntax error.  Strict native and ARM helper builds, ASan/UBSan, focused GCC analyzer, one hundred random-access, menu-hop, reserve and staging repetitions, twenty overlay and SPU repetitions, Program Stream seek, audio seek/UI/visualizer and unsupported-LPCM tests pass.  The exact ARM helper passes its capability probe and real MP3/WAV/FLAC/Ogg integration with 378 or 381 pictures and one clear record per file.  The static stripped ARMv7 EABI5 artifact `host/build/MediaPlayer_Helper_H262Stream_0f1165c` is 966052 bytes with SHA-256 `613d35de5ace0622584ae14b4540423c2c56b1f923c02c599f47b55722e21e56`; Main, RBF and visualizer are unchanged.
-
-#### Next Steps:
-
-Exit MediaPlayer, replace only `/media/fat/linux/MediaPlayer_Helper` with `host/build/MediaPlayer_Helper_H262Stream_0f1165c`, preserve executable mode and retain the installed Main, visualizer and timing-qualified RBF.  With telemetry enabled, start The Big Lebowski and require correction one at elementary offset 185, a second correction when the following seven-second still begins, accepted bytes advancing beyond the former 5,670-byte failure boundary, error flags remaining zero and normal title playback beginning.  Press `m`, exercise the Root Menu and Scene Selection repeatedly, return to the title and reopen both paths, then verify each new malformed authored sequence is corrected without a helper exit or decoder latch.  Spot-check Blazing Saddles and Coming to America title, menu and chapter navigation before returning the fresh log, screenshot and telemetry sidecar.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
-- tools/test_h262_restart_normalization.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
