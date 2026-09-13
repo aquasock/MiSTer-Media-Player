@@ -74,6 +74,8 @@ localparam [4:0]
 reg [4:0]  state;
 reg [1:0]  zero_run;
 reg [7:0]  code;
+reg [7:0] selected_video, selected_audio;
+reg selected_video_valid, selected_audio_valid;
 reg        is_video;
 reg        is_pack_mpeg2;
 reg [15:0] pes_length;    // PES_packet_length: bytes remaining after this field
@@ -87,8 +89,10 @@ reg        pts_is_legacy; // this PTS capture came from the legacy header form
 reg        legacy_has_dts;
 reg [15:0] legacy_prefix_bytes; // legacy stuffing/STD bytes consumed before the timestamp marker
 
-assign in_ready =
-    (state == S_PES_PAYLOAD) ? (is_video ? video_ready : audio_ready) : 1'b1;
+// Each output is an elastic one-byte register. A consumer may withdraw
+// ready immediately after an input transfer; retain that byte and its PTS.
+assign in_ready = (!video_valid || video_ready) &&
+                  (!audio_valid || audio_ready);
 
 wire accept = in_valid && in_ready;
 
@@ -124,13 +128,18 @@ wire [17:0] legacy_none_payload_calc =
 wire        legacy_none_payload_valid = !legacy_none_payload_calc[17];
 
 always @(posedge clk) begin
-    video_valid     <= 1'b0;
-    audio_valid     <= 1'b0;
-    video_pts_valid <= 1'b0;
-    audio_pts_valid <= 1'b0;
+    if (video_ready) begin video_valid <= 1'b0; video_pts_valid <= 1'b0; end
+    if (audio_ready) begin audio_valid <= 1'b0; audio_pts_valid <= 1'b0; end
     stream_end      <= 1'b0;
 
     if (reset) begin
+        video_valid <= 1'b0;
+        audio_valid <= 1'b0;
+        video_pts_valid <= 1'b0;
+        audio_pts_valid <= 1'b0;
+        pts_pending <= 1'b0;
+        selected_video_valid <= 1'b0;
+        selected_audio_valid <= 1'b0;
         state       <= S_SYNC;
         zero_run    <= 2'd0;
         demux_error <= 1'b0;
@@ -228,8 +237,17 @@ always @(posedge clk) begin
 
         S_LEN_LO: begin
             pes_length[7:0] <= in_data;
-            if (code[7:4] == 4'he || code[7:5] == 3'b110) begin
+            if ((code[7:4] == 4'he && (!selected_video_valid || code == selected_video)) ||
+                (code[7:5] == 3'b110 && (!selected_audio_valid || code == selected_audio))) begin
+                if (code[7:4] == 4'he) begin
+                    selected_video <= code;
+                    selected_video_valid <= 1'b1;
+                end else begin
+                    selected_audio <= code;
+                    selected_audio_valid <= 1'b1;
+                end
                 if ({pes_length[15:8], in_data} == 16'd0) begin
+                    demux_error <= 1'b1;
                     // A zero-length video PES is only legal in a Transport
                     // Stream, never here; a zero-length audio PES carries
                     // nothing to decode either way. Resync.
@@ -241,6 +259,7 @@ always @(posedge clk) begin
                     // that very byte is already the timestamp marker with
                     // no stuffing/STD field ahead of it (confirmed the
                     // common case on real files, not just a corner case).
+                    pts_pending <= 1'b0;
                     legacy_prefix_bytes <= 16'd0;
                     state <= S_PES_HDR_B0;
                 end
@@ -439,7 +458,9 @@ always @(posedge clk) begin
             pts_pending    <= pts_dts_flags[1]; // '10' or '11' both start with a PTS
             pts_is_legacy  <= 1'b0;
             pts_byte_index <= 3'd0;
-            if (!payload_len_valid) begin
+            if (!payload_len_valid || pts_dts_flags == 2'b01 ||
+                (pts_dts_flags == 2'b10 && in_data < 8'd5) ||
+                (pts_dts_flags == 2'b11 && in_data < 8'd10)) begin
                 demux_error <= 1'b1;
                 state       <= S_SYNC;
                 zero_run    <= 2'd0;
@@ -516,9 +537,11 @@ always @(posedge clk) begin
             if (is_video) begin
                 video_data  <= in_data;
                 video_valid <= 1'b1;
+                video_pts_valid <= pts_pending;
             end else begin
                 audio_data  <= in_data;
                 audio_valid <= 1'b1;
+                audio_pts_valid <= pts_pending;
             end
             if (pts_pending) begin
                 if (is_video) begin

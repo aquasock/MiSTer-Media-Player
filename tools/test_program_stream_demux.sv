@@ -130,10 +130,10 @@ reg [32:0] got_video_pts, got_audio_pts;
 integer got_stream_end;
 
 always @(posedge clk) begin
-    if (video_valid) begin got_video[got_video_len] = video_data; got_video_len = got_video_len + 1; end
-    if (audio_valid) begin got_audio[got_audio_len] = audio_data; got_audio_len = got_audio_len + 1; end
-    if (video_pts_valid) begin got_video_pts = video_pts; got_video_pts_seen = 1; end
-    if (audio_pts_valid) begin got_audio_pts = audio_pts; got_audio_pts_seen = 1; end
+    if (video_valid && video_ready) begin got_video[got_video_len] = video_data; got_video_len = got_video_len + 1; end
+    if (audio_valid && audio_ready) begin got_audio[got_audio_len] = audio_data; got_audio_len = got_audio_len + 1; end
+    if (video_valid && video_ready && video_pts_valid) begin got_video_pts = video_pts; got_video_pts_seen = 1; end
+    if (audio_valid && audio_ready && audio_pts_valid) begin got_audio_pts = audio_pts; got_audio_pts_seen = 1; end
     if (stream_end) got_stream_end = got_stream_end + 1;
 end
 

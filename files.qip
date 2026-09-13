@@ -1,11 +1,10 @@
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_player.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_video_output_timing.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_video_svga_800x600.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_stream_fifo.sv
 # Entry 395: codec-independent signed PCM proof path.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/audio_pcm_test_source.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/audio_pcm_fifo.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/audio_pcm_output_adapter.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_progressive_geometry.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_luma_framebuffer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_frontend.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_dct_vlc.sv
@@ -14,7 +13,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_idct.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_intra_recon.sv
 # P chroma tags plus Commit-128 B scratch-frame tags are decoded here.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_luma_write_fingerprint.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
 # Shared P reconstruction plus the first two-reference B raster client.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_explicit_reference_probe.sv
@@ -23,17 +21,10 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_four_m
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_output_cadence.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_system_time_clock.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_display_record_router.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_audio_ui.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_dvd_overlay.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_clean_video_queue.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_native_startup.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_final_gop_progress_probe.sv
@@ -68,4 +59,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_two_pict
 set_global_assignment -name SDC_FILE MediaPlayer.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE MediaPlayer.sv
 
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_quant_matrices.sv
+# Progressive file playback through stock Main; no host-side demultiplexer.
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_program_stream_ingress.sv

@@ -12,29 +12,11 @@
 //  media.  The ingress byte path, by contrast, is already proven: it streams a
 //  14,315-picture file with working backpressure.
 //
-//  Records use reserved H.262 start codes: B0 carries picture metadata, B1 a
-//  run of PCM frames, B6 a zero-payload PCM end token, and B9 a length-bounded
-//  DVD overlay record. No encoder emits these codes. Payload lengths are
-//  declared rather than scanned, so arbitrary
-//  signed PCM bytes are consumed as data and can never be mistaken for a nested
-//  marker. A plain elementary stream contains no records and passes through
-//  unchanged.
-//
-//  Entry 462: one frame per record put 48,000 records and 422 KiB/s of audio on
-//  a path carrying 138 KiB/s of video, three quarters of everything crossing,
-//  and hardware measured a cost per record in late presentations.  The mode
-//  byte carries a frame count, so one record can deliver a run of frames:
-//  {non_audio,count[4:0],rate_48k,stereo} then count frames of
-//  {left[15:8],left[7:0],right[15:8],right[7:0]}.  A count of zero means one
-//  frame, which is exactly the encoding streams used before this change, so
-//  older transports decode unchanged.  Each frame's final byte still waits for
-//  the audio sink, so backpressure reaches the producer at frame granularity
-//  rather than record granularity.
-//
-//  Entry 699: non_audio is one only for helper-built IEC 61937 AC-3/DTS burst
-//  records. Decoded PCM and compressed bursts share the sample transport, but
-//  IEC 60958 channel status must distinguish them when S/PDIF is selected.
-//  Five count bits still cover the helper's bounded sixteen-frame records.
+//  Records are framed with 0x000001B0.  That is a *reserved* H.262 start code,
+//  so no encoder emits it, and start-code emulation prevention guarantees the
+//  0x000001 prefix cannot occur inside payload data.  A plain elementary
+//  stream therefore contains no records and passes through unchanged; raw ES
+//  compatibility is a property of the framing rather than a mode to select.
 //
 //  Detection uses a four-byte sliding window.  A byte is only emitted once it
 //  has fallen out of the window without completing a marker, which costs three
@@ -48,9 +30,6 @@
 // ============================================================================
 
 module mpeg2_h262_inband_metadata
-#(
-    parameter integer STREAM_FIFO_DEPTH = 256
-)
 (
     input  wire        clk,
     input  wire        reset,
@@ -60,7 +39,7 @@ module mpeg2_h262_inband_metadata
     output wire        input_ready,
     input  wire        input_end,
 
-    output wire  [7:0] stream_data,
+    output reg   [7:0] stream_data,
     output wire        stream_valid,
     input  wire        stream_ready,
 
@@ -70,127 +49,40 @@ module mpeg2_h262_inband_metadata
     output reg         repeat_first_field,
     output reg         progressive_frame,
     output reg         metadata_valid,      // one-cycle pulse
-    input  wire        metadata_ready,
-    output reg   [7:0] metadata_count,
-
-    output reg  [15:0] pcm_left,
-    output reg  [15:0] pcm_right,
-    output reg         pcm_stereo,
-    output reg         pcm_rate_48k,
-    output reg         pcm_non_audio,
-    output reg         pcm_valid,           // one-cycle pulse
-    output reg         pcm_end,             // one-cycle pulse
-    input  wire        pcm_ready,
-    output reg  [13:0] pcm_sample_count,
-    output reg         pcm_protocol_error,
-
-    output wire  [7:0] overlay_data,
-    output wire        overlay_start,       // first command/payload byte
-    output wire        overlay_last,        // final command/payload byte
-    output wire        overlay_valid,       // retained until ready transfer
-    input  wire        overlay_ready,
-    output reg         overlay_protocol_error
+    output reg   [7:0] metadata_count
 );
 
-localparam [31:0] PTS_MARKER     = 32'h000001B0;
-localparam [31:0] PCM_MARKER     = 32'h000001B1;
-localparam [31:0] PCM_END_MARKER = 32'h000001B6;
-localparam [31:0] OVERLAY_MARKER = 32'h000001B9;
+localparam [31:0] RECORD_MARKER = 32'h000001B0;
 localparam integer PAYLOAD_BYTES = 5;
-localparam [4:0]   MAX_PCM_FRAMES = 5'd16;
-localparam [15:0]  MAX_OVERLAY_BYTES = 16'd4097;
 
-localparam [3:0] S_FILL           = 4'd0,
-                 S_STREAM         = 4'd1,
-                 S_PTS_PAYLOAD    = 4'd2,
-                 S_PCM_PAYLOAD    = 4'd3,
-                 S_PCM_END        = 4'd4,
-                 S_FLUSH          = 4'd5,
-                 S_OVERLAY_LEN_HI = 4'd6,
-                 S_OVERLAY_LEN_LO = 4'd7,
-                 S_OVERLAY_PAYLOAD= 4'd8;
+localparam [1:0] S_FILL    = 2'd0,
+                 S_STREAM  = 2'd1,
+                 S_PAYLOAD = 2'd2,
+                 S_FLUSH   = 2'd3;
 
-localparam integer STREAM_FIFO_AW = $clog2(STREAM_FIFO_DEPTH);
-
-reg [3:0]  state;
+reg [1:0]  state;
 reg [31:0] window;
 reg [2:0]  window_fill;
 reg [2:0]  payload_index;
 reg [39:0] payload;
-reg [5:0]  pcm_frames_left;
-reg        pcm_mode_seen;
-reg [1:0]  pcm_byte_index;
-reg [23:0] pcm_frame;
-reg [15:0] overlay_length;
-reg [15:0] overlay_remaining;
-reg [1:0]  overlay_queue_count;
-reg [7:0]  overlay_queue_data [0:1];
-reg [1:0]  overlay_queue_start;
-reg [1:0]  overlay_queue_last;
+reg        stream_pending;
 
-assign overlay_data  = overlay_queue_data[0];
-assign overlay_start = overlay_queue_start[0];
-assign overlay_last  = overlay_queue_last[0];
-assign overlay_valid = (overlay_queue_count != 2'd0);
+// The integrated decoder advances on stream_valid itself rather than on a
+// conventional valid-and-ready transfer.  Retain a pending output byte while
+// it is stalled, but expose valid only in the cycle the decoder accepts it.
+// This preserves the pre-extractor pulse-valid contract and prevents a held
+// byte from being parsed repeatedly during picture-ownership backpressure.
+assign stream_valid = stream_pending && stream_ready;
 
-// The extractor used to hold at most one pending clean-stream byte, so when
-// the downstream video queue stalled (stream_ready low), input_ready stalled
-// with it -- blocking the entire extractor, including PCM/PTS records that
-// appear later in the same interleaved byte stream, even though those bytes
-// have nothing to do with the video queue being full.  A small circular
-// buffer decouples extraction from that downstream backpressure: bytes queue
-// here while the video queue is stalled, and PCM/PTS records keep parsing
-// and reaching the audio sink without waiting on video.
-reg [7:0]  stream_fifo_mem [0:STREAM_FIFO_DEPTH-1];
-reg [STREAM_FIFO_AW:0] stream_fifo_wptr;
-reg [STREAM_FIFO_AW:0] stream_fifo_rptr;
-wire stream_fifo_empty = (stream_fifo_wptr == stream_fifo_rptr);
-wire stream_fifo_full =
-    (stream_fifo_wptr[STREAM_FIFO_AW-1:0] == stream_fifo_rptr[STREAM_FIFO_AW-1:0]) &&
-    (stream_fifo_wptr[STREAM_FIFO_AW] != stream_fifo_rptr[STREAM_FIFO_AW]);
-
-assign stream_valid = !stream_fifo_empty;
-assign stream_data  = stream_fifo_mem[stream_fifo_rptr[STREAM_FIFO_AW-1:0]];
-
-wire stream_fifo_pop = !stream_fifo_empty && stream_ready;
-
-// Accept input whenever the FIFO has room, except while draining the window
-// at end of transfer.  The last byte of every frame, not merely of every
-// record, is the one the sink must be ready for.
-wire pcm_payload_final =
-    (state == S_PCM_PAYLOAD) && pcm_mode_seen && (pcm_byte_index == 2'd3);
-wire pts_payload_final =
-    (state == S_PTS_PAYLOAD) &&
-    (payload_index == PAYLOAD_BYTES[2:0] - 3'd1);
-
+// Accept input whenever the pending output is free or will transfer in this
+// cycle, except while draining the window at end of transfer.
 assign input_ready =
-    (state != S_FLUSH) &&
-    (state != S_PCM_END) &&
-    !stream_fifo_full &&
-    (!pts_payload_final || metadata_ready) &&
-    (!pcm_payload_final || pcm_ready) &&
-    ((state != S_OVERLAY_PAYLOAD) || (overlay_queue_count != 2'd2));
-
-wire stream_fifo_push_stream =
-    (state == S_STREAM) && input_valid && input_ready;
-wire stream_fifo_push_flush =
-    (state == S_FLUSH) && !stream_fifo_full && (window_fill != 3'd0);
-wire stream_fifo_push = stream_fifo_push_stream || stream_fifo_push_flush;
-
-wire overlay_enqueue =
-    (state == S_OVERLAY_PAYLOAD) && input_valid && input_ready;
-wire overlay_dequeue = overlay_valid && overlay_ready;
+    (state != S_FLUSH) && (!stream_pending || stream_ready);
 
 wire [31:0] window_next = {window[23:0], input_data};
 // window_fill saturates at four; the window then always holds the true
 // last four bytes, so the marker test is simply on the shifted-in value.
-wire pts_marker_hit = (window_next == PTS_MARKER);
-wire pcm_marker_hit = (window_next == PCM_MARKER);
-wire pcm_end_marker_hit = (window_next == PCM_END_MARKER);
-wire overlay_marker_hit = (window_next == OVERLAY_MARKER);
-wire marker_hit = (window_fill == 3'd4) &&
-    (pts_marker_hit || pcm_marker_hit || pcm_end_marker_hit ||
-     overlay_marker_hit);
+wire        marker_hit  = (window_fill == 3'd4) && (window_next == RECORD_MARKER);
 wire [39:0] payload_full = {payload[31:0], input_data};
 
 always @(posedge clk) begin
@@ -200,8 +92,8 @@ always @(posedge clk) begin
         window_fill        <= 3'd0;
         payload_index      <= 3'd0;
         payload            <= 40'd0;
-        stream_fifo_wptr   <= {(STREAM_FIFO_AW+1){1'b0}};
-        stream_fifo_rptr   <= {(STREAM_FIFO_AW+1){1'b0}};
+        stream_data        <= 8'd0;
+        stream_pending     <= 1'b0;
         pts_90k            <= 33'd0;
         picture_structure  <= 2'd0;
         top_field_first    <= 1'b0;
@@ -209,90 +101,12 @@ always @(posedge clk) begin
         progressive_frame  <= 1'b0;
         metadata_valid     <= 1'b0;
         metadata_count     <= 8'd0;
-        pcm_left           <= 16'd0;
-        pcm_right          <= 16'd0;
-        pcm_stereo         <= 1'b0;
-        pcm_rate_48k       <= 1'b0;
-        pcm_non_audio      <= 1'b0;
-        pcm_valid          <= 1'b0;
-        pcm_end            <= 1'b0;
-        pcm_sample_count   <= 14'd0;
-        pcm_protocol_error <= 1'b0;
-        pcm_frames_left    <= 6'd0;
-        pcm_mode_seen      <= 1'b0;
-        pcm_byte_index     <= 2'd0;
-        pcm_frame          <= 24'd0;
-        overlay_queue_count <= 2'd0;
-        overlay_queue_data[0] <= 8'd0;
-        overlay_queue_data[1] <= 8'd0;
-        overlay_queue_start <= 2'b00;
-        overlay_queue_last  <= 2'b00;
-        overlay_protocol_error <= 1'b0;
-        overlay_length     <= 16'd0;
-        overlay_remaining  <= 16'd0;
     end
     else begin
         metadata_valid <= 1'b0;
-        pcm_valid      <= 1'b0;
-        pcm_end        <= 1'b0;
-        // A two-entry retained queue absorbs the engine's transition into a
-        // DDR-write stall without exposing overlay_ready on the upstream
-        // timing path.  Its front remains stable for the complete stall, and
-        // simultaneous dequeue/enqueue preserves continuous source progress.
-        case ({overlay_enqueue,overlay_dequeue})
-            2'b01: begin
-                if (overlay_queue_count == 2'd2) begin
-                    overlay_queue_data[0]  <= overlay_queue_data[1];
-                    overlay_queue_start[0] <= overlay_queue_start[1];
-                    overlay_queue_last[0]  <= overlay_queue_last[1];
-                end
-                overlay_queue_count <= overlay_queue_count - 2'd1;
-            end
-            2'b10: begin
-                if (overlay_queue_count == 2'd0) begin
-                    overlay_queue_data[0]  <= input_data;
-                    overlay_queue_start[0] <=
-                        (overlay_remaining == overlay_length);
-                    overlay_queue_last[0]  <=
-                        (overlay_remaining == 16'd1);
-                end
-                else begin
-                    overlay_queue_data[1]  <= input_data;
-                    overlay_queue_start[1] <=
-                        (overlay_remaining == overlay_length);
-                    overlay_queue_last[1]  <=
-                        (overlay_remaining == 16'd1);
-                end
-                overlay_queue_count <= overlay_queue_count + 2'd1;
-            end
-            2'b11: begin
-                if (overlay_queue_count == 2'd1) begin
-                    overlay_queue_data[0]  <= input_data;
-                    overlay_queue_start[0] <=
-                        (overlay_remaining == overlay_length);
-                    overlay_queue_last[0]  <=
-                        (overlay_remaining == 16'd1);
-                end
-                else begin
-                    overlay_queue_data[0]  <= overlay_queue_data[1];
-                    overlay_queue_start[0] <= overlay_queue_start[1];
-                    overlay_queue_last[0]  <= overlay_queue_last[1];
-                    overlay_queue_data[1]  <= input_data;
-                    overlay_queue_start[1] <=
-                        (overlay_remaining == overlay_length);
-                    overlay_queue_last[1]  <=
-                        (overlay_remaining == 16'd1);
-                end
-            end
-            default: begin end
-        endcase
 
-        if (stream_fifo_push) begin
-            stream_fifo_mem[stream_fifo_wptr[STREAM_FIFO_AW-1:0]] <= window[31:24];
-            stream_fifo_wptr <= stream_fifo_wptr + 1'b1;
-        end
-        if (stream_fifo_pop)
-            stream_fifo_rptr <= stream_fifo_rptr + 1'b1;
+        if (stream_pending && stream_ready)
+            stream_pending <= 1'b0;
 
         case (state)
 
@@ -303,19 +117,11 @@ always @(posedge clk) begin
                 window      <= window_next;
                 window_fill <= window_fill + 3'd1;
                 if (window_fill == 3'd3) begin
-                    if (pts_marker_hit || pcm_marker_hit || pcm_end_marker_hit ||
-                        overlay_marker_hit) begin
+                    if (window_next == RECORD_MARKER) begin
                         window        <= 32'd0;
                         window_fill   <= 3'd0;
                         payload_index <= 3'd0;
-                        if (pts_marker_hit)
-                            state <= S_PTS_PAYLOAD;
-                        else if (pcm_marker_hit)
-                            state <= S_PCM_PAYLOAD;
-                        else if (pcm_end_marker_hit)
-                            state <= S_PCM_END;
-                        else
-                            state <= S_OVERLAY_LEN_HI;
+                        state         <= S_PAYLOAD;
                     end
                     else
                         state <= S_STREAM;
@@ -339,26 +145,24 @@ always @(posedge clk) begin
                     // must not be emitted, but the byte falling out of the
                     // window precedes the marker and still belongs to the
                     // stream.  Dropping it here silently truncated the byte
-                    // before every record.  (The byte itself is queued by
-                    // stream_fifo_push_stream above, keyed off input_ready.)
+                    // before every record.
+                    stream_data   <= window[31:24];
+                    stream_pending <= 1'b1;
                     window        <= 32'd0;
                     window_fill   <= 3'd0;
                     payload_index <= 3'd0;
-                    if (pts_marker_hit)
-                        state <= S_PTS_PAYLOAD;
-                    else if (pcm_marker_hit)
-                        state <= S_PCM_PAYLOAD;
-                    else if (pcm_end_marker_hit)
-                        state <= S_PCM_END;
-                    else
-                        state <= S_OVERLAY_LEN_HI;
+                    state         <= S_PAYLOAD;
+                end
+                else begin
+                    stream_data  <= window[31:24];
+                    stream_pending <= 1'b1;
                 end
             end
             else if (input_end)
                 state <= S_FLUSH;
 
         // Collect the record payload.  These bytes never reach the decoder.
-        S_PTS_PAYLOAD:
+        S_PAYLOAD:
             if (input_valid && input_ready) begin
                 payload <= {payload[31:0], input_data};
                 if (payload_index == PAYLOAD_BYTES[2:0] - 3'd1) begin
@@ -377,103 +181,12 @@ always @(posedge clk) begin
                     payload_index <= payload_index + 3'd1;
             end
 
-        // A PCM record is {non_audio,count,rate,stereo}, then count frames of
-        // {left[15:8],left[7:0],right[15:8],right[7:0]}.  The final byte of
-        // each frame is not consumed until the audio FIFO can accept the
-        // assembled sample, extending existing file-channel backpressure all
-        // the way to the FPGA-owned PCM sink at frame granularity.
-        S_PCM_PAYLOAD:
-            if (input_valid && input_ready) begin
-                if (!pcm_mode_seen) begin
-                    pcm_rate_48k   <= input_data[1];
-                    pcm_stereo     <= input_data[0];
-                    pcm_non_audio  <= input_data[7];
-                    pcm_mode_seen  <= 1'b1;
-                    pcm_byte_index <= 2'd0;
-                    // A count of zero is the pre-entry-462 encoding of one
-                    // frame.  A count past the supported run is reported and
-                    // treated as one, which consumes the same five bytes a
-                    // malformed record consumed before.
-                    if (input_data[6:2] > MAX_PCM_FRAMES) begin
-                        pcm_protocol_error <= 1'b1;
-                        pcm_frames_left    <= 6'd1;
-                    end
-                    else if (input_data[6:2] == 5'd0)
-                        pcm_frames_left <= 6'd1;
-                    else
-                        pcm_frames_left <= {1'b0, input_data[6:2]};
-                end
-                else begin
-                    pcm_frame <= {pcm_frame[15:0], input_data};
-                    if (pcm_byte_index == 2'd3) begin
-                        pcm_left  <= {pcm_frame[23:16], pcm_frame[15:8]};
-                        pcm_right <= {pcm_frame[7:0], input_data};
-                        pcm_valid <= 1'b1;
-                        if (pcm_sample_count != 14'h3FFF)
-                            pcm_sample_count <= pcm_sample_count + 14'd1;
-                        pcm_byte_index <= 2'd0;
-                        if (pcm_frames_left == 6'd1) begin
-                            pcm_mode_seen <= 1'b0;
-                            payload_index <= 3'd0;
-                            state         <= S_FILL;
-                        end
-                        else
-                            pcm_frames_left <= pcm_frames_left - 6'd1;
-                    end
-                    else
-                        pcm_byte_index <= pcm_byte_index + 2'd1;
-                end
-            end
-
-        // The end token enters the same FIFO behind the final sample. The
-        // output adapter consumes it on a sample boundary and stops cleanly.
-        S_PCM_END:
-            if (pcm_ready) begin
-                pcm_end <= 1'b1;
-                state   <= S_FILL;
-            end
-
-        // B9 records carry a big-endian byte count followed by exactly that
-        // many bytes.  The first byte is the overlay command; subsequent bytes
-        // are command data.  The extractor retains no record body, so the
-        // The retained output slot applies the overlay engine's backpressure
-        // to ioctl_download without losing the byte immediately following a
-        // completed 64-bit DDR word.
-        S_OVERLAY_LEN_HI:
-            if (input_valid && input_ready) begin
-                overlay_length <= {input_data, 8'd0};
-                state          <= S_OVERLAY_LEN_LO;
-            end
-
-        S_OVERLAY_LEN_LO:
-            if (input_valid && input_ready) begin
-                overlay_length <= {overlay_length[15:8], input_data};
-                if ({overlay_length[15:8], input_data} == 16'd0 ||
-                    {overlay_length[15:8], input_data} > MAX_OVERLAY_BYTES) begin
-                    overlay_protocol_error <= 1'b1;
-                    state <= S_FILL;
-                end
-                else begin
-                    overlay_remaining <= {overlay_length[15:8], input_data};
-                    state <= S_OVERLAY_PAYLOAD;
-                end
-            end
-
-        S_OVERLAY_PAYLOAD:
-            if (input_valid && input_ready) begin
-                if (overlay_remaining == 16'd1) begin
-                    overlay_remaining <= 16'd0;
-                    state <= S_FILL;
-                end
-                else
-                    overlay_remaining <= overlay_remaining - 16'd1;
-            end
-
         // Emit the residual window at end of transfer, oldest byte first.
-        // (Each byte is queued by stream_fifo_push_flush above.)
         S_FLUSH:
-            if (!stream_fifo_full) begin
+            if (!stream_pending || stream_ready) begin
                 if (window_fill != 3'd0) begin
+                    stream_data  <= window[31:24];
+                    stream_pending <= 1'b1;
                     window       <= {window[23:0], 8'd0};
                     window_fill  <= window_fill - 3'd1;
                 end

@@ -3,7 +3,7 @@
 #
 # kate - This script does not alter constraints or RTL.  It opens the fitted
 # MediaPlayer design, rebuilds the TimeQuest timing netlist from the project's
-# existing SDC files, identifies the 60 MHz decoder and 54 MHz video clocks by
+# existing SDC files, identifies the 60 MHz decoder and 40 MHz video clocks by
 # their periods, and writes detailed path reports for timing-closure work.
 #
 # kate - Phase 1P same-clock separation:
@@ -11,7 +11,7 @@
 #   pipeline removed the previous long decoder datapath, the worst reported
 #   "decoder" paths became unrelated crossings from another PLL output into the
 #   60 MHz domain.  Explicit -from_clock/-to_clock reports are now generated so
-#   genuine 60->60 and 54->54 register-to-register timing can be evaluated
+#   genuine 60->60 and 40->40 register-to-register timing can be evaluated
 #   independently of CDC paths.
 #
 # Run from the Quartus project root after a successful full compilation:
@@ -64,12 +64,12 @@ update_timing_netlist
 
 # Current PLL configuration:
 #   decoder = 60.0 MHz = 16.667 ns
-#   video   = 54.0 MHz = 18.519 ns
+#   video   = 40.0 MHz = 25.000 ns
 #
 # Select by period instead of hierarchy-generated PLL names so the reports
 # remain usable if Quartus changes generated-clock node naming.
 set decoder_clock [phase1p_find_clock_by_period 16.667 0.010 "60 MHz decoder"]
-set video_clock   [phase1p_find_clock_by_period 18.519 0.010 "54 MHz video"]
+set video_clock   [phase1p_find_clock_by_period 25.000 0.010 "40 MHz video"]
 
 # Keep general summaries beside the detailed path reports.  These summaries
 # intentionally include all launch clocks and therefore may still be dominated
@@ -84,18 +84,6 @@ create_timing_summary \
 
 check_timing \
     -file "$output_dir/phase1p_check_timing.rpt"
-
-# Capture the actual global setup gate with full routing detail.  This keeps
-# framework HDMI/scaler failures visible alongside the decoder/video reports
-# instead of requiring an ad-hoc TimeQuest script after a rejected fit.
-report_timing \
-    -setup \
-    -npaths 100 \
-    -nworst 5 \
-    -detail full_path \
-    -show_routing \
-    -multi_corner \
-    -file "$output_dir/phase1p_global_setup.rpt"
 
 # ---------------------------------------------------------------------------
 # All paths ending in the 60 MHz decoder domain.
@@ -166,10 +154,10 @@ report_timing \
     -file "$output_dir/phase1p_decoder_recovery.rpt"
 
 # ---------------------------------------------------------------------------
-# 54 MHz presentation domain.
+# 40 MHz presentation domain.
 #
 # Keep the original all-launch-clocks report to expose CDC paths, and add a
-# separate 54->54 report for genuine presentation-domain datapath timing.
+# separate 40->40 report for genuine presentation-domain datapath timing.
 # ---------------------------------------------------------------------------
 
 report_timing \
@@ -207,7 +195,6 @@ puts ""
 puts "Phase 1P timing extraction complete."
 puts "Reports written to:"
 puts "  $output_dir/phase1p_decoder_setup.rpt"
-puts "  $output_dir/phase1p_global_setup.rpt"
 puts "  $output_dir/phase1p_decoder_setup_diverse.rpt"
 puts "  $output_dir/phase1p_decoder_same_clock_setup.rpt"
 puts "  $output_dir/phase1p_decoder_same_clock_setup_diverse.rpt"

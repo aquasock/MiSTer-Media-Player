@@ -262,7 +262,6 @@ end
 task init_row_parser;
     begin
         parse_byte_index<=0;
-        parse_cur_byte<=row_head0;
         parse_bit_index<=3'd7;
         parser_state<=R_H_QSCALE;
         field_bit_count<=0;
@@ -278,20 +277,9 @@ task init_row_parser;
         skip_emit_col<=0;
         skip_remaining<=0;
         predictor_x<=0;
-        predictor_y_frame<=0;
-        predictor_x1<=0;
-        predictor_y1_frame<=0;
+        predictor_y<=0;
         current_motion_x<=0;
         current_motion_y<=0;
-        current_motion_x1<=0;
-        current_motion_y1<=0;
-        current_motion_type<=2'b10;
-        motion_type_shift<=0;
-        motion_type_count<=0;
-        motion_slot<=0;
-        motion_second_sent<=0;
-        current_fsel0<=0;
-        current_fsel1<=0;
         current_is_intra<=0;
         dc_predictor_y<=dc_predictor_reset;
         dc_predictor_cb<=dc_predictor_reset;
@@ -313,15 +301,7 @@ task init_row_parser;
 endtask
 
 always @(posedge clk) begin
-    // Unconditional and outside reset so Quartus infers a block-memory read
-    // port; the address leads the bit pointer by one byte.
-    row_ram_q<=row_bytes[parse_byte_index+9'd1];
     if(reset) begin
-        parse_cur_byte<=0;
-        row_head0<=0;
-        row_head1<=0;
-        row_tail_last<=0;
-        row_tail_prev<=0;
         byte_window<=0;
         sequence_capture<=0;
         sequence_count<=0;
@@ -340,7 +320,6 @@ always @(posedge clk) begin
         p_forward_f_code_horizontal<=0;
         p_forward_f_code_vertical<=0;
         p_intra_vlc_format<=0;
-        p_frame_pred_frame_dct<=1'b1;
         wide_candidate<=0;
         wide_unsupported_now<=0;
         wide_seen<=0;
@@ -352,10 +331,6 @@ always @(posedge clk) begin
         motion_event_x<=0;
         motion_event_y<=0;
         motion_event_intra<=0;
-        motion_event_second<=0;
-        motion_event_fsel0<=0;
-        motion_event_fsel1<=0;
-        motion_event_field_dct<=0;
         residual_block_read_word<=0;
         residual_block_count<=0;
         residual_present<=0;
@@ -407,21 +382,9 @@ always @(posedge clk) begin
         current_has_quant<=0;
         current_is_intra<=0;
         predictor_x<=0;
-        predictor_y_frame<=0;
-        predictor_x1<=0;
-        predictor_y1_frame<=0;
+        predictor_y<=0;
         current_motion_x<=0;
         current_motion_y<=0;
-        current_motion_x1<=0;
-        current_motion_y1<=0;
-        current_motion_type<=2'b10;
-        motion_type_shift<=0;
-        motion_type_count<=0;
-        motion_slot<=0;
-        motion_second_sent<=0;
-        current_fsel0<=0;
-        current_fsel1<=0;
-        current_field_dct<=0;
         motion_code_pending<=0;
         motion_vlc_bits<=0;
         motion_vlc_len<=0;

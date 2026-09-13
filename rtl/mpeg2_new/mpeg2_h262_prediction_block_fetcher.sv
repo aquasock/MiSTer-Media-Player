@@ -6,7 +6,7 @@
 // block may use two such phases.  This module assigns eighteen direct slots to
 // each phase, generates every rectangle address once, keeps a bounded number
 // of ordered reads in flight, and associates each ordered response with its
-// destination slot.  Production defaults to four outstanding reads; simulation may override the
+// destination slot.  Production defaults to four; simulation may override the
 // shared macro to measure a deeper end-to-end command path before committing
 // more hardware capacity.
 // Pixel engines consume the retained words by phase/row/column, avoiding an
@@ -16,34 +16,19 @@
 `define H262_PREDICTION_DESCRIPTOR_DEPTH 4
 `endif
 
-// Entry 701: every instance retains at most two rectangles.  Bidirectional
-// field prediction distributes its forward and backward parity pairs across
-// the B engine's two existing instances instead of widening both stores.
-module mpeg2_h262_prediction_block_fetcher #(
-    parameter integer PHASES=2,
-    parameter integer PIPELINED_LOOKUP=0
-)
+module mpeg2_h262_prediction_block_fetcher
 (
     input  wire        clk,
     input  wire        reset,
     input  wire        start,
-    input  wire [2:0]  phase_count,
+    input  wire [1:0]  phase_count,
     input  wire [28:0] phase0_base_addr,
     input  wire [28:0] phase1_base_addr,
-    input  wire [28:0] phase2_base_addr,
-    input  wire [28:0] phase3_base_addr,
     input  wire        phase0_two_words,
     input  wire        phase1_two_words,
-    input  wire        phase2_two_words,
-    input  wire        phase3_two_words,
     input  wire [3:0]  phase0_rows,
     input  wire [3:0]  phase1_rows,
-    input  wire [3:0]  phase2_rows,
-    input  wire [3:0]  phase3_rows,
-    // Entry 695: a field fetch is the same rectangle read with the parity
-    // folded into the base address and the row stride doubled, so luma
-    // reaches 180 words and no longer fits seven bits.
-    input  wire [7:0]  row_words,
+    input  wire [6:0]  row_words,
 
     input  wire        memory_busy,
     input  wire [63:0] memory_dout,
@@ -52,7 +37,7 @@ module mpeg2_h262_prediction_block_fetcher #(
     output wire        memory_rd,
 
     input  wire        lookup_request,
-    input  wire [1:0]  lookup_phase,
+    input  wire        lookup_phase,
     input  wire [3:0]  lookup_row,
     input  wire        lookup_column,
     output reg         lookup_ready,
@@ -69,70 +54,50 @@ module mpeg2_h262_prediction_block_fetcher #(
     output wire [2:0]  outstanding_count
 );
 
-localparam integer SLOTS=PHASES*18;
 localparam integer DESCRIPTOR_DEPTH=`H262_PREDICTION_DESCRIPTOR_DEPTH;
 localparam integer DESCRIPTOR_POINTER_WIDTH=
     (DESCRIPTOR_DEPTH<=2)?1:$clog2(DESCRIPTOR_DEPTH);
 localparam integer DESCRIPTOR_COUNT_WIDTH=$clog2(DESCRIPTOR_DEPTH+1);
 
-reg [63:0] word_data [0:SLOTS-1];
-reg [SLOTS-1:0] word_valid;
+reg [63:0] word_data [0:35];
+reg [35:0] word_valid;
 
-reg [1:0] generator_phase;
+reg generator_phase;
 reg [3:0] generator_row;
 reg generator_column;
 reg [28:0] generator_row_addr;
 reg all_issued;
-reg [2:0] phase_count_reg;
-// One entry per phase rather than a pair of named registers, so a phase is
-// selected by index everywhere instead of by a chain of conditionals.
-reg [28:0] phase_base_addr_reg [0:3];
-reg        phase_two_words_reg [0:3];
-reg [3:0]  phase_rows_reg      [0:3];
-reg [7:0] row_words_reg;
+reg [1:0] phase_count_reg;
+reg [28:0] phase1_base_addr_reg;
+reg phase0_two_words_reg,phase1_two_words_reg;
+reg [3:0] phase0_rows_reg,phase1_rows_reg;
+reg [6:0] row_words_reg;
 
-reg [6:0] descriptor_slot [0:DESCRIPTOR_DEPTH-1];
+reg [5:0] descriptor_slot [0:DESCRIPTOR_DEPTH-1];
 reg [DESCRIPTOR_POINTER_WIDTH-1:0] descriptor_head,descriptor_tail;
 reg [DESCRIPTOR_COUNT_WIDTH-1:0] descriptor_count;
-// Keep the response-side empty decision independent of the multi-bit count.
-// The count still controls request capacity, while this one-bit invariant cuts
-// that full/room cone out of every retained-word write enable.
-(* preserve *) reg descriptor_nonempty;
-reg lookup_pending;
-reg [1:0] lookup_phase_q;
-reg [3:0] lookup_row_q;
-reg lookup_column_q;
 
-wire generator_two_words=phase_two_words_reg[generator_phase];
-wire [3:0] generator_rows=phase_rows_reg[generator_phase];
+wire generator_two_words=generator_phase?
+    phase1_two_words_reg:phase0_two_words_reg;
+wire [3:0] generator_rows=generator_phase?
+    phase1_rows_reg:phase0_rows_reg;
 wire generator_last_column=!generator_two_words||generator_column;
 wire generator_last_row=(generator_row+1'b1)>=generator_rows;
-wire generator_last_phase=
-    ({1'b0,generator_phase}+3'd1)>=phase_count_reg;
+wire generator_last_phase=generator_phase||(phase_count_reg==2'd1);
 wire generator_last=generator_last_column&&generator_last_row&&
     generator_last_phase;
 
-wire [6:0] generator_slot=
-    ({5'd0,generator_phase}*7'd18)+
-    {2'd0,generator_row,1'b0}+{6'd0,generator_column};
+wire [5:0] generator_slot=
+    (generator_phase?6'd18:6'd0)+
+    {generator_row,1'b0}+generator_column;
 assign memory_addr=generator_row_addr+generator_column;
 
-wire start_rows_ok=
-    (phase0_rows>=4'd1)&&(phase0_rows<=4'd9)&&
-    ((phase_count<3'd2)||((phase1_rows>=4'd1)&&(phase1_rows<=4'd9)))&&
-    ((phase_count<3'd3)||((phase2_rows>=4'd1)&&(phase2_rows<=4'd9)))&&
-    ((phase_count<3'd4)||((phase3_rows>=4'd1)&&(phase3_rows<=4'd9)));
-
-wire response_existing=memory_dout_ready&&descriptor_nonempty;
+wire response_existing=memory_dout_ready&&(descriptor_count!=0);
 wire descriptor_room=(descriptor_count<DESCRIPTOR_DEPTH)||response_existing;
 assign memory_rd=active&&!all_issued&&descriptor_room;
 wire issue_accept=memory_rd&&!memory_busy;
-// When the FIFO is empty, its count is zero by construction and therefore it
-// necessarily has room.  Spell out the direct-response issue predicate here
-// so descriptor_count cannot feed the retained-word write-control path.
-wire response_direct=memory_dout_ready&&!descriptor_nonempty&&
-    active&&!all_issued&&!memory_busy;
-wire response_pop=memory_dout_ready&&descriptor_nonempty;
+wire response_direct=memory_dout_ready&&(descriptor_count==0)&&issue_accept;
+wire response_pop=memory_dout_ready&&(descriptor_count!=0);
 wire descriptor_push=issue_accept&&!response_direct;
 wire [DESCRIPTOR_COUNT_WIDTH:0] descriptor_count_after=
     {1'b0,descriptor_count}+descriptor_push-response_pop;
@@ -144,61 +109,42 @@ wire [DESCRIPTOR_POINTER_WIDTH-1:0] descriptor_tail_next=
     (descriptor_tail==(DESCRIPTOR_DEPTH-1))?
     {DESCRIPTOR_POINTER_WIDTH{1'b0}}:descriptor_tail+1'b1;
 
-wire lookup_do=PIPELINED_LOOKUP ? lookup_pending : lookup_request;
-// Mode 1 preserves the original held-request handshake.  Mode 2 is used by
-// the B raster issue cursor: every asserted cycle is a distinct ordered
-// request, so the address and data registers may both stay in place while the
-// pipeline accepts one lookup per clock.
-wire streaming_lookup=(PIPELINED_LOOKUP==2);
-wire pipelined_lookup_accept=lookup_request&&
-    (streaming_lookup||!lookup_pending);
-wire [1:0] lookup_phase_selected=
-    PIPELINED_LOOKUP ? lookup_phase_q : lookup_phase;
-wire [3:0] lookup_row_selected=
-    PIPELINED_LOOKUP ? lookup_row_q : lookup_row;
-wire lookup_column_selected=
-    PIPELINED_LOOKUP ? lookup_column_q : lookup_column;
-wire [6:0] lookup_slot=({5'd0,lookup_phase_selected}*7'd18)+
-    {2'd0,lookup_row_selected,1'b0}+{6'd0,lookup_column_selected};
-wire [6:0] lookup_next_row_slot=lookup_slot+7'd2;
-wire [3:0] selected_lookup_rows=
-    phase_rows_reg[lookup_phase_selected];
-wire selected_lookup_two_words=
-    phase_two_words_reg[lookup_phase_selected];
-wire lookup_in_range=({1'b0,lookup_phase_selected}<phase_count_reg)&&
-    (lookup_row_selected<selected_lookup_rows)&&
-    (!lookup_column_selected||selected_lookup_two_words);
+wire [5:0] lookup_slot=(lookup_phase?6'd18:6'd0)+
+    {lookup_row,1'b0}+lookup_column;
+wire [5:0] lookup_next_row_slot=lookup_slot+6'd2;
+wire [3:0] selected_lookup_rows=lookup_phase?
+    phase1_rows_reg:phase0_rows_reg;
+wire selected_lookup_two_words=lookup_phase?
+    phase1_two_words_reg:phase0_two_words_reg;
+wire lookup_in_range=(lookup_phase<phase_count_reg)&&
+    (lookup_row<selected_lookup_rows)&&
+    (!lookup_column||selected_lookup_two_words);
 wire lookup_next_row_in_range=lookup_in_range&&
-    (lookup_row_selected+1'b1<selected_lookup_rows);
+    (lookup_row+1'b1<selected_lookup_rows);
 
-integer clear_index,descriptor_index,phase_index;
+integer clear_index,descriptor_index;
 always @(posedge clk) begin
     if(reset) begin
-        word_valid<={SLOTS{1'b0}};
-        generator_phase<=2'd0;
+        word_valid<=36'd0;
+        generator_phase<=1'b0;
         generator_row<=4'd0;
         generator_column<=1'b0;
         generator_row_addr<=29'd0;
         all_issued<=1'b0;
-        phase_count_reg<=3'd0;
-        for(phase_index=0;phase_index<4;phase_index=phase_index+1) begin
-            phase_base_addr_reg[phase_index]<=29'd0;
-            phase_two_words_reg[phase_index]<=1'b0;
-            phase_rows_reg[phase_index]<=4'd0;
-        end
-        row_words_reg<=8'd0;
+        phase_count_reg<=2'd0;
+        phase1_base_addr_reg<=29'd0;
+        phase0_two_words_reg<=1'b0;
+        phase1_two_words_reg<=1'b0;
+        phase0_rows_reg<=4'd0;
+        phase1_rows_reg<=4'd0;
+        row_words_reg<=7'd0;
         for(descriptor_index=0;descriptor_index<DESCRIPTOR_DEPTH;
             descriptor_index=descriptor_index+1)
-            descriptor_slot[descriptor_index]<=7'd0;
+            descriptor_slot[descriptor_index]<=6'd0;
         descriptor_head<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
         descriptor_tail<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
         descriptor_count<={DESCRIPTOR_COUNT_WIDTH{1'b0}};
-        descriptor_nonempty<=1'b0;
         lookup_ready<=1'b0;
-        lookup_pending<=1'b0;
-        lookup_phase_q<=2'd0;
-        lookup_row_q<=4'd0;
-        lookup_column_q<=1'b0;
         lookup_valid<=1'b0;
         lookup_data<=64'd0;
         lookup_next_row_valid<=1'b0;
@@ -208,60 +154,35 @@ always @(posedge clk) begin
         error<=1'b0;
         issued_count<=7'd0;
         returned_count<=7'd0;
-        for(clear_index=0;clear_index<SLOTS;clear_index=clear_index+1)
+        for(clear_index=0;clear_index<36;clear_index=clear_index+1)
             word_data[clear_index]<=64'd0;
     end else begin
         lookup_ready<=1'b0;
-        if(PIPELINED_LOOKUP) begin
-            // Mode 1 suppresses a held duplicate.  Mode 2 receives request
-            // pulses from an ordered cursor and shifts one valid address on
-            // every asserted cycle.
-            lookup_pending<=streaming_lookup?lookup_request:
-                pipelined_lookup_accept;
-            if(pipelined_lookup_accept) begin
-                lookup_phase_q<=lookup_phase;
-                lookup_row_q<=lookup_row;
-                lookup_column_q<=lookup_column;
-            end
-        end
 
         if(start) begin
-            // A queued lookup belongs to the footprint being replaced.  Do
-            // not expose its retained word on the cycle that start clears the
-            // validity map; the held consumer request will retry afterward.
-            lookup_pending<=1'b0;
-            lookup_ready<=1'b0;
-            lookup_valid<=1'b0;
-            lookup_next_row_valid<=1'b0;
             complete<=1'b0;
             issued_count<=7'd0;
             returned_count<=7'd0;
-            word_valid<={SLOTS{1'b0}};
+            word_valid<=36'd0;
             descriptor_head<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
             descriptor_tail<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
             descriptor_count<={DESCRIPTOR_COUNT_WIDTH{1'b0}};
-            descriptor_nonempty<=1'b0;
-            generator_phase<=2'd0;
+            generator_phase<=1'b0;
             generator_row<=4'd0;
             generator_column<=1'b0;
             generator_row_addr<=phase0_base_addr;
             all_issued<=1'b0;
             phase_count_reg<=phase_count;
-            phase_base_addr_reg[0]<=phase0_base_addr;
-            phase_base_addr_reg[1]<=phase1_base_addr;
-            phase_base_addr_reg[2]<=phase2_base_addr;
-            phase_base_addr_reg[3]<=phase3_base_addr;
-            phase_two_words_reg[0]<=phase0_two_words;
-            phase_two_words_reg[1]<=phase1_two_words;
-            phase_two_words_reg[2]<=phase2_two_words;
-            phase_two_words_reg[3]<=phase3_two_words;
-            phase_rows_reg[0]<=phase0_rows;
-            phase_rows_reg[1]<=phase1_rows;
-            phase_rows_reg[2]<=phase2_rows;
-            phase_rows_reg[3]<=phase3_rows;
+            phase1_base_addr_reg<=phase1_base_addr;
+            phase0_two_words_reg<=phase0_two_words;
+            phase1_two_words_reg<=phase1_two_words;
+            phase0_rows_reg<=phase0_rows;
+            phase1_rows_reg<=phase1_rows;
             row_words_reg<=row_words;
-            if(active||(phase_count<1)||(phase_count>PHASES)||
-               !start_rows_ok||
+            if(active||(phase_count<1)||(phase_count>2)||
+               (phase0_rows<1)||(phase0_rows>9)||
+               ((phase_count==2)&&
+                ((phase1_rows<1)||(phase1_rows>9)))||
                (row_words==0)) begin
                 active<=1'b0;
                 error<=1'b1;
@@ -278,18 +199,9 @@ always @(posedge clk) begin
                 descriptor_head<=descriptor_head_next;
 
             case({descriptor_push,response_pop})
-                2'b10:begin
-                    descriptor_count<=descriptor_count+1'b1;
-                    descriptor_nonempty<=1'b1;
-                end
-                2'b01:begin
-                    descriptor_count<=descriptor_count-1'b1;
-                    descriptor_nonempty<=(descriptor_count!=1);
-                end
-                default:begin
-                    descriptor_count<=descriptor_count;
-                    descriptor_nonempty<=descriptor_nonempty;
-                end
+                2'b10:descriptor_count<=descriptor_count+1'b1;
+                2'b01:descriptor_count<=descriptor_count-1'b1;
+                default:descriptor_count<=descriptor_count;
             endcase
 
             if(issue_accept) begin
@@ -302,13 +214,12 @@ always @(posedge clk) begin
                     generator_row<=generator_row+1'b1;
                     generator_column<=1'b0;
                     generator_row_addr<=generator_row_addr+
-                        {21'd0,row_words_reg};
+                        {22'd0,row_words_reg};
                 end else begin
-                    generator_phase<=generator_phase+1'b1;
+                    generator_phase<=1'b1;
                     generator_row<=4'd0;
                     generator_column<=1'b0;
-                    generator_row_addr<=
-                        phase_base_addr_reg[generator_phase+1'b1];
+                    generator_row_addr<=phase1_base_addr_reg;
                 end
             end
 
@@ -332,7 +243,7 @@ always @(posedge clk) begin
             end
         end
 
-        if(lookup_do&&!start) begin
+        if(lookup_request) begin
             lookup_ready<=1'b1;
             lookup_valid<=lookup_in_range&&word_valid[lookup_slot];
             lookup_next_row_valid<=lookup_next_row_in_range&&

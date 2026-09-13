@@ -15,7 +15,7 @@
 // row-bound/skip arithmetic so the Commit-171 syntax does not sit on one long
 // 54 MHz combinational path. Address semantics and consumed bits are unchanged.
 // kate - Commit 194: apply each picture-signalled forward/backward horizontal
-// and vertical f_code independently across the admitted range 1..6 (ten-bit signed half-sample vectors).
+// and vertical f_code independently across the admitted range 1..4.
 // kate - Commit 198: refill the 512-byte parser window with two-byte overlap,
 // removing it as a whole-slice capacity limit while retaining start-code
 // recognition across every refill boundary.
@@ -43,8 +43,8 @@ module mpeg2_h262_b_core_probe
     output reg  sideband_valid,
     output reg  [5:0] sideband_index,
     output reg  signed [15:0] sideband_value,
-    output reg  signed [9:0] motion_vector_x,
-    output reg  signed [9:0] motion_vector_y,
+    output reg  signed [8:0] motion_vector_x,
+    output reg  signed [8:0] motion_vector_y,
     output reg  first_sample_valid,
     output reg  signed [15:0] first_sample_value,
     output wire probe_error
@@ -105,22 +105,8 @@ reg pce_capture; reg [2:0] pce_count; reg [39:0] pce_shift;
 wire [39:0] pce_next={pce_shift[31:0],stream_data};
 reg [3:0] b_forward_f_code_horizontal,b_forward_f_code_vertical;
 reg [3:0] b_backward_f_code_horizontal,b_backward_f_code_vertical;
-// Entry 695: picture_coding_extension controls the macroblock layer needs once
-// interlaced P/B is admitted.  frame_pred_frame_dct clear is what introduces
-// frame_motion_type and the macroblock dct_type bit together, so the parser
-// has to carry it rather than assume frame prediction structurally.
-reg       b_frame_pred_frame_dct;
-reg       b_progressive_frame;
 
-// Commit 420: the row window lives in block memory with a registered read.
-// Entries 0 and 1 stay in registers so the chunk rollover needs neither a
-// second write port nor a combinational read of the array's final entries,
-// which are tracked in shadow registers as they are written.
-(* ramstyle = "M10K" *) reg [7:0] row_bytes [0:ROW_BUFFER_BYTES-1];
-reg [7:0] row_ram_q;
-reg [7:0] row_head0,row_head1;
-reg [7:0] row_tail_last,row_tail_prev;
-reg [7:0] parse_cur_byte;
+reg [7:0] row_bytes [0:ROW_BUFFER_BYTES-1];
 reg slice_capture, slice_parser_started, chunk_boundary_known;
 reg [5:0] slice_row_number; reg [8:0] row_byte_count;
 reg [10:0] row_base_index;
@@ -130,11 +116,7 @@ reg final_row_queued;
 reg producer_rearm_pending;
 reg [8:0] parse_byte_limit,parse_byte_index; reg [2:0] parse_bit_index;
 wire parser_at_end=(parse_byte_index>=parse_byte_limit);
-// The parser consumes one bit per consume_bit and therefore crosses a byte
-// boundary at most once every eight cycles, which is the lead time the
-// registered block-memory read needs.
-wire parser_current_bit=parse_cur_byte[parse_bit_index];
-wire [7:0] parse_next_byte=(parse_byte_index==9'd0)?row_head1:row_ram_q;
+wire parser_current_bit=row_bytes[parse_byte_index][parse_bit_index];
 
 localparam [5:0]
     S_QSCALE=0,S_EXTRA_FLAG=1,S_EXTRA_INFO=2,S_MBA=3,S_MBTYPE=4,
@@ -144,25 +126,11 @@ localparam [5:0]
     S_COEFF_SIGN=17,S_ESCAPE_RUN=18,S_ESCAPE_LEVEL=19,
     S_MB_DONE=20,S_STUFF=21,S_SUCCESS=22,S_ERROR=23,
     S_SKIP_A=24,S_SKIP_B=25,S_GEOMETRY=26,S_MB_B=27,S_MBA_APPLY=28,
-    S_MB_QSCALE=29,S_DC_SIZE=30,S_DC_DIFF=31,
-    // Entry 695: field motion in a frame picture codes two vectors per
-    // direction, each preceded by its own motion_vertical_field_select, so the
-    // existing per-direction vector states are iterated twice through a slot
-    // rather than duplicated.
-    S_MOTION_TYPE=32,S_FSEL=33,S_FDONE=34,S_BSEL=35,S_BDONE=36,
-    // Field prediction emits a second motion record per direction.  The
-    // backward second record is emitted before the existing backward state so
-    // that state's macroblock-completion tail stays where it is; the engines
-    // assemble by sideband index, not by arrival order.
-    S_MB_F1=37,S_MB_B1=38,
-    // Entry 707: dct_type follows frame_motion_type (when present) and
-    // precedes motion vectors for pattern-bearing or intra macroblocks.
-    S_DCT_TYPE=39;
+    S_MB_QSCALE=29,S_DC_SIZE=30,S_DC_DIFF=31;
 reg [5:0] state;
 
 reg [2:0] field_bit_count; reg [4:0] qscale_shift,current_qscale; reg [3:0] extra_info_count;
 reg [5:0] current_col; reg row_has_coded_mb; reg [5:0] skip_remaining; reg geometry_sent;
-reg current_field_dct;
 // Historical 1..8 decoder state remains below for source compatibility; Commit
 // 171 drives S_MBA from the wider Table-B.1 state and Quartus prunes the old path.
 reg [6:0] mba_bits; reg [2:0] mba_len;
@@ -246,51 +214,9 @@ wire [7:0] mba_escape_min_target_q={2'b00,current_col}+mba_escape_accum_next_q;
 
 reg [5:0] mbtype_bits; reg [2:0] mbtype_len; reg [1:0] current_direction,last_direction;
 reg current_pattern,current_intra,current_quant;
-// Entry 695: the vertical predictors live in fpy_frame/bpy_frame, which hold
-// frame units.  The former fpy/bpy are gone rather than left dead, because
-// 4bd6869 moved every update to the frame-unit pair but left two readers and
-// all four slice-start resets pointing at the old names.
-reg signed [9:0] fpx,bpx,cur_fx,cur_fy,cur_bx,cur_by;
-// Entry 695: field motion state.  frame_motion_type 2'b01 selects field
-// prediction, 2'b10 frame prediction; 2'b11 is dual prime and 2'b00 is
-// reserved, both refused as an implementation limit of this decoder rather
-// than a limit of H.262.
-reg [1:0] current_motion_type;
-reg [1:0] motion_type_shift;
-reg       motion_type_count;
-reg       motion_slot;
-reg       cur_fsel0,cur_fsel1,cur_bsel0,cur_bsel1;
-reg signed [9:0] cur_fx1,cur_fy1,cur_bx1,cur_by1;
-// Second-slot predictors.  H.262 7.6.3.1 keeps every vertical predictor in
-// frame units, so a field vertical vector is stored doubled and halved before
-// use; one extra bit carries that doubling.
-reg signed [10:0] fpy_frame,bpy_frame,fpy1_frame,bpy1_frame;
-reg signed [9:0]  fpx1,bpx1;
-wire field_motion = (current_motion_type==2'b01);
-// Field prediction parses slot 1 last, so slot 0 sits in cur_*1; frame
-// prediction has only the one vector.
-wire signed [9:0] cur_fx1_or_cur_fx = field_motion ? cur_fx1 : cur_fx;
-wire signed [9:0] cur_fy1_or_cur_fy = field_motion ? cur_fy1 : cur_fy;
-wire signed [9:0] cur_bx1_or_cur_bx = field_motion ? cur_bx1 : cur_bx;
-wire signed [9:0] cur_by1_or_cur_by = field_motion ? cur_by1 : cur_by;
-wire signed [9:0]  fpx_sel = motion_slot ? fpx1 : fpx;
-wire signed [9:0]  bpx_sel = motion_slot ? bpx1 : bpx;
-wire signed [10:0] fpy_frame_sel = motion_slot ? fpy1_frame : fpy_frame;
-wire signed [10:0] bpy_frame_sel = motion_slot ? bpy1_frame : bpy_frame;
-// H.262 4.1 defines DIV as integer division toward minus infinity, so a
-// negative odd vertical PMV must use an arithmetic shift here (-3 DIV 2=-2).
-function automatic signed [9:0] half_floor;
-    input signed [10:0] value;
-    begin
-        half_floor=$signed(value)>>>1;
-    end
-endfunction
-wire signed [9:0] fpy_sel = field_motion ? half_floor(fpy_frame_sel)
-                                         : $signed(fpy_frame_sel[9:0]);
-wire signed [9:0] bpy_sel = field_motion ? half_floor(bpy_frame_sel)
-                                         : $signed(bpy_frame_sel[9:0]);
+reg signed [8:0] fpx,fpy,bpx,bpy,cur_fx,cur_fy,cur_bx,cur_by;
 reg signed [5:0] motion_code_pending; reg [10:0] motion_bits; reg [3:0] motion_len;
-reg [4:0] motion_residual_shift; reg [2:0] motion_residual_count;
+reg [3:0] motion_residual_shift; reg [1:0] motion_residual_count;
 
 reg [8:0] cbp_bits; reg [3:0] cbp_len; reg [5:0] current_cbp; reg [2:0] current_block_index;
 reg [15:0] coeff_vlc_code; reg [4:0] coeff_vlc_len;

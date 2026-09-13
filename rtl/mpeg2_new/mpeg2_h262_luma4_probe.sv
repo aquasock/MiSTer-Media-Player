@@ -52,9 +52,6 @@ module mpeg2_h262_luma4_probe
     input  wire [13:0] vertical_size,
     input  wire [1:0]  intra_dc_precision,
     input  wire        intra_vlc_format,
-    // Entry 650: clear for field-DCT streams, which carry a dct_type bit
-    // between macroblock_type/quantiser_scale_code and the first block.
-    input  wire        frame_pred_frame_dct,
 
     // One-cycle pulse from the reconstruction stage after sample 63 of the
     // previously submitted block.  The next block is not submitted before it.
@@ -69,8 +66,6 @@ module mpeg2_h262_luma4_probe
     // and picture_data() reaches the next non-slice start code.
     output reg         first_picture_420_parsed,
     output reg         probe_error,
-    // Set while the current macroblock's luma blocks are field-ordered.
-    output reg         dct_type,
 
     output reg  [4:0]  quantiser_scale_code,
     output reg  [11:0] macroblock_address_increment,
@@ -143,8 +138,7 @@ localparam [4:0]
     ST_WAIT_PIPELINE    = 5'd18,
     ST_SLICE_END_ZEROS  = 5'd19,
     ST_START_CODE_PREFIX = 5'd20,
-    ST_START_CODE_VALUE  = 5'd21,
-    ST_DCT_TYPE          = 5'd22;
+    ST_START_CODE_VALUE  = 5'd21;
 
 reg [4:0] parse_state;
 
@@ -725,7 +719,6 @@ always @(posedge clk) begin
         quantiser_scale_code              <= 5'd0;
         macroblock_address_increment      <= 12'd0;
         macroblock_quant                  <= 1'b0;
-        dct_type                          <= 1'b0;
         macroblock_quantiser_scale_code   <= 5'd0;
         slice_vertical_position           <= 8'd0;
         first_luma_dc_size                <= 4'd0;
@@ -1036,8 +1029,7 @@ always @(posedge clk) begin
                             first_i_macroblock_seen <= 1'b1;
                             luma_macroblock_start   <= 1'b1;
                             block_index              <= 3'd0;
-                            if (frame_pred_frame_dct) start_luma_block();
-                            else parse_state <= ST_DCT_TYPE;
+                            start_luma_block();
                         end
                         else parse_state <= ST_MBTYPE_SECOND;
                     end
@@ -1050,10 +1042,7 @@ always @(posedge clk) begin
                             block_index              <= 3'd0;
                             macroblock_qscale_shift <= 5'd0;
                             field_bit_count         <= 4'd0;
-                            // H.262 macroblock_modes() carries dct_type before
-                            // macroblock() carries quantiser_scale_code.
-                            parse_state <= frame_pred_frame_dct ?
-                                           ST_MB_QSCALE : ST_DCT_TYPE;
+                            parse_state             <= ST_MB_QSCALE;
                         end
                         else begin
                             probe_error  <= 1'b1;
@@ -1077,18 +1066,6 @@ always @(posedge clk) begin
                             else start_luma_block();
                         end
                         else field_bit_count <= field_bit_count + 4'd1;
-                    end
-
-                    // Entry 650: one bit, present only when
-                    // frame_pred_frame_dct is clear in a frame picture.  It
-                    // selects field ordering for this macroblock's four luma
-                    // blocks and is consumed before the first block's DC.
-                    ST_DCT_TYPE: begin
-                        dct_type <= current_bit;
-                        if (macroblock_quant)
-                            parse_state <= ST_MB_QSCALE;
-                        else
-                            start_luma_block();
                     end
 
                     ST_DC_LUMA: begin

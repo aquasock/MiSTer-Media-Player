@@ -3,10 +3,12 @@
                 if(parser_at_end)state<=S_ERROR;
                 else begin
                     motion_residual_shift<=motion_residual_next;
-                    if({1'b0,motion_residual_count}==(b_forward_f_code_vertical-4'd2))begin
-                        cur_fy<=reconstruct_mv(fpy_sel,motion_code_pending,motion_residual_next,b_forward_f_code_vertical);
+                    if({2'b00,motion_residual_count}==(b_forward_f_code_vertical-4'd2))begin
+                        cur_fy<=reconstruct_mv(fpy,motion_code_pending,motion_residual_next,b_forward_f_code_vertical);
                         motion_residual_count<=0;motion_bits<=0;motion_len<=0;
-                        state<=S_FDONE;
+                        if(current_direction==2'd3)state<=S_BX;
+                        else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
+                        else state<=S_MB_DONE;
                     end else motion_residual_count<=motion_residual_count+1'b1;
                 end
             end
@@ -14,9 +16,9 @@
                 if(parser_at_end)state<=S_ERROR;
                 else if(motion_match[6])begin
                     motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
-                    if($signed(motion_match[5:0])==0)begin cur_bx<=bpx_sel;state<=S_BY;end
+                    if($signed(motion_match[5:0])==0)begin cur_bx<=bpx;state<=S_BY;end
                     else if(b_backward_f_code_horizontal==4'd1)begin
-                        cur_bx<=reconstruct_mv(bpx_sel,motion_match[5:0],4'd0,b_backward_f_code_horizontal);state<=S_BY;
+                        cur_bx<=reconstruct_mv(bpx,motion_match[5:0],4'd0,b_backward_f_code_horizontal);state<=S_BY;
                     end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_BX_RES;end
                 end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end
@@ -25,8 +27,8 @@
                 if(parser_at_end)state<=S_ERROR;
                 else begin
                     motion_residual_shift<=motion_residual_next;
-                    if({1'b0,motion_residual_count}==(b_backward_f_code_horizontal-4'd2))begin
-                        cur_bx<=reconstruct_mv(bpx_sel,motion_code_pending,motion_residual_next,b_backward_f_code_horizontal);
+                    if({2'b00,motion_residual_count}==(b_backward_f_code_horizontal-4'd2))begin
+                        cur_bx<=reconstruct_mv(bpx,motion_code_pending,motion_residual_next,b_backward_f_code_horizontal);
                         motion_residual_count<=0;motion_bits<=0;motion_len<=0;state<=S_BY;
                     end else motion_residual_count<=motion_residual_count+1'b1;
                 end
@@ -36,11 +38,11 @@
                 else if(motion_match[6])begin
                     motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
                     if($signed(motion_match[5:0])==0)begin
-                        cur_by<=bpy_sel;
-                        state<=S_BDONE;
+                        cur_by<=bpy;
+                        if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
                     end else if(b_backward_f_code_vertical==4'd1)begin
-                        cur_by<=reconstruct_mv(bpy_sel,motion_match[5:0],4'd0,b_backward_f_code_vertical);
-                        state<=S_BDONE;
+                        cur_by<=reconstruct_mv(bpy,motion_match[5:0],4'd0,b_backward_f_code_vertical);
+                        if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
                     end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_BY_RES;end
                 end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end
@@ -49,10 +51,10 @@
                 if(parser_at_end)state<=S_ERROR;
                 else begin
                     motion_residual_shift<=motion_residual_next;
-                    if({1'b0,motion_residual_count}==(b_backward_f_code_vertical-4'd2))begin
-                        cur_by<=reconstruct_mv(bpy_sel,motion_code_pending,motion_residual_next,b_backward_f_code_vertical);
+                    if({2'b00,motion_residual_count}==(b_backward_f_code_vertical-4'd2))begin
+                        cur_by<=reconstruct_mv(bpy,motion_code_pending,motion_residual_next,b_backward_f_code_vertical);
                         motion_residual_count<=0;
-                        state<=S_BDONE;
+                        if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
                     end else motion_residual_count<=motion_residual_count+1'b1;
                 end
             end
@@ -163,65 +165,17 @@
                 end
             end
             S_MB_DONE: begin
-                // Entry 695: the record value carries the field-motion flag and
-                // this slot's motion_vertical_field_select; it was previously
-                // always zero for motion records, so no width changes.
-                sideband_valid<=1;sideband_index<=current_intra?6'h37:direction_index(current_direction);
-                sideband_value<=$signed({13'd0,current_field_dct,field_motion,cur_fsel0});
-                motion_vector_x<=cur_fx1_or_cur_fx;motion_vector_y<=cur_fy1_or_cur_fy;
-                if(field_motion)state<=S_MB_F1;
-                else if(!geometry_sent)state<=S_GEOMETRY;else state<=S_MB_B;
-            end
-            S_MB_F1: begin
-                sideband_valid<=1;sideband_index<=6'h35;
-                sideband_value<=$signed({14'd0,1'b1,cur_fsel1});
-                motion_vector_x<=cur_fx;motion_vector_y<=cur_fy;
-                if(!geometry_sent)state<=S_GEOMETRY;else state<=S_MB_B1;
-            end
-            S_MB_B1: begin
-                sideband_valid<=1;sideband_index<=6'h36;
-                sideband_value<=$signed({14'd0,1'b1,cur_bsel1});
-                motion_vector_x<=cur_bx;motion_vector_y<=cur_by;
-                state<=S_MB_B;
+                sideband_valid<=1;sideband_index<=current_intra?6'h37:direction_index(current_direction);sideband_value<=0;motion_vector_x<=cur_fx;motion_vector_y<=cur_fy;
+                if(!geometry_sent)state<=S_GEOMETRY;else state<=S_MB_B;
             end
             S_GEOMETRY: begin
-                sideband_valid<=1;sideband_index<=6'h3c;sideband_value<=$signed({4'd0,picture_mb_width,picture_mb_height});geometry_sent<=1;state<=field_motion?S_MB_B1:S_MB_B;
+                sideband_valid<=1;sideband_index<=6'h3c;sideband_value<=$signed({4'd0,picture_mb_width,picture_mb_height});geometry_sent<=1;state<=S_MB_B;
             end
             S_MB_B: begin
-                sideband_valid<=1;sideband_index<=6'h3b;
-                sideband_value<=$signed({14'd0,field_motion,cur_bsel0});
-                motion_vector_x<=cur_bx1_or_cur_bx;motion_vector_y<=cur_by1_or_cur_by;
-                // H.262 7.6.3.4: intra without concealment resets ALL PMVs.
-                // Concealment vectors remain excluded by picture admission.
-                if(current_intra)begin
-                    fpx<=0;fpy_frame<=0;bpx<=0;bpy_frame<=0;
-                    fpx1<=0;fpy1_frame<=0;bpx1<=0;bpy1_frame<=0;last_direction<=0;
-                end else begin
-                    // Entry 695: H.262 7.6.3.1 keeps every vertical predictor in
-                    // frame units, so a field vertical vector is stored doubled.
-                    // Field prediction leaves slot 0 in cur_*1 and slot 1 in
-                    // cur_*, because the second slot reuses the vector states.
-                    if(current_direction[0])begin
-                        if(field_motion)begin
-                            fpx<=cur_fx1;fpy_frame<=$signed({cur_fy1,1'b0});
-                            fpx1<=cur_fx;fpy1_frame<=$signed({cur_fy,1'b0});
-                        end else begin
-                            fpx<=cur_fx;fpy_frame<=$signed({cur_fy[9],cur_fy});
-                            fpx1<=cur_fx;fpy1_frame<=$signed({cur_fy[9],cur_fy});
-                        end
-                    end
-                    if(current_direction[1])begin
-                        if(field_motion)begin
-                            bpx<=cur_bx1;bpy_frame<=$signed({cur_by1,1'b0});
-                            bpx1<=cur_bx;bpy1_frame<=$signed({cur_by,1'b0});
-                        end else begin
-                            bpx<=cur_bx;bpy_frame<=$signed({cur_by[9],cur_by});
-                            bpx1<=cur_bx;bpy1_frame<=$signed({cur_by[9],cur_by});
-                        end
-                    end
-                    last_direction<=current_direction;
-                end
-                row_has_coded_mb<=1;
+                sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=0;motion_vector_x<=cur_bx;motion_vector_y<=cur_by;
+                if(current_direction[0])begin fpx<=cur_fx;fpy<=cur_fy;end
+                if(current_direction[1])begin bpx<=cur_bx;bpy<=cur_by;end
+                if(!current_intra)last_direction<=current_direction;row_has_coded_mb<=1;
                 // kate - Commit 173: current_col becomes the next uncovered
                 // column after every coded endpoint. S_MBA then either parses
                 // another in-slice MBA or recognizes the buffered zero tail.

@@ -51,20 +51,13 @@ wire parser_consumes_bit=(state==S_QSCALE)||(state==S_EXTRA_FLAG)||(state==S_EXT
     (state==S_BX)||(state==S_BX_RES)||(state==S_BY)||(state==S_BY_RES)||(state==S_CBP)||
     (state==S_FIRST_COEFF)||(state==S_COEFF_VLC)||(state==S_COEFF_SIGN)||(state==S_ESCAPE_RUN)||
     (state==S_ESCAPE_LEVEL)||(state==S_STUFF)||(state==S_MB_QSCALE)||
-    (state==S_DC_SIZE)||(state==S_DC_DIFF)||
-    // Entry 695: frame_motion_type and each vector's
-    // motion_vertical_field_select are read from the bitstream like any other
-    // syntax element and must advance the bit pointer.  Without this
-    // S_MOTION_TYPE reads one bit twice and decodes 00 or 11, and the field
-    // selects desynchronise every vector behind them.
-    (state==S_MOTION_TYPE)||(state==S_FSEL)||(state==S_BSEL)||
-    (state==S_DCT_TYPE);
+    (state==S_DC_SIZE)||(state==S_DC_DIFF);
 wire consume_bit=parse_active&&parser_consumes_bit&&!parser_at_end;
 
 reg t_start,t_we,t_end,t_intra; reg [5:0] t_widx; reg signed [12:0] t_wval; reg [4:0] t_qscale;
 wire t_done,t_first_valid,t_valid,t_error; wire signed [15:0] t_first_value,t_value; wire [1:0] t_unused_block; wire [5:0] t_index;
 mpeg2_h262_p_non_intra_transform b_transform(
-    .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.qfs_block_index(2'd1),.qfs_block_start(t_start),.qfs_write_en(t_we),
+    .clk(clk),.reset(reset),.qfs_block_index(2'd1),.qfs_block_start(t_start),.qfs_write_en(t_we),
     .qfs_write_index(t_widx),.qfs_write_value(t_wval),.qfs_block_end(t_end),
     .quantiser_scale_code(t_qscale),.q_scale_type(q_scale_type),.alternate_scan(alternate_scan),
     .intra_block(t_intra),.intra_dc_precision(b_intra_dc_precision),
@@ -116,28 +109,19 @@ always @(posedge clk) begin
 end
 
 always @(posedge clk) begin
-    // Unconditional and outside reset so Quartus infers a block-memory read
-    // port; the address leads the bit pointer by one byte.
-    row_ram_q<=row_bytes[parse_byte_index+9'd1];
     if(reset) begin
-        parse_cur_byte<=0;row_head0<=0;row_head1<=0;row_tail_last<=0;row_tail_prev<=0;
         byte_window<=0;sequence_capture<=0;sequence_count<=0;sequence_shift<=0;geometry_supported<=0;picture_mb_width<=0;picture_mb_height<=0;
         picture_capture<=0;picture_count<=0;picture_shift<=0;current_picture_is_b<=0;
         pce_capture<=0;pce_count<=0;pce_shift<=0;b_candidate<=0;b_seen<=0;b_complete_now<=0;
         b_forward_f_code_horizontal<=0;b_forward_f_code_vertical<=0;
-        b_frame_pred_frame_dct<=1'b1;b_progressive_frame<=1'b1;
         b_backward_f_code_horizontal<=0;b_backward_f_code_vertical<=0;
         parse_hold<=0;parser_error<=0;replay_error<=0;prior_error<=0;slice_capture<=0;slice_parser_started<=0;chunk_boundary_known<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;
         parse_active<=0;proof_done<=0;boundary_final<=0;row_waiting<=0;replay_row_final<=0;
         outstanding_rows<=0;final_row_queued<=0;producer_rearm_pending<=0;
         parse_byte_limit<=0;parse_byte_index<=0;parse_bit_index<=7;
-        state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;geometry_sent<=0;current_field_dct<=0;
+        state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;geometry_sent<=0;
         mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;mba_symbol_escape_q<=0;mba_symbol_value_q<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;current_intra<=0;current_quant<=0;
-        fpx<=0;bpx<=0;cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;
-        fpy_frame<=0;bpy_frame<=0;fpx1<=0;fpy1_frame<=0;bpx1<=0;bpy1_frame<=0;
-        current_motion_type<=2'b10;motion_type_shift<=0;motion_type_count<=0;motion_slot<=0;
-        cur_fsel0<=0;cur_fsel1<=0;cur_bsel0<=0;cur_bsel1<=0;
-        cur_fx1<=0;cur_fy1<=0;cur_bx1<=0;cur_by1<=0;
+        fpx<=0;fpy<=0;bpx<=0;bpy<=0;cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;
         motion_code_pending<=0;motion_bits<=0;motion_len<=0;motion_residual_shift<=0;motion_residual_count<=0;
         cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
         qfs_index<=0;coeff_run_pending<=0;coeff_level_pending<=0;current_block_has_coeff<=0;
@@ -182,13 +166,12 @@ always @(posedge clk) begin
         if(parse_active) begin
             if(parser_at_end && !chunk_boundary_known) begin
                 parse_active<=0;parse_hold<=0;slice_capture<=1;
-                row_head0<=row_tail_prev;
-                row_head1<=row_tail_last;
-                parse_cur_byte<=row_tail_prev;
+                row_bytes[0]<=row_bytes[ROW_BUFFER_BYTES-2];
+                row_bytes[1]<=row_bytes[ROW_BUFFER_BYTES-1];
                 row_byte_count<=9'd2;parse_byte_index<=0;parse_bit_index<=7;
             end else begin
             if(consume_bit) begin
-                if(parse_bit_index==0)begin parse_bit_index<=7;parse_byte_index<=parse_byte_index+1'b1;parse_cur_byte<=parse_next_byte;end
+                if(parse_bit_index==0)begin parse_bit_index<=7;parse_byte_index<=parse_byte_index+1'b1;end
                 else parse_bit_index<=parse_bit_index-1'b1;
             end
             case(state)
@@ -240,10 +223,10 @@ always @(posedge clk) begin
             end
             S_SKIP_A: begin
                 if(last_direction==0)state<=S_ERROR;
-                else begin dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;sideband_valid<=1;sideband_index<=direction_index(last_direction);sideband_value<=0;motion_vector_x<=fpx;motion_vector_y<=$signed(fpy_frame[9:0]);state<=S_SKIP_B;end
+                else begin dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;sideband_valid<=1;sideband_index<=direction_index(last_direction);sideband_value<=0;motion_vector_x<=fpx;motion_vector_y<=fpy;state<=S_SKIP_B;end
             end
             S_SKIP_B: begin
-                sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=0;motion_vector_x<=bpx;motion_vector_y<=$signed(bpy_frame[9:0]);current_col<=current_col+1'b1;
+                sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=0;motion_vector_x<=bpx;motion_vector_y<=bpy;current_col<=current_col+1'b1;
                 if(skip_remaining==1)begin skip_remaining<=0;state<=S_MBTYPE;end
                 else begin skip_remaining<=skip_remaining-1'b1;state<=S_SKIP_A;end
             end
@@ -253,110 +236,22 @@ always @(posedge clk) begin
                     current_quant<=mbtype_match[4];current_intra<=mbtype_match[3];current_direction<=mbtype_match[2:1];current_pattern<=mbtype_match[0];mbtype_bits<=0;mbtype_len<=0;
                     cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;motion_bits<=0;motion_len<=0;
                     if(!mbtype_match[3])begin dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;end
-                    // Entry 695: per-macroblock field motion state starts from
-                    // frame prediction, which is what a set frame_pred_frame_dct
-                    // implies and what every skipped macroblock assumes.
-                    motion_type_shift<=0;motion_type_count<=0;motion_slot<=0;
-                    current_motion_type<=2'b10;
-                    current_field_dct<=0;
-                    cur_fsel0<=0;cur_fsel1<=0;cur_bsel0<=0;cur_bsel1<=0;
-                    cur_fx1<=0;cur_fy1<=0;cur_bx1<=0;cur_by1<=0;
-                    // H.262 macroblock_modes() precedes macroblock_quant's
-                    // quantiser_scale_code.  For interlaced frame pictures,
-                    // consume motion_type and dct_type before the scale.
-                    if(mbtype_match[3])begin
-                        current_cbp<=6'h3f;current_block_index<=0;
-                        if(!b_frame_pred_frame_dct)state<=S_DCT_TYPE;
-                        else if(mbtype_match[4])begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
-                        else state<=S_BLOCK;
-                    end else if(!b_frame_pred_frame_dct)state<=S_MOTION_TYPE;
-                    else if(mbtype_match[4])begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
+                    if(mbtype_match[4])begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
+                    else if(mbtype_match[3])begin current_cbp<=6'h3f;current_block_index<=0;state<=S_BLOCK;end
                     else if(mbtype_match[2:1]==2'd2)state<=S_BX;else state<=S_FX;
                 end else if(mbtype_len_next>=6)state<=S_ERROR;else begin mbtype_bits<=mbtype_bits_next;mbtype_len<=mbtype_len_next;end
             end
             S_MB_QSCALE: begin
                 if(parser_at_end)state<=S_ERROR;
-                else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;if(current_intra)state<=S_BLOCK;else if(current_direction!=0)state<=field_motion?((current_direction==2'd2)?S_BSEL:S_FSEL):((current_direction==2'd2)?S_BX:S_FX);else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;end end else field_bit_count<=field_bit_count+1'b1;end
-            end
-            // Entry 695: with frame_pred_frame_dct clear, frame_motion_type
-            // follows macroblock_type for every macroblock carrying motion.
-            // 2'b01 is field prediction, 2'b10 frame prediction; 2'b11 is dual
-            // prime and 2'b00 reserved, both refused here as an implementation
-            // limit of this decoder rather than a limit of H.262.
-            S_MOTION_TYPE: begin
-                if(parser_at_end)state<=S_ERROR;
-                else begin
-                    motion_type_shift<=motion_type_next;
-                    if(motion_type_count==1'b1)begin
-                        motion_type_count<=0;current_motion_type<=motion_type_next;motion_slot<=0;
-                        if((motion_type_next!=2'b01)&&
-                           (motion_type_next!=2'b10))state<=S_ERROR;
-                        else if(current_pattern)state<=S_DCT_TYPE;
-                        else if(current_quant)begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
-                        else state<=(motion_type_next==2'b01)?
-                            ((current_direction==2'd2)?S_BSEL:S_FSEL):
-                            ((current_direction==2'd2)?S_BX:S_FX);
-                    end else motion_type_count<=motion_type_count+1'b1;
-                end
-            end
-            S_DCT_TYPE: begin
-                if(parser_at_end)state<=S_ERROR;
-                else begin
-                    current_field_dct<=parser_current_bit;
-                    if(current_quant)begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
-                    else if(current_intra)state<=S_BLOCK;
-                    else if(current_direction!=0)
-                        state<=field_motion?
-                            ((current_direction==2'd2)?S_BSEL:S_FSEL):
-                            ((current_direction==2'd2)?S_BX:S_FX);
-                    else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
-                    else state<=S_MB_DONE;
-                end
-            end
-            // motion_vertical_field_select immediately precedes its own vector.
-            S_FSEL: begin
-                if(parser_at_end)state<=S_ERROR;
-                else begin
-                    if(motion_slot)cur_fsel1<=parser_current_bit;else cur_fsel0<=parser_current_bit;
-                    motion_bits<=0;motion_len<=0;state<=S_FX;
-                end
-            end
-            S_BSEL: begin
-                if(parser_at_end)state<=S_ERROR;
-                else begin
-                    if(motion_slot)cur_bsel1<=parser_current_bit;else cur_bsel0<=parser_current_bit;
-                    motion_bits<=0;motion_len<=0;state<=S_BX;
-                end
-            end
-            // One vector pair is complete.  Field prediction codes a second,
-            // so retain the first slot's vector and parse the other; otherwise
-            // continue exactly as frame prediction always did.
-            S_FDONE: begin
-                if(field_motion&&!motion_slot)begin
-                    cur_fx1<=cur_fx;cur_fy1<=cur_fy;motion_slot<=1'b1;state<=S_FSEL;
-                end else begin
-                    motion_slot<=0;
-                    if(current_direction==2'd3)state<=field_motion?S_BSEL:S_BX;
-                    else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
-                    else state<=S_MB_DONE;
-                end
-            end
-            S_BDONE: begin
-                if(field_motion&&!motion_slot)begin
-                    cur_bx1<=cur_bx;cur_by1<=cur_by;motion_slot<=1'b1;state<=S_BSEL;
-                end else begin
-                    motion_slot<=0;
-                    if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
-                    else state<=S_MB_DONE;
-                end
+                else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;if(current_intra)begin current_cbp<=6'h3f;current_block_index<=0;state<=S_BLOCK;end else state<=S_ERROR;end end else field_bit_count<=field_bit_count+1'b1;end
             end
             S_FX: begin
                 if(parser_at_end)state<=S_ERROR;
                 else if(motion_match[6])begin
                     motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
-                    if($signed(motion_match[5:0])==0)begin cur_fx<=fpx_sel;state<=S_FY;end
+                    if($signed(motion_match[5:0])==0)begin cur_fx<=fpx;state<=S_FY;end
                     else if(b_forward_f_code_horizontal==4'd1)begin
-                        cur_fx<=reconstruct_mv(fpx_sel,motion_match[5:0],4'd0,b_forward_f_code_horizontal);state<=S_FY;
+                        cur_fx<=reconstruct_mv(fpx,motion_match[5:0],4'd0,b_forward_f_code_horizontal);state<=S_FY;
                     end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_FX_RES;end
                 end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end
@@ -365,8 +260,8 @@ always @(posedge clk) begin
                 if(parser_at_end)state<=S_ERROR;
                 else begin
                     motion_residual_shift<=motion_residual_next;
-                    if({1'b0,motion_residual_count}==(b_forward_f_code_horizontal-4'd2))begin
-                        cur_fx<=reconstruct_mv(fpx_sel,motion_code_pending,motion_residual_next,b_forward_f_code_horizontal);
+                    if({2'b00,motion_residual_count}==(b_forward_f_code_horizontal-4'd2))begin
+                        cur_fx<=reconstruct_mv(fpx,motion_code_pending,motion_residual_next,b_forward_f_code_horizontal);
                         motion_residual_count<=0;motion_bits<=0;motion_len<=0;state<=S_FY;
                     end else motion_residual_count<=motion_residual_count+1'b1;
                 end
@@ -376,11 +271,15 @@ always @(posedge clk) begin
                 else if(motion_match[6])begin
                     motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
                     if($signed(motion_match[5:0])==0)begin
-                        cur_fy<=fpy_sel;
-                        state<=S_FDONE;
+                        cur_fy<=fpy;
+                        if(current_direction==2'd3)state<=S_BX;
+                        else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
+                        else state<=S_MB_DONE;
                     end else if(b_forward_f_code_vertical==4'd1)begin
-                        cur_fy<=reconstruct_mv(fpy_sel,motion_match[5:0],4'd0,b_forward_f_code_vertical);
-                        state<=S_FDONE;
+                        cur_fy<=reconstruct_mv(fpy,motion_match[5:0],4'd0,b_forward_f_code_vertical);
+                        if(current_direction==2'd3)state<=S_BX;
+                        else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
+                        else state<=S_MB_DONE;
                     end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_FY_RES;end
                 end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end

@@ -12,25 +12,12 @@ module mpeg2_h262_b_presentation_scheduler
     input  wire clk,
     input  wire reset,
     input  wire swap_window_pulse,
-    input  wire cadence_tick_pulse,
     input  wire [3:0] frame_rate_code,
-    input  wire native_film_mode,
-    input  wire native_field,
-    input  wire display_picture_present,
-    input  wire display_repeat_first_field,
-    input  wire candidate_top_field_first,
-    // Entry 470: cadence is the mandatory floor for every retained picture.
-    // A timestamp may hold its candidate beyond that slot but may never admit
-    // it early; untimestamped candidates use the exact-rate cadence alone.
+    // Entry 389: when the next retained picture owns a timestamp, its modulo
+    // PTS comparison replaces only the cadence admission gate.  Untimestamped
+    // candidates continue through the established exact-rate accumulator.
     input  wire timestamp_candidate_active,
     input  wire timestamp_candidate_due,
-    // Native full-frame presentation has one safe swap boundary every two
-    // fields.  The ordinary-reference overlap below may decode one I/P picture
-    // into the already existing third frame region while its predecessor
-    // waits for that boundary. Other modes retain the
-    // established serialized ownership path.
-    input  wire native_ordinary_overlap_enable,
-    input  wire [1:0] active_frame_bank,
     input  wire frame_waiting,
     input  wire [1:0] completed_frame_bank,
     input  wire [1:0] reference_frame_bank,
@@ -50,10 +37,6 @@ module mpeg2_h262_b_presentation_scheduler
     output wire candidate_frame_scratch,
     output wire candidate_scratch_bank,
     output wire [1:0] candidate_frame_bank,
-    // Entry 468: passive admission telemetry. These outputs mirror terms
-    // already used below and never feed the scheduler back.
-    output wire cadence_slot_debug,
-    output wire candidate_presentable_debug,
     output reg [2:0] framebuffer_swap_reset_count,
     output wire reference_overlap_header,
     output wire presentation_hold,
@@ -66,20 +49,6 @@ module mpeg2_h262_b_presentation_scheduler
     // clears it until that run's scratch pictures and future reference retire.
     output reg  presentation_complete,
     output reg  presentation_error,
-    // Entry 990: one-cycle pulse, high the same cycle presentation_error is
-    // first asserted for the deferred_queued_b_start+overlap_decode_open
-    // abort specifically. The overlap reference this abort abandons never
-    // reaches picture_420_complete/p_persisted_now in the picture bookkeeper
-    // (mpeg2_h262_two_picture_probe_p_chain.sv), so without this pulse that
-    // module's active_frame_bank_reg freezes on the abandoned picture's bank
-    // forever - the next real picture header then collides with it in the
-    // P-destination-ownership-hold check (MediaPlayer.sv), which can only
-    // release once display moves off that bank, which requires a new
-    // candidate this same freeze prevents. A second, distinct deadlock from
-    // the first (entry 985/986), confirmed on real hardware after that fix
-    // shipped: presentation_hold correctly cleared, but the transfer stalled
-    // permanently a few hundred KB later with zero burst credit.
-    output reg  overlap_reference_abandoned,
     // Entry 311: passive state export for the development cadence snapshot.
     // No bit feeds scheduler control or timing decisions.
     output wire [31:0] debug_state
@@ -99,30 +68,6 @@ reg overlap_decode_open,overlap_frame_pending;
 // The classification byte is retained here while presentation backpressure
 // prevents any B payload from reaching the decoder without both resources.
 reg deferred_queued_b_start;
-// A free scratch bank admits a B header, not a second reference payload.
-// Retain a following I/P classification until the occupied reference slot
-// leaves the draining run. This also preserves a header before completion.
-reg deferred_reference_payload;
-// A following reference header may arrive before the preceding reference's
-// public completion. Keep its classification permission with that completion
-// instead of leaving the new pending slot unreleased and overwritable.
-reg [1:0] reference_headers_inflight;
-// Publication generation observed at the newest accepted I/P header.  A later
-// promotion proves that header has published without assuming that lifetime
-// header and publication totals remain aligned across sequence boundaries.
-reg [7:0] reference_promotion_at_last_header;
-reg [1:0] active_frame_bank_q;
-reg early_reference_release;
-wire reference_completed = frame_waiting || (active_frame_bank != active_frame_bank_q);
-// A B header following an overlapped reference belongs to the secondary
-// bank. Its payload may use scratch as soon as that reference completes, but
-// the older ordinary candidate must still be presented before the scratch.
-reg deferred_ordinary_b_start;
-reg ordinary_reference_before_b;
-// Once a closed B run has no prediction work left, its old reference bank
-// can hold a second ordinary successor while scratch/future presentation
-// drains. Keep that transaction distinct from the run's first successor.
-reg ordinary_drain_overlap;
 
 // Entry 269: while one closed run is being presented, retain the following
 // run in a distinct logical generation.  Both generations still share the
@@ -139,92 +84,86 @@ reg decode_generation_queued,promotion_pending;
 reg last_bound_reference_valid;
 reg [1:0] last_bound_reference_bank;
 reg [7:0] last_bound_reference_count;
-reg ordinary_reference_decode_open;
-reg [1:0] ordinary_reference_decode_bank;
-// Native all-I decode can now finish slightly ahead of its 30000/1001
-// presentation slot.  With three ordinary DDR regions, retain the completed
-// third bank here while pending_frame_* continues to own its predecessor.
-reg ordinary_secondary_valid;
-reg [1:0] ordinary_secondary_bank;
-reg ordinary_secondary_released;
-reg ordinary_resume_pending;
-reg ordinary_terminal_drain_pending;
 
-reg [1:0] native_fields_elapsed;
-// Entry 153: a display field has elapsed exactly when the display field parity
-// changes, and nothing else defines it.  Entry 152 counted cadence_tick_pulse
-// or swap_window_pulse instead, and both fire inside a single field, so this
-// counter advanced from one straight to three and every three-field picture
-// reached its authored duration a whole field early.  The parity gate below
-// then held that picture for the field the counter had skipped, which is why
-// the error never showed up in the presented rate.  Count the parity edge.
-reg native_field_q;
-wire native_field_elapsed_pulse=native_field!=native_field_q;
-wire [1:0] native_field_duration=display_repeat_first_field ? 2'd3 : 2'd2;
+// Entry 354: the fixed 40 MHz 800x600 raster produces one swap window every
+// 1056*628 pixels.  Accumulate source-picture credit in pixel-clock units for
+// the 24000/1001, exact 24, 25, 30000/1001, and exact 30 fps Table 6-4 rates.
+// The 24000/1001 fractional rate uses the exact reduced ratio
+//     (663168 * 24000) / (40000000 * 1001) = 22608 / 56875
+// and the 30000/1001 rate uses
+//     (663168 * 30000) / (40000000 * 1001) = 5652 / 11375
+// so neither drifts or rounds to its neighboring integer rate.  Saturating at
+// the next due slot prevents a decode stall from banking credit and replaying
+// ready pictures on consecutive refreshes.
+localparam [25:0] CADENCE_LIMIT_24000_1001 = 26'd56875;
+localparam [25:0] CADENCE_STEP_24000_1001  = 26'd22608;
+localparam [25:0] CADENCE_DUE_24000_1001 =
+    CADENCE_LIMIT_24000_1001-CADENCE_STEP_24000_1001;
+localparam [25:0] CADENCE_LIMIT_24FPS = 26'd40000000;
+localparam [25:0] CADENCE_STEP_24FPS  = 26'd15916032;
+localparam [25:0] CADENCE_DUE_24FPS =
+    CADENCE_LIMIT_24FPS-CADENCE_STEP_24FPS;
+localparam [25:0] CADENCE_LIMIT_25FPS = 26'd40000000;
+localparam [25:0] CADENCE_STEP_25FPS  = 26'd16579200;
+localparam [25:0] CADENCE_DUE_25FPS =
+    CADENCE_LIMIT_25FPS-CADENCE_STEP_25FPS;
+localparam [25:0] CADENCE_LIMIT_30000_1001 = 26'd11375;
+localparam [25:0] CADENCE_STEP_30000_1001  = 26'd5652;
+localparam [25:0] CADENCE_DUE_30000_1001 =
+    CADENCE_LIMIT_30000_1001-CADENCE_STEP_30000_1001;
+localparam [25:0] CADENCE_LIMIT_30FPS = 26'd40000000;
+localparam [25:0] CADENCE_STEP_30FPS  = 26'd19895040;
+localparam [25:0] CADENCE_DUE_30FPS =
+    CADENCE_LIMIT_30FPS-CADENCE_STEP_30FPS;
+reg [25:0] cadence_credit;
+reg [3:0] cadence_rate_code_q;
 
-wire ordinary_b_header_wait=pending_frame_valid&&
-    (ordinary_secondary_valid||ordinary_reference_decode_open);
-wire ordinary_b_header_ready=deferred_ordinary_b_start&&!reorder_active&&
-    !ordinary_reference_decode_open&&(ordinary_secondary_valid||pending_frame_valid);
-wire admitted_b_picture_start=(b_picture_start&&!ordinary_b_header_wait)||
-    ordinary_b_header_ready;
-wire new_b_retains_primary=admitted_b_picture_start&&!reorder_active&&
-    ordinary_secondary_valid&&pending_frame_valid;
-wire ordinary_before_b_waiting=(ordinary_reference_before_b||new_b_retains_primary)&&
-    pending_frame_valid&&pending_frame_released;
 wire b_user_success_edge=b_user_success&&!b_user_success_d;
 wire scratch_waiting=next_present_scratch_bank?scratch1_pending:scratch0_pending;
 wire future_waiting=future_frame_pending&&run_closed&&!decode_inflight&&
                     !future_reference_pending&&
                     !scratch0_pending&&!scratch1_pending&&scratch_presented;
-wire scheduled_frame_valid=ordinary_before_b_waiting||scratch_waiting||future_waiting||
-    (!reorder_active&&!admitted_b_picture_start&&pending_frame_valid&&
+wire scheduled_frame_valid=scratch_waiting||future_waiting||
+    (!reorder_active&&!b_picture_start&&pending_frame_valid&&
      pending_frame_released);
-wire scheduled_frame_scratch=!ordinary_before_b_waiting&&scratch_waiting;
+wire scheduled_frame_scratch=scratch_waiting;
 wire scheduled_scratch_bank=next_present_scratch_bank;
-wire [1:0] scheduled_frame_bank=(future_waiting&&!ordinary_before_b_waiting)?future_frame_bank:
+wire [1:0] scheduled_frame_bank=future_waiting?future_frame_bank:
                                 pending_frame_bank;
 wire scheduled_frame_differs=scheduled_frame_scratch?
     (!display_scratch||(scheduled_scratch_bank!=display_scratch_bank)):
     (display_scratch||(scheduled_frame_bank!=display_frame_bank));
-wire ordinary_cadence_slot;
-// Entry 153: the authored duration is the whole of film-mode cadence.  Also
-// requiring the display's current field parity to equal the picture's
-// top_field_first made the scheduler refuse a picture that had already served
-// its authored fields, costing one extra field on 22 percent of pictures; the
-// field order inside a picture is already owned by native_field_order, and the
-// focused run confirms field_order_error stays zero without this term.
-wire cadence_slot=native_film_mode ?
-    (native_fields_elapsed>=native_field_duration) :
-    ordinary_cadence_slot;
-// Entry 143: a film-mode picture's display duration is fully authored by its
-// own top-field-first and repeat-first-field descriptors, so an early
-// timestamp must not withhold it.  The timeline's discontinuity re-anchor
-// keeps the clock near the stream; the timestamp stays a gate only on the
-// ordinary path, which is unchanged.
-// Entry 143: a film-mode picture's display duration is fully authored by its
-// own top-field-first and repeat-first-field descriptors, so an early
-// timestamp must not withhold it.  The timeline's discontinuity re-anchor
-// keeps the clock near the stream; the timestamp stays a gate only on the
-// ordinary path, which is unchanged.
-wire presentation_slot=cadence_slot&&
-                       (native_film_mode||
-                        !timestamp_candidate_active||timestamp_candidate_due);
-wire presentation_consume=swap_window_pulse&&presentation_slot&&
-                          scheduled_frame_valid&&scheduled_frame_differs;
-
-mpeg2_h262_output_cadence mpeg2_h262_output_cadence(
-    .clk(clk),.reset(reset),.tick(cadence_tick_pulse),
-    .consume(presentation_consume&&!native_film_mode),
-    .frame_rate_code(frame_rate_code),.slot(ordinary_cadence_slot)
-);
+wire cadence_24000_1001=(frame_rate_code==4'h1);
+wire cadence_24fps=(frame_rate_code==4'h2);
+wire cadence_25fps=(frame_rate_code==4'h3);
+wire cadence_30000_1001=(frame_rate_code==4'h4);
+wire cadence_30fps=(frame_rate_code==4'h5);
+wire cadence_supported=cadence_24000_1001||cadence_24fps||cadence_25fps||
+                       cadence_30000_1001||cadence_30fps;
+wire [25:0] cadence_limit=cadence_24000_1001?CADENCE_LIMIT_24000_1001:
+                          cadence_30000_1001?CADENCE_LIMIT_30000_1001:
+                          CADENCE_LIMIT_24FPS;
+wire [25:0] cadence_step=cadence_24000_1001?CADENCE_STEP_24000_1001:
+                         cadence_24fps?CADENCE_STEP_24FPS:
+                         cadence_25fps?CADENCE_STEP_25FPS:
+                         cadence_30000_1001?CADENCE_STEP_30000_1001:
+                                             CADENCE_STEP_30FPS;
+wire [25:0] cadence_due=cadence_24000_1001?CADENCE_DUE_24000_1001:
+                        cadence_24fps?CADENCE_DUE_24FPS:
+                        cadence_25fps?CADENCE_DUE_25FPS:
+                        cadence_30000_1001?CADENCE_DUE_30000_1001:
+                                            CADENCE_DUE_30FPS;
+wire cadence_scale_changed=
+    (cadence_24000_1001!=(cadence_rate_code_q==4'h1))||
+    (cadence_30000_1001!=(cadence_rate_code_q==4'h4));
+wire cadence_slot=!cadence_scale_changed&&
+                  (!cadence_supported||(cadence_credit>=cadence_due));
+wire presentation_slot=timestamp_candidate_active?
+                       timestamp_candidate_due:cadence_slot;
 assign candidate_frame_valid=scheduled_frame_valid;
 assign candidate_frame_scratch=scheduled_frame_scratch;
 assign candidate_scratch_bank=scheduled_scratch_bank;
 assign candidate_frame_bank=scheduled_frame_bank;
-assign cadence_slot_debug=cadence_slot;
-assign candidate_presentable_debug=scheduled_frame_valid&&
-                                   scheduled_frame_differs;
 wire scratch0_available=!scratch0_pending&&!queued_scratch0_pending&&
     !(display_scratch&&!display_scratch_bank)&&
     !(decode_inflight&&!decode_scratch_bank)&&
@@ -281,68 +220,19 @@ assign debug_state = {
     run_closed,
     reorder_active
 };
-// A released ordinary reference normally occupies the scheduler's sole
-// pending slot. Native 30000/1001 playback has three ordinary frame regions,
-// so one proven I/P transaction may use the third region while cadence
-// consumes its predecessor. Candidate timestamp validity changes
-// when classification releases a frame, so it must not govern queue capacity.
-// Each retained bank keeps its timestamp; presentation_slot still requires
-// both cadence credit and that candidate's due time before a swap.
+// A released ordinary reference occupies the scheduler's sole pending slot.
+// Stop after its classifying header until cadence consumes it, otherwise a
+// lightweight following P can publish and overwrite that undisplayed bank.
+// The initial reference is already visible in the reset display bank and does
+// not need a synthetic bank change before decode may continue.
 wire ordinary_reference_waiting=!reorder_active&&pending_frame_valid&&
     pending_frame_released&&
     (display_scratch||(pending_frame_bank!=display_frame_bank));
-wire ordinary_reference_overlap_safe=
-    native_ordinary_overlap_enable&&
-    (frame_rate_code==4'h4)&&
-    !reorder_active&&
-    !display_scratch&&
-    !ordinary_secondary_valid&&
-    !ordinary_resume_pending&&
-    pending_frame_valid&&
-    (pending_frame_released||non_b_picture_start)&&
-    (pending_frame_bank!=display_frame_bank)&&
-    (active_frame_bank!=display_frame_bank)&&
-    (active_frame_bank!=pending_frame_bank);
-wire ordinary_drain_mode_safe=
-    native_ordinary_overlap_enable&&(frame_rate_code==4'h4)&&
-    reorder_active&&run_closed&&!decode_inflight&&!queued_run_active&&
-    !deferred_queued_b_start&&!promotion_pending&&
-    future_frame_pending&&!future_reference_pending;
-wire ordinary_drain_overlap_safe=ordinary_drain_mode_safe&&
-    overlap_frame_pending&&!overlap_decode_open&&
-    pending_frame_valid&&(pending_frame_released||non_b_picture_start)&&
-    !ordinary_secondary_valid&&!ordinary_resume_pending&&
-    (display_scratch||(active_frame_bank!=display_frame_bank))&&
-    (active_frame_bank!=future_frame_bank)&&
-    (active_frame_bank!=pending_frame_bank);
-wire ordinary_reference_present_now=
-    swap_window_pulse&&presentation_slot&&scheduled_frame_valid&&
-    scheduled_frame_differs&&!scheduled_frame_scratch&&!future_waiting;
-wire ordinary_secondary_mode_safe=
-    native_ordinary_overlap_enable&&
-    (frame_rate_code==4'h4)&&
-    ((!display_scratch&&!reorder_active)||
-     (ordinary_drain_overlap&&ordinary_drain_mode_safe));
-wire ordinary_secondary_release_now=
-    ordinary_secondary_valid&&!ordinary_secondary_released&&
-    (sequence_end||ordinary_terminal_drain_pending||
-     ((i_picture_start||p_picture_start)&&ordinary_secondary_mode_safe));
-wire ordinary_secondary_resume_now=
-    ordinary_secondary_valid&&!ordinary_secondary_released&&
-    (i_picture_start||p_picture_start)&&ordinary_secondary_mode_safe;
-assign presentation_hold=deferred_ordinary_b_start||
-                         (ordinary_reference_before_b&&run_closed)||
-                         (ordinary_reference_waiting&&
-                          !ordinary_reference_decode_open&&
-                          !(ordinary_secondary_valid&&
-                            !ordinary_secondary_released))||
-                         (ordinary_secondary_valid&&
-                          ordinary_secondary_released)||
+assign presentation_hold=ordinary_reference_waiting||
                          (reorder_active&&run_closed&&
                           !presentation_complete&&!presentation_error&&
-                          ((deferred_reference_payload&&!ordinary_reference_decode_open)||
-                           deferred_queued_b_start||
-                           (!overlap_decode_open&&!ordinary_reference_decode_open&&!queued_decode_inflight&&
+                          (deferred_queued_b_start||
+                           (!overlap_decode_open&&!queued_decode_inflight&&
                             (promotion_pending||!queued_header_capacity))));
 
 always @(posedge clk) begin
@@ -357,14 +247,6 @@ always @(posedge clk) begin
         future_reference_pending<=0;scratch_presented<=0;
         overlap_decode_open<=0;overlap_frame_pending<=0;
         deferred_queued_b_start<=0;
-        deferred_reference_payload<=0;
-        reference_headers_inflight<=0;
-        reference_promotion_at_last_header<=0;
-        active_frame_bank_q<=0;
-        early_reference_release<=0;
-        deferred_ordinary_b_start<=0;
-        ordinary_reference_before_b<=0;
-        ordinary_drain_overlap<=0;
         queued_run_active<=0;queued_run_closed<=0;
         queued_decode_inflight<=0;
         queued_scratch0_pending<=0;queued_scratch1_pending<=0;
@@ -376,50 +258,11 @@ always @(posedge clk) begin
         decode_generation_queued<=0;promotion_pending<=0;
         last_bound_reference_valid<=0;last_bound_reference_bank<=0;
         last_bound_reference_count<=0;
-        ordinary_reference_decode_open<=0;
-        ordinary_reference_decode_bank<=0;
-        ordinary_secondary_valid<=0;
-        ordinary_secondary_bank<=0;
-        ordinary_secondary_released<=0;
-        ordinary_resume_pending<=0;
-        ordinary_terminal_drain_pending<=0;
         run_picture_count<=0;presentation_complete<=1;presentation_error<=0;
-        overlap_reference_abandoned<=0;
-        native_fields_elapsed<=0;
-        native_field_q<=native_field;
+        cadence_credit<=CADENCE_DUE_24FPS;cadence_rate_code_q<=0;
     end else begin
-        overlap_reference_abandoned<=0;
         b_user_success_d<=b_user_success;
-        if(b_picture_start&&ordinary_b_header_wait)
-            deferred_ordinary_b_start<=1;
-        else if(ordinary_b_header_ready)
-            deferred_ordinary_b_start<=0;
-        active_frame_bank_q<=active_frame_bank;
-        if(!reorder_active)ordinary_drain_overlap<=0;
-        if(i_picture_start||p_picture_start)
-            reference_promotion_at_last_header<=reference_promotion_count;
-        case ({non_b_picture_start,reference_completed})
-            2'b10: if(reference_headers_inflight!=2)
-                       reference_headers_inflight<=reference_headers_inflight+1'b1;
-            2'b01: if(reference_headers_inflight!=0)
-                       reference_headers_inflight<=reference_headers_inflight-1'b1;
-            2'b11: if(reference_headers_inflight==0)
-                       reference_headers_inflight<=1;
-            default: begin end
-        endcase
-        if(reference_completed)
-            early_reference_release<=0;
-        else if(non_b_picture_start&&(reference_headers_inflight!=0))
-            early_reference_release<=1;
-        if(!reorder_active||presentation_error)
-            deferred_reference_payload<=0;
-        else if(non_b_picture_start&&run_closed&&
-                !(queued_run_active&&!queued_run_closed))
-            deferred_reference_payload<=1;
-        native_field_q<=native_field;
-        if(!native_film_mode) native_fields_elapsed<=0;
-        else if(native_field_elapsed_pulse && native_fields_elapsed!=3)
-            native_fields_elapsed<=native_fields_elapsed+1'b1;
+        cadence_rate_code_q<=frame_rate_code;
 
         // Seed the generation comparison from the first published reference.
         // Thereafter only a B future binding advances it, so a later bank wrap
@@ -428,6 +271,17 @@ always @(posedge clk) begin
             last_bound_reference_valid<=1;
             last_bound_reference_bank<=reference_frame_bank;
             last_bound_reference_count<=reference_promotion_count;
+        end
+
+        if(cadence_scale_changed)
+            cadence_credit<=cadence_due;
+        else if(swap_window_pulse)begin
+            if(!cadence_supported)
+                cadence_credit<=CADENCE_DUE_24FPS;
+            else if(cadence_credit<cadence_due)
+                cadence_credit<=cadence_credit+cadence_step;
+            else
+                cadence_credit<=cadence_due;
         end
 
         // Entry 225: a reference publication is not display-order permission.
@@ -441,16 +295,10 @@ always @(posedge clk) begin
         if(sequence_end&&!pending_frame_valid)
             terminal_boundary_pending<=1;
 
-        if(frame_waiting&&!reorder_active&&!admitted_b_picture_start&&
-           !b_user_success_edge&&
-           !(ordinary_reference_decode_open&&pending_frame_valid&&
-             !ordinary_reference_present_now))begin
+        if(frame_waiting&&!reorder_active&&!b_picture_start&&!b_user_success_edge)begin
             pending_frame_valid<=1;
             pending_frame_bank<=completed_frame_bank;
-            pending_frame_released<=sequence_end||
-                                    ordinary_terminal_drain_pending||
-                                    terminal_boundary_pending||
-                                    early_reference_release||
+            pending_frame_released<=sequence_end||terminal_boundary_pending||
                                     non_b_picture_start;
             terminal_boundary_pending<=0;
         end
@@ -462,9 +310,7 @@ always @(posedge clk) begin
            !deferred_queued_b_start)begin
             pending_frame_valid<=1;
             pending_frame_bank<=completed_frame_bank;
-            pending_frame_released<=non_b_picture_start||
-                                    deferred_reference_payload||early_reference_release||sequence_end||
-                                    terminal_boundary_pending;
+            pending_frame_released<=0;
             overlap_frame_pending<=1;
             overlap_decode_open<=0;
         end
@@ -476,83 +322,13 @@ always @(posedge clk) begin
            queued_overlap_decode_open)begin
             pending_frame_valid<=1;
             pending_frame_bank<=completed_frame_bank;
-            pending_frame_released<=non_b_picture_start||
-                                    deferred_reference_payload||early_reference_release||sequence_end||
-                                    terminal_boundary_pending;
+            pending_frame_released<=0;
             queued_overlap_frame_pending<=1;
             queued_overlap_decode_open<=0;
         end
 
-        if(pending_frame_valid&&(non_b_picture_start||sequence_end||
-                                ordinary_terminal_drain_pending))
+        if(pending_frame_valid&&(non_b_picture_start||sequence_end))
             pending_frame_released<=1;
-
-        // The raw sequence-end event is only one cycle wide.  Native all-I
-        // ownership may promote a secondary identity on that same edge, so
-        // retain terminal permission until the complete ordinary queue drains.
-        if(sequence_end&&ordinary_secondary_mode_safe)
-            ordinary_terminal_drain_pending<=1;
-        else if(ordinary_terminal_drain_pending&&
-                !pending_frame_valid&&!ordinary_secondary_valid&&
-                !ordinary_reference_decode_open&&!frame_waiting)
-            ordinary_terminal_drain_pending<=0;
-
-        // A native I/P stream may use the third ordinary frame region while
-        // the preceding completed reference waits for its full-frame boundary.
-        // The header which releases that predecessor also fixes the new decode
-        // class. A header accepted before completion or behind a draining B
-        // run may use the same proof once its predecessor occupies this slot.
-        if((i_picture_start||p_picture_start||(reference_headers_inflight!=0))&&
-           (ordinary_reference_overlap_safe||ordinary_drain_overlap_safe)&&
-           !ordinary_reference_decode_open)begin
-            ordinary_reference_decode_open<=1;
-            ordinary_reference_decode_bank<=active_frame_bank;
-            if(ordinary_drain_overlap_safe)ordinary_drain_overlap<=1;
-        end
-
-        // When all three ordinary banks are owned, admit exactly the next I/P
-        // classification boundary but hold its payload.  That header releases
-        // the completed secondary frame; decode resumes only after the primary
-        // pending frame presents and frees its old display bank.
-        if(ordinary_secondary_release_now)begin
-            ordinary_secondary_released<=1;
-            if(ordinary_secondary_resume_now)
-                ordinary_resume_pending<=1;
-        end
-
-        // Ownership must remain fixed for the complete overlapped decode.  A
-        // violated invariant is fatal to presentation but never permits the
-        // displayed or waiting bank to be overwritten silently.
-        if(ordinary_reference_decode_open&&!frame_waiting&&
-           ((active_frame_bank!=ordinary_reference_decode_bank)||
-            (!display_scratch&&(active_frame_bank==display_frame_bank))||
-            (ordinary_drain_overlap&&reorder_active&&
-             (!ordinary_drain_mode_safe||(active_frame_bank==future_frame_bank)))))begin
-            ordinary_reference_decode_open<=0;
-            presentation_error<=1;
-        end
-
-        if(frame_waiting&&ordinary_reference_decode_open)begin
-            ordinary_reference_decode_open<=0;
-            if(completed_frame_bank!=ordinary_reference_decode_bank)
-                presentation_error<=1;
-            else if(pending_frame_valid&&!ordinary_reference_present_now)begin
-                if(ordinary_secondary_valid||
-                   (completed_frame_bank==pending_frame_bank)||
-                   (!display_scratch&&(completed_frame_bank==display_frame_bank))||
-                   (ordinary_drain_overlap&&reorder_active&&
-                    (completed_frame_bank==future_frame_bank)))
-                    presentation_error<=1;
-                else begin
-                    ordinary_secondary_valid<=1;
-                    ordinary_secondary_bank<=completed_frame_bank;
-                    ordinary_secondary_released<=sequence_end||
-                                                   ordinary_terminal_drain_pending||
-                                                   early_reference_release||non_b_picture_start;
-                    ordinary_resume_pending<=0;
-                end
-            end
-        end
 
         // Entry 227: the B header can be accepted in the same registered
         // handoff that publishes its future reference.  If the header arrived
@@ -579,7 +355,7 @@ always @(posedge clk) begin
             overlap_decode_open<=0;
         end
 
-        if(deferred_queued_b_start&&!admitted_b_picture_start&&
+        if(deferred_queued_b_start&&!b_picture_start&&
            (pending_frame_valid||frame_waiting)&&
            queued_scratch_available)begin
             queued_run_active<=1;queued_run_closed<=0;
@@ -605,7 +381,7 @@ always @(posedge clk) begin
             deferred_queued_b_start<=0;
         end
 
-        if(admitted_b_picture_start)begin
+        if(b_picture_start)begin
             if(!reorder_active)begin
                 reorder_active<=1;run_closed<=0;decode_inflight<=1;
                 decode_scratch_bank<=0;scratch0_pending<=0;scratch1_pending<=0;
@@ -617,21 +393,7 @@ always @(posedge clk) begin
                 overlap_decode_open<=0;overlap_frame_pending<=0;
                 deferred_queued_b_start<=0;
                 decode_generation_queued<=0;
-                if(ordinary_secondary_valid)begin
-                    // Decode B into scratch now, while the older ordinary
-                    // picture still owns first presentation priority.
-                    future_frame_bank<=ordinary_secondary_bank;
-                    future_reference_pending<=0;
-                    ordinary_reference_before_b<=1;
-                    pending_frame_valid<=1;
-                    pending_frame_released<=1;
-                    ordinary_secondary_valid<=0;
-                    ordinary_secondary_released<=0;
-                    ordinary_resume_pending<=0;
-                    last_bound_reference_valid<=1;
-                    last_bound_reference_bank<=ordinary_secondary_bank;
-                    last_bound_reference_count<=reference_promotion_count;
-                end else if(frame_waiting)begin
+                if(frame_waiting)begin
                     future_frame_bank<=completed_frame_bank;
                     future_reference_pending<=0;
                     last_bound_reference_valid<=1;
@@ -643,19 +405,11 @@ always @(posedge clk) begin
                     last_bound_reference_valid<=1;
                     last_bound_reference_bank<=pending_frame_bank;
                     last_bound_reference_count<=reference_promotion_count;
-                // A newer promoted generation may already be on screen when
-                // presentation releases the compressed stream immediately
-                // before this B header.  It is the future reference only when
-                // the publication generation advanced after the newest I/P
-                // header, proving that header has completed.  An unchanged
-                // generation retains the early-B protection.
-                end else if(!display_scratch&&
-                            ((display_frame_bank!=reference_frame_bank)||
-                             (last_bound_reference_valid&&
-                              (reference_promotion_count!=
-                               last_bound_reference_count)&&
-                              (reference_promotion_count!=
-                               reference_promotion_at_last_header))))begin
+                end else if((!display_scratch&&
+                             (display_frame_bank!=reference_frame_bank))||
+                            (last_bound_reference_valid&&
+                             (reference_promotion_count!=
+                              last_bound_reference_count)))begin
                     future_frame_bank<=reference_frame_bank;
                     future_reference_pending<=0;
                     last_bound_reference_valid<=1;
@@ -848,20 +602,24 @@ always @(posedge clk) begin
             end
         end
 
-        if(presentation_consume)begin
-            // Entry 470: presentation_slot guarantees cadence_slot here, so a
-            // timestamped presentation consumes exactly the same accumulated
-            // cadence credit as an untimestamped presentation.
-            native_fields_elapsed<=0;
+        if(swap_window_pulse&&presentation_slot&&scheduled_frame_valid&&
+           scheduled_frame_differs)begin
+            // Timestamp admission may intentionally occur before the free
+            // cadence has accumulated a whole slot.  Clearing partial credit
+            // in that case consumes the presentation and prevents an
+            // annotated-to-unannotated transition from bursting next refresh.
+            if(cadence_supported) begin
+                if(cadence_slot)
+                    cadence_credit<=cadence_credit+cadence_step-
+                                    cadence_limit;
+                else
+                    cadence_credit<=26'd0;
+            end
             display_scratch<=scheduled_frame_scratch;
             if(scheduled_frame_scratch)display_scratch_bank<=scheduled_scratch_bank;
             else display_frame_bank<=scheduled_frame_bank;
             framebuffer_swap_reset_count<=4;
-            if(ordinary_before_b_waiting)begin
-                pending_frame_valid<=0;
-                pending_frame_released<=0;
-                ordinary_reference_before_b<=0;
-            end else if(scratch_waiting)begin
+            if(scratch_waiting)begin
                 if(next_present_scratch_bank)scratch1_pending<=0;
                 else scratch0_pending<=0;
                 next_present_scratch_bank<=!next_present_scratch_bank;
@@ -869,30 +627,7 @@ always @(posedge clk) begin
             end else if(future_waiting)begin
                 future_frame_pending<=0;
                 future_reference_pending<=0;
-                if(deferred_queued_b_start&&overlap_decode_open)begin
-                    // Entry 985: hardware telemetry confirmed this exact
-                    // combination is an unrecoverable circular wait, not a
-                    // recoverable one. deferred_queued_b_start's own clear
-                    // condition needs a frame_waiting pulse from this same
-                    // still-open overlap reference, but presentation_hold
-                    // (asserted unconditionally by deferred_queued_b_start,
-                    // independent of promotion_pending) blocks all further
-                    // decoder input at the top level - including the rest
-                    // of that very reference's compressed data. Retiring
-                    // this generation via promotion_pending here would only
-                    // extend the same hold under a different name. Abort
-                    // instead, matching this module's own stated recovery
-                    // policy of failing forward rather than hanging.
-                    reorder_active<=0;run_closed<=0;decode_inflight<=0;
-                    scratch0_pending<=0;scratch1_pending<=0;
-                    deferred_queued_b_start<=0;
-                    overlap_decode_open<=0;
-                    overlap_frame_pending<=0;
-                    presentation_error<=1;
-                    // Entry 990: tell the picture bookkeeper this overlap
-                    // reference is abandoned, not merely delayed.
-                    overlap_reference_abandoned<=1;
-                end else if(queued_run_active||deferred_queued_b_start)begin
+                if(queued_run_active||deferred_queued_b_start)begin
                     // Retire the visible generation first.  Promotion waits
                     // for any queued B completion edge so that ownership can
                     // never be lost on a coincident cadence window.
@@ -922,42 +657,8 @@ always @(posedge clk) begin
                     else presentation_error<=1;
                 end
             end else begin
-                // A just-completed native overlap can coincide exactly with
-                // presentation of its predecessor.  Preserve the completed
-                // bank as the new (unreleased) candidate rather than letting
-                // the predecessor's retirement clear it on this same edge.
-                if(ordinary_secondary_valid)begin
-                    pending_frame_valid<=1;
-                    pending_frame_bank<=ordinary_secondary_bank;
-                    pending_frame_released<=ordinary_secondary_released||
-                                            ordinary_secondary_release_now||
-                                            ordinary_terminal_drain_pending;
-                    ordinary_secondary_valid<=0;
-                    ordinary_secondary_released<=0;
-                    if((ordinary_resume_pending||
-                        ordinary_secondary_resume_now)&&
-                       (active_frame_bank!=scheduled_frame_bank)&&
-                       (active_frame_bank!=ordinary_secondary_bank))begin
-                        ordinary_reference_decode_open<=1;
-                        ordinary_reference_decode_bank<=active_frame_bank;
-                    end else if(ordinary_resume_pending||
-                                ordinary_secondary_resume_now)
-                        presentation_error<=1;
-                    ordinary_resume_pending<=0;
-                    terminal_boundary_pending<=0;
-                end else if(frame_waiting&&ordinary_reference_decode_open)begin
-                    pending_frame_valid<=1;
-                    pending_frame_bank<=completed_frame_bank;
-                    pending_frame_released<=sequence_end||
-                                            ordinary_terminal_drain_pending||
-                                            terminal_boundary_pending||
-                                            early_reference_release||
-                                            non_b_picture_start;
-                    terminal_boundary_pending<=0;
-                end else begin
-                    pending_frame_valid<=0;
-                    pending_frame_released<=0;
-                end
+                pending_frame_valid<=0;
+                pending_frame_released<=0;
             end
         end else if(swap_window_pulse&&future_waiting&&!scheduled_frame_differs)begin
             future_frame_pending<=0;reorder_active<=0;run_closed<=0;
@@ -1013,7 +714,7 @@ always @(posedge clk) begin
             end
         end
 
-        if((reorder_active||deferred_ordinary_b_start)&&b_decode_error)begin
+        if(reorder_active&&b_decode_error)begin
             reorder_active<=0;run_closed<=0;decode_inflight<=0;
             scratch0_pending<=0;scratch1_pending<=0;future_frame_pending<=0;
             future_reference_pending<=0;
@@ -1029,27 +730,8 @@ always @(posedge clk) begin
             presentation_error<=1;
         end
 
-        // The secondary ordinary slot still requires the native timing and
-        // ordinary display ownership used to admit its transaction.
-        if((ordinary_secondary_valid||ordinary_resume_pending)&&
-           (!native_ordinary_overlap_enable||(frame_rate_code!=4'h4)||
-            (display_scratch&&!(ordinary_drain_overlap&&ordinary_drain_mode_safe))))
-            presentation_error<=1;
-        if(ordinary_secondary_valid&&frame_waiting&&
-           !ordinary_reference_decode_open)
-            presentation_error<=1;
-
-        if(presentation_error)begin
-            deferred_ordinary_b_start<=0;
-            ordinary_reference_before_b<=0;
-            ordinary_drain_overlap<=0;
+        if(presentation_error)
             deferred_queued_b_start<=0;
-            ordinary_reference_decode_open<=0;
-            ordinary_secondary_valid<=0;
-            ordinary_secondary_released<=0;
-            ordinary_resume_pending<=0;
-            ordinary_terminal_drain_pending<=0;
-        end
     end
 end
 endmodule

@@ -168,67 +168,23 @@
             end
 
             R_MB_DONE: begin
-                // Entry 695: field prediction sends slot 0 on the ordinary
-                // record and slot 1 on a second record behind it.  The
-                // ordinary record must go first: it is what arms the raster
-                // engine's capture, so a second record ahead of it would be
-                // dropped on the first macroblock of every picture.  The
-                // engine therefore completes the macroblock on the second
-                // record, as the B engine already does.  This state consumes
-                // no bit, so holding it for the extra cycle costs no syntax.
-                if(field_motion&&!motion_second_sent) begin
-                    motion_event_valid<=1;
-                    motion_event_index<=current_mb_index;
-                    motion_event_x<=current_motion_x1_or_x;
-                    motion_event_y<=current_motion_y1_or_y;
-                    motion_event_intra<=current_is_intra;
-                    motion_event_second<=1'b0;
-                    motion_event_fsel0<=1'b0;
-                    motion_event_fsel1<=1'b0;
-                    motion_event_field_dct<=current_field_dct;
-                    motion_second_sent<=1'b1;
+                motion_event_valid<=1;
+                motion_event_index<=current_mb_index;
+                motion_event_x<=current_motion_x;
+                motion_event_y<=current_motion_y;
+                motion_event_intra<=current_is_intra;
+                if(current_has_motion) begin
+                    predictor_x<=current_motion_x;
+                    predictor_y<=current_motion_y;
+                end
+                row_has_coded_mb<=1;
+                if(current_col==(picture_mb_width-1'b1)) begin
+                    parser_state<=R_STUFF;
                 end else begin
-                    motion_event_valid<=1;
-                    motion_event_index<=current_mb_index;
-                    motion_event_x<=field_motion?current_motion_x
-                                                :current_motion_x1_or_x;
-                    motion_event_y<=field_motion?current_motion_y
-                                                :current_motion_y1_or_y;
-                    motion_event_intra<=field_motion?1'b0:current_is_intra;
-                    motion_event_second<=field_motion;
-                    motion_event_fsel0<=current_fsel0;
-                    motion_event_fsel1<=current_fsel1;
-                    motion_event_field_dct<=current_field_dct;
-                    motion_second_sent<=1'b0;
-                    if(current_has_motion) begin
-                        // H.262 7.6.3.1: every vertical predictor is kept in frame
-                        // units, so a field vertical vector is stored doubled.
-                        // Field prediction leaves slot 0 in current_motion_*1 and
-                        // slot 1 in current_motion_*, because the second slot
-                        // reuses the vector states.
-                        if(field_motion) begin
-                            predictor_x<=current_motion_x1;
-                            predictor_y_frame<=$signed({current_motion_y1,1'b0});
-                            predictor_x1<=current_motion_x;
-                            predictor_y1_frame<=$signed({current_motion_y,1'b0});
-                        end else begin
-                            predictor_x<=current_motion_x;
-                            predictor_y_frame<=
-                                $signed({current_motion_y[12],current_motion_y});
-                            predictor_x1<=current_motion_x;
-                            predictor_y1_frame<=
-                                $signed({current_motion_y[12],current_motion_y});
-                        end
-                    end
-                    row_has_coded_mb<=1;
-                    if(current_col==(picture_mb_width-1'b1)) begin
-                        parser_state<=R_STUFF;
-                    end else begin
-                        mba_vlc_bits<=0;
-                        mba_vlc_len<=0;
-                        mba_escape_accum<=0;
-                        parser_state<=R_MBA;
-                    end
+                    mba_vlc_bits<=0;
+                    mba_vlc_len<=0;
+                    mba_escape_accum<=0;
+                    parser_state<=R_MBA;
                 end
             end
 
@@ -385,11 +341,7 @@
 
             if(pce_capture) begin
                 pce_shift<=pce_next;
-                // Other extension types (including quant matrices) must not
-                // overwrite the last picture-coding extension's controls.
-                if((pce_count==0)&&(stream_data[7:4]!=4'h8))begin
-                    pce_capture<=0;pce_count<=0;
-                end else if(pce_count==4) begin
+                if(pce_count==4) begin
                     pce_capture<=0;
                     pce_count<=0;
                     q_scale_type<=pce_next[12];
@@ -397,7 +349,6 @@
                     p_intra_vlc_format<=pce_next[11];
                     p_forward_f_code_horizontal<=pce_next[35:32];
                     p_forward_f_code_vertical<=pce_next[31:28];
-                    p_frame_pred_frame_dct<=pce_next[14];
                     wide_candidate<=
                         geometry_supported &&
                         current_picture_is_p &&
@@ -407,6 +358,7 @@
                         (pce_next[31:28]>=4'd1) &&
                         (pce_next[31:28]<=4'd9) &&
                         (pce_next[17:16]==2'b11) &&
+                        pce_next[14] &&
                         !pce_next[13];
                     // Entry 289: announce the rejection.  This is a well
                     // formed P picture coding extension that this probe will
@@ -423,6 +375,7 @@
                           (pce_next[31:28]>=4'd1) &&
                           (pce_next[31:28]<=4'd9) &&
                           (pce_next[17:16]==2'b11) &&
+                          pce_next[14] &&
                           !pce_next[13]);
                 end else pce_count<=pce_count+1'b1;
             end else if(current_picture_is_p &&
@@ -472,7 +425,6 @@
                             init_row_parser();
                         end else begin
                             parse_byte_index<=0;
-                            parse_cur_byte<=row_head0;
                             parse_bit_index<=3'd7;
                         end
                     end else if(
@@ -492,7 +444,6 @@
                             init_row_parser();
                         end else begin
                             parse_byte_index<=0;
-                            parse_cur_byte<=row_head0;
                             parse_bit_index<=3'd7;
                         end
                     end else begin
@@ -502,18 +453,12 @@
                         if(!probe_error)probe_error_detail<=5'd30;
                     end
                 end else if(row_byte_count<(ROW_BUFFER_BYTES-1)) begin
-                    if(row_byte_count==9'd0)row_head0<=stream_data;
-                    else if(row_byte_count==9'd1)row_head1<=stream_data;
-                    else row_bytes[row_byte_count]<=stream_data;
-                    row_tail_prev<=row_tail_last;
-                    row_tail_last<=stream_data;
+                    row_bytes[row_byte_count]<=stream_data;
                     row_byte_count<=row_byte_count+1'b1;
                 end else begin
                     // Fill the final byte, parse through byte 509, and retain
                     // bytes 510..511 as start-code overlap for the next window.
                     row_bytes[row_byte_count]<=stream_data;
-                    row_tail_prev<=row_tail_last;
-                    row_tail_last<=stream_data;
                     slice_capture<=0;
                     parse_active<=1;
                     parse_hold<=1;
@@ -524,7 +469,6 @@
                         init_row_parser();
                     end else begin
                         parse_byte_index<=0;
-                        parse_cur_byte<=row_head0;
                         parse_bit_index<=3'd7;
                     end
                 end
@@ -545,21 +489,6 @@
                 end
             end
         end
-
-        // Entry 993: same class of bug as entry 992's mpeg2_h262_b_core_probe
-        // fix, found by direct code comparison after live hardware evidence
-        // moved the same stall to this module (mpeg2_h262_p_diagnostic_
-        // controller_rearm.sv's wide_parse_hold, one of stream_hold's four
-        // OR-terms). Two probe_error<=1 sites above (detail 30, both
-        // occurrences) do not also clear parse_hold, unlike every other
-        // probe_error site in this file. If parse_hold is already asserted
-        // when one of those specific sites fires, nothing else clears it,
-        // for the identical reason entry 992 documents: this statement must
-        // stay outside the `if(stream_valid)` gate above, since no further
-        // bytes ever arrive once stream_hold (derived from parse_hold) has
-        // blocked the top-level stream_ready that would supply them.
-        if (probe_error)
-            parse_hold <= 1'b0;
     end
 end
 

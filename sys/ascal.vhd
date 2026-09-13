@@ -484,7 +484,6 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_copyv : unsigned(0 TO 14);
 	SIGNAL o_adrs : unsigned(31 DOWNTO 0); -- Avalon address
 	SIGNAL o_adrs_pre : natural RANGE 0 TO 2**24-1;
-	SIGNAL o_adrs_line_burst : unsigned(31 DOWNTO 0);
 	SIGNAL o_stride : unsigned(13 DOWNTO 0);
 	SIGNAL o_adrsa,o_adrsb,o_rline : std_logic;
 	SIGNAL o_ad,o_ad1,o_ad2,o_ad3 : natural RANGE 0 TO 2*BLEN-1;
@@ -567,15 +566,6 @@ ARCHITECTURE rtl OF ascal IS
 	ATTRIBUTE ramstyle OF o_hpixq : SIGNAL IS "logic"; -- avoid blockram shift register
 	SIGNAL o_vpixq, o_vpixq_pre : arr_pix(0 TO 3);
 	SIGNAL o_vpix_outer : arr_pix(0 TO 2);
-	-- MiSTer-Media-Player entry 879: isolate the always-selected C8 element
-	-- zero from the other outer-pixel registers.  This same-cycle copy gives
-	-- the fitter a register it can place beside o_vpixq_pre instead of routing
-	-- the grouped o_vpix_outer(0) across the device.  It adds no pipeline stage.
-	SIGNAL o_vpix_outer0_c8 : type_pix;
-	-- MiSTer-Media-Player entry 714: same-cycle physical duplicate of
-	-- o_vpix_outer(1) for the distant C8 queue element-three boundary mux.
-	-- This is not a pipeline stage; both registers capture the same C2 pixel.
-	SIGNAL o_vpix_outer1_c8 : type_pix;
 	SIGNAL o_vpix_inner : arr_pix(0 TO 6);
 
 	SIGNAL o_vpe : std_logic;
@@ -1060,10 +1050,8 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_v_poly_phase_a,o_v_poly_phase_a2,o_v_poly_phase_a3, o_v_poly_phase_a4, o_v_poly_phase_a5 : poly_phase_t;
 	SIGNAL o_poly_phase_a, o_poly_phase_a2, o_poly_phase_a3 : poly_phase_t;
 	SIGNAL o_poly_phase_b,o_poly_phase_b2,o_poly_phase_b3 : poly_phase_t;
-	SIGNAL o_v_poly_phase, o_v_poly_phase_g, o_v_poly_phase_b : poly_phase_interp_t;
-	SIGNAL o_v_poly_phase2, o_h_poly_phase, o_poly_phase, o_poly_phase1 : poly_phase_interp_t;
-	SIGNAL o_v_poly_pix, o_h_poly_pix, o_h_lum_pix : type_pix;
-	SIGNAL o_v_lum_rg_max, o_v_lum_b : unsigned(7 DOWNTO 0);
+	SIGNAL o_v_poly_phase, o_v_poly_phase2, o_h_poly_phase, o_poly_phase, o_poly_phase1 : poly_phase_interp_t;
+	SIGNAL o_v_poly_pix, o_h_poly_pix, o_h_lum_pix, o_v_lum_pix : type_pix;
 	SIGNAL o_poly_lum, o_poly_lum1 : unsigned(7 DOWNTO 0);
 	SIGNAL o_poly_lerp_ta, o_poly_lerp_tb : signed(9 DOWNTO 0);
 	SIGNAL o_h_poly_t,o_h_poly_t2,o_v_poly_t   : type_poly_t;
@@ -1076,16 +1064,10 @@ ARCHITECTURE rtl OF ascal IS
 	-- duplicates, not delays: identical input, identical timing, so the only
 	-- change is that the fitter may place a copy beside the C8 mux.
 	-- dont_merge stops Quartus folding them back into one register.
-	SIGNAL o_v_poly_use_adaptive_c8 : std_logic;
-	SIGNAL o_h_poly_use_adaptive_c8_effective : std_logic;
+	SIGNAL o_v_poly_use_adaptive_c8, o_h_poly_use_adaptive_c8 : std_logic;
 	ATTRIBUTE dont_merge : boolean;
 	ATTRIBUTE dont_merge OF o_v_poly_use_adaptive_c8 : SIGNAL IS true;
-	ATTRIBUTE dont_merge OF o_h_poly_use_adaptive_c8_effective : SIGNAL IS true;
-	ATTRIBUTE dont_merge OF o_v_poly_phase : SIGNAL IS true;
-	ATTRIBUTE dont_merge OF o_v_poly_phase_g : SIGNAL IS true;
-	ATTRIBUTE dont_merge OF o_v_poly_phase_b : SIGNAL IS true;
-	ATTRIBUTE dont_merge OF o_vpix_outer0_c8 : SIGNAL IS true;
-	ATTRIBUTE dont_merge OF o_vpix_outer1_c8 : SIGNAL IS true;
+	ATTRIBUTE dont_merge OF o_h_poly_use_adaptive_c8 : SIGNAL IS true;
 	SIGNAL poly_wr_mode : std_logic_vector(2 DOWNTO 0);
 	SIGNAL poly_tdw : unsigned(39 DOWNTO 0);
 	SIGNAL poly_a2 : unsigned(FRAC-1 DOWNTO 0);
@@ -1118,28 +1100,6 @@ ARCHITECTURE rtl OF ascal IS
 					 fi.t1 * signed('0' & p(1).b));
 		t.b1:=(fi.t2 * signed('0' & p(2).b) +
 					 fi.t3 * signed('0' & p(3).b));
-		RETURN t;
-	END FUNCTION;
-
-	-- Entry 879: vertical polyphase RGB multipliers occupy separate DSP
-	-- regions.  Independent, value-identical coefficient registers let each
-	-- color's copy be placed beside its DSPs instead of sharing one long route.
-	FUNCTION poly_calc_rgb(fi_r, fi_g, fi_b : poly_phase_interp_t;
-								 p : arr_pix(0 TO 3)) RETURN type_poly_t IS
-		VARIABLE t : type_poly_t;
-	BEGIN
-		t.r0:=(fi_r.t0 * signed('0' & p(0).r) +
-				 fi_r.t1 * signed('0' & p(1).r));
-		t.r1:=(fi_r.t2 * signed('0' & p(2).r) +
-				 fi_r.t3 * signed('0' & p(3).r));
-		t.g0:=(fi_g.t0 * signed('0' & p(0).g) +
-				 fi_g.t1 * signed('0' & p(1).g));
-		t.g1:=(fi_g.t2 * signed('0' & p(2).g) +
-				 fi_g.t3 * signed('0' & p(3).g));
-		t.b0:=(fi_b.t0 * signed('0' & p(0).b) +
-				 fi_b.t1 * signed('0' & p(1).b));
-		t.b1:=(fi_b.t2 * signed('0' & p(2).b) +
-				 fi_b.t3 * signed('0' & p(3).b));
 		RETURN t;
 	END FUNCTION;
 
@@ -2243,13 +2203,6 @@ BEGIN
 				o_adrs_pre<=to_integer(o_vacpt) * to_integer(o_stride);
 			END IF;
 
-			-- Entry 880: prepare the normal line-plus-burst sum during the
-			-- existing sREAD request cycle.  o_adrsa consumes it one cycle
-			-- later, preserving the Avalon request edge while removing this
-			-- adder from the conditional o_adrs mux.
-			o_adrs_line_burst<=to_unsigned(o_adrs_pre,32) +
-									to_unsigned(o_hbcpt * N_BURST,32);
-
 			IF o_adrsa='1' THEN
 				IF o_fload=2 THEN
 					o_adrs<=to_unsigned(o_hbcpt * N_BURST,32);
@@ -2258,7 +2211,7 @@ BEGIN
 					o_adrs<=to_unsigned(o_hbcpt * N_BURST,32) + o_stride;
 					o_alt<="0100";
 				ELSE
-					o_adrs<=o_adrs_line_burst;
+					o_adrs<=to_unsigned(o_adrs_pre + (o_hbcpt * N_BURST),32);
 					o_alt<=altx(o_vacptl + 1);
 				END IF;
 			END IF;
@@ -2464,12 +2417,7 @@ BEGIN
 			o_v_poly_use_adaptive <= to_std_logic((o_vmode(2 DOWNTO 0)/="000") AND (o_v_poly_adaptive = '1'));
 			o_h_poly_use_adaptive <= to_std_logic((o_hmode(2 DOWNTO 0)/="000") AND (o_h_poly_adaptive = '1'));
 			o_v_poly_use_adaptive_c8 <= to_std_logic((o_vmode(2 DOWNTO 0)/="000") AND (o_v_poly_adaptive = '1'));
-			-- Entry 880: preserve the original vertical-over-horizontal
-			-- priority in a register so the vertical enable is not also a
-			-- late input to every horizontal C8 coefficient mux.
-			o_h_poly_use_adaptive_c8_effective <= to_std_logic(
-				((o_hmode(2 DOWNTO 0)/="000") AND (o_h_poly_adaptive = '1')) AND
-				NOT ((o_vmode(2 DOWNTO 0)/="000") AND (o_v_poly_adaptive = '1')));
+			o_h_poly_use_adaptive_c8 <= to_std_logic((o_hmode(2 DOWNTO 0)/="000") AND (o_h_poly_adaptive = '1'));
 			o_v_poly_addr<=to_integer(o_vfrac(11 DOWNTO 12-FRAC));
 
 			-- C3 / HC3 / VC4
@@ -2486,13 +2434,7 @@ BEGIN
 			END IF;
 
 			IF o_v_poly_use_adaptive='1' THEN
-				-- The R/G maximum was registered in the existing vertical
-				-- pixel stage.  Only the final B comparison remains here.
-				IF o_v_lum_b > o_v_lum_rg_max THEN
-					o_poly_lum<=o_v_lum_b;
-				ELSE
-					o_poly_lum<=o_v_lum_rg_max;
-				END IF;
+				o_poly_lum<=poly_lum(o_v_lum_pix);
 				o_a_poly_addr<=o_v_poly_addr;
 			ELSIF o_h_poly_use_adaptive='1' THEN
 				o_poly_lum<=poly_lum(o_h_lum_pix);
@@ -2534,16 +2476,11 @@ BEGIN
 
 			-- C8 / HC8 / VC9
 			o_v_poly_phase<=poly_cvt(o_v_poly_phase_a5);
-			o_v_poly_phase_g<=poly_cvt(o_v_poly_phase_a5);
-			o_v_poly_phase_b<=poly_cvt(o_v_poly_phase_a5);
 			o_h_poly_phase<=poly_cvt(o_h_poly_phase_a5);
 
 			IF o_v_poly_use_adaptive_c8 = '1' THEN
 				o_v_poly_phase<=o_poly_phase1;
-				o_v_poly_phase_g<=o_poly_phase1;
-				o_v_poly_phase_b<=o_poly_phase1;
-			END IF;
-			IF o_h_poly_use_adaptive_c8_effective = '1' THEN
+			ELSIF o_h_poly_use_adaptive_c8 = '1' THEN
 				o_h_poly_phase<=o_poly_phase1;
 			END IF;
 
@@ -2987,14 +2924,11 @@ BEGIN
 					WHEN OTHERS => pixq_v:=(o_l3_v,o_l0_v,o_l1_v,o_l2_v);
 				END CASE;
 
-				o_vpix_outer0_c8<=pixq_v(0);
 				IF fracnn_v = '0' THEN
 					o_vpix_outer<=(pixq_v(0), pixq_v(2), pixq_v(3));
-					o_vpix_outer1_c8<=pixq_v(2);
 					o_vpix_inner(0)<=pixq_v(1);
 				ELSE
 					o_vpix_outer<=(pixq_v(0), pixq_v(1), pixq_v(3));
-					o_vpix_outer1_c8<=pixq_v(1);
 					o_vpix_inner(0)<=pixq_v(2);
 				END IF;
 
@@ -3004,21 +2938,21 @@ BEGIN
 				-- CYCLE 8
 				IF o_vacpt_gt_ivsize='1' THEN
 					IF fracnn_v = '0' THEN
-						o_vpixq_pre<=(o_vpix_outer0_c8, o_vpix_inner(5), o_vpix_inner(5), o_vpix_inner(5));
+						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_inner(5), o_vpix_inner(5), o_vpix_inner(5));
 					ELSE
-						o_vpixq_pre<=(o_vpix_outer0_c8, o_vpix_outer(1), o_vpix_outer(1), o_vpix_outer1_c8);
+						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_outer(1), o_vpix_outer(1), o_vpix_outer(1));
 					END IF;
 				ELSIF o_vacpt_eq_ivsize='1' THEN
 					IF fracnn_v = '0' THEN
-						o_vpixq_pre<=(o_vpix_outer0_c8, o_vpix_inner(5), o_vpix_outer(1), o_vpix_outer1_c8);
+						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_inner(5), o_vpix_outer(1), o_vpix_outer(1));
 					ELSE
-						o_vpixq_pre<=(o_vpix_outer0_c8, o_vpix_outer(1), o_vpix_inner(5), o_vpix_inner(5));
+						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_outer(1), o_vpix_inner(5), o_vpix_inner(5));
 					END IF;
 				ELSE
 					IF fracnn_v = '0' THEN
-						o_vpixq_pre<=(o_vpix_outer0_c8, o_vpix_inner(5), o_vpix_outer(1), o_vpix_outer(2));
+						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_inner(5), o_vpix_outer(1), o_vpix_outer(2));
 					ELSE
-						o_vpixq_pre<=(o_vpix_outer0_c8, o_vpix_outer(1), o_vpix_inner(5), o_vpix_outer(2));
+						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_outer(1), o_vpix_inner(5), o_vpix_outer(2));
 					END IF;
 				END IF;
 
@@ -3064,19 +2998,12 @@ BEGIN
 
 				-- POLYPHASE ---------------------------------------
 				-- C3 : Setup luminance
-				-- Entry 880: split the adaptive maximum across the existing
-				-- pixel and coefficient stages without changing its sample age.
-				IF o_vpix_inner(0).r > o_vpix_inner(0).g THEN
-					o_v_lum_rg_max<=o_vpix_inner(0).r;
-				ELSE
-					o_v_lum_rg_max<=o_vpix_inner(0).g;
-				END IF;
-				o_v_lum_b<=o_vpix_inner(0).b;
+				o_v_lum_pix<=o_vpix_inner(0);
 
 				-- C4-C9 in PolyFetch
 
 				-- C10 : Apply polyphase
-				o_v_poly_t<=poly_calc_rgb(o_v_poly_phase,o_v_poly_phase_g,o_v_poly_phase_b,o_vpixq);
+				o_v_poly_t<=poly_calc(o_v_poly_phase,o_vpixq);
 
 				-- C11 : Bound
 				o_v_poly_pix<=poly_final(o_v_poly_t);

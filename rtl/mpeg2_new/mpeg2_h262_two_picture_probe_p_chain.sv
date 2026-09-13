@@ -10,23 +10,15 @@
 module mpeg2_h262_two_picture_probe
 (
     input wire clk,input wire reset,input wire[7:0] stream_data,input wire stream_valid,output wire stream_ready,
-    input wire phase1_supported,input wire[13:0] vertical_size,input wire[1:0] intra_dc_precision,input wire intra_vlc_format,input wire frame_pred_frame_dct,
+    input wire phase1_supported,input wire[13:0] vertical_size,input wire[1:0] intra_dc_precision,input wire intra_vlc_format,
     input wire pipeline_block_done,input wire recon_block_complete,input wire p_persistence_complete,
     input wire p_row_persistence_complete,
-    // Entry 990: one-cycle pulse from mpeg2_h262_b_presentation_scheduler
-    // when it abandons an in-flight overlap reference picture instead of
-    // completing it. Without this, active_frame_bank_reg below would never
-    // advance past that picture (it only advances on a real completion
-    // pulse), freezing on a bank the very next real picture header can
-    // collide with in the top-level P-destination-ownership-hold check.
-    input wire overlap_reference_abandoned,
     output wire slice_header_seen,output wire macroblock_address_seen,output wire first_i_macroblock_seen,
     output wire first_luma_dc_seen,output wire first_luma_block_complete,output wire first_picture_420_parsed,
     output wire second_picture_420_parsed,output wire picture_420_complete,output wire[1:0] active_frame_bank,
     output wire[1:0] completed_frame_bank,output wire[7:0] picture_count,output wire reference_frame_valid,
     output wire[1:0] reference_frame_bank,output wire[1:0] previous_reference_frame_bank,
     output wire[7:0] reference_promotion_count,
-    output wire dct_type,
     output wire p_macroblock_type_seen,output wire p_forward_vector_valid,output wire signed[12:0] p_forward_vector_x,
     output wire signed[12:0] p_forward_vector_y,output wire p_residual_required,output wire p_residual_success,
     output wire p_first_residual_sample_valid,output wire signed[15:0] p_first_residual_sample_value,
@@ -49,17 +41,8 @@ module mpeg2_h262_two_picture_probe
     output wire[6:0] first_luma_ac_nonzero_count,output wire[5:0] first_luma_last_coeff_index,
     output wire signed[11:0] first_luma_last_ac_level,output wire slice_start,output wire luma_macroblock_start,
     output wire[2:0] qfs_block_index,output wire qfs_block_start,output wire qfs_write_en,
-    output wire[5:0] qfs_write_index,output wire signed[12:0] qfs_write_value,output wire qfs_block_end,
-    // Entry 991: passive observability only, for a stall-triggered snapshot
-    // capture in MediaPlayer.sv. Bundles the individual terms of the
-    // stream_ready expression below so a sustained real stall (decoder_ready
-    // stuck low with bytes waiting) can be diagnosed precisely from a
-    // screenshot instead of guessed at from source reading alone.
-    output wire[11:0] stall_probe_debug
+    output wire[5:0] qfs_write_index,output wire signed[12:0] qfs_write_value,output wire qfs_block_end
 );
-assign stall_probe_debug={p_error_raw,b_transport,b_candidate,b_error,
-    b_persistence_verified,b_seen,b_picture_inflight,b_persistence_wait,
-    b_parse_hold,p_hold_effective,p_hold_raw,parser_ready};
 
 wire parser_ready,p_picture_expected,bookkeeper_error,p_hold_raw,p_error_raw;
 wire p_unsupported_raw;
@@ -68,7 +51,7 @@ wire[7:0] base_picture_count;wire base_reference_frame_valid,base_reference_fram
 
 mpeg2_h262_picture_bookkeeper bookkeeper(
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.parser_stream_ready(parser_ready),
- .phase1_supported(phase1_supported),.vertical_size(vertical_size),.intra_dc_precision(intra_dc_precision),.intra_vlc_format(intra_vlc_format),.frame_pred_frame_dct(frame_pred_frame_dct),.dct_type(dct_type),
+ .phase1_supported(phase1_supported),.vertical_size(vertical_size),.intra_dc_precision(intra_dc_precision),.intra_vlc_format(intra_vlc_format),
  .pipeline_block_done(pipeline_block_done),.recon_block_complete(recon_block_complete),.p_picture_expected(p_picture_expected),
  .slice_header_seen(slice_header_seen),.macroblock_address_seen(macroblock_address_seen),.first_i_macroblock_seen(first_i_macroblock_seen),
  .first_luma_dc_seen(first_luma_dc_seen),.first_luma_block_complete(first_luma_block_complete),.first_picture_420_parsed(first_picture_420_parsed),
@@ -100,7 +83,7 @@ wire picture_start_now=(picture_window_next==32'h00000100);reg picture_header_ca
 // Preserve every P/B header and persistence event through the complete stream;
 // saturation at 3/7 made the first B of the second GOP indistinguishable from
 // the already-settled first-GOP state.
-reg[7:0] p_header_count;reg consecutive_candidate_seen;reg b_picture_inflight,b_persistence_verified;
+reg[7:0] p_header_count;reg consecutive_candidate_seen;reg b_picture_observed,b_picture_inflight,b_persistence_verified;
 reg[7:0] b_header_count,b_persist_count;
 wire b_header_now=stream_valid&&picture_header_capture&&picture_header_second_byte&&(stream_data[5:3]==3'b011);
 wire persistence_edge=p_persistence_complete&&!p_persistence_d;
@@ -126,7 +109,7 @@ always @(posedge clk)begin
   b_reference_publication_pending<=0;p_persistence_d<=0;p_publication_count<=0;publication_error<=0;publication_error_detail_reg<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
   picture_count_reg<=0;reference_frame_valid_reg<=0;reference_frame_bank_reg<=0;previous_reference_frame_bank_reg<=0;reference_promotion_count_reg<=0;
   picture_window<=0;picture_header_capture<=0;picture_header_second_byte<=0;p_header_count<=0;consecutive_candidate_seen<=0;
-  b_picture_inflight<=0;b_persistence_verified<=0;b_header_count<=0;b_persist_count<=0;
+  b_picture_observed<=0;b_picture_inflight<=0;b_persistence_verified<=0;b_header_count<=0;b_persist_count<=0;
  end else begin
   p_persistence_d<=p_persistence_complete;picture_complete_pulse<=0;
 
@@ -141,7 +124,7 @@ always @(posedge clk)begin
       if(p_header_count!=8'hff)p_header_count<=p_header_count+1'b1;
       if(p_header_count>=1)consecutive_candidate_seen<=1;
      end else if(stream_data[5:3]==3'b011)begin
-      b_picture_inflight<=1;b_persistence_verified<=0;
+      b_picture_observed<=1;b_picture_inflight<=1;b_persistence_verified<=0;
       if(b_header_count!=8'hff)b_header_count<=b_header_count+1'b1;
       // In coded order the future reference P precedes each B.  Do not accept
       // a B transaction if an observed P header has not actually persisted.
@@ -204,18 +187,6 @@ always @(posedge clk)begin
    b_picture_inflight<=0;
    b_persistence_verified<=0;
   end
-
-  // Entry 990: the scheduler gave up on the in-flight I/P overlap
-  // reference without ever supplying its completion pulse. Advance
-  // active_frame_bank_reg exactly as a real completion would, so the next
-  // real picture header targets a fresh bank instead of colliding with
-  // this one forever in the top-level ownership-hold check. Deliberately
-  // does not touch completed_frame_bank_reg, picture_count_reg,
-  // reference_frame_valid_reg, reference_frame_bank_reg or
-  // reference_promotion_count_reg: this picture was never actually
-  // reconstructed, so it must never be published as a usable reference.
-  if(overlap_reference_abandoned)
-   active_frame_bank_reg<=(active_frame_bank_reg==2'd2)?2'd0:(active_frame_bank_reg+1'b1);
  end
 end
 
@@ -238,7 +209,7 @@ mpeg2_h262_p_diagnostic_controller p_controller(
 
 wire b_candidate,b_seen,b_complete_now,b_parse_hold,b_replay_active,b_sideband_valid,b_first_valid,b_error;
 wire[5:0] b_sideband_index;wire signed[15:0] b_sideband_value,b_first_value;
-wire signed[9:0] b_motion_vector_x,b_motion_vector_y;
+wire signed[8:0] b_motion_vector_x,b_motion_vector_y;
 mpeg2_h262_b_core_probe b_controller(
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.row_retired(p_row_persistence_complete),.b_candidate(b_candidate),.b_seen(b_seen),
  .b_complete_now(b_complete_now),.parse_hold(b_parse_hold),.replay_active(b_replay_active),.sideband_valid(b_sideband_valid),
@@ -252,8 +223,8 @@ wire b_transport=b_replay_active||b_sideband_valid;
 assign b_motion_transport=b_transport;
 assign p_macroblock_type_seen=b_final_success?1'b1:p_macroblock_type_seen_raw;
 assign p_forward_vector_valid=b_transport?1'b1:p_forward_vector_valid_raw;
-assign p_forward_vector_x=b_transport?{{3{b_motion_vector_x[9]}},b_motion_vector_x}:p_forward_vector_x_raw;
-assign p_forward_vector_y=b_transport?{{3{b_motion_vector_y[9]}},b_motion_vector_y}:p_forward_vector_y_raw;
+assign p_forward_vector_x=b_transport?{{4{b_motion_vector_x[8]}},b_motion_vector_x}:p_forward_vector_x_raw;
+assign p_forward_vector_y=b_transport?{{4{b_motion_vector_y[8]}},b_motion_vector_y}:p_forward_vector_y_raw;
 assign p_residual_required=b_transport?b_first_valid:p_residual_required_raw;
 assign p_residual_success=b_transport?1'b1:p_residual_success_raw;
 assign p_first_residual_sample_valid=b_transport?b_first_valid:p_first_residual_sample_valid_raw;
@@ -271,20 +242,23 @@ wire b_persistence_wait=b_picture_inflight&&b_seen&&!b_persistence_verified&&!b_
 assign stream_ready=(b_picture_inflight?1'b1:parser_ready)&&!p_hold_effective&&!b_parse_hold&&!b_persistence_wait;
 wire b_accept_error=b_error||publication_error||reference_progress_error;
 assign b_user_success=b_final_success&&!b_accept_error;
-// The P controller now exports only functional failures and unsupported
-// pictures; its historical unowned subset rejections are already removed at
-// their source.  Report both I and P errors for the whole stream.  The former
-// sticky b_picture_observed mask hid every I/P failure after the first B.
-assign probe_error=bookkeeper_error||
-                   p_error_raw||
+// Entry 289: p_error_raw is gated by b_picture_observed because a controlled
+// pattern observer's subset rejection may still be owned by another observer.
+// p_unsupported_raw is not such a rejection: it means no engine claimed the
+// picture, so it must reach acceptance ungated or the stream hangs instead of
+// reporting.
+assign probe_error=(b_picture_observed?1'b0:bookkeeper_error)||
+                   (b_picture_observed?1'b0:p_error_raw)||
                    p_unsupported_raw||
                    b_error||publication_error||reference_progress_error;
 
 // kate - Commit 179 observability only.  Priority order matches the OR above.
+wire bookkeeper_error_gated=b_picture_observed?1'b0:bookkeeper_error;
+wire p_error_gated=b_picture_observed?1'b0:p_error_raw;
 assign probe_error_source=
     p_unsupported_raw         ? 4'd10 :
-    bookkeeper_error          ? 4'd1 :
-    p_error_raw               ? 4'd2 :
+    bookkeeper_error_gated    ? 4'd1 :
+    p_error_gated             ? 4'd2 :
     b_error                   ? 4'd3 :
     publication_error         ? 4'd4 :
     reference_progress_error  ? 4'd5 : 4'd0;

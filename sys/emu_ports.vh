@@ -85,12 +85,6 @@ output [15:0] AUDIO_R,
 output        AUDIO_S,   // 1 - signed audio samples, 0 - unsigned
 output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
 
-// MediaPlayer fork: select the exclusive digital output, then independently
-// identify an IEC 61937 non-audio burst. Decoded PCM selected for S/PDIF uses
-// the normal mixed path and ordinary IEC 60958 audio channel status.
-output        AUDIO_SPDIF_MODE,
-output        AUDIO_SPDIF_NONAUDIO,
-
 //ADC
 inout   [3:0] ADC_BUS,
 

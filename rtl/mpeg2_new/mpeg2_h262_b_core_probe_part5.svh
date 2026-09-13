@@ -120,7 +120,7 @@
                         prior_error<=prior_error|parser_error|replay_error;
                         proof_done<=0;b_seen<=0;b_candidate<=0;parse_hold<=0;parser_error<=0;replay_error<=0;
                         slice_capture<=0;slice_parser_started<=0;chunk_boundary_known<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;residual_count<=0;residual_coeff_count<=0;geometry_sent<=0;row_waiting<=0;replay_row_final<=0;outstanding_rows<=0;final_row_queued<=0;producer_rearm_pending<=0;
-                        current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;last_direction<=0;fpx<=0;fpy_frame<=0;bpx<=0;bpy_frame<=0;fpx1<=0;fpy1_frame<=0;bpx1<=0;bpy1_frame<=0;
+                        current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;last_direction<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;
                         mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;
                     end
                 end else picture_count<=1;
@@ -128,25 +128,18 @@
 
             if(pce_capture)begin
                 pce_shift<=pce_next;
-                // Other extension types (including quant matrices) must not
-                // overwrite the last picture-coding extension's controls.
-                if((pce_count==0)&&(stream_data[7:4]!=4'h8))begin
-                    pce_capture<=0;pce_count<=0;
-                end else if(pce_count==4)begin
+                if(pce_count==4)begin
                     pce_capture<=0;pce_count<=0;q_scale_type<=pce_next[12];b_intra_vlc_format<=pce_next[11];alternate_scan<=pce_next[10];b_intra_dc_precision<=pce_next[19:18];
                     b_forward_f_code_horizontal<=pce_next[35:32];
                     b_forward_f_code_vertical<=pce_next[31:28];
                     b_backward_f_code_horizontal<=pce_next[27:24];
                     b_backward_f_code_vertical<=pce_next[23:20];
-                    b_frame_pred_frame_dct<=pce_next[14];
-                    b_progressive_frame<=pce_next[7];
                     b_candidate<=geometry_supported&&current_picture_is_b&&(pce_next[39:36]==4'h8)&&
-                        (pce_next[35:32]>=4'd1)&&(pce_next[35:32]<=4'd6)&&
-                        (pce_next[31:28]>=4'd1)&&(pce_next[31:28]<=4'd6)&&
-                        (pce_next[27:24]>=4'd1)&&(pce_next[27:24]<=4'd6)&&
-                        (pce_next[23:20]>=4'd1)&&(pce_next[23:20]<=4'd6)&&
-                        (pce_next[17:16]==2'b11)&&
-                        !pce_next[13];
+                        (pce_next[35:32]>=4'd1)&&(pce_next[35:32]<=4'd5)&&
+                        (pce_next[31:28]>=4'd1)&&(pce_next[31:28]<=4'd5)&&
+                        (pce_next[27:24]>=4'd1)&&(pce_next[27:24]<=4'd5)&&
+                        (pce_next[23:20]>=4'd1)&&(pce_next[23:20]<=4'd5)&&
+                        (pce_next[17:16]==2'b11)&&pce_next[14]&&!pce_next[13];
                 end else pce_count<=pce_count+1'b1;
             end else if(current_picture_is_b&&start_code_now&&(start_code_value==EXTENSION_START_CODE))begin pce_capture<=1;pce_count<=0;pce_shift<=0;end
 
@@ -163,32 +156,26 @@
                         // kate - Commit 173: while the current buffered slice is
                         // parsed, slice_capture retains whether the already-seen
                         // following slice remains on the same macroblock row.
-                        slice_capture<=(start_code_value=={2'd0,slice_row_number});parse_cur_byte<=row_head0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=0;parse_byte_limit<=(row_byte_count<3)?9'd0:(row_byte_count-3'b011);parse_byte_index<=0;parse_bit_index<=7;
+                        slice_capture<=(start_code_value=={2'd0,slice_row_number});parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=0;parse_byte_limit<=(row_byte_count<3)?9'd0:(row_byte_count-3'b011);parse_byte_index<=0;parse_bit_index<=7;
                         if(!slice_parser_started)begin
                             slice_parser_started<=1;state<=S_QSCALE;
-                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy_frame<=0;bpx<=0;bpy_frame<=0;fpx1<=0;fpy1_frame<=0;bpx1<=0;bpy1_frame<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;
+                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;
                             cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
                         end
                     end else if((slice_row_number==picture_mb_height)&&post_b_boundary_now)begin
-                        slice_capture<=0;parse_cur_byte<=row_head0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=1;parse_byte_limit<=(row_byte_count<3)?9'd0:(row_byte_count-3'b011);parse_byte_index<=0;parse_bit_index<=7;
+                        slice_capture<=0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=1;parse_byte_limit<=(row_byte_count<3)?9'd0:(row_byte_count-3'b011);parse_byte_index<=0;parse_bit_index<=7;
                         if(!slice_parser_started)begin
                             slice_parser_started<=1;state<=S_QSCALE;
-                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy_frame<=0;bpx<=0;bpy_frame<=0;fpx1<=0;fpy1_frame<=0;bpx1<=0;bpy1_frame<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;
+                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;
                             cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
                         end
                     end else begin slice_capture<=0;proof_done<=1;parser_error<=1;end
-                end else if(row_byte_count<(ROW_BUFFER_BYTES-1))begin
-                    if(row_byte_count==9'd0)row_head0<=stream_data;
-                    else if(row_byte_count==9'd1)row_head1<=stream_data;
-                    else row_bytes[row_byte_count]<=stream_data;
-                    row_tail_prev<=row_tail_last;row_tail_last<=stream_data;
-                    row_byte_count<=row_byte_count+1'b1;
-                end
+                end else if(row_byte_count<(ROW_BUFFER_BYTES-1))begin row_bytes[row_byte_count]<=stream_data;row_byte_count<=row_byte_count+1'b1;end
                 else begin
-                    row_bytes[row_byte_count]<=stream_data;row_tail_prev<=row_tail_last;row_tail_last<=stream_data;parse_cur_byte<=row_head0;slice_capture<=0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=0;parse_byte_limit<=ROW_BUFFER_BYTES-2;parse_byte_index<=0;parse_bit_index<=7;
+                    row_bytes[row_byte_count]<=stream_data;slice_capture<=0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=0;parse_byte_limit<=ROW_BUFFER_BYTES-2;parse_byte_index<=0;parse_bit_index<=7;
                     if(!slice_parser_started)begin
                         slice_parser_started<=1;state<=S_QSCALE;
-                        field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy_frame<=0;bpx<=0;bpy_frame<=0;fpx1<=0;fpy1_frame<=0;bpx1<=0;bpy1_frame<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;
+                        field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;
                         cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
                     end
                 end
@@ -199,25 +186,6 @@
                 end else begin proof_done<=1;parser_error<=1;end
             end
         end
-
-        // Entry 992: any latched error must release parse_hold immediately,
-        // not just the picture-level b_error/b_candidate bookkeeping the
-        // rearm branch above already clears when a fresh slice start
-        // arrives. Deliberately placed outside the `if(stream_valid)` gate
-        // above: hardware testing found parse_hold stuck permanently with
-        // b_error=1, b_candidate=1, b_seen=0 and b_picture_inflight=0 - a
-        // replay error had fired while parse_hold was already asserted
-        // waiting on external row-persistence credit (mpeg2_h262_
-        // reference_pipeline_probe_rearm.sv's row_persisted), and that
-        // credit's only source is a downstream B-engine that itself only
-        // activates via b_motion_transport from this module - a signal
-        // that requires the forward progress this same stuck parse_hold
-        // was blocking. Because stream_ready depends on !parse_hold, no
-        // further stream_valid bytes could ever arrive to reach the rearm
-        // branch above and break the cycle; this statement must therefore
-        // run unconditionally every cycle to actually clear it.
-        if (parser_error || replay_error || prior_error)
-            parse_hold <= 1'b0;
     end
 end
 endmodule
