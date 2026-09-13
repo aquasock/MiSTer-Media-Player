@@ -1,3 +1,37 @@
+## 001 COMMIT Unreleased ??? 2026-09-13T08:38:36-07:00
+
+#### Coming From:
+
+Unreleased ace6b7b
+
+#### Purpose:
+
+Reduce FPGA resource pressure by removing legacy LED diagnostics, disabling Linux ALSA and limiting ASCAL image width to 2048 while retaining screen telemetry and core-generated MP2 audio.
+
+#### Outcome:
+
+The user authorized these changes and three builds. Prior source ace6b7b completed all seeds: 52 used 40671 ALMs with setup -0.307 ns, 61 used 40841 ALMs with setup -0.145 ns and hold -0.057 ns, and 87 used 40711 ALMs with setup -0.131 ns. None passed static timing. The user accepted seed 87 playback with synchronized flash/beep audio; captured schema-8 telemetry confirmed 1250 MP2 frames, exactly 1440000 stereo sample pairs, quiet completion and zero error flags, underruns or audio timestamp errors. One 106.62245 ms video gap was recorded. Detailed timing confirms ASCAL horizontal pixel and line-buffer paths dominate seeds 52 and 61; history records that retiming the extended-resolution read mux worsened RAM inference, so the approved 2048-width bound will remove its extension requirement instead. The cleanup reuses the LED removal from 391baa4 and existing MISTER_DISABLE_ALSA option, with explicit zero ties for inactive sample and DDR request inputs. Playback and telemetry RTL remain unchanged; packing remains MEDIUM. The standalone PCM sink regression passed 2304 samples in each of normal and wrapping timestamp sessions, and a source audit found no external consumers of the removed blink signals.
+
+#### Next Steps:
+
+Install the prepared changes, inspect synthesis for removal of ALSA, LED diagnostics and extended-width scaler storage, then run clean seeds 87, 52 and 61 with standard and focused timing reports including HDMI setup and global hold. Compare fitted resources with ace6b7b and require new hardware playback validation; preserve the prior user-tested RBF.
+
+#### Files Modified:
+
+- MediaPlayer_top_07.svh
+- MediaPlayer.qsf
+- sys/sys_top.v
+- tools/phase1p_timing.tcl
+- README.md
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 999 COMMIT Unreleased ace6b7b 2026-09-13T07:53:13-07:00
 
 #### Coming From:
@@ -1224,50 +1258,6 @@ None.
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 960 COMMIT Unreleased 3b2a0ca 2026-09-03T22:32:01-07:00
-
-#### Coming From:
-
-Unreleased 5fc7a1e
-
-#### Purpose:
-
-Add direct physical Audio CD playback through the existing standalone-audio interface and combine its picker change with the pending naming RBF build.
-
-#### Outcome:
-
-Source `184b2fa` adds the `Audio CD.cd` marker to the existing audio picker, maps it in isolated Main to `cdda:/dev/sr0`, inventories the disc table of contents through Linux optical-drive controls, skips data tracks and reads audio sectors digitally as native 44.1 kHz signed stereo PCM for the existing audio UI, visualizer and in-band transport.  The helper exposes playable tracks as one continuous timeline, retains fixed-time seeking and maps previous or next commands to audio-track boundaries through the established READY/GO lifecycle; the decoder RTL and transport protocol are unchanged.  Focused CDDA optimized, AddressSanitizer, UndefinedBehaviorSanitizer and GCC analyzer coverage passes, as do strict native compilation, the isolated Main CDDA contract and retained AC-3, file-audio, UI, visualizer, DVD random-access, SPU, reserve, staging, Program Stream seek, Main seek, LPCM-skip and real MP3, WAV, FLAC and Ogg integrations.  GNU 10.2.1 produced the 974,244-byte static stripped ARMv7 `host/build/MediaPlayer_Helper` with SHA-256 `35a369ed1c3f30197f0ce663da67a0c171dbf132c34d6c131c859aa626663dd7` and the 1,182,684-byte stripped ARMv7 `host/build/MiSTer_MediaPlayer` with SHA-256 `06339d6b5ac2fa216c2be47062ba7e5d8b178c0bd4aa950562c25ea3fedfdc3f`.  The initial seed-24 Quartus build failed only global setup at negative 0.606 ns while decoder and video setup passed at positive 0.984 ns and positive 1.097 ns; the single authorized source-`3b2a0ca` seed-25 retry passes global setup at positive 0.118 ns, hold at positive 0.247 ns, recovery at positive 3.578 ns, removal at positive 0.580 ns, minimum pulse width at positive 0.925 ns, decoder setup at positive 0.250 ns and video setup at positive 1.662 ns, with peak interconnect reduced from 67 percent to 60 percent.  Its worst path is the pre-existing `ascal` vertical-accept-to-address DSP calculation, whose 6.596 ns data delay is 78 percent cell delay and 22 percent routing rather than a general interconnect failure.  The resulting 4,477,416-byte `host/build/MediaPlayer_20260903.rbf` has SHA-256 `686957247693c1556aee9018ff4be19e08e1969225fe35e1063ffb67c597d74e`; no physical Audio CD was available for local hardware acceptance.
-
-#### Next Steps:
-
-Exit MediaPlayer, install `host/build/MediaPlayer_20260903.rbf` as `/media/fat/MediaPlayer_20260903.rbf`, `host/build/MiSTer_MediaPlayer` as executable `/media/fat/MiSTer_MediaPlayer`, `host/build/MediaPlayer_Helper` as executable `/media/fat/linux/MediaPlayer_Helper`, `assets/Video DVD.dvd` as `/media/fat/games/MediaPlayer/Video DVD.dvd` and `assets/Audio CD.cd` as `/media/fat/games/MediaPlayer/Audio CD.cd`, remove the obsolete `/media/fat/games/MediaPlayer/USB DVD Drive.dvd`, preserve the current visualizer and per-core INI, then reboot.  Load an Audio CD through the audio picker and require clean first-track playback, UI and visualization, previous and next track selection, fixed-time seeking, pause and end-of-disc behavior, including a mixed-mode disc if available; then confirm ordinary DVD loading, menus, chapter controls, Bob or Weave output and the retained experimental native-NTSC mode before marking this source hardware-passed.  Treat a future scaler timing-improvement cycle separately by investigating the registered `ascal` address-DSP path rather than weakening the timing gate.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.qsf
-- MediaPlayer.sv
-- README.md
-- assets/Audio CD.cd
-- docs/BUILDING.md
-- docs/TEST_INSTRUCTIONS.md
-- host/arm/ARCHITECTURE.md
-- host/arm/Makefile
-- host/arm/cdda_audio.c
-- host/arm/cdda_audio.h
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_cdda_audio.c
-- tools/test_main_cdda.py
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
