@@ -1,3 +1,32 @@
+## 009 COMMIT Unreleased 0710e81 2026-09-13T11:55:45-07:00
+
+#### Coming From:
+
+Unreleased 0710e81
+
+#### Purpose:
+
+Record partial hardware validation of loading-message suppression and the user's instruction to defer menu-access work.
+
+#### Outcome:
+
+At the user's explicit request, the timing-failing 0710e81 seed-87 RBF was provided for hardware testing while the corrected 07b8688 builds ran. It is retained at results/hardware-test-0710e81-seed87/MediaPlayer_20260913.rbf with SHA-256 ef3026b9b2e3eda03865c70a6df327b8002c510ac3b81ee04198dd8ae13b4d63 and a build-info.json marking setup -1.525 ns and timing_passed false. The user reported that the loading bar is gone, but pressing the menu button still cannot bring up the OSD during playback. This confirms the visual message-suppression behavior only; it does not establish interactive menu access. That remaining limitation is consistent with Main's blocking file-transfer loop and was identified in the approved proposal; preserving ordinary menu rendering in RTL does not make Main service the menu button during that loop. The user explicitly instructed leaving the behavior as-is for now and waiting for the three current timing results. Source 07b8688 adds only the subcarrier mailbox and its six audit stages and was committed and pushed before clean seeds 52, 61 and 87 began under results/build-07b8688-20260913-114641/. No Main or audio changes were made.
+
+#### Next Steps:
+
+Finish the three 07b8688 builds and their timing checks, including the fitted 60-register synchronizer audit and explicit operating-corner reports. Report the results and any passing candidate without further implementation changes; menu access during playback is deferred by the user's instruction.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 008 COMMIT Unreleased 0710e81 2026-09-13T11:44:14-07:00
 
 #### Coming From:
@@ -1244,36 +1273,6 @@ The user confirmed TOTAL/REMAIN now hold steady but the reveal still only showed
 #### Next Steps:
 
 Source `24a6bda` adds the equivalent `video_overlay_style()` and rewrites `video_overlay_pause_barrier()` to use it exclusively (set `visible`/`activity_pts` directly, send the style toggle only on a fresh reveal, then `PAUSE_READY` and wait for `GO`), relying on the plane already holding a committed bitmap from the unconditional reveal already performed at session start.  Also clears `command` after the barrier so `process_program_stream()`'s unrelated catch-all no longer logs a handled command as unexpected, and genericized Main's remaining "audio pause helper ready"/"unexpected audio pause ready" diagnostic wording now shared with `.mpg` sessions.  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; `host/build/MiSTer_MediaPlayer` (SHA-256 `be3946ba5404dedccdf8b041bad2600b22dc4041eb10f5efc5375f1d531470a1`) and `host/build/MediaPlayer_Helper` (SHA-256 `11bb2a00de4f353fea8f7ef5bd661990353248611f5e150e9ce96768f0c173ad`) are both built; no RTL change, current RBF (`fa0ebf6`, seed 33) unaffected.  Deliver both for the user to retest: the overlay should now reveal immediately on pause, not just on resume.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 968 COMMIT Unreleased f329dce 2026-09-12T07:08:14-07:00
-
-#### Coming From:
-
-Unreleased fa0ebf6
-
-#### Purpose:
-
-Fix two remaining `.mpg` progress-overlay problems: it only revealed on the next resume rather than on pause itself, and TOTAL/REMAIN visibly jumped around instead of counting down smoothly.
-
-#### Outcome:
-
-The user confirmed the overlay now draws (`fa0ebf6`) but reported it "only shows up on resume, not pause," matching the audio player's own pre-`4116a00` bug, and that ELAPSED was stable while REMAIN and TOTAL jumped around.  The pause-reveal bug traced to the same root cause as the audio player's original one: the fire-and-forget `MEDIA_CONTROL_USER_ACTIVITY` ping added in `08db78e` raced Main's own transfer loop, which stops draining the helper's output pipe as soon as `playback_paused` is set; once that pipe fills, `process_program_stream()` blocks inside a write and never returns to the top of its loop to see the pending control byte until the *next* unpause lets the blocked write through.  Main's existing audio pause barrier (`MEDIA_CONTROL_PAUSE`/`PAUSE_READY`, `pause_pending`/`pause_ready`/`pause_pipe_empty`, `pause_barrier_finish()`) already solves exactly this by continuing to drain normally while `pause_pending` is set and only asserting `playback_paused` once the helper has replied and the pipe is confirmed empty; it was gated on `audio_visualizer_controls` only.  The TOTAL/REMAIN jitter traced to `video_overlay_estimated_length_pts()` recomputing the `max_video_pts`/`max_video_pts_byte` ratio on every publish, which drifts slightly as more of a VBR file is read; REMAIN (`length - position`) inherits that same drift.
-
-#### Next Steps:
-
-Source `f329dce` widens the pause-barrier gate from `audio_visualizer_controls` to `seek_controls` (audio_visualizer_controls plus direct `.mpg`/`.mpeg` files, excluding DVD/ISO/menu content) so `.mpg` sessions use the identical, already-correct barrier; added `video_overlay_pause_barrier()` (mirrors `audio_pause_barrier()`) wired into `process_program_stream()`'s per-iteration command read in place of the removed `MEDIA_CONTROL_USER_ACTIVITY` ping.  Renamed the estimator to `video_overlay_locked_length_pts()` and made it compute the ratio once (a new `video_overlay_length_known` flag), caching the result in `output_state` and preserving it across `reset_output_for_navigation()`'s memset alongside the other `video_overlay_*` resources, so a seek does not re-lock a different estimate mid-session.  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  `host/build/MiSTer_MediaPlayer` (SHA-256 `a7bf5dcd6af84f6de6134a2fcd447041f67d59662b0776e2a1985f6be5f2fe13`) and `host/build/MediaPlayer_Helper` (SHA-256 `214e48931268df2e498a73c2e4b4b32d0f570b774c5f09be533266f205383312`) are both built; the current RBF (`fa0ebf6`, seed 33) is unaffected.  Deliver both for the user to retest: the overlay should reveal immediately on pause (not just resume), and TOTAL should hold one static value for the whole session while REMAIN counts down smoothly.
 
 #### Files Modified:
 
