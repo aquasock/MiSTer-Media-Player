@@ -1,3 +1,32 @@
+## 993 COMMIT Unreleased 8b6ed49 2026-09-13T04:12:53-07:00
+
+#### Coming From:
+
+Unreleased 2f413b4
+
+#### Purpose:
+
+Fix the same parse_hold-not-cleared-on-error bug found again, this time in the P-side wide-motion probe, after entry 992's B-side fix let the file progress further.
+
+#### Outcome:
+
+Deployed entry 992's build (seed99, +0.434ns margin) and asked the user to reload. Real progress: `sent` advanced from ~143590 to 171634 bytes before stalling again with the same `credit=0` real-backpressure symptom, confirming entry 992's fix genuinely works - it just wasn't the last blocker in this file. Fresh telemetry showed `stall_diag_b_parse_hold=False` now (fixed) but `stall_diag_p_hold_raw`/`stall_diag_p_hold_effective=True` - a different sub-module, `mpeg2_h262_p_diagnostic_controller_rearm.sv`'s `wide_parse_hold`, one of `stream_hold`'s four OR-terms. Ruled out the other three: `four_mb_parse_hold` and `legacy_parse_hold` are both hardwired to `1'b0` (dead code), and `raster_hold_active` has its own ~0.28-second timeout safety net already built in (`raster_hold_timeout<=24'hffffff`), so it could not still be stuck after the diagnostic's 3-second arm delay. Comparing `mpeg2_h262_p_wide_motion_syntax_probe_part3.svh`'s eight `probe_error<=1` sites against entry 992's exact bug pattern found the identical defect: six sites correctly pair `probe_error<=1` with `parse_hold<=0` (matching every `parser_error` site in the B-core probe), but two sites (both `probe_error_detail=30`, in the slice-continuation-classification branch) do not. Source `8b6ed49` adds the same one-line unconditional statement entry 992 used, outside the `if(stream_valid)` gate for the identical reason (no further bytes ever arrive once `stream_hold` has blocked `stream_ready`): whenever `probe_error` is set, clear `parse_hold`. `quartus_map` on seed99 is clean, 0 errors, same warning count. No new Icarus reproduction attempted (same reasoning as entry 992 - this module's own sequencing preconditions aren't fully understood by a narrow isolated harness); rests on real hardware evidence plus the already-verified code pattern.
+
+#### Next Steps:
+
+Sync to all three seed build directories, run the full timing build, deploy the best-passing seed, and ask the user to reload the file. Given the pattern established across entries 986/990/992/993 (each fix uncovers real forward progress into a new, distinct stuck point rather than fully unblocking playback), pull fresh telemetry immediately on any further stall rather than assuming completion or the same cause; if `stall_diag_valid` shows all of `parser_ready`/`p_hold_effective`/`b_parse_hold`/`b_persistence_wait` clear, the stall has moved to a mechanism outside this stall-diagnostic bundle entirely (widen the diagnostic's coverage, or check `mpeg2_new_stream_ready`'s own `mpeg2_download_rearm_reset` term and both top-level holds again fresh) rather than re-checking the same four bits. If the file reaches a point where video actually displays, that is the first real milestone this stall-hunting chain has been working toward - confirm playback continues past the point of a full picture, not just single-frame progress.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 992 COMMIT Unreleased 2f413b4 2026-09-13T03:48:42-07:00
 
 #### Coming From:
@@ -1044,70 +1073,6 @@ Retain source `5fc7a1e` as the naming boundary and incorporate its pending RBF c
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 958 COMMIT Unreleased d34c292 2026-09-03T21:59:59-07:00
-
-#### Coming From:
-
-Unreleased d34c292
-
-#### Purpose:
-
-Package the source-`d34c292` native NTSC output boundary for controlled HDMI, HDMI-to-SDI and analog forum testing.
-
-#### Outcome:
-
-The 1,378,292-byte forum archive `host/build/MiSTer_MediaPlayer_NTSC480i_d34c292.zip` has SHA-256 `621cf865c1561f6f87a3ded01bc3c95f00416acd508f2b561e5c4a7dc4aaefdc` and passes ZIP integrity plus every internal SHA-256 check.  It contains the source-`d34c292` 1,182,684-byte `MiSTer_MediaPlayer`, the source-`f93c6ba` 970,148-byte static helper needed for the latest automatic-menu pacing behavior, the per-core INI fragment, source provenance, project and dependency licences, and a dedicated installation, rollback and reporting guide.  The guide separates ordinary Bob/Weave HDMI as the control, native 525i59.94 direct HDMI for sinks that explicitly accept 480i, HDMI-to-SDI through the Decimator MD-LX with downstream external processing, and native 15 kHz RGB or YPbPr analog output; it warns that a blank unsupported HDMI monitor is inconclusive and that scaled screenshots are not a reliable Direct Video capture.  The unchanged RBF, visualizer and USB DVD launcher are intentionally absent so testers retain their installed matched v0.9.0 set, and the official `/media/fat/MiSTer` is never replaced.
-
-#### Next Steps:
-
-Distribute `MiSTer_MediaPlayer_NTSC480i_d34c292.zip` as an unreleased forum hardware test and have each tester verify the archive manifest, preserve the official Main, install the two isolated executables and report the exact display, converter and processor models.  Require a normal Bob/Weave HDMI control first, then record whether direct HDMI or the MD-LX identifies and locks 480i or 525i at 59.94 Hz, whether menus, titles and audio remain continuous, whether 4:3 and 16:9 are identified correctly, and whether field motion reaches the external processor intact; compare with a 15 kHz analog CRT where available and return the results before changing the ADV7513 policy.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 957 COMMIT Unreleased d34c292 2026-09-03T21:18:06-07:00
-
-#### Coming From:
-
-Unreleased f93c6ba
-
-#### Purpose:
-
-Expose the proven native NTSC raster as standards-signalled 525i59.94 HDMI for external processing through the Decimator MD-LX.
-
-#### Outcome:
-
-Source `d34c292` adds an experimental NTSC-only direct-HDMI boundary to the isolated patched Main without changing the decoder, helper or RBF.  It activates only for the reported `MediaPlayer` core with per-core `direct_video=1`, divides the core's 54 MHz ADV7513 input clock by two, samples every 13.5 MHz content pixel twice at 27 MHz, advertises manual x2 pixel repetition without multiplying that already-correct link clock, selects negative-sync CTA VIC 6 or 7 from status bit 121, identifies BT.601 and limited RGB, forces the full-to-limited CSC and uses CTS 27,000 for 48 or 96 kHz audio.  Generic Main behavior remains behind the existing branches, the aspect and AVI state refresh without a scaler mode change, the tracked INI fragment leaves Direct Video commented by default, and the README and architecture document the initial native-interlaced-only test boundary.  The new static register-policy test passes, all three Main patches apply cleanly in order to pinned upstream `0a8fb44`, and GNU 10.2.1 builds the 1,182,684-byte stripped ARMv7 `host/build/MiSTer_MediaPlayer` with SHA-256 `6aeded222240b6abd324b5d1525ce88d4ef6d56984a80c1d9d0332aaa2675462`.
-
-#### Next Steps:
-
-Replace only `/media/fat/MiSTer_MediaPlayer`, retain the accepted helper and RBF, add `direct_video=1` beneath the existing `[MediaPlayer]` section, reboot and test native-interlaced NTSC DVD material through MiSTer's HDMI port and the Decimator MD-LX.  Require the MD-LX and downstream processor to identify and hold 525i59.94, confirm continuous picture and HDMI audio through menus and title playback, exercise both 4:3 and 16:9 signalling, inspect field motion for intact interlace rather than Bob or Weave, and remove `direct_video=1` after the test because progressive and standalone-audio output are intentionally not qualified in this first boundary; return the updated results before considering 576i, 60.000 Hz or a live core-menu switch.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- README.md
-- assets/MiSTer_MediaPlayer.ini.fragment
-- docs/ARCHITECTURE.md
-- host/build_arm_stack.sh
-- host/main_mister/0003-mediaplayer-ntsc-480i-hdmi.patch
-- tools/test_main_ntsc_480i.py
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
