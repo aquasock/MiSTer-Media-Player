@@ -199,6 +199,25 @@
                 end else begin proof_done<=1;parser_error<=1;end
             end
         end
+
+        // Entry 992: any latched error must release parse_hold immediately,
+        // not just the picture-level b_error/b_candidate bookkeeping the
+        // rearm branch above already clears when a fresh slice start
+        // arrives. Deliberately placed outside the `if(stream_valid)` gate
+        // above: hardware testing found parse_hold stuck permanently with
+        // b_error=1, b_candidate=1, b_seen=0 and b_picture_inflight=0 - a
+        // replay error had fired while parse_hold was already asserted
+        // waiting on external row-persistence credit (mpeg2_h262_
+        // reference_pipeline_probe_rearm.sv's row_persisted), and that
+        // credit's only source is a downstream B-engine that itself only
+        // activates via b_motion_transport from this module - a signal
+        // that requires the forward progress this same stuck parse_hold
+        // was blocking. Because stream_ready depends on !parse_hold, no
+        // further stream_valid bytes could ever arrive to reach the rearm
+        // branch above and break the cycle; this statement must therefore
+        // run unconditionally every cycle to actually clear it.
+        if (parser_error || replay_error || prior_error)
+            parse_hold <= 1'b0;
     end
 end
 endmodule
