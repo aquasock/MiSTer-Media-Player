@@ -1,3 +1,33 @@
+## 010 COMMIT Unreleased 07b8688 2026-09-13T12:09:39-07:00
+
+#### Coming From:
+
+Unreleased 0710e81
+
+#### Purpose:
+
+Record the completed subcarrier-crossing repair builds and explicit four-corner timing qualification.
+
+#### Outcome:
+
+Clean seeds 52, 61 and 87 compiled successfully and each passed the 60-register fitted synchronizer audit. Explicit checks at all four available operating conditions supersede the initial default-corner summaries: seed 52 fails setup at -0.076 ns and seed 61 at -0.005 ns in HDMI scaler paths at Slow 1100mV -40C; both pass hold, recovery, removal and pulse width. Seed 87 passes all four corners with minimum setup +0.121 ns, hold +0.097 ns, recovery +2.991 ns, removal +0.194 ns and pulse width +0.925 ns. Seed 87 uses 40609 ALMs, 55779 registers, 472 RAM blocks and 69 DSP blocks. Reports and corner-summary.json are retained under results/build-07b8688-20260913-114641/. The timing-qualified candidate is results/hardware-test-07b8688-seed87/MediaPlayer_20260913.rbf, SHA-256 9e5fe835433a1ca2141f37a7a84f870c10069cab645ad120e994bd59c435ee5e, with build-info.json. No new RTL or audio changes were made during validation and no candidate was installed. Loading-message suppression has only the earlier partial hardware acceptance; interactive OSD access remains absent. Read-only investigation found stock Main's generic mounted-file sector service provides a proposed RBF-side route to interactive menus, correcting the earlier overly categorical suggestion that a Main change might be necessary. The user requested a plan accommodating later pause and seeking; a local proposed docs/OSD_PLAYBACK_PLAN.md describes bounded reads, explicit sessions/EOF, coordinated flushing, future presentation pause and offset-based restart, pending implementation authorization.
+
+#### Next Steps:
+
+Have the user validate the seed-87 candidate on hardware. Preserve the timing reports and rollback reference. Implement the proposed stock-Main mounted-file transport only after the user accepts that plan, validating installed Main identity, menu responsiveness, buffering, repeated loads and exact EOF; pause and user seeking remain future milestones. Update the committed timing helper in a future authorized source cycle so file reports explicitly enumerate operating corners instead of relying on ineffective multi_corner file output.
+
+#### Files Modified:
+
+- sys/sys_top.v
+- tools/phase1p_timing.tcl
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 009 COMMIT Unreleased 0710e81 2026-09-13T11:55:45-07:00
 
 #### Coming From:
@@ -1248,36 +1278,6 @@ Install `.ai/current_results/MediaPlayer_nativestartupfix_seed26.rbf` (Main/help
 #### Files Modified:
 
 - MediaPlayer.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 969 COMMIT Unreleased 24a6bda 2026-09-12T07:28:33-07:00
-
-#### Coming From:
-
-Unreleased f329dce
-
-#### Purpose:
-
-Fix the `.mpg` progress overlay still only appearing on resume, not on pause itself, despite `f329dce`'s barrier widening.
-
-#### Outcome:
-
-The user confirmed TOTAL/REMAIN now hold steady but the reveal still only showed up on resume.  A fresh telemetry-enabled log pulled from the test MiSTer showed the CONFIG record and `MEDIA_CONTROL_PAUSE_READY` both went out promptly after "pause requested," so the barrier protocol itself was working, but the matching COMMIT record (and most of its ~22 chunked DATA records) did not appear until immediately after "playback resumed," and the helper logged `ignoring unexpected control 0x11 during playback` right after the pause.  The cause: `video_overlay_pause_barrier()` called `video_overlay_service()` inside the barrier, which on a fresh reveal triggers a full `video_overlay_publish()` - CONFIG plus ~22 DATA chunks plus COMMIT, around 88 KiB total.  Main's `pause_pipe_empty` detection can see a momentary gap mid-transfer of that payload and satisfy `pause_barrier_finish()`'s drain check before the trailing records get through, stranding them in the helper's blocked `write()` once Main actually stops draining - the same class of bug as the original fire-and-forget ping, just relocated to a heavier payload racing the same detection.  `audio_pause_barrier()` never has this problem because it only ever sends a single ~41-byte `MEDIA_PLAYER_OVERLAY_STYLE` record inside the barrier, relying on bitmap content already committed from an earlier periodic service call rather than republishing pixel data at pause time.
-
-#### Next Steps:
-
-Source `24a6bda` adds the equivalent `video_overlay_style()` and rewrites `video_overlay_pause_barrier()` to use it exclusively (set `visible`/`activity_pts` directly, send the style toggle only on a fresh reveal, then `PAUSE_READY` and wait for `GO`), relying on the plane already holding a committed bitmap from the unconditional reveal already performed at session start.  Also clears `command` after the barrier so `process_program_stream()`'s unrelated catch-all no longer logs a handled command as unexpected, and genericized Main's remaining "audio pause helper ready"/"unexpected audio pause ready" diagnostic wording now shared with `.mpg` sessions.  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; `host/build/MiSTer_MediaPlayer` (SHA-256 `be3946ba5404dedccdf8b041bad2600b22dc4041eb10f5efc5375f1d531470a1`) and `host/build/MediaPlayer_Helper` (SHA-256 `11bb2a00de4f353fea8f7ef5bd661990353248611f5e150e9ce96768f0c173ad`) are both built; no RTL change, current RBF (`fa0ebf6`, seed 33) unaffected.  Deliver both for the user to retest: the overlay should now reveal immediately on pause, not just on resume.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- host/main_mister/0001-mediaplayer-arm-loader.patch
 
 #### Status:
 
