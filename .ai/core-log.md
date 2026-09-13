@@ -1,3 +1,32 @@
+## 998 COMMIT Unreleased ??? 2026-09-13T06:39:28-07:00
+
+#### Coming From:
+
+Unreleased 9233f07
+
+#### Purpose:
+
+Add FPGA MPEG-1 Layer II audio decoding and synchronized progressive MPG playback on the accepted seed-52 video baseline.
+
+#### Outcome:
+
+The user approved proceeding after accepting seed 52 with the generated 30-second MPG. Development will retain stock Main, progressive decode and the existing output raster, reuse the proven PCM output path, and implement compressed audio in FPGA logic. Historical audio decoding ran on ARM and is reference evidence rather than reusable FPGA codec logic. An isolated source export under /home/vash/builds/mp2-stage2 will establish decoder arithmetic against FFmpeg before installation and clean builds. The initial test content uses 48 kHz stereo MP2 at 192 or 320 kb/s. No hardware or audio-decoder validation is claimed by this proposal.
+
+#### Next Steps:
+
+Implement and simulate Layer II frame parsing, requantization, subband synthesis, bounded compressed/PCM buffering and timestamp association, checking audio quality against FFmpeg plus reset, backpressure, end-of-file and A/V startup behavior. Install the reviewed source, commit and push it, then run three independent Quartus compiles including successful seed 52 and two new seeds, review timing, and supply passing RBF paths and an executable test-content script. Progressive native 720x480 output follows synchronized audio acceptance.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 997 COMMIT Unreleased 9233f07 2026-09-13T06:31:16-07:00
 
 #### Coming From:
