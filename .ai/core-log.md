@@ -1,3 +1,36 @@
+## 990 COMMIT Unreleased 03b033f 2026-09-13T02:28:44-07:00
+
+#### Coming From:
+
+Unreleased 2967e0b
+
+#### Purpose:
+
+Fix the third deadlock hardware testing surfaced after entries 986/988/989's fixes shipped: a frozen bank in the picture bookkeeper, not the scheduler or the transport gate.
+
+#### Outcome:
+
+Deployed entry 989's build and asked the user to reload the file again. Fresh telemetry confirmed `presentation_hold=False` throughout (all three earlier fixes are genuinely working - no more indefinite hold, no more fatal-latch drain), but a fresh Main log pull showed `sent` frozen at 143590 bytes with `credit=0` held for 670,000+ poll cycles - real FIFO backpressure this time, not the old unthrottled drain, and a much earlier, smaller failure point than before. Traced it by direct code reading, no simulation needed to find the mechanism (though Icarus reproduction was still used to verify the fix before any hardware build): entry 986's abort deliberately abandons the in-flight overlap reference picture mid-decode, so `picture_420_complete`/`p_persistence_complete` never pulse for it. The separate picture bookkeeper inside `mpeg2_h262_two_picture_probe_p_chain.sv` only advances its own `active_frame_bank_reg` on those same completion pulses, so it freezes on the abandoned picture's bank forever - nothing else in that module resets or advances it. The very next real picture header is then classified by `MediaPlayer.sv`'s separate P-destination-ownership-hold watcher (Commit 162) against that frozen bank; since nothing has moved display since the abort, it very likely collides, latching a hold that can only release once display moves to a new bank - which requires a new picture to decode and get promoted, which requires `stream_ready`, which this same hold blocks. A genuine third circular wait, confirmed in the code before writing any fix. Source `03b033f` adds a new one-cycle pulse output, `overlap_reference_abandoned`, fired by the scheduler in the same cycle as its entry-986 abort, wired into the bookkeeper to advance `active_frame_bank_reg` exactly as a real completion would (the same 0->1->2->0 rotation) while deliberately leaving `completed_frame_bank_reg`, `picture_count_reg`, `reference_frame_valid_reg`, `reference_frame_bank_reg` and `reference_promotion_count_reg` untouched, since this picture was never actually reconstructed and must never be published as a usable reference - only the one frozen value the ownership-hold check reads is corrected. Two testbenches verify this: `tools/test_two_picture_probe_abandon.sv` (new) drives the bookkeeper in isolation and confirms three abandon pulses wrap the bank 0->1->2->0 while every reference/publication field stays at reset, and that a single pulse advances exactly one step, not a level; `tools/test_b_presentation_scheduler_deadlock.sv` (updated) confirms the scheduler's abort pulses `overlap_reference_abandoned` for exactly one cycle. Both pass. `quartus_map` on seed99 is clean, 0 errors, 156 warnings, matching prior baselines.
+
+#### Next Steps:
+
+Sync to all three seed build directories, run the full three-seed timing build, deploy the best-passing seed, and ask the user to reload the file again. If it still stalls, pull fresh telemetry and a fresh Main log immediately and characterize the new failure precisely (unthrottled drain vs real backpressure, and how far it got) rather than assuming it is a variant of any of the first three; three distinct real deadlocks have now surfaced from decoding this one file, each in a different subsystem (the B-reorder scheduler, the transport gate's fatal-error latch, and now the picture bookkeeper/ownership-hold pair), so a fourth is plausible and should be diagnosed from evidence again, not guessed at.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- tools/test_b_presentation_scheduler_deadlock.sv
+- tools/test_two_picture_probe_abandon.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 989 COMMIT Unreleased 2967e0b 2026-09-13T01:50:32-07:00
 
 #### Coming From:
@@ -1134,66 +1167,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 952 COMMIT Unreleased 5f1cf92 2026-09-03T18:36:35-07:00
-
-#### Coming From:
-
-Unreleased 0df8570
-
-#### Purpose:
-
-Bound automatic-menu PCM scheduling when a repeated video timestamp exhausts the normal timestamp-derived audio target.
-
-#### Outcome:
-
-Source `5f1cf92` preserves the continuous automatic-menu decoder epoch and normal advancing-PTS scheduler while recognizing three equivalent stalled-horizon conditions confined to that epoch: video remaining at the first audio PTS, a repeated video PTS, or 256 KiB of delivered video without a PTS advance.  After the timestamp-derived target is exhausted, decoded PCM above the existing 8,192-frame reserve drains completely as individually bounded 2,048-frame batches through the unchanged output and FPGA FIFO-credit path; any later PTS advance disables fallback before the new target is evaluated.  A post-drain 48,000-frame hold invariant now reports and rejects an impossible growing queue instead of allowing host memory exhaustion.  The production test delivers 100,000 patterned stereo frames with exact sample reconstruction, an exact terminal reserve and more than 2 MiB of byte-exact continuous menu video under repeated PTS, verifies the advancing-PTS control remains on its original 2,048-frame timestamp batch, and exercises the hard-limit rejection.  Strict optimized, GCC analyzer, AddressSanitizer, UndefinedBehaviorSanitizer, twenty repeated production runs, native helper, DVD random-access, SPU, menu-hop, output reserve and staging, AC-3 resynchronization, unsupported-LPCM, audio UI, visualizer and seek tests pass.  GNU 10.2.1 builds the 970,148-byte stripped static ARMv7 helper `host/build/MediaPlayer_Helper` with SHA-256 `a919e4f202d9de9ce996fdfbacbe11c6da815d21e043af0e1f6a6446e2d591f1`; Main, protocol, RTL and RBF are unchanged.
-
-#### Next Steps:
-
-Replace only `/media/fat/linux/MediaPlayer_Helper` with the source-`5f1cf92` artifact and retain the current per-core Main and RBF, then rerun Futurama disc one through the complete intro into its moving menu.  Confirm one `automatic menu PCM fallback activated` diagnostic, continuous intelligible audio without periodic bursts, a responsive selector, held PCM remaining near the 8,192-frame reserve rather than growing by millions of frames, no hold-limit diagnostic and no signal-nine termination; return the updated helper/Main log, screenshot and telemetry for hardware qualification.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- tools/test_dvd_overlay_output.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 951 COMMIT Unreleased 0df8570 2026-09-03T18:32:13-07:00
-
-#### Coming From:
-
-Unreleased 0df8570
-
-#### Purpose:
-
-Qualify the continuous automatic-menu epoch on Futurama disc one and isolate its remaining burst-audio failure.
-
-#### Outcome:
-
-The physical source-`0df8570` run validates the continuous decoder correction but rejects its audio scheduling.  All three finite intro boundaries complete, automatic menu entry at 43.904862 seconds produces the new helper-only scheduling and PTS epochs without a fourth Main decoder reset, the menu becomes visible and animated, and the user confirms its selector responds.  The checksum-valid schema-21 capture reports 128 displayed pictures and 127 swaps in 4.423730 seconds, zero decoder flags, zero PCM protocol errors and a valid overlay; Main records eighty-two complete overlay commits with no ordering error and no video lookahead failure.  At menu entry the first raw PTS 45,045 is translated to 647,273, equal to the later maximum video horizon, so the audio target remains fixed at the 8,192-frame reserve for the entire run.  The scheduler consequently emits only its 128-frame safety refill per 4,096 video bytes, averaging about 4,270 frames per second instead of 48,000 and matching the reported periodic distorted bursts, while AC-3 decode accumulates unchecked: the final progress record has emitted 591,360 frames but holds 118,129,152 frames, approximately 472.5 MiB of stereo PCM.  Linux then kills the helper with signal nine at 187.177284 seconds, consistent with exhausting the target's approximately 492 MiB visible RAM.  The 4,060,455-byte log, 637,658-byte screenshot and 844-byte telemetry sidecar have SHA-256 `f22b5b1808ac1bb94b8c19440e4c19079410d7c3fed86b5dff1f06925148dbba`, `1bdd9d344bb5b18584c6f04b258b7397b9285806ae4c0f995fcf986c11ed86dc` and `1322af6836d63a481d2fbab7b4815c84a6c95a6a38792eaeba79a139f3a47f19`.
-
-#### Next Steps:
-
-After user approval, preserve the source-`0df8570` continuous decoder/menu transition and normal advancing-PTS scheduler, but add an automatic-menu-only PCM fallback for an exhausted timestamp target: after startup, when decoded audio exceeds the existing reserve and the video horizon schedules nothing, emit the excess in bounded batches through the unchanged PCM transport so FPGA FIFO credit supplies the real-time 48 kHz backpressure instead of allowing an unbounded host queue.  Add a hard bounded-hold invariant and diagnostics, extend the production regression with repeated or nonadvancing menu video PTS plus sustained decoded PCM to prove continuous exact sample delivery, bounded memory, byte-exact video and unchanged advancing-PTS behavior, rerun strict native, analyzer, sanitizer and retained DVD/audio suites, then build only a new static ARM helper for another Futurama menu test; Main, protocol, RTL and RBF should remain unchanged.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
