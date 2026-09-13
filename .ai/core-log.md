@@ -1,3 +1,44 @@
+## 25 COMMIT Unreleased ??? 2026-09-13T16:38:32-07:00
+
+#### Coming From:
+
+Unreleased 6da4771
+
+#### Purpose:
+
+Implement keyboard play/pause and time-based seeks using the existing stock-Main playback path.
+
+#### Outcome:
+
+The user authorizes Space play/pause and backward/forward arrow jumps of 10 seconds, Ctrl 30 seconds and Ctrl+Alt 300 seconds. Left and Right select direction; OSD navigation must not trigger playback commands. Pause will hold presentation and both media clocks, retain queues and silence movie output without consuming samples. Seeking will use the existing quiesce/flush restart and silently reconstruct from the beginning at decoder throughput to the requested displayed-media time, preserving reference correctness and the requested paused state. This first implementation has no byte-rate estimate or random-access index, so long seeks can take time. Physical raster and OSD service remain active. Seek targets clamp at the start and drain safely at EOF. Commands, CDC, timeline behavior, queued audio, repeated controls and decoder ownership need regression coverage before three clean seeded builds.
+
+#### Next Steps:
+
+Implement and validate the controls and restart integration, commit source, run seeds 52/61/87 with complete timing and CDC audits, then deliver qualified candidates and hardware instructions.
+
+#### Files Modified:
+
+- rtl/media_playback_control.sv
+- rtl/media_keyboard_control.sv
+- rtl/audio/mp2_pcm_output.sv
+- rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_06.svh
+- MediaPlayer_av.svh
+- files.qip
+- tools/phase1p_timing.tcl
+- MediaPlayer.sdc
+- docs/TEST_INSTRUCTIONS.md
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 24 COMMIT Unreleased 6da4771 2026-09-13T16:23:17-07:00
 
 #### Coming From:
@@ -1300,36 +1341,6 @@ Reload the real `.mpg` via F4 and check whether video now actually decodes and d
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 984 COMMIT Unreleased 3713581 2026-09-12T23:48:33-07:00
-
-#### Coming From:
-
-Unreleased 254fd3a
-
-#### Purpose:
-
-Fix the black screen: the demux never recognized the real test file's PES optional-header form at all.
-
-#### Outcome:
-
-Entry 983's diagnostic log showed the transfer running at full, unthrottled speed (constant maximum burst credit, zero backpressure) for 183MB with zero video ever appearing - meaning the FPGA was accepting bytes but the demux was never forwarding any of them as real payload. Pulled the actual file's header bytes over SSH and found the cause directly: the first video PES packet's optional header starts with `0x31`, whose top two bits are `00`, not the `10` marker this demux exclusively recognized - the legacy MPEG-1 PES header form (optional 0xFF stuffing, an optional 2-byte STD_buffer_scale/size field, then a bare PTS/PTS+DTS/no-timestamp marker with no `header_data_length` field), which entry 979 explicitly and wrongly assumed no real file still used. `host/arm/media_player_helper.c`'s own `parse_pes_header()` already handles this form in software. Added it to the RTL, and building an Icarus test from the file's actual captured bytes before touching hardware again caught three real bugs in the process: `legacy_prefix_bytes` was never initialized for the (real-file-common) case where the very first header byte is already the marker, the legacy PTS byte counter was off by one because the marker byte is shifted into `pts_shift` at detection time unlike the MPEG-2 path, and the STD field's own second byte was incorrectly matched against the timestamp-marker pattern instead of just being consumed. Four new Icarus passes cover the exact real-file byte sequence, a stuffed variant, and an STD-field variant, all now passing; `quartus_map` on seed99 remains clean, 0 errors, same warning count as before.
-
-#### Next Steps:
-
-Run the full three-seed timing build, deploy the RBF (Main is unchanged from entry 983 and does not need reinstalling), and reload the real `.mpg` via F4. Watch the diagnostic log for `credit` actually fluctuating now (evidence the FIFO is filling and draining against real decode consumption instead of racing unthrottled) and confirm video actually appears this time.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
-- tools/test_program_stream_demux.sv
 
 #### Status:
 
