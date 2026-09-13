@@ -1,3 +1,32 @@
+## 988 COMMIT Unreleased 5764dd4 2026-09-13T01:22:47-07:00
+
+#### Coming From:
+
+Unreleased e6e5a4c
+
+#### Purpose:
+
+Stop entry 986's scheduler-abort fix from silently discarding the rest of the file's decode.
+
+#### Outcome:
+
+Hardware testing of entry 987's build confirmed the deadlock itself is fixed (`hold=False`, presentation duration ~2.5M cycles instead of ~1.79 billion) but the user reported the file still froze the same way; fresh telemetry showed `error=True` with three simultaneous bits (`b_presentation_error`, `pred_error`, `phase1_probe_error`), all LEDs steady off, and a full Main log pull showed the *entire* 887MB file had transferred (`finish reason=complete sent=887078912 polls=435207`) with nothing ever decoded afterward. Reading `rtl/mpeg2_new/mpeg2_h262_stream_transport_gate.sv` directly found the cause: its `fatal_error_latched` register is permanently sticky (only `reset_mpeg2` clears it), and once any of the OR-aggregated `mpeg2_new_transport_fatal_error` sources fires, the gate keeps draining `mpeg2_stream_fifo` unthrottled forever (`fifo_read` ungated) while permanently zeroing `decoder_valid` - exactly matching the observed symptom. `mpeg2_h262_b_presentation_scheduler`'s own header states its aborts are intentionally recoverable ("fails the transaction without retaining compressed-stream backpressure") and it already resets its own bookkeeping to clean idle on `presentation_error`; wiring that signal into a project-wide permanent kill switch contradicted the module's own documented design. Source `5764dd4` removes `mpeg2_new_b_presentation_error` from the `mpeg2_new_transport_fatal_error` OR-list in `MediaPlayer.sv`, leaving the other eight sources (syntax, phase1_probe, pred, inverse_quant x2, idct, recon, ddr_store, ddr_cache) untouched, since `phase1_probe_error` and `pred_error` also cover genuinely unsupported I/P syntax unrelated to B-scheduler aborts and were not removed without independent evidence they are similarly safe to exclude - even though both were also latched in the same telemetry snapshot and are suspected to be direct knock-on effects of the same aborted transaction rather than independent faults. `quartus_map` on seed99 is clean, 0 errors, 156 warnings, matching prior baselines.
+
+#### Next Steps:
+
+Sync this change to all three seed build directories and run the full three-seed `quartus_sh --flow compile` timing build, deploy the best-passing seed's RBF, and ask the user to reload the real `.mpg` via F4. If video still does not play, pull fresh `--json` telemetry immediately rather than assuming the same cause, and check whether `phase1_probe_error`/`pred_error` are independently still tripping the same sticky latch - if so they likely also need excluding from `mpeg2_new_transport_fatal_error`, or the scheduler's abort path needs to properly signal the phase1-probe/prediction-reader modules to stop too.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 987 COMMIT Unreleased e6e5a4c 2026-09-13T00:54:32-07:00
 
 #### Coming From:
@@ -1191,37 +1220,6 @@ After user approval, preserve all finite-still decoder boundaries and the source
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 948 COMMIT Unreleased d7d5ab2 2026-09-03T16:51:15-07:00
-
-#### Coming From:
-
-Unreleased ae533a1
-
-#### Purpose:
-
-Submit the final odd byte of an autonomous DVD boundary after nonblocking pipe quiescence instead of returning before the existing transport path.
-
-#### Outcome:
-
-Source `d7d5ab2` corrects the single Main control-flow defect demonstrated by the Futurama trace: after an autonomous boundary, nonblocking pipe quiescence with one buffered byte now falls through to the existing transport routine, which submits that real byte in a zero-padded 16-bit word, while ordinary non-boundary lone bytes remain held and `EINTR` remains nonterminal.  A later empty-pipe observation permits the existing reset and GO handshake, so no media byte is discarded and the control protocol, helper, RTL and RBF are unchanged.  The lifecycle regression covers ordinary hold, interrupted read, boundary odd-byte submission, empty-pipe release, exact byte accounting and a single reset/GO; optimized, AddressSanitizer plus UndefinedBehaviorSanitizer and GCC analyzer runs pass.  The production overlay-output regression passes optimized, AddressSanitizer and UndefinedBehaviorSanitizer runs, the patch applies cleanly to pinned Main `0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f`, and two local GNU 10.2.1 ARM builds are byte-identical.  The resulting 1,182,692-byte ARMv7 executable `host/build/MiSTer_MediaPlayer` has SHA-256 `250f065859f30150a4b8226072b254ff81f76e27e1b926d1c63ede0ef48bc121`; the unchanged 966,052-byte helper has SHA-256 `32c9a5846aac94f4c1ce2c1bb36a752b5a1c71bfa4ab0bcf304170ef58645e72`.  The 1,335,713-byte archive `host/build/MiSTer_MediaPlayer_BoundaryByte_d7d5ab2.zip` has SHA-256 `0ef5a03055e39a52ea185064ca32b1a74c53f67fe0309200f72d0f38d6086783`; ZIP integrity, fresh extraction, executable modes and its five-file manifest verify.
-
-#### Next Steps:
-
-Leave `/media/fat/MiSTer` untouched, install the archive's `MiSTer_MediaPlayer` and `linux/MediaPlayer_Helper` at the paths documented in `INSTALL.txt`, merge only its `[MediaPlayer]` fragment, set both executables to mode 755 and reboot.  Retest Futurama through every finite first-play still into its visible moving menu with synchronized AC-3 and responsive activation.  The log should show the helper boundary request and Main boundary pending; when an odd tail exists it should then show `DVD stream boundary pipe quiescent odd_tail=1`, a one-byte transfer, `DVD stream boundary released after drain`, and helper release rather than repeated would-block polling.  Collect a fresh Main/helper log, screenshot and telemetry for acceptance or further isolation.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/test_main_seek_lifecycle.cpp
 
 #### Status:
 
