@@ -145,10 +145,10 @@ set_false_path -to [get_keepers {*|picture_4_3_sync[0]}]
 # Cut only the held bundle and first control synchronizer stages.
 # RTL disables shift-RAM inference and preserves all three control registers;
 # phase1p_timing.tcl requires every stage of every configuration mailbox.
-set_false_path -from [get_keepers {*|video_config_cdc:*|held_data[*]}] -to [get_keepers {*|video_config_cdc:*|dst_data[*]}]
-set_false_path -to [get_keepers {*|video_config_cdc:*|req_sync[0]}]
-set_false_path -to [get_keepers {*|video_config_cdc:*|ack_sync[0]}]
+set_false_path -from [get_keepers {*video_config_cdc:*|held_data[*]}] -to [get_keepers {*video_config_cdc:*|dst_data[*]}]
+set_false_path -to [get_keepers {*video_config_cdc:*|req_sync[0]}]
+set_false_path -to [get_keepers {*video_config_cdc:*|ack_sync[0]}]
 
 # Asynchronous VS levels enter system-clock edge detectors through three stages.
-set_false_path -to [get_keepers {*|hdmi_vs_sys_sync[0]}]
-set_false_path -to [get_keepers {*|core_vs_sys_sync[0]}]
+set_false_path -to [get_keepers {*hdmi_vs_sys_sync[0]}]
+set_false_path -to [get_keepers {*core_vs_sys_sync[0]}]
