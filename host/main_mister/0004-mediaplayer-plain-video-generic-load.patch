@@ -17,10 +17,10 @@ index 4603529..c6d2196 100644
  							if (!mediaplayer_start(selPath, idx)) Info("MediaPlayer ARM helper failed to start");
  						}
 diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
-index 10c7dd7..91491c1 100644
+index 10c7dd7..e9482a8 100644
 --- a/support/mediaplayer/mediaplayer.cpp
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -330,6 +330,125 @@ int mediaplayer_handles_file(const char *path)
+@@ -330,6 +330,157 @@ int mediaplayer_handles_file(const char *path)
  	                     !strcasecmp(extension, ".ogg"));
  }
  
@@ -72,9 +72,21 @@ index 10c7dd7..91491c1 100644
 +static fileTYPE plain_video_file = {};
 +static bool plain_video_active = false;
 +static media_burst_state plain_video_burst_state = {};
++static int plain_video_diag_fd = -1;
++static uint64_t plain_video_sent_bytes = 0;
++static uint32_t plain_video_poll_count = 0;
 +
 +static void plain_video_finish(const char *reason)
 +{
++	if (plain_video_diag_fd >= 0)
++	{
++		dprintf(plain_video_diag_fd,
++		        "finish reason=%s sent=%llu polls=%u\n",
++		        reason, (unsigned long long)plain_video_sent_bytes,
++		        plain_video_poll_count);
++		close(plain_video_diag_fd);
++		plain_video_diag_fd = -1;
++	}
 +	FileClose(&plain_video_file);
 +	if (download_active)
 +	{
@@ -89,6 +101,7 @@ index 10c7dd7..91491c1 100644
 +
 +static void plain_video_poll()
 +{
++	++plain_video_poll_count;
 +	if (pending_size - pending_offset < 2 && !pending_eof)
 +	{
 +		const uint32_t remaining = pending_size - pending_offset;
@@ -115,6 +128,15 @@ index 10c7dd7..91491c1 100644
 +	uint32_t consumed = 0;
 +	const int valid = user_io_file_tx_data_step(pending_buffer + pending_offset,
 +	    available, &plain_video_burst_state, &burst, &consumed, NULL);
++	if (plain_video_diag_fd >= 0 &&
++	    (plain_video_poll_count <= 20 || !(plain_video_poll_count % 500)))
++		dprintf(plain_video_diag_fd,
++		        "poll=%u mode=%u valid=%d consumed=%u available=%u sent=%llu "
++		        "credit=%u flags=%u error=%u exp_words=%u obs_words=%u\n",
++		        plain_video_poll_count, plain_video_burst_state.mode, valid,
++		        consumed, available, (unsigned long long)plain_video_sent_bytes,
++		        burst.credit, burst.flags, burst.error,
++		        burst.expected_words, burst.observed_words);
 +	if (!valid || consumed > available)
 +	{
 +		plain_video_finish("transport-fault");
@@ -122,6 +144,7 @@ index 10c7dd7..91491c1 100644
 +	}
 +	if (!consumed) return; // No credit yet: leave the bytes for next poll.
 +	pending_offset += consumed;
++	plain_video_sent_bytes += consumed;
 +}
 +
 +int mediaplayer_start_plain_video_file(const char *path, unsigned char index)
@@ -130,6 +153,15 @@ index 10c7dd7..91491c1 100644
 +
 +	printf("MediaPlayer: starting plain video file %s with %llu bytes for index %d\n",
 +	       path, (unsigned long long)plain_video_file.size, index);
++
++	plain_video_diag_fd = open("/tmp/MediaPlayer_ARM.log",
++	                           O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC,
++	                           0644);
++	plain_video_sent_bytes = 0;
++	plain_video_poll_count = 0;
++	if (plain_video_diag_fd >= 0)
++		dprintf(plain_video_diag_fd, "start path=%s size=%llu index=%u\n",
++		        path, (unsigned long long)plain_video_file.size, (unsigned)index);
 +
 +	user_io_set_index(index);
 +	user_io_file_info(".M2V");
@@ -146,7 +178,7 @@ index 10c7dd7..91491c1 100644
  static void finish_download(const char *reason, bool release_download)
  {
  	const bool was_idle = idle_session;
-@@ -1272,11 +1391,17 @@ void mediaplayer_poll()
+@@ -1272,11 +1423,17 @@ void mediaplayer_poll()
  	{
  		if (helper_fd >= 0 || helper_pid > 0 || download_active)
  			stop_with_reason("core-changed");
