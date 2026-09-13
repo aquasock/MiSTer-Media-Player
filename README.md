@@ -28,3 +28,8 @@ scope. Historical v0.7–v0.9 releases describe the earlier DVD/ARM architecture
 See [building](docs/BUILDING.md), [architecture](docs/ARCHITECTURE.md), and
 [hardware tests](docs/TEST_INSTRUCTIONS.md). Active sources are in `files.qip`;
 `rtl/mpeg2fpga/` is frozen reference code.
+
+Supported output targets are HDMI through 1920x1080 and standard CRT resolutions.
+ASCAL image width is capped at 2048 pixels; the analog output path is retained.
+The unused Linux ALSA path and legacy LED blink diagnostics are disabled;
+FPGA movie audio and the screen telemetry remain enabled.

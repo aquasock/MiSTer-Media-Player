@@ -19,7 +19,17 @@ This project is still in active pre-release development. Published milestone rel
   `9233f07` seed 52 was hardware-accepted with the generated 30-second MPG.
 - Keep the 800x600 output raster for this audio milestone; native progressive
   720x480 output follows synchronized-audio hardware acceptance.
-- The current audio candidate awaits its own build and hardware qualification.
+- Source `ace6b7b` seed 87 passed the user's synchronized flash/beep playback
+  test. Telemetry confirmed 1,250 MP2 frames, 1,440,000 stereo sample pairs,
+  clean completion and zero error flags; one 106.6 ms video gap was recorded.
+  Static setup timing still missed by 0.131 ns.
+- Remove legacy LED blink diagnostics and disable the unused Linux ALSA path,
+  explicitly tying inactive audio and memory-request inputs to zero. Retain
+  screen telemetry and the FPGA MP2 playback path.
+- Limit ASCAL output image width to 2048 pixels, retaining 1920x1080 support
+  while eliminating the extended-width line-buffer path.
+- Capture detailed HDMI/ASCAL setup and global hold paths with each timing run.
+  Resource savings and timing qualification of this cleanup remain pending.
   Earlier DVD/helper/custom-Main implementations remain in Git history.
 
 ## [0.9.0] - 2026-09-03 — DVD navigation, native video and consumer-audio milestone

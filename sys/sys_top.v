@@ -681,6 +681,12 @@ ddr_svc ddr_svc
 	.ch0_data(alsa_readdata),
 	.ch0_req(alsa_req),
 	.ch0_ready(alsa_ready),
+`else
+	.ch0_addr(29'd0),
+	.ch0_burst(8'd0),
+	.ch0_req(1'b0),
+	.ch0_data(),
+	.ch0_ready(),
 `endif
 
 	.ch1_addr(pal_addr),
@@ -732,6 +738,8 @@ wire         bob_deint;
 	`ifdef MISTER_DOWNSCALE_NN
 		.DOWNSCALE_NN("true"),
 	`endif
+		// Bound HDMI image width to 2048; omit extended-width line storage.
+		.OHRES(2048),
 		.FRAC(8),
 `ifdef MENU_CORE
 		.N_BURST(2048),
@@ -1604,6 +1612,9 @@ audio_out audio_out
 `ifndef MISTER_DISABLE_ALSA
 	.alsa_l(alsa_l),
 	.alsa_r(alsa_r),
+`else
+	.alsa_l(16'd0),
+	.alsa_r(16'd0),
 `endif
 
 	.i2s_bclk(HDMI_SCLK),

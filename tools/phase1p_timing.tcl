@@ -207,5 +207,13 @@ puts "  $output_dir/phase1p_recovery_summary.rpt"
 puts "  $output_dir/phase1p_check_timing.rpt"
 puts ""
 
+# Include HDMI scaler paths and global hold failures in every build report.
+set hdmi_clock [get_clocks {pll_hdmi|pll_hdmi_inst|altera_pll_i|cyclonev_pll|counter[0].output_counter|divclk}]
+report_timing -setup -from_clock $hdmi_clock -to_clock $hdmi_clock \
+    -npaths 50 -nworst 3 -detail full_path -show_routing -multi_corner \
+    -file "$output_dir/phase1p_hdmi_same_clock_setup.rpt"
+report_timing -hold -npaths 30 -nworst 3 -detail full_path -show_routing \
+    -multi_corner -file "$output_dir/phase1p_global_hold.rpt"
+
 delete_timing_netlist
 project_close
