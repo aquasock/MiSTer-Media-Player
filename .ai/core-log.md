@@ -1,3 +1,32 @@
+## 24 COMMIT Unreleased 6da4771 2026-09-13T16:23:17-07:00
+
+#### Coming From:
+
+Unreleased 6da4771
+
+#### Purpose:
+
+Record user acceptance of the refresh-rate comparison using the generated motion tests.
+
+#### Outcome:
+
+The user confirms the refresh switch is working and clearly observes smoother motion with the 29.97 fps test at 59.94 Hz. They cannot readily distinguish the two output settings with the 25 fps clip, so that visual comparison remains inconclusive rather than a failure. This accepts the observed refresh-dependent cadence benefit on the existing hardware-accepted compact core 0b6eb0e seed 87 by handoff context. No independent running-RBF hash, measured HDMI refresh, or specific raw-versus-program-stream test coverage was reported. The media generator passed its software checks; no new FPGA build was needed for this cycle.
+
+#### Next Steps:
+
+Retain the accepted compact core and manual refresh selection, with 59.94 Hz for 29.97 fps content and 50 Hz available for 25 fps content; no corrective implementation is indicated by this test.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 23 COMMIT Unreleased 6da4771 2026-09-13T16:01:34-07:00
 
 #### Coming From:
@@ -1308,33 +1337,3 @@ Run the full three-seed timing build, deploy the RBF (Main is unchanged from ent
 - [ ] Passed
 
 ---
-
-## 983 COMMIT Unreleased 254fd3a 2026-09-12T23:19:48-07:00
-
-#### Coming From:
-
-Unreleased 709c5cd
-
-#### Purpose:
-
-Fix a blocking-transfer hardware bug and a black-screen hardware bug found testing entry 982's timing-clean stage B build.
-
-#### Outcome:
-
-Deployed entry 982's build (seed99 RBF, four-patch Main) and loaded a real `.mpg` via F4. Two real bugs surfaced. First, the file loaded extremely slowly and Main was completely unresponsive - no input, no `/dev/MiSTer_cmd` commands, nothing - for the whole transfer, traced to `user_io_file_tx()`'s chunk loop never returning to Main's top-level poll until the entire file finished, which this project's Program Stream demux backpressures to real-time decode consumption. Second, once the transfer did finish, the screen stayed completely black: `user_io_file_tx_data()`, the function called for the interim fix, is the plain ACK-per-word blocking primitive with no knowledge of this project's `MEDIA_BURST` credit protocol, so bytes sent through it never satisfied `mpeg2_stream_fifo`'s `burst_ready` gate and the decoder never received a single byte, even though Main believed the transfer had succeeded. Found the correct primitive already in stock Main by reading how the ARM helper's own transfer loop (`mediaplayer_poll_inner()`) works: `user_io_file_tx_data_step()`, a non-blocking, burst-credit-aware function that fast-writes only as many bytes as the FPGA currently has room for, returning 0 consumed immediately when no credit is available rather than blocking. Rewrote patch `0004` around this: `mediaplayer_start_plain_video_file()` now opens the file and returns immediately, and a new `plain_video_poll()` - called once per `mediaplayer_poll()` tick exactly like the existing helper-pipe transfer path it sits beside - refills a pending buffer from the file and steps it through `user_io_file_tx_data_step()`, so Main's normal loop keeps running between calls instead of blocking on the whole file. Also fixed `user_io_file_info()` to pass the literal `.M2V` instead of the file's real extension, matching every other call site in this file. Verified by cloning the pinned `Main_MiSTer` commit, applying all four patches in sequence from a fresh checkout, and cross-compiling cleanly (`host/build/MiSTer_MediaPlayer`, SHA-256 `b5a694c0f8e0acd6d332cdb608d42bce9e6455d36204f67b1b156ca09b6b579d`). Not yet retested on hardware.
-
-#### Next Steps:
-
-Install this corrected Main binary (RBF unchanged from entry 982's seed99 build) and reload a `.mpg` via F4; confirm the load is now fast and Main stays responsive throughout (screenshot/input work during the transfer), and that video actually decodes and displays once the transfer completes. If video still does not appear, check `mpeg2_burst_ready`/`mpeg2_stream_full`/the demux's `in_ready` live via a fresh diagnostic rather than guessing further.
-
-#### Files Modified:
-
-- host/main_mister/0004-mediaplayer-plain-video-generic-load.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
