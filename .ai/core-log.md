@@ -1,4 +1,4 @@
-## 006 COMMIT Unreleased ??? 2026-09-13T11:04:15-07:00
+## 006 COMMIT Unreleased 9c6ccbb 2026-09-13T11:04:15-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Suppress the loading message during playback and repair synthesized video-config
 
 #### Outcome:
 
-The user approved a combined loading-overlay and timing repair cycle and explicitly excluded the earlier inaudible audio underrun from this work. Stock Main repeatedly publishes its loading progress message throughout a backpressured file transfer, so the proposed FPGA change will suppress message-mode OSD while playback is active while retaining ordinary menus and restoring message visibility at a new session or reset. Timing work will preserve actual request, acknowledgement and VS synchronization flip-flops, verify constraint endpoint matching, complete the LFB_EN, HDMI_PR and lowlat configuration crossings and address remaining decoder setup failures if present in the new fit. The user-authorized build PC may commit and push directly. The previous detailed build directory recorded under /home/vash/builds is absent on this PC; new clean builds will supply current netlist and timing evidence.
+Implemented playback-controlled suppression of Main message-mode OSD on HDMI and analog paths, preserving ordinary menu and info windows. The first scheduled display-frame swap latches playback state; reset or a new download clears it, and an acknowledged mailbox carries the state into the system clock before the OSD configuration mailboxes. Explicit OSD startup state makes the every-other-frame enable behavior reproducible in simulation. Configuration and VS synchronizers now disable shift-register RAM inference and preserve their registers. System aspect configuration is transferred as a held bundle, ASCAL receives separate input/output-clock mode snapshots, and HDMI framebuffer enable is synchronized. Focused timing extraction now requires all three stages of every configuration and VS synchronization chain to exist as registers. Full-raster compiled OSD simulation passes seven visibility cases and sync alignment, including zero loading-message pixels during playback and retained menu/info pixels. Raster reset, 345600-pixel cache scanout, mailbox, geometry, all five cadence rates, B-picture ordering and telemetry regressions pass. Timed MPG regression passes 24192 stereo sample pairs with maximum FFmpeg difference one sample unit, 152679 matching video bytes and 15 correct picture timestamps; its FIFO is ideal and full video reconstruction and physical CDC are outside that test. The user explicitly excluded the earlier inaudible audio underrun from this cycle; audio behavior is unchanged. Source 9c6ccbb was committed and pushed before launching three independent clean Quartus exports under results/build-9c6ccbb-20260913-111811/. Only fitter seed and worker count differ from committed project settings; seeds are 52, 61 and 87 with six workers each. New synthesis and timing results remain pending.
 
 #### Next Steps:
 
@@ -18,15 +18,17 @@ Implement the reviewed changes, run focused OSD, mailbox, raster, cadence and pl
 
 #### Files Modified:
 
-- MediaPlayer_top_00.svh
-- MediaPlayer.sdc
-- rtl/video_config_cdc.sv
-- sys/emu_ports.vh
-- sys/sys_top.v
-- sys/osd.v
-- tools/verify_video_sync.py
-- tools/phase1p_timing.tcl
 - CHANGELOG.md
+- MediaPlayer.sdc
+- MediaPlayer_top_00.svh
+- rtl/video_config_cdc.sv
+- sys/ascal.vhd
+- sys/emu_ports.vh
+- sys/osd.v
+- sys/sys_top.v
+- tools/phase1p_timing.tcl
+- tools/test_osd_playback.sv
+- tools/verify_video_sync.py
 
 #### Status:
 
