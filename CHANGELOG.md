@@ -8,6 +8,9 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Frame-associated BT.601/BT.709 color matrix selection with Auto and manual OSD overrides; untagged or unsupported matrices retain the BT.601 compatibility fallback.
+- Deterministic matching color clips and exhaustive RGB conversion tests, including exact legacy BT.601 output and BT.709 error bounded to one RGB code value.
+
 - Stock-Main mounted MPG/M2V playback using bounded sector reads, leaving menu input available during playback; OSD and filter control validated on hardware.
 - Coordinated playback-session restart with DDR response draining, exact byte/EOF transport, startup prefill, and reader offset/suspension interfaces for later pause and seeking.
 - Telemetry schema 9 reports file-read requests/completions, maximum response wait, byte position, session generation, reservoir minimum and transport status; decoder retains older capture support.

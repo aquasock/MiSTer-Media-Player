@@ -50,3 +50,22 @@ fraction/blanking equivalence against a0f153a, and
 `python3 tools/verify_decoder_timing.py --output /tmp/decoder-timing` for the
 mixed I/P/B pixel oracle. These simulations do not replace hardware testing
 or fitted timing at every operating corner.
+
+## Color matrix validation
+
+Color matrix offers Auto, BT.601 and BT.709. Auto follows supported sequence
+matrix metadata; missing, unspecified or unsupported values use BT.601.
+Aspect ratio remains the separate manual 4:3/16:9 choice. Color changes apply
+at a raster boundary, and automatic color context follows the displayed picture.
+
+Generate clips with `python3 tools/make_color_matrix_tests.py --output /tmp/color-tests`.
+Compare 01_color_601.m2v and 02_color_709.m2v with Auto: both should look nearly
+the same. Force BT.601 on the 709 clip to expose the wrong-matrix color shift,
+then force BT.709 to restore it. The 03_color_709_untagged.m2v clip requires a
+manual BT.709 override. Watch the colored and skin-tone patches; the grayscale
+steps should stay essentially unchanged. Keep the same aspect and filters,
+check OSD responsiveness, and reload the 601 clip after restoring Auto.
+
+Run `python3 tools/verify_color_matrix.py --output /tmp/color.json` for metadata,
+frame ownership, frame-boundary CDC, colored stalled-DDR scanout and exhaustive
+matrix arithmetic. Matrix selection adds no gamut or transfer-curve conversion.

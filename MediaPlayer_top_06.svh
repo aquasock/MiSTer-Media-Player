@@ -16,7 +16,15 @@ assign mpeg2_new_ddr_rd_banked_addr =
     mpeg2_new_ddr_rd_addr + mpeg2_new_display_frame_offset;
 
 
-mpeg2_luma_framebuffer mpeg2_luma_framebuffer
+wire video_matrix_bt709;
+media_color_control color_control(
+ .sys_clk(clk_sys),.decoder_clk(clk_mpeg2),.video_clk(clk_video),
+ .video_reset(reset_video),.mode(status[5:4]),
+ .display_bt709(mpeg2_new_display_bt709),
+ .frame_start((display_h_pos==0)&&(display_v_pos==0)),
+ .matrix_bt709(video_matrix_bt709));
+
+mpeg2_luma_framebuffer #(.ENABLE_COLOR_MATRIX(1)) mpeg2_luma_framebuffer
 (
     .reset          (mpeg2_new_framebuffer_reset),
     .mem_clk        (clk_mpeg2),
@@ -33,6 +41,7 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .read_seen      (mpeg2_new_ddr_read_seen),
     .cache_error    (mpeg2_new_ddr_cache_error),
     .rd_clk         (clk_video),
+    .matrix_bt709(video_matrix_bt709),
     .h_pos          (display_h_pos),
     .v_pos          (display_v_pos),
     .pixel_en       (display_pixel_en),

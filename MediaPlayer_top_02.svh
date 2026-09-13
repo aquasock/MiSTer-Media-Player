@@ -53,6 +53,8 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.horizontal_size                  (mpeg2_new_horizontal_size),
 	.vertical_size                    (mpeg2_new_vertical_size),
 	.aspect_ratio_information         (mpeg2_new_aspect_ratio_information),
+    .colour_description_valid(mpeg2_new_colour_description_valid),
+    .matrix_coefficients(mpeg2_new_matrix_coefficients),
 	.frame_rate_code                  (mpeg2_new_frame_rate_code),
 	.profile_and_level_indication     (mpeg2_new_profile_and_level_indication),
 	.progressive_sequence             (mpeg2_new_progressive_sequence),

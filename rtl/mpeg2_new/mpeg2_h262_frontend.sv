@@ -53,6 +53,8 @@ module mpeg2_h262_frontend
     output reg  [13:0] horizontal_size,
     output reg  [13:0] vertical_size,
     output reg  [3:0]  aspect_ratio_information,
+    output reg         colour_description_valid,
+    output reg  [7:0]  matrix_coefficients,
     output reg  [3:0]  frame_rate_code,
     output reg  [1:0]  frame_rate_extension_n,
     output reg  [4:0]  frame_rate_extension_d,
@@ -131,6 +133,7 @@ reg [6:0]  payload_byte_index;
 reg [63:0] payload_shift;
 reg [3:0]  active_extension_id;
 reg        active_extension_id_valid;
+reg        display_colour_description;
 
 reg        expect_sequence_extension;
 reg        expect_picture_coding_extension;
@@ -255,6 +258,9 @@ always @(posedge clk) begin
         horizontal_size                     <= 14'd0;
         vertical_size                       <= 14'd0;
         aspect_ratio_information            <= 4'd0;
+        colour_description_valid            <= 1'b0;
+        matrix_coefficients                 <= 8'd2;
+        display_colour_description          <= 1'b0;
         frame_rate_code                     <= 4'd0;
         frame_rate_extension_n               <= 2'd0;
         frame_rate_extension_d               <= 5'd0;
@@ -321,6 +327,10 @@ always @(posedge clk) begin
 
             case (start_code_value)
                 SEQUENCE_HEADER_CODE: begin
+                    // No description means application-defined color, never
+                    // metadata inherited from the previous sequence/file.
+                    colour_description_valid <= 1'b0;
+                    matrix_coefficients <= 8'd2;
                     expect_sequence_extension     <= 1'b1;
                     // H.262 6.3.11: every sequence header resets all
                     // quantisation matrices to their default values before
@@ -393,6 +403,11 @@ always @(posedge clk) begin
                 (payload_byte_index == 0)) begin
                 active_extension_id       <= stream_data[7:4];
                 active_extension_id_valid <= 1'b1;
+                if (stream_data[7:4] == EXT_SEQUENCE_DISPLAY) begin
+                    display_colour_description <= stream_data[0];
+                    colour_description_valid <= 1'b0;
+                    matrix_coefficients <= 8'd2;
+                end
 
                 if (expect_sequence_extension &&
                     (stream_data[7:4] != EXT_SEQUENCE)) begin
@@ -418,6 +433,18 @@ always @(posedge clk) begin
                 // Later phases will parse its individual load flags/matrices.
                 if (stream_data[7:4] == EXT_QUANT_MATRIX)
                     intra_quant_matrix_default <= 1'b0;
+            end
+
+            // H.262 6.2.2.4 / 6.3.6: retain the matrix only after the
+            // complete optional display extension and its marker arrive.
+            // Primaries/transfer bytes and display dimensions are skipped;
+            // they do not control the user's aspect ratio or add color management.
+            if ((active_start_code == EXTENSION_START_CODE) &&
+                active_extension_id_valid &&
+                (active_extension_id == EXT_SEQUENCE_DISPLAY) &&
+                display_colour_description && (payload_byte_index == 7)) begin
+                colour_description_valid <= payload_next[17];
+                matrix_coefficients <= payload_next[17] ? payload_next[39:32] : 8'd2;
             end
 
             // sequence_extension(): 48 payload bits.

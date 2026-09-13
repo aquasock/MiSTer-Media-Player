@@ -177,3 +177,18 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .presentation_error          (mpeg2_new_b_presentation_error),
     .debug_state                 (mpeg2_new_b_scheduler_debug_state)
 );
+
+wire mpeg2_new_display_bt709;
+mpeg2_h262_picture_color picture_color(
+ .clk(clk_mpeg2),.reset(reset_mpeg2),
+ .colour_description_valid(mpeg2_new_colour_description_valid),
+ .matrix_coefficients(mpeg2_new_matrix_coefficients),
+ .picture_start(mpeg2_new_picture_header_classified_now),
+ .picture_is_b(mpeg2_new_b_picture_start_now),
+ .decode_scratch_bank(mpeg2_new_b_decode_scratch_bank),
+ .b_picture_complete(mpeg2_new_b_user_success),
+ .active_frame_bank(mpeg2_new_active_frame_bank),
+ .display_frame_bank(mpeg2_new_display_frame_bank),
+ .display_scratch(mpeg2_new_display_scratch),
+ .display_scratch_bank(mpeg2_new_display_scratch_bank),
+ .display_bt709(mpeg2_new_display_bt709));

@@ -190,3 +190,6 @@ wire        mpeg2_new_pred_busy;
 wire        mpeg2_new_pred_dout_ready;
 wire        mpeg2_new_pred_read_seen;
 wire [7:0]  mpeg2_new_pred_sample_value;
+
+wire mpeg2_new_colour_description_valid;
+wire [7:0] mpeg2_new_matrix_coefficients;

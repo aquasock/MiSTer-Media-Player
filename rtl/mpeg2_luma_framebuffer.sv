@@ -22,7 +22,7 @@
 // H.262 decoding/reconstruction remains upstream and full precision.
 //============================================================================
 
-module mpeg2_luma_framebuffer
+module mpeg2_luma_framebuffer #(parameter ENABLE_COLOR_MATRIX=0)
 (
     input  wire        reset,
 
@@ -46,6 +46,7 @@ module mpeg2_luma_framebuffer
 
     // Independent fixed video side - 27 MHz.
     input  wire        rd_clk,
+    input  wire        matrix_bt709,
     input  wire [11:0] h_pos,
     input  wire [11:0] v_pos,
     input  wire        pixel_en,
@@ -729,8 +730,9 @@ wire [7:0] rgb_r;
 wire [7:0] rgb_g;
 wire [7:0] rgb_b;
 
-mpeg2_ycbcr_to_rgb_bt601 mpeg2_ycbcr_to_rgb_bt601
+mpeg2_ycbcr_to_rgb mpeg2_ycbcr_to_rgb
 (
+    .matrix_bt709(ENABLE_COLOR_MATRIX ? matrix_bt709 : 1'b0),
     .y  (y_rd_data),
     .cb (cb_rd_data),
     .cr (cr_rd_data),

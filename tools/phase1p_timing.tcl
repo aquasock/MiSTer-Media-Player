@@ -66,7 +66,7 @@ update_timing_netlist
 # Check every stage of each required instance, not just a wildcard that could
 # accidentally match one surviving synchronizer elsewhere in the design.
 set cdc_audit [open "$output_dir/configuration_cdc_audit.rpt" w]
-foreach instance {media_prefill_config media_fatal_config media_telemetry_config aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
+foreach instance {color_mode_config display_color_config media_prefill_config media_fatal_config media_telemetry_config aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
     if {[string first "|" $instance] < 0} {
         set prefix "*video_config_cdc:$instance"
     } else {
