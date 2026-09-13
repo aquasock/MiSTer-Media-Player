@@ -7,17 +7,17 @@
 // the raw file bytes in, and everything downstream (this module included)
 // lives in RTL. Scope matches core-reference.md's adopted H.222.0 records
 // H222-001 through H222-006: pack header/stuffing, PES framing via the
-// 16-bit PES_packet_length, the MPEG-2-style PES optional header (marker
-// bits '10'), and video (stream_id 0xE0-0xEF) / audio (stream_id 0xC0-0xDF)
-// stream_id routing. The legacy MPEG-1 pack header form (marker '0010') is
-// also accepted since it costs one extra state; the legacy MPEG-1 PES
-// optional-header form (leading 0xFF stuffing bytes and a bare '0010'/
-// '0011' timestamp marker outside the '10' form) is not - every real encode
-// this project has actually parsed uses the MPEG-2 form, and
-// host/arm/media_player_helper.c's own legacy branch exists only for
-// defensiveness, not because a test file has ever needed it. A packet whose
-// PES optional header does not start with the '10' marker is treated as a
-// syntax error and its declared length is skipped whole.
+// 16-bit PES_packet_length, video (stream_id 0xE0-0xEF) / audio (stream_id
+// 0xC0-0xDF) stream_id routing, and both PES optional-header forms - the
+// MPEG-2 form (marker bits '10', an explicit header_data_length) and the
+// legacy MPEG-1 form (optional 0xFF stuffing bytes, an optional one 2-byte
+// STD_buffer_scale/size marker, then either a bare PTS marker '0010', a
+// PTS+DTS marker '0011', or the no-timestamp marker 0x0F - no explicit
+// length field of its own). Entry 979 assumed no real file would still use
+// the legacy form; entry 983's hardware test proved that wrong - the
+// project's own primary test file uses it - so both are handled here, the
+// same way host/arm/media_player_helper.c's parse_pes_header() already did
+// in software.
 //
 // Unlike the ARM helper's replacement scheme, there is no need to smuggle
 // audio or overlay data back through the video elementary-stream pipe as
@@ -52,21 +52,24 @@ module mpeg2_h262_program_stream_demux
 );
 
 localparam [4:0]
-    S_SYNC           = 5'd0,
-    S_CODE           = 5'd1,
-    S_PACK_B0        = 5'd2,
-    S_PACK_SKIP      = 5'd3,
-    S_PACK_STUFF_LEN = 5'd4,
-    S_PACK_STUFF     = 5'd5,
-    S_LEN_HI         = 5'd6,
-    S_LEN_LO         = 5'd7,
-    S_SKIP_PAYLOAD   = 5'd8,
-    S_PES_HDR_B0     = 5'd9,
-    S_PES_HDR_B1     = 5'd10,
-    S_PES_HDR_B2     = 5'd11,
-    S_PES_PTS        = 5'd12,
-    S_PES_HDR_SKIP   = 5'd13,
-    S_PES_PAYLOAD    = 5'd14;
+    S_SYNC            = 5'd0,
+    S_CODE            = 5'd1,
+    S_PACK_B0         = 5'd2,
+    S_PACK_SKIP       = 5'd3,
+    S_PACK_STUFF_LEN  = 5'd4,
+    S_PACK_STUFF      = 5'd5,
+    S_LEN_HI          = 5'd6,
+    S_LEN_LO          = 5'd7,
+    S_SKIP_PAYLOAD    = 5'd8,
+    S_PES_HDR_B0      = 5'd9,
+    S_PES_HDR_B1      = 5'd10,
+    S_PES_HDR_B2      = 5'd11,
+    S_PES_PTS         = 5'd12,
+    S_PES_HDR_SKIP    = 5'd13,
+    S_PES_PAYLOAD     = 5'd14,
+    S_PES_LEGACY_STUFF= 5'd15,
+    S_PES_LEGACY_STD2 = 5'd16,
+    S_PES_LEGACY_TS_CHECK = 5'd17;
 
 reg [4:0]  state;
 reg [1:0]  zero_run;
@@ -80,6 +83,9 @@ reg [1:0]  pts_dts_flags;
 reg [2:0]  pts_byte_index;
 reg [39:0] pts_shift;     // 5 bytes captured MSB-first
 reg        pts_pending;   // this PES has a PTS to publish with its first payload byte
+reg        pts_is_legacy; // this PTS capture came from the legacy header form
+reg        legacy_has_dts;
+reg [15:0] legacy_prefix_bytes; // legacy stuffing/STD bytes consumed before the timestamp marker
 
 assign in_ready =
     (state == S_PES_PAYLOAD) ? (is_video ? video_ready : audio_ready) : 1'b1;
@@ -101,6 +107,21 @@ wire [32:0] decoded_pts = {
 // underflow instead of wrapping to a huge unsigned payload count.
 wire [16:0] payload_len_calc = {1'b0, pes_length} - 17'd3 - {9'd0, in_data};
 wire        payload_len_valid = !payload_len_calc[16];
+
+// Legacy-form payload length once the timestamp marker byte (this cycle's
+// in_data) is identified: total header bytes are legacy_prefix_bytes
+// (stuffing/STD consumed so far) plus 5 PTS bytes plus 5 more DTS bytes
+// when this is the '0011' marker, all guarded against underflow exactly
+// like the MPEG-2 calculation above.
+wire [17:0] legacy_ts_payload_calc =
+    {2'b0, pes_length} - {2'b0, legacy_prefix_bytes} - 18'd5 -
+    (in_data[7:4] == 4'h3 ? 18'd5 : 18'd0);
+wire        legacy_ts_payload_valid = !legacy_ts_payload_calc[17];
+// Legacy no-timestamp marker (0x0F): header is legacy_prefix_bytes plus
+// this one byte.
+wire [17:0] legacy_none_payload_calc =
+    {2'b0, pes_length} - {2'b0, legacy_prefix_bytes} - 18'd1;
+wire        legacy_none_payload_valid = !legacy_none_payload_calc[17];
 
 always @(posedge clk) begin
     video_valid     <= 1'b0;
@@ -215,6 +236,12 @@ always @(posedge clk) begin
                     state    <= S_SYNC;
                     zero_run <= 2'd0;
                 end else begin
+                    // legacy_prefix_bytes must read as 0 the moment
+                    // S_PES_HDR_B0 evaluates its own first byte, in case
+                    // that very byte is already the timestamp marker with
+                    // no stuffing/STD field ahead of it (confirmed the
+                    // common case on real files, not just a corner case).
+                    legacy_prefix_bytes <= 16'd0;
                     state <= S_PES_HDR_B0;
                 end
             end else if ({pes_length[15:8], in_data} == 16'd0) begin
@@ -241,9 +268,56 @@ always @(posedge clk) begin
         S_PES_HDR_B0: begin
             if (in_data[7:6] == 2'b10) begin
                 state <= S_PES_HDR_B1;
+            end else if (in_data == 8'hff) begin
+                // Legacy form: stuffing byte, at least one more header byte
+                // follows.
+                legacy_prefix_bytes <= 16'd1;
+                state               <= S_PES_LEGACY_STUFF;
+            end else if (in_data[7:6] == 2'b01) begin
+                // Legacy form: 2-byte STD_buffer_scale/size marker.
+                legacy_prefix_bytes <= 16'd1;
+                state               <= S_PES_LEGACY_STD2;
+            end else if (in_data[7:4] == 4'h2 || in_data[7:4] == 4'h3) begin
+                // Legacy form: bare PTS ('0010') or PTS+DTS ('0011') marker,
+                // no stuffing or STD field ahead of it.
+                if (!legacy_ts_payload_valid) begin
+                    demux_error <= 1'b1;
+                    state       <= S_SYNC;
+                    zero_run    <= 2'd0;
+                end else begin
+                    payload_len    <= legacy_ts_payload_calc[15:0];
+                    pts_is_legacy  <= 1'b1;
+                    legacy_has_dts <= (in_data[7:4] == 4'h3);
+                    pts_pending    <= 1'b1;
+                    // This marker byte is already being shifted into
+                    // pts_shift below, unlike the MPEG-2 path (which
+                    // transitions to S_PES_PTS on the header_data_length
+                    // byte, a byte the PTS itself does not include) - so
+                    // the count of already-consumed PTS bytes starts at 1,
+                    // not 0, or S_PES_PTS's completion check fires one
+                    // byte too late and swallows the packet's first real
+                    // payload byte into the tail of pts_shift instead.
+                    pts_byte_index <= 3'd1;
+                    pts_shift      <= {pts_shift[31:0], in_data};
+                    state          <= S_PES_PTS;
+                end
+            end else if (in_data == 8'h0f) begin
+                // Legacy form: no timestamp, this one byte is the whole
+                // header.
+                if (!legacy_none_payload_valid) begin
+                    demux_error <= 1'b1;
+                    state       <= S_SYNC;
+                    zero_run    <= 2'd0;
+                end else if (legacy_none_payload_calc[15:0] == 16'd0) begin
+                    state    <= S_SYNC;
+                    zero_run <= 2'd0;
+                end else begin
+                    skip_count <= legacy_none_payload_calc[15:0];
+                    state      <= S_PES_PAYLOAD;
+                end
             end else begin
-                // Legacy MPEG-1 PES header, or a malformed packet: skip the
-                // remaining declared length rather than mis-parse it.
+                // Genuinely malformed: skip the remaining declared length
+                // rather than mis-parse it.
                 demux_error <= 1'b1;
                 if (pes_length <= 16'd1) begin
                     state    <= S_SYNC;
@@ -255,6 +329,107 @@ always @(posedge clk) begin
             end
         end
 
+        S_PES_LEGACY_STUFF: begin
+            if (in_data == 8'hff) begin
+                legacy_prefix_bytes <= legacy_prefix_bytes + 16'd1;
+            end else if (in_data[7:6] == 2'b01) begin
+                legacy_prefix_bytes <= legacy_prefix_bytes + 16'd1;
+                state               <= S_PES_LEGACY_STD2;
+            end else if (in_data[7:4] == 4'h2 || in_data[7:4] == 4'h3) begin
+                if (!legacy_ts_payload_valid) begin
+                    demux_error <= 1'b1;
+                    state       <= S_SYNC;
+                    zero_run    <= 2'd0;
+                end else begin
+                    payload_len    <= legacy_ts_payload_calc[15:0];
+                    pts_is_legacy  <= 1'b1;
+                    legacy_has_dts <= (in_data[7:4] == 4'h3);
+                    pts_pending    <= 1'b1;
+                    // This marker byte is already being shifted into
+                    // pts_shift below, unlike the MPEG-2 path (which
+                    // transitions to S_PES_PTS on the header_data_length
+                    // byte, a byte the PTS itself does not include) - so
+                    // the count of already-consumed PTS bytes starts at 1,
+                    // not 0, or S_PES_PTS's completion check fires one
+                    // byte too late and swallows the packet's first real
+                    // payload byte into the tail of pts_shift instead.
+                    pts_byte_index <= 3'd1;
+                    pts_shift      <= {pts_shift[31:0], in_data};
+                    state          <= S_PES_PTS;
+                end
+            end else if (in_data == 8'h0f) begin
+                if (!legacy_none_payload_valid) begin
+                    demux_error <= 1'b1;
+                    state       <= S_SYNC;
+                    zero_run    <= 2'd0;
+                end else if (legacy_none_payload_calc[15:0] == 16'd0) begin
+                    state    <= S_SYNC;
+                    zero_run <= 2'd0;
+                end else begin
+                    skip_count <= legacy_none_payload_calc[15:0];
+                    state      <= S_PES_PAYLOAD;
+                end
+            end else begin
+                demux_error <= 1'b1;
+                state       <= S_SYNC;
+                zero_run    <= 2'd0;
+            end
+        end
+
+        // The STD_buffer_scale/size field is exactly 2 bytes with no
+        // constraint of its own on the second byte's value - it is not
+        // itself a candidate for the timestamp-marker check. Just consume
+        // it and look for the marker on the byte after.
+        S_PES_LEGACY_STD2: begin
+            legacy_prefix_bytes <= legacy_prefix_bytes + 16'd1;
+            state <= S_PES_LEGACY_TS_CHECK;
+        end
+
+        // Spec order allows only one STD field and no further stuffing
+        // after it; the byte here must be a timestamp marker or the
+        // no-timestamp marker.
+        S_PES_LEGACY_TS_CHECK: begin
+            if (in_data[7:4] == 4'h2 || in_data[7:4] == 4'h3) begin
+                if (!legacy_ts_payload_valid) begin
+                    demux_error <= 1'b1;
+                    state       <= S_SYNC;
+                    zero_run    <= 2'd0;
+                end else begin
+                    payload_len    <= legacy_ts_payload_calc[15:0];
+                    pts_is_legacy  <= 1'b1;
+                    legacy_has_dts <= (in_data[7:4] == 4'h3);
+                    pts_pending    <= 1'b1;
+                    // This marker byte is already being shifted into
+                    // pts_shift below, unlike the MPEG-2 path (which
+                    // transitions to S_PES_PTS on the header_data_length
+                    // byte, a byte the PTS itself does not include) - so
+                    // the count of already-consumed PTS bytes starts at 1,
+                    // not 0, or S_PES_PTS's completion check fires one
+                    // byte too late and swallows the packet's first real
+                    // payload byte into the tail of pts_shift instead.
+                    pts_byte_index <= 3'd1;
+                    pts_shift      <= {pts_shift[31:0], in_data};
+                    state          <= S_PES_PTS;
+                end
+            end else if (in_data == 8'h0f) begin
+                if (!legacy_none_payload_valid) begin
+                    demux_error <= 1'b1;
+                    state       <= S_SYNC;
+                    zero_run    <= 2'd0;
+                end else if (legacy_none_payload_calc[15:0] == 16'd0) begin
+                    state    <= S_SYNC;
+                    zero_run <= 2'd0;
+                end else begin
+                    skip_count <= legacy_none_payload_calc[15:0];
+                    state      <= S_PES_PAYLOAD;
+                end
+            end else begin
+                demux_error <= 1'b1;
+                state       <= S_SYNC;
+                zero_run    <= 2'd0;
+            end
+        end
+
         S_PES_HDR_B1: begin
             pts_dts_flags <= in_data[7:6];
             state         <= S_PES_HDR_B2;
@@ -262,6 +437,7 @@ always @(posedge clk) begin
 
         S_PES_HDR_B2: begin
             pts_pending    <= pts_dts_flags[1]; // '10' or '11' both start with a PTS
+            pts_is_legacy  <= 1'b0;
             pts_byte_index <= 3'd0;
             if (!payload_len_valid) begin
                 demux_error <= 1'b1;
@@ -288,20 +464,36 @@ always @(posedge clk) begin
             pts_shift      <= {pts_shift[31:0], in_data};
             pts_byte_index <= pts_byte_index + 3'd1;
             if (pts_byte_index == 3'd4) begin
-                // header_data_len's 5 PTS bytes are already accounted for
-                // in payload_len (computed from the full header_data_len
-                // regardless of what it is spent on), so what remains here
-                // is only any header bytes *beyond* those 5 - e.g. a
-                // trailing DTS field or stuffing.
-                if (payload_len == 16'd0 && header_extra_after_pts == 16'd0) begin
-                    state    <= S_SYNC;
-                    zero_run <= 2'd0;
-                end else if (header_extra_after_pts != 16'd0) begin
-                    skip_count <= header_extra_after_pts;
-                    state      <= S_PES_HDR_SKIP;
+                if (pts_is_legacy) begin
+                    if (legacy_has_dts) begin
+                        // Skip the 5 DTS bytes; payload_len was already
+                        // computed net of them.
+                        skip_count <= 16'd5;
+                        state      <= S_PES_HDR_SKIP;
+                    end else if (payload_len == 16'd0) begin
+                        state    <= S_SYNC;
+                        zero_run <= 2'd0;
+                    end else begin
+                        skip_count <= payload_len;
+                        state      <= S_PES_PAYLOAD;
+                    end
                 end else begin
-                    skip_count <= payload_len;
-                    state      <= S_PES_PAYLOAD;
+                    // header_data_len's 5 PTS bytes are already accounted
+                    // for in payload_len (computed from the full
+                    // header_data_len regardless of what it is spent on),
+                    // so what remains here is only any header bytes
+                    // *beyond* those 5 - e.g. a trailing DTS field or
+                    // stuffing.
+                    if (payload_len == 16'd0 && header_extra_after_pts == 16'd0) begin
+                        state    <= S_SYNC;
+                        zero_run <= 2'd0;
+                    end else if (header_extra_after_pts != 16'd0) begin
+                        skip_count <= header_extra_after_pts;
+                        state      <= S_PES_HDR_SKIP;
+                    end else begin
+                        skip_count <= payload_len;
+                        state      <= S_PES_PAYLOAD;
+                    end
                 end
             end
         end

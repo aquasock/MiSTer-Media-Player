@@ -183,9 +183,126 @@ initial begin
     check_results;
     $display("PASS (with mid-stream audio backpressure)");
 
+    // Pass 3: the legacy MPEG-1 PES optional-header form (leading 0xFF
+    // stuffing, a bare PTS/PTS+DTS marker, no header_data_length field at
+    // all) - built from the exact byte sequence pulled from the project's
+    // own primary test file ("01 - Pee Strike.mpg"), which entry 983's
+    // hardware test found this demux could not parse at all.
+    build_legacy_stream;
+    got_video_len=0; got_audio_len=0; got_video_pts_seen=0; got_audio_pts_seen=0; got_stream_end=0;
+    drive_all(-1, 0);
+    repeat(4) @(posedge clk);
+    if (got_video_len !== 6 || got_video[0] !== "S" || got_video[1] !== "E" ||
+        got_video[2] !== "Q" || got_video[3] !== "H" || got_video[4] !== "D" || got_video[5] !== "R")
+        fail("legacy-form video payload did not decode to SEQHDR");
+    if (!got_video_pts_seen || got_video_pts !== 33'd48003)
+        fail("legacy-form PTS did not decode to 48003 (the real file's actual first video PTS)");
+    if (demux_error)
+        fail("demux_error asserted on the real-file-derived legacy-form stream");
+    $display("PASS (legacy MPEG-1 PES optional-header form, real-file byte pattern)");
+
+    // Pass 4: legacy form with two leading 0xFF stuffing bytes and a
+    // PTS-only marker (no DTS) - exercises S_PES_LEGACY_STUFF, which Pass 3
+    // never touches since the real file's own marker has no stuffing
+    // ahead of it.
+    build_legacy_stuffed_stream;
+    got_video_len=0; got_audio_len=0; got_video_pts_seen=0; got_audio_pts_seen=0; got_stream_end=0;
+    drive_all(-1, 0);
+    repeat(4) @(posedge clk);
+    if (got_video_len !== 4 || got_video[0] !== "V" || got_video[1] !== "I" ||
+        got_video[2] !== "D" || got_video[3] !== "1")
+        fail("legacy-form-with-stuffing video payload did not decode to VID1");
+    if (!got_video_pts_seen || got_video_pts !== 33'd12345)
+        fail("legacy-form-with-stuffing PTS did not decode to 12345");
+    if (demux_error)
+        fail("demux_error asserted on the stuffed legacy-form stream");
+    $display("PASS (legacy form with leading stuffing bytes, PTS-only)");
+
+    // Pass 5: legacy form with the 2-byte STD_buffer_scale/size field
+    // present ahead of the timestamp marker - exercises S_PES_LEGACY_STD2.
+    build_legacy_std_stream;
+    got_video_len=0; got_audio_len=0; got_video_pts_seen=0; got_audio_pts_seen=0; got_stream_end=0;
+    drive_all(-1, 0);
+    repeat(4) @(posedge clk);
+    if (got_video_len !== 4 || got_video[0] !== "V" || got_video[1] !== "I" ||
+        got_video[2] !== "D" || got_video[3] !== "2")
+        fail("legacy-form-with-STD video payload did not decode to VID2");
+    if (!got_video_pts_seen || got_video_pts !== 33'd67890)
+        fail("legacy-form-with-STD PTS did not decode to 67890");
+    if (demux_error)
+        fail("demux_error asserted on the STD-field legacy-form stream");
+    $display("PASS (legacy form with STD_buffer_scale/size field, PTS-only)");
+
     $display("PASS: program stream demux decodes video/audio elementary bytes and PTS correctly");
     $finish;
 end
+
+task build_legacy_stuffed_stream;
+begin
+    len = 0;
+    push(8'h00); push(8'h00); push(8'h01); push(8'he0);
+    video_len_pos = len; push(8'h00); push(8'h00);
+    push(8'hff); push(8'hff); // two stuffing bytes ahead of the marker
+    push_pts_bytes(4'b0010, 33'd12345); // PTS-only marker, no DTS
+    push("V"); push("I"); push("D"); push("1");
+    stream[video_len_pos]   = ((len - video_len_pos - 2) >> 8) & 8'hff;
+    stream[video_len_pos+1] = (len - video_len_pos - 2) & 8'hff;
+    push(8'h00); push(8'h00); push(8'h01); push(8'hb9);
+    $display("built %0d-byte stuffed legacy-form synthetic Program Stream", len);
+end
+endtask
+
+task build_legacy_std_stream;
+begin
+    len = 0;
+    push(8'h00); push(8'h00); push(8'h01); push(8'he0);
+    video_len_pos = len; push(8'h00); push(8'h00);
+    push(8'h4a); push(8'h5b); // 2-byte STD_buffer_scale/size field (0x4X marker)
+    push_pts_bytes(4'b0010, 33'd67890); // PTS-only marker, no DTS
+    push("V"); push("I"); push("D"); push("2");
+    stream[video_len_pos]   = ((len - video_len_pos - 2) >> 8) & 8'hff;
+    stream[video_len_pos+1] = (len - video_len_pos - 2) & 8'hff;
+    push(8'h00); push(8'h00); push(8'h01); push(8'hb9);
+    $display("built %0d-byte STD-field legacy-form synthetic Program Stream", len);
+end
+endtask
+
+// Builds a short Program Stream using the exact pack-header/PES-header
+// byte pattern captured from "01 - Pee Strike.mpg" offsets 0x00-0x2D
+// (pack header, system header, and a video PES's legacy PTS+DTS marker),
+// but with a short synthetic 6-byte payload ("SEQHDR") in place of the
+// real ~2000-byte picture data, so the test stays small.
+task build_legacy_stream;
+begin
+    len = 0;
+
+    // Pack header (MPEG-2 form, as the real file uses): identical in kind
+    // to Pass 1's, bytes taken directly from the captured file.
+    push(8'h00); push(8'h00); push(8'h01); push(8'hba);
+    push(8'h21); push(8'h00); push(8'h01); push(8'h00);
+    push(8'h01); push(8'h80); push(8'haa); push(8'hd3);
+
+    // System header: real captured bytes verbatim.
+    push(8'h00); push(8'h00); push(8'h01); push(8'hbb);
+    push(8'h00); push(8'h0c);
+    push(8'h80); push(8'haa); push(8'hd3); push(8'h04); push(8'h21); push(8'hff);
+    push(8'he0); push(8'he0); push(8'he6); push(8'hc0); push(8'hc0); push(8'h20);
+
+    // Video PES: real stream_id/legacy PTS+DTS bytes verbatim, but a short
+    // synthetic payload and a length field recomputed to match.
+    push(8'h00); push(8'h00); push(8'h01); push(8'he0);
+    video_len_pos = len; push(8'h00); push(8'h00);
+    push_pts_bytes(4'b0011, 33'd48003); // PTS+DTS marker, matches the real byte 0x31
+    push_pts_bytes(4'b0001, 33'd45000); // DTS marker, matches the real byte 0x11
+    push("S"); push("E"); push("Q"); push("H"); push("D"); push("R");
+    stream[video_len_pos]   = ((len - video_len_pos - 2) >> 8) & 8'hff;
+    stream[video_len_pos+1] = (len - video_len_pos - 2) & 8'hff;
+
+    push(8'h00); push(8'h00); push(8'h01); push(8'hb9);
+
+    $display("built %0d-byte legacy-form synthetic Program Stream", len);
+end
+endtask
 
 initial begin
     #5000000; // 5ms simulated-time watchdog
