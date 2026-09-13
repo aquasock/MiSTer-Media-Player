@@ -219,6 +219,19 @@ mpeg2_h262_download_rearm mpeg2_h262_download_rearm
 
 wire reset_mpeg2 = reset_mpeg2_base || mpeg2_download_rearm_reset;
 
+// The first scheduled frame starts playback. Keep message suppression through
+// subsequent bank swaps and EOF, clearing it only at reset or a fresh load.
+reg playback_started = 0;
+always @(posedge clk_mpeg2) begin
+    if (reset_mpeg2) playback_started <= 0;
+    else if (mpeg2_new_framebuffer_swap_reset_count != 0) playback_started <= 1;
+end
+video_config_cdc #(.WIDTH(1)) playback_osd_config (
+ .src_clk(clk_mpeg2), .dst_clk(clk_sys),
+ .src_data(playback_started), .dst_data(OSD_HIDE_MESSAGE)
+);
+
+
 // Entry 395: atomic Audio mode changes cross from clk_sys to clk_mpeg2 and
 // CLK_AUDIO through dedicated DCFIFO mailboxes. Only the PCM data FIFO uses
 // the stretched cross-domain clear; ordinary source/output state resets

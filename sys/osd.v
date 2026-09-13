@@ -4,6 +4,7 @@
 module osd
 (
 	input         clk_sys,
+	input         hide_message, // clk_sys; ordinary menu and info OSD remain visible
 	input         io_osd,
 	input         io_strobe,
 	input  [15:0] io_din,
@@ -33,6 +34,11 @@ localparam OSD_HDR      = 12'd0;
 `endif
 
 reg        osd_enable = 0;
+reg        message = 0;
+// Explicit static power-up state, shared by event-driven and compiled simulation.
+reg        highres = 0;
+reg [21:0] cnt = 0;
+reg        f1 = 0;
 (* ramstyle="no_rw_check" *) reg  [7:0] osd_buffer[OSD_HDR ? (4096+1024) : 4096];
 
 reg        info = 0;
@@ -51,7 +57,6 @@ always@(posedge clk_sys) begin
 	reg  [7:0] cmd;
 	reg        has_cmd;
 	reg        old_strobe;
-	reg        highres = 0;
 
 	osd_t <= rot[0] ? OSD_WIDTH : (OSD_HEIGHT<<1);
 	osd_h <= rot[0] ? (info ? infow : OSD_WIDTH) : info ? infoh : (OSD_HEIGHT<<highres);
@@ -73,6 +78,7 @@ always@(posedge clk_sys) begin
 				if(io_din[7:4] == 4) begin
 					if(!io_din[0]) {osd_status,highres} <= 0;
 					else {osd_status,info} <= {~io_din[2] & ~io_din[3],io_din[2]};
+					message <= io_din[3];
 					bcnt  <= 0;
 				end
 				// command 0x20: OSDCMDWRITE
@@ -112,13 +118,12 @@ wire [1:0] rot_video;
 wire [0:0] osd_enable_video;
 video_config_cdc #(.WIDTH(132)) osd_config (
  .src_clk(clk_sys),.dst_clk(clk_video),
- .src_data({info,infoh,infow,infox,infoy,osd_h,osd_t,osd_w,rot,osd_enable}),
+ .src_data({info,infoh,infow,infox,infoy,osd_h,osd_t,osd_w,rot,(osd_enable & ~(message & hide_message))}),
  .dst_data({info_video,infoh_video,infow_video,infox_video,infoy_video,osd_h_video,osd_t_video,osd_w_video,rot_video,osd_enable_video})
 );
 
 (* direct_enable *) reg ce_pix;
 always @(posedge clk_video) begin
-	reg [21:0] cnt = 0;
 	reg [21:0] pixsz, pixcnt;
 	reg deD;
 
@@ -183,7 +188,6 @@ always @(posedge clk_video) begin
 	reg [21:0] osd_hcnt2;
 	reg        osd_de1,osd_de2;
 	reg  [1:0] osd_en;
-	reg        f1;
 	reg        half;
 
 	if(ce_pix) begin

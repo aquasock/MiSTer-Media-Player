@@ -15,6 +15,7 @@ raster = ['tools/test_480p_scanout.sv', 'rtl/mpeg2_video_720x480p.sv',
           'rtl/mpeg2_luma_framebuffer.sv', 'rtl/mpeg2_progressive_geometry.sv',
           'rtl/mpeg2_new/mpeg2_ycbcr_to_rgb_bt601.sv']
 tests = [
+    ('test_osd_playback', ['tools/test_osd_playback.sv', 'sys/osd.v', 'rtl/video_config_cdc.sv']),
     ('test_480p_scanout', raster),
     ('test_video_config_cdc', ['tools/test_video_config_cdc.sv', 'rtl/video_config_cdc.sv']),
     ('test_mpeg2_progressive_framebuffer', ['tools/test_mpeg2_progressive_framebuffer.sv', 'rtl/mpeg2_progressive_geometry.sv']),
@@ -25,8 +26,19 @@ results = {}
 with tempfile.TemporaryDirectory(prefix='video-sync-') as tmp:
     def run(name, sources, expect_failure=False):
         binary = str(Path(tmp) / name)
-        subprocess.run(['iverilog', '-g2012', '-s', name, '-o', binary, *sources], cwd=root, check=True)
-        result = subprocess.run(['vvp', binary], cwd=root, text=True, capture_output=True, timeout=180)
+        if name == 'test_osd_playback':
+            # Tens of full raster frames are much faster in compiled simulation.
+            obj = str(Path(tmp) / 'osd_obj')
+            compiled = subprocess.run(['verilator', '--binary', '--timing', '-j', '6',
+                '-Wno-fatal', '--top-module', name, '--Mdir', obj, *sources],
+                cwd=root, text=True, capture_output=True)
+            if compiled.returncode:
+                raise RuntimeError(compiled.stdout + compiled.stderr)
+            command = [str(Path(obj) / ('V' + name))]
+        else:
+            subprocess.run(['iverilog', '-g2012', '-s', name, '-o', binary, *sources], cwd=root, check=True)
+            command = ['vvp', binary]
+        result = subprocess.run(command, cwd=root, text=True, capture_output=True, timeout=180)
         output = result.stdout + result.stderr
         print(output, end='', flush=True)
         if expect_failure:

@@ -143,6 +143,8 @@ set_false_path -to [get_keepers {*|picture_4_3_sync[0]}]
 
 # Configuration mailbox: data remains fixed from request through acknowledgement.
 # Cut only the held bundle and first control synchronizer stages.
+# RTL disables shift-RAM inference and preserves all three control registers;
+# phase1p_timing.tcl requires every stage of every configuration mailbox.
 set_false_path -from [get_keepers {*|video_config_cdc:*|held_data[*]}] -to [get_keepers {*|video_config_cdc:*|dst_data[*]}]
 set_false_path -to [get_keepers {*|video_config_cdc:*|req_sync[0]}]
 set_false_path -to [get_keepers {*|video_config_cdc:*|ack_sync[0]}]

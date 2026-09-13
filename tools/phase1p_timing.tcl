@@ -62,6 +62,35 @@ create_timing_netlist
 read_sdc
 update_timing_netlist
 
+# Reject a build whose mailbox/VS control chains vanished or became shift RAMs.
+# Check every stage of each required instance, not just a wildcard that could
+# accidentally match one surviving synchronizer elsewhere in the design.
+set cdc_audit [open "$output_dir/configuration_cdc_audit.rpt" w]
+foreach instance {aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
+    if {[string first "|" $instance] < 0} {
+        set prefix "*|video_config_cdc:$instance"
+    } else {
+        set prefix "*|osd:$instance"
+    }
+    foreach chain {req_sync ack_sync} {
+        for {set stage 0} {$stage < 3} {incr stage} {
+            set pattern [format {%s|%s[%d]} $prefix $chain $stage]
+            set count [get_collection_size [get_registers $pattern]]
+            puts $cdc_audit "$pattern: $count registers"
+            if {$count != 1} {error "Expected one preserved configuration synchronizer register: $pattern, found $count"}
+        }
+    }
+}
+foreach chain {hdmi_vs_sys_sync core_vs_sys_sync} {
+    for {set stage 0} {$stage < 3} {incr stage} {
+        set pattern [format {*|%s[%d]} $chain $stage]
+        set count [get_collection_size [get_registers $pattern]]
+        puts $cdc_audit "$pattern: $count registers"
+        if {$count != 1} {error "Expected one preserved VS synchronizer register: $pattern, found $count"}
+    }
+}
+close $cdc_audit
+
 # Current PLL configuration:
 #   decoder = 60.0 MHz = 16.667 ns
 #   video   = 27.0 MHz = 37.037 ns

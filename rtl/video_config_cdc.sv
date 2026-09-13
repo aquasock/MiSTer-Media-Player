@@ -7,7 +7,7 @@ module video_config_cdc #(parameter WIDTH=1)(
 );
 reg [WIDTH-1:0] held_data=0;
 reg request=0,acknowledge=0;
-(* altera_attribute="-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+(* preserve, altera_attribute="-name AUTO_SHIFT_REGISTER_RECOGNITION OFF; -name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] req_sync=0,ack_sync=0;
 always @(posedge src_clk) begin
  ack_sync <= {ack_sync[1:0],acknowledge};

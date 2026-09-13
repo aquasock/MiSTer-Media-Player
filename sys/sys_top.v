@@ -335,6 +335,7 @@ reg [11:0] vs_line = 0;
 reg        scaler_out = 0;
 reg        vrr_mode = 0;
 wire       hdmi_blackout;
+wire       osd_hide_message;
 
 reg [31:0] aflt_rate = 7056000;
 reg [39:0] acx  = 4258969;
@@ -550,7 +551,7 @@ end
 
 // Resynchronize VS levels before system-clock edge detection. Never compare
 // the asynchronous pin against the first synchronizer stage.
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+(* preserve, altera_attribute="-name AUTO_SHIFT_REGISTER_RECOGNITION OFF; -name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] hdmi_vs_sys_sync = 0, core_vs_sys_sync = 0;
 always @(posedge clk_sys) begin
  hdmi_vs_sys_sync <= {hdmi_vs_sys_sync[1:0], HDMI_TX_VS};
@@ -725,6 +726,23 @@ wire         bob_deint;
 `ifndef MISTER_DEBUG_NOHDMI
 	wire clk_hdmi  = hdmi_clk_out;
 
+// Independent acknowledged mode snapshots for ASCAL input and output clocks.
+wire [4:0] scaler_mode_input, scaler_mode_output;
+wire [4:0] scaler_mode_sys = {1'b0,~lowlat,LFB_EN ? LFB_FLT : |scaler_flt,2'b00};
+video_config_cdc #(.WIDTH(5)) scaler_input_config (
+ .src_clk(clk_sys), .dst_clk(clk_ihdmi),
+ .src_data(scaler_mode_sys), .dst_data(scaler_mode_input)
+);
+video_config_cdc #(.WIDTH(5)) scaler_output_config (
+ .src_clk(clk_sys), .dst_clk(clk_hdmi),
+ .src_data(scaler_mode_sys), .dst_data(scaler_mode_output)
+);
+wire [0:0] lfb_enable_hdmi;
+video_config_cdc #(.WIDTH(1)) framebuffer_enable_config (
+ .src_clk(clk_sys), .dst_clk(clk_hdmi),
+ .src_data(LFB_EN), .dst_data(lfb_enable_hdmi)
+);
+
 	ascal 
 	#(
 		.RAMBASE(32'h20000000),
@@ -805,7 +823,8 @@ wire         bob_deint;
 		.swblack  (hdmi_blackout),
 
 		// kate - Commit 174: explicitly drive ASCAL's documented TBD MODE[4] low.
-		.mode     ({1'b0,~lowlat,LFB_EN ? LFB_FLT : |scaler_flt,2'b00}),
+		.mode     (scaler_mode_output),
+		.mode_input(scaler_mode_input),
 		.poly_clk (clk_sys),
 		.poly_a   (coef_addr),
 		.poly_dw  (coef_data),
@@ -917,25 +936,47 @@ reg [11:0] arx;
 reg [11:0] ary;
 reg        arxy;
 
+// Hold system configuration until the video-domain aspect calculator acknowledges it.
+wire [11:0] WIDTH_video;
+wire [11:0] HEIGHT_video;
+wire [11:0] HSET_video;
+wire [11:0] VSET_video;
+wire [0:0] HDMI_PR_video;
+wire [0:0] FREESCALE_video;
+wire [0:0] LFB_EN_video;
+wire [11:0] LFB_HMIN_video;
+wire [11:0] LFB_HMAX_video;
+wire [11:0] LFB_VMIN_video;
+wire [11:0] LFB_VMAX_video;
+wire [12:0] arc1x_video;
+wire [12:0] arc1y_video;
+wire [12:0] arc2x_video;
+wire [12:0] arc2y_video;
+video_config_cdc #(.WIDTH(151)) platform_aspect_config (
+ .src_clk(clk_sys), .dst_clk(clk_vid),
+ .src_data({WIDTH,HEIGHT,HSET,VSET,HDMI_PR,FREESCALE,LFB_EN,LFB_HMIN,LFB_HMAX,LFB_VMIN,LFB_VMAX,arc1x,arc1y,arc2x,arc2y}),
+ .dst_data({WIDTH_video,HEIGHT_video,HSET_video,VSET_video,HDMI_PR_video,FREESCALE_video,LFB_EN_video,LFB_HMIN_video,LFB_HMAX_video,LFB_VMIN_video,LFB_VMAX_video,arc1x_video,arc1y_video,arc2x_video,arc2y_video})
+);
+
 always @(posedge clk_vid) begin
 	reg [11:0] hmini,hmaxi,vmini,vmaxi;
 	reg [11:0] wcalc,videow;
 	reg [11:0] hcalc,videoh;
 	reg  [2:0] state;
 
-	hdmi_height <= (VSET && (VSET < HEIGHT)) ? VSET : HEIGHT;
-	hdmi_width  <= (HSET && (HSET < WIDTH))  ? HSET << HDMI_PR : WIDTH << HDMI_PR;
+	hdmi_height <= (VSET_video && (VSET_video < HEIGHT_video)) ? VSET_video : HEIGHT_video;
+	hdmi_width  <= (HSET_video && (HSET_video < WIDTH_video))  ? HSET_video << HDMI_PR_video : WIDTH_video << HDMI_PR_video;
 
 	if(!ARY) begin
 		if(ARX == 1) begin
-			arx  <= arc1x[11:0];
-			ary  <= arc1y[11:0];
-			arxy <= arc1x[12] | arc1y[12];
+			arx  <= arc1x_video[11:0];
+			ary  <= arc1y_video[11:0];
+			arxy <= arc1x_video[12] | arc1y_video[12];
 		end
 		else if(ARX == 2) begin
-			arx  <= arc2x[11:0];
-			ary  <= arc2y[11:0];
-			arxy <= arc2x[12] | arc2y[12];
+			arx  <= arc2x_video[11:0];
+			ary  <= arc2y_video[11:0];
+			arxy <= arc2x_video[12] | arc2y_video[12];
 		end
 		else begin
 			arx  <= 0;
@@ -952,14 +993,14 @@ always @(posedge clk_vid) begin
 	ar_md_start <= 0;
 	state <= state + 1'd1;
 	case(state)
-		0: if(LFB_EN) begin
-				hmini <= LFB_HMIN;
-				vmini <= LFB_VMIN;
-				hmaxi <= LFB_HMAX;
-				vmaxi <= LFB_VMAX;
+		0: if(LFB_EN_video) begin
+				hmini <= LFB_HMIN_video;
+				vmini <= LFB_VMIN_video;
+				hmaxi <= LFB_HMAX_video;
+				vmaxi <= LFB_VMAX_video;
 				state <= 0;
 			end
-			else if(FREESCALE || !arx || !ary) begin
+			else if(FREESCALE_video || !arx || !ary) begin
 				wcalc <= hdmi_width;
 				hcalc <= hdmi_height;
 				state <= 6;
@@ -993,15 +1034,15 @@ always @(posedge clk_vid) begin
 			end
 
 		6: begin
-				videow <= (wcalc > hdmi_width)  ? (hdmi_width >> HDMI_PR)  : (wcalc[11:0] >> HDMI_PR);
+				videow <= (wcalc > hdmi_width)  ? (hdmi_width >> HDMI_PR_video)  : (wcalc[11:0] >> HDMI_PR_video);
 				videoh <= (hcalc > hdmi_height) ? hdmi_height : hcalc[11:0];
 			end
 
 		7: begin
-				hmini <= ((WIDTH  - videow)>>1);
-				hmaxi <= ((WIDTH  - videow)>>1) + videow - 1'd1;
-				vmini <= ((HEIGHT - videoh)>>1);
-				vmaxi <= ((HEIGHT - videoh)>>1) + videoh - 1'd1;
+				hmini <= ((WIDTH_video  - videow)>>1);
+				hmaxi <= ((WIDTH_video  - videow)>>1) + videow - 1'd1;
+				vmini <= ((HEIGHT_video - videoh)>>1);
+				vmaxi <= ((HEIGHT_video - videoh)>>1) + videoh - 1'd1;
 			end
 	endcase
 	
@@ -1160,7 +1201,7 @@ cyclonev_hps_interface_peripheral_i2c hdmi_i2c
 	reg dis_output;
 	always @(posedge clk_hdmi) begin
 		reg dis;
-		dis <= fb_force_blank & ~LFB_EN;
+		dis <= fb_force_blank & ~lfb_enable_hdmi;
 		dis_output <= dis;
 	end
 	`else
@@ -1186,7 +1227,7 @@ cyclonev_hps_interface_peripheral_i2c hdmi_i2c
 		.vs_in(hdmi_vs),
 		.de_in(hdmi_de),
 		.brd_in(hdmi_brd),
-		.enable(~LFB_EN),
+		.enable(~lfb_enable_hdmi),
 
 		.dout(hdmi_data_mask),
 		.hs_out(hdmi_hs_mask),
@@ -1199,6 +1240,7 @@ cyclonev_hps_interface_peripheral_i2c hdmi_i2c
 
 	osd hdmi_osd
 	(
+		.hide_message(osd_hide_message),
 		.clk_sys(clk_sys),
 
 		.io_osd(io_osd_hdmi),
@@ -1419,6 +1461,7 @@ wire [23:0] vga_data_osd;
 wire        vga_vs_osd, vga_hs_osd, vga_de_osd;
 osd vga_osd
 (
+	.hide_message(osd_hide_message),
 	.clk_sys(clk_sys),
 
 	.io_osd(io_osd_vga),
@@ -1798,6 +1841,7 @@ emu emu
 	.HDMI_WIDTH(direct_video ? 12'd0 : hdmi_width),
 	.HDMI_HEIGHT(direct_video ? 12'd0 : hdmi_height),
 	.HDMI_FREEZE(freeze),
+	.OSD_HIDE_MESSAGE(osd_hide_message),
 	.HDMI_BLACKOUT(hdmi_blackout),
 	.HDMI_BOB_DEINT(bob_deint),
 

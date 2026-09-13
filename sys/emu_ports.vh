@@ -33,6 +33,8 @@ output        VGA_DISABLE, // analog out is off
 
 input  [11:0] HDMI_WIDTH,
 input  [11:0] HDMI_HEIGHT,
+// System-clock level: suppress message windows while media is playing.
+output        OSD_HIDE_MESSAGE,
 output        HDMI_FREEZE,
 output        HDMI_BLACKOUT,
 output        HDMI_BOB_DEINT,

@@ -203,7 +203,8 @@ ENTITY ascal IS
 		-- Output video parameters
 		run       : IN std_logic :='1'; -- 1=Enable output image. 0=No image
 		freeze    : IN std_logic :='0'; -- 1=Disable framebuffer writes
-		mode      : IN unsigned(4 DOWNTO 0);
+		mode      : IN unsigned(4 DOWNTO 0); -- Synchronous to o_clk
+		mode_input : IN unsigned(4 DOWNTO 0); -- Synchronous to i_clk
  		bob_deint : IN std_logic := '0';
 		-- SYNC  |_________________________/"""""""""\_______|
 		-- DE    |""""""""""""""""""\________________________|
@@ -1335,7 +1336,7 @@ BEGIN
 					i_hburst<=(i_hrsize*4 + N_BURST - 1) / N_BURST;
 				END IF;
 				----------------------------------------------------
-				i_mode<=mode; -- <ASYNC>
+				i_mode<=mode_input;
 				i_format<=format; -- <ASYNC>
 
 				-- Downscaling : Nearest or bilinear
@@ -1913,7 +1914,7 @@ BEGIN
 
 		ELSIF rising_edge(o_clk) THEN
 			------------------------------------------------------
-			o_mode   <=mode; -- <ASYNC> ?
+			o_mode   <=mode;
 			o_format <="0001" & format; -- <ASYNC> ?
 
 			o_run    <=run; -- <ASYNC> ?

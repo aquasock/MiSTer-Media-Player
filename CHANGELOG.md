@@ -15,6 +15,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Fixed
 
+- Hide Main's loading-message overlay once playback starts, preserving normal menus.
+- Preserve configuration and VS synchronizer flip-flops through synthesis and
+  transfer platform aspect and scaler mode settings into their consuming clocks.
+
 - Keep HS/VS/DE continuous across frame-buffer bank resets, preventing extra
   negative-sync pulses during progressive playback.
 - Transfer OSD and aspect settings through acknowledged clock-domain mailboxes;
