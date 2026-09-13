@@ -101,7 +101,7 @@ always @(posedge clk_video) begin
     if (reset_video)
         mpeg2_new_swap_window_video <= 1'b0;
     else
-        mpeg2_new_swap_window_video <= (display_v_pos >= 12'd600);
+        mpeg2_new_swap_window_video <= (display_v_pos >= 12'd480);
 end
 
 always @(posedge clk_mpeg2) begin

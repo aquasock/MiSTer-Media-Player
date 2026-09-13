@@ -58,7 +58,7 @@ localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
 localparam [31:0] SNAPSHOT_FORMAT={8'd8,8'd41,16'd60000};
-localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd432;
+localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd312;
 localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd164;
 
 reg session_active;

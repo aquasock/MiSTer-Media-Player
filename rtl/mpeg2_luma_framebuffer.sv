@@ -10,7 +10,7 @@
 //   Cr : two cached 360-pel lines, 45 x 64-bit words per line
 //
 // The memory side runs at the decoder/DDRAM clock.  The presentation side runs
-// at the independent fixed 40 MHz video clock.  Each cache RAM is dual-clock.
+// at the independent fixed 27 MHz video clock.  Each cache RAM is dual-clock.
 //
 // The first two luma lines and first two chroma lines are prefetched before a
 // picture is published.  Once display begins, finishing source line N frees a
@@ -44,7 +44,7 @@ module mpeg2_luma_framebuffer
     output reg         read_seen,
     output reg         cache_error,
 
-    // Independent fixed video side - 40 MHz.
+    // Independent fixed video side - 27 MHz.
     input  wire        rd_clk,
     input  wire [11:0] h_pos,
     input  wire [11:0] v_pos,
@@ -585,7 +585,7 @@ reg [10:0] picture_height_r2;
 reg        picture_present_rd;
 
 // kate - Phase 1P: the module reset input is synchronized to mem_clk by the
-// top level.  It still crosses into the independent 40 MHz rd_clk domain, so
+// top level.  It still crosses into the independent 27 MHz rd_clk domain, so
 // synchronize only its RELEASE again here.  Assertion remains asynchronous.
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] rd_reset_sync;
@@ -627,10 +627,10 @@ always @(posedge rd_clk) begin
         // Mark a source line free one pixel after its final cache read request.
         // Only the event toggle crosses to mem_clk; the memory-side sequence
         // counter supplies the source-line identity.
-        if (picture_present_rd && pixel_en &&
-            (h_pos == 12'd760) &&
-            (v_pos >= 12'd60) &&
-            (v_pos < (12'd60 + {1'b0, picture_height_r2}))) begin
+        if (picture_present_rd &&
+            (h_pos == origin_x + picture_width_r2) &&
+            (v_pos >= origin_y) &&
+            (v_pos < (origin_y + {1'b0, picture_height_r2}))) begin
             line_done_toggle_rd <= ~line_done_toggle_rd;
         end
     end
@@ -640,13 +640,14 @@ end
 // Video-side cache addressing and full-precision 4:2:0 expansion.
 // -------------------------------------------------------------------------
 
-wire source_window =
-    pixel_en &&
-    (h_pos >= 12'd40)  && (h_pos < 12'd760) &&
-    (v_pos >= 12'd60)  && (v_pos < 12'd540);
-
-wire [11:0] source_x = h_pos - 12'd40;
-wire [11:0] source_y = v_pos - 12'd60;
+wire [11:0] origin_x, origin_y, source_x, source_y;
+wire source_window;
+mpeg2_progressive_geometry geometry (
+    .pixel_en(pixel_en), .h_pos(h_pos), .v_pos(v_pos),
+    .picture_width(picture_width_r2), .picture_height(picture_height_r2),
+    .origin_x(origin_x), .origin_y(origin_y),
+    .source_window(source_window), .source_x(source_x), .source_y(source_y)
+);
 
 wire decoded_picture_window =
     source_window &&
@@ -669,6 +670,7 @@ wire [2:0] c_byte_lane = source_x[3:1];
 reg [2:0] y_byte_lane_d;
 reg [2:0] c_byte_lane_d;
 reg       source_window_d;
+reg       pixel_en_d, h_sync_d, v_sync_d;
 reg       decoded_picture_window_d;
 
 reg [7:0] y_rd_data;
@@ -746,6 +748,7 @@ always @(posedge rd_clk) begin
         video_r                   <= 8'd0;
         video_g                   <= 8'd0;
         video_b                   <= 8'd0;
+        pixel_en_d <= 1'b0; h_sync_d <= 1'b1; v_sync_d <= 1'b1;
         video_de                  <= 1'b0;
         video_hs                  <= 1'b0;
         video_vs                  <= 1'b0;
@@ -756,9 +759,10 @@ always @(posedge rd_clk) begin
         source_window_d          <= source_window;
         decoded_picture_window_d <= decoded_picture_window;
 
-        video_de <= pixel_en;
-        video_hs <= h_sync;
-        video_vs <= v_sync;
+        pixel_en_d <= pixel_en; h_sync_d <= h_sync; v_sync_d <= v_sync;
+        video_de <= pixel_en_d;
+        video_hs <= h_sync_d;
+        video_vs <= v_sync_d;
 
         if (decoded_picture_window_d) begin
             video_r <= rgb_r;

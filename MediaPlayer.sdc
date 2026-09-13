@@ -15,18 +15,18 @@ set_false_path \
 
 # kate - Phase 1P CDC/reset timing closure.
 #
-# The 40 MHz video and 54 MHz MPEG clocks are both PLL-derived, but the
+# The 27 MHz video and 60 MHz MPEG clocks are both PLL-derived, but the
 # framebuffer deliberately transfers a few control/descriptor values through
 # explicit synchronizer stages.  Do not mark the entire clock domains
 # asynchronous: that would hide accidental future crossings.  Cut only the
 # proven first-stage CDC paths; stage 2 and all ordinary same-clock logic remain
 # timed normally.
 
-# 54 MHz memory/decoder -> 40 MHz presentation descriptor handshake.
+# 60 MHz memory/decoder -> 27 MHz presentation descriptor handshake.
 # picture_width_mem / picture_height_mem are captured before cache_ready is
 # asserted and remain stable for the displayed picture.  cache_ready itself is
 # synchronized separately.  These exceptions therefore cover only the first
-# sampling registers in the 40 MHz domain.
+# sampling registers in the 27 MHz domain.
 set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|picture_height_mem[*]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|picture_height_r1[*]}]
@@ -37,17 +37,17 @@ set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|cache_ready}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|cache_ready_r1}]
 
-# 40 MHz presentation -> 54 MHz memory/decoder line-consumed handshake.
+# 27 MHz presentation -> 60 MHz memory/decoder line-consumed handshake.
 # kate - Phase 1S removed the old asynchronous 11-bit line-number bus.  Only the
-# event toggle now crosses domains; the 54 MHz side derives source-line identity
+# event toggle now crosses domains; the 60 MHz side derives source-line identity
 # from a local sequential counter.  Cut only the first toggle synchronizer stage.
 set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_toggle_rd*}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_toggle_m1}]
 
 # kate - Phase 1S publication scheduling adds one single-bit video-domain
-# blanking-window level.  It is registered in the 40 MHz domain, then sampled by
-# an explicit three-stage synchronizer in the 54 MHz decoder/DDRAM domain.  Cut
+# blanking-window level.  It is registered in the 27 MHz domain, then sampled by
+# an explicit three-stage synchronizer in the 60 MHz decoder/DDRAM domain.  Cut
 # only the asynchronous source -> first synchronizer stage; later stages and the
 # scheduler remain fully timed.
 set_false_path \
@@ -104,20 +104,20 @@ set_false_path \
     -to   [get_keepers {*|reset_video_sync[*]}]
 
 # The framebuffer reset reaches a second async-assert/sync-deassert chain in
-# the independent 40 MHz read domain.  Cut only the asynchronous transfer from
+# the independent 27 MHz read domain.  Cut only the asynchronous transfer from
 # the already-synchronized MPEG reset output into that chain.
 set_false_path \
     -from [get_keepers {*|reset_mpeg2_sync[2]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
 
 # kate - Phase 1R controlled frame-bank publication uses a four-cycle reset
-# request generated entirely in the 54 MHz memory/decoder domain to restart the
+# request generated entirely in the 60 MHz memory/decoder domain to restart the
 # framebuffer memory-side prefill state after bank 1 has been completed.  That
-# request also intentionally asserts the framebuffer's existing 40 MHz
+# request also intentionally asserts the framebuffer's existing 27 MHz
 # rd_reset_sync chain asynchronously; release is still synchronized by the
 # chain itself.  Treat only this new assertion boundary like the original
 # reset_mpeg2_sync boundary above.  Do not cut the stage-to-stage release paths
-# or any other 54 MHz -> 40 MHz logic.
+# or any other 60 MHz -> 27 MHz logic.
 set_false_path \
     -from [get_keepers {*|mpeg2_h262_b_presentation_scheduler:*|framebuffer_swap_reset_count[*]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
@@ -137,3 +137,6 @@ set_false_path \
 # wraclr/rdaclr synchronizer stage-0 structure rather than the whole FIFO.
 set_false_path -to [get_keepers {*|dcfifo:*|dcfifo_*:auto_generated|dffpipe_*:wraclr|dffe*a[0]}]
 set_false_path -to [get_keepers {*|dcfifo:*|dcfifo_*:auto_generated|dffpipe_*:rdaclr|dffe*a[0]}]
+
+# Slow sequence-aspect indication into the video domain.
+set_false_path -to [get_keepers {*|picture_4_3_sync[0]}]

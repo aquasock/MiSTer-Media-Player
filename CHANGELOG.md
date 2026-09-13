@@ -17,8 +17,14 @@ This project is still in active pre-release development. Published milestone rel
 
 - Restore progressive video from `a57079f` using stock MiSTer Main. Source
   `9233f07` seed 52 was hardware-accepted with the generated 30-second MPG.
-- Keep the 800x600 output raster for this audio milestone; native progressive
-  720x480 output follows synchronized-audio hardware acceptance.
+- Source `1750154` seed 87 passed all timing classes and the user's playback
+  test, using 40,132 ALMs and 470 RAM blocks. Seed 61 also passed timing;
+  seed 52 exited with a Quartus fitter crash.
+- Replace the 800x600 raster with progressive-only 720x480 at 60000/1001 Hz
+  using a 27 MHz pixel clock. Retain 60 MHz decoding and FPGA MP2 audio.
+- Center smaller pictures, align DE/sync with the RGB cache pipeline, adjust
+  the blanking swap window and fallback cadence, and fit telemetry within
+  480 lines. Native output hardware qualification remains pending.
 - Source `ace6b7b` seed 87 passed the user's synchronized flash/beep playback
   test. Telemetry confirmed 1,250 MP2 frames, 1,440,000 stereo sample pairs,
   clean completion and zero error flags; one 106.6 ms video gap was recorded.

@@ -36,19 +36,20 @@ def _cell_bit(image: Image.Image, column: int, row: int, origin_y: int = Y0) -> 
 
 def decode_words(path: Path | str) -> list[int]:
     image = Image.open(path).convert("RGB")
-    if image.width < X0 + 43 * CELL or image.height < Y0 + WORDS * CELL:
-        raise TelemetryDecodeError(
-            f"image is {image.width}x{image.height}; an unscaled 800x600 "
-            "MiSTer screenshot is required"
-        )
-
-    origin_y, count = Y0, WORDS
-    # Schema eight adds audio counters and moves the taller barcode upward.
-    probe = [_cell_bit(image, column, 0, 432) for column in range(43)]
-    magic = 0
-    for bit in probe[10:42]: magic = (magic << 1) | bit
-    if tuple(probe[:4]) == ROW_PREFIX and magic == MAGIC:
-        origin_y, count = 432, 41
+    origin_y, count = None, None
+    # Native 480p schema 8, prior SVGA schema 8, and legacy SVGA schema 7.
+    for candidate_y, candidate_count in ((312, 41), (432, 41), (444, 38)):
+        if image.width < X0 + 43 * CELL or image.height < candidate_y + candidate_count * CELL:
+            continue
+        probe = [_cell_bit(image, column, 0, candidate_y) for column in range(43)]
+        magic = 0
+        for bit in probe[10:42]:
+            magic = (magic << 1) | bit
+        if tuple(probe[:4]) == ROW_PREFIX and magic == MAGIC:
+            origin_y, count = candidate_y, candidate_count
+            break
+    if origin_y is None:
+        raise TelemetryDecodeError("telemetry absent; use an unscaled 720x480 or 800x600 MiSTer screenshot")
     words: list[int] = []
     for row in range(count):
         bits = [_cell_bit(image, column, row, origin_y) for column in range(43)]

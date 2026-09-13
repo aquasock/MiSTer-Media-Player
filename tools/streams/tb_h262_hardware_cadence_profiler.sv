@@ -127,7 +127,7 @@ endtask
 task verify_overlay_prefix;
     integer x;
 begin
-    v_pos=12'd445;
+    v_pos=12'd313;
     for(x=0;x<=29;x=x+1)begin
         @(negedge clk_video);h_pos=x;
         @(posedge clk_video);#1;

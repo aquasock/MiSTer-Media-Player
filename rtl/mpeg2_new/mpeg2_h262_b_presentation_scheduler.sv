@@ -85,34 +85,28 @@ reg last_bound_reference_valid;
 reg [1:0] last_bound_reference_bank;
 reg [7:0] last_bound_reference_count;
 
-// Entry 354: the fixed 40 MHz 800x600 raster produces one swap window every
-// 1056*628 pixels.  Accumulate source-picture credit in pixel-clock units for
-// the 24000/1001, exact 24, 25, 30000/1001, and exact 30 fps Table 6-4 rates.
-// The 24000/1001 fractional rate uses the exact reduced ratio
-//     (663168 * 24000) / (40000000 * 1001) = 22608 / 56875
-// and the 30000/1001 rate uses
-//     (663168 * 30000) / (40000000 * 1001) = 5652 / 11375
-// so neither drifts or rounds to its neighboring integer rate.  Saturating at
-// the next due slot prevents a decode stall from banking credit and replaying
-// ready pictures on consecutive refreshes.
-localparam [25:0] CADENCE_LIMIT_24000_1001 = 26'd56875;
-localparam [25:0] CADENCE_STEP_24000_1001  = 26'd22608;
+// One swap window per 858*525 pixels at 27 MHz (60000/1001 Hz).
+// Exact source-picture credit ratios: 2/5 for 24000/1001 and 1/2
+// for 30000/1001; integer rates retain a common 27 MHz denominator.
+// Keep the existing stall saturation and timestamp override policy.
+localparam [25:0] CADENCE_LIMIT_24000_1001 = 26'd5;
+localparam [25:0] CADENCE_STEP_24000_1001  = 26'd2;
 localparam [25:0] CADENCE_DUE_24000_1001 =
     CADENCE_LIMIT_24000_1001-CADENCE_STEP_24000_1001;
-localparam [25:0] CADENCE_LIMIT_24FPS = 26'd40000000;
-localparam [25:0] CADENCE_STEP_24FPS  = 26'd15916032;
+localparam [25:0] CADENCE_LIMIT_24FPS = 26'd27000000;
+localparam [25:0] CADENCE_STEP_24FPS  = 26'd10810800;
 localparam [25:0] CADENCE_DUE_24FPS =
     CADENCE_LIMIT_24FPS-CADENCE_STEP_24FPS;
-localparam [25:0] CADENCE_LIMIT_25FPS = 26'd40000000;
-localparam [25:0] CADENCE_STEP_25FPS  = 26'd16579200;
+localparam [25:0] CADENCE_LIMIT_25FPS = 26'd27000000;
+localparam [25:0] CADENCE_STEP_25FPS  = 26'd11261250;
 localparam [25:0] CADENCE_DUE_25FPS =
     CADENCE_LIMIT_25FPS-CADENCE_STEP_25FPS;
-localparam [25:0] CADENCE_LIMIT_30000_1001 = 26'd11375;
-localparam [25:0] CADENCE_STEP_30000_1001  = 26'd5652;
+localparam [25:0] CADENCE_LIMIT_30000_1001 = 26'd2;
+localparam [25:0] CADENCE_STEP_30000_1001  = 26'd1;
 localparam [25:0] CADENCE_DUE_30000_1001 =
     CADENCE_LIMIT_30000_1001-CADENCE_STEP_30000_1001;
-localparam [25:0] CADENCE_LIMIT_30FPS = 26'd40000000;
-localparam [25:0] CADENCE_STEP_30FPS  = 26'd19895040;
+localparam [25:0] CADENCE_LIMIT_30FPS = 26'd27000000;
+localparam [25:0] CADENCE_STEP_30FPS  = 26'd13513500;
 localparam [25:0] CADENCE_DUE_30FPS =
     CADENCE_LIMIT_30FPS-CADENCE_STEP_30FPS;
 reg [25:0] cadence_credit;

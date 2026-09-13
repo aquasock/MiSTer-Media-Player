@@ -67,8 +67,16 @@ assign BUTTONS = 0;
 
 wire [1:0] ar = status[122:121];
 
-assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
+// Sequence aspect is stable during playback; synchronize the slow 4:3 flag.
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] picture_4_3_sync;
+always @(posedge clk_video) begin
+    if (reset_video) picture_4_3_sync <= 0;
+    else picture_4_3_sync <= {picture_4_3_sync[1:0],
+        mpeg2_new_aspect_ratio_information == 4'd2};
+end
+assign VIDEO_ARX = (!ar) ? (picture_4_3_sync[2] ? 12'd4 : 12'd16) : (ar - 1'd1);
+assign VIDEO_ARY = (!ar) ? (picture_4_3_sync[2] ? 12'd3 : 12'd9) : 12'd0;
 
 `include "build_id.v"
 localparam CONF_STR = {

@@ -1,4 +1,4 @@
-mpeg2_video_svga_800x600 mpeg2_video_svga_800x600
+mpeg2_video_720x480p mpeg2_video_720x480p
 (
 	.clk      (clk_video),
 	.reset    (reset_video),
