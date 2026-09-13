@@ -575,6 +575,31 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "framebuffer_second_field_cache_addr_sum": (
             words[62] & 0xFFFF if schema_version >= 18 else None
         ),
+        # Entry 991: a one-shot snapshot of mpeg2_new_decoder_stream_ready and
+        # its gating terms, armed after ~3 seconds of continuous real stall
+        # (bytes waiting but the decoder not accepting them). Word 58 is
+        # hardwired to 0 in this build's DEADLINE_DIAGNOSTICS=1 configuration
+        # otherwise, so stall_diag_valid distinguishes "never stalled long
+        # enough to arm" from a genuine all-clear.
+        "stall_diag_valid": bool((words[58] >> 20) & 1),
+        "stall_diag_display_frame_bank": (words[58] >> 18) & 0x3,
+        "stall_diag_active_frame_bank": (words[58] >> 16) & 0x3,
+        "stall_diag_stream_ready": bool((words[58] >> 15) & 1),
+        "stall_diag_destination_hold": bool((words[58] >> 14) & 1),
+        "stall_diag_presentation_hold": bool((words[58] >> 13) & 1),
+        "stall_diag_decoder_stream_ready": bool((words[58] >> 12) & 1),
+        "stall_diag_parser_ready": bool((words[58] >> 0) & 1),
+        "stall_diag_p_hold_raw": bool((words[58] >> 1) & 1),
+        "stall_diag_p_hold_effective": bool((words[58] >> 2) & 1),
+        "stall_diag_b_parse_hold": bool((words[58] >> 3) & 1),
+        "stall_diag_b_persistence_wait": bool((words[58] >> 4) & 1),
+        "stall_diag_b_picture_inflight": bool((words[58] >> 5) & 1),
+        "stall_diag_b_seen": bool((words[58] >> 6) & 1),
+        "stall_diag_b_persistence_verified": bool((words[58] >> 7) & 1),
+        "stall_diag_b_error": bool((words[58] >> 8) & 1),
+        "stall_diag_b_candidate": bool((words[58] >> 9) & 1),
+        "stall_diag_b_transport": bool((words[58] >> 10) & 1),
+        "stall_diag_p_error_raw": bool((words[58] >> 11) & 1),
         "checksum": words[-1],
     }
 

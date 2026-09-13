@@ -49,8 +49,17 @@ module mpeg2_h262_two_picture_probe
     output wire[6:0] first_luma_ac_nonzero_count,output wire[5:0] first_luma_last_coeff_index,
     output wire signed[11:0] first_luma_last_ac_level,output wire slice_start,output wire luma_macroblock_start,
     output wire[2:0] qfs_block_index,output wire qfs_block_start,output wire qfs_write_en,
-    output wire[5:0] qfs_write_index,output wire signed[12:0] qfs_write_value,output wire qfs_block_end
+    output wire[5:0] qfs_write_index,output wire signed[12:0] qfs_write_value,output wire qfs_block_end,
+    // Entry 991: passive observability only, for a stall-triggered snapshot
+    // capture in MediaPlayer.sv. Bundles the individual terms of the
+    // stream_ready expression below so a sustained real stall (decoder_ready
+    // stuck low with bytes waiting) can be diagnosed precisely from a
+    // screenshot instead of guessed at from source reading alone.
+    output wire[11:0] stall_probe_debug
 );
+assign stall_probe_debug={p_error_raw,b_transport,b_candidate,b_error,
+    b_persistence_verified,b_seen,b_picture_inflight,b_persistence_wait,
+    b_parse_hold,p_hold_effective,p_hold_raw,parser_ready};
 
 wire parser_ready,p_picture_expected,bookkeeper_error,p_hold_raw,p_error_raw;
 wire p_unsupported_raw;

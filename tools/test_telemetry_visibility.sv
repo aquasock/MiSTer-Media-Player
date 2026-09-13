@@ -29,6 +29,7 @@ mpeg2_h262_hardware_cadence_profiler dut (
     .base_b(8'h56),
     .base_de(1'b1),
     .telemetry_visible(telemetry_visible),
+    .stall_diag_word(32'd0),
     .video_r(video_r),
     .video_g(video_g),
     .video_b(video_b),

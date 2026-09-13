@@ -117,6 +117,10 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire [11:0] v_pos,input wire [7:0] base_r,
     input wire [7:0] base_g,input wire [7:0] base_b,input wire base_de,
     input wire telemetry_visible,
+    // Entry 991: already latched one-shot by the caller (MediaPlayer.sv),
+    // published verbatim as snapshot word 58 in place of the DEADLINE_
+    // DIAGNOSTICS-mode hardwired zero that word carried before.
+    input wire [31:0] stall_diag_word,
     output reg [7:0] video_r,output reg [7:0] video_g,
     output reg [7:0] video_b,output wire snapshot_ready
 );
@@ -701,7 +705,7 @@ wire [31:0] snapshot_word_56=DEADLINE_DIAGNOSTICS ?
 wire [31:0] snapshot_word_57=DEADLINE_DIAGNOSTICS ?
     {18'd0,audio_fifo_floor_q} : legacy_snapshot_word_57;
 wire [31:0] snapshot_word_58=DEADLINE_DIAGNOSTICS ?
-    32'd0 : legacy_snapshot_word_58;
+    stall_diag_word : legacy_snapshot_word_58;
 wire [31:0] snapshot_word_59=DEADLINE_DIAGNOSTICS ?
     32'd0 : legacy_snapshot_word_59;
 wire [31:0] snapshot_word_60=DEADLINE_DIAGNOSTICS ?

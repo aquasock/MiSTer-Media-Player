@@ -1206,6 +1206,9 @@ wire [1:0]  mpeg2_new_completed_frame_bank;
 // bookkeeper (see mpeg2_h262_two_picture_probe_p_chain.sv and
 // mpeg2_h262_b_presentation_scheduler.sv for the full explanation).
 wire        mpeg2_new_overlap_reference_abandoned;
+// Entry 991: passive observability bundle from the picture bookkeeper,
+// captured into a stall-triggered snapshot below.
+wire [11:0] mpeg2_new_stall_probe_debug;
 wire [7:0]  mpeg2_new_picture_count;
 wire        mpeg2_new_reference_frame_valid;
 wire [1:0]  mpeg2_new_reference_frame_bank;
@@ -1521,7 +1524,8 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.qfs_write_en                (mpeg2_new_qfs_write_en),
 	.qfs_write_index             (mpeg2_new_qfs_write_index),
 	.qfs_write_value             (mpeg2_new_qfs_write_value),
-	.qfs_block_end               (mpeg2_new_qfs_block_end)
+	.qfs_block_end               (mpeg2_new_qfs_block_end),
+	.stall_probe_debug           (mpeg2_new_stall_probe_debug)
 );
 
 mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
@@ -2669,6 +2673,7 @@ mpeg2_h262_hardware_cadence_profiler
     .base_b                    (presentation_base_b),
     .base_de                   (presentation_base_de),
     .telemetry_visible         (status[125]),
+    .stall_diag_word           (mpeg2_new_stall_diag_word),
     .video_r                   (cadence_video_r),
     .video_g                   (cadence_video_g),
     .video_b                   (cadence_video_b),
@@ -2774,6 +2779,56 @@ wire mpeg2_new_normal_user_led =
 //   3 pred            6 idct                            9 ddr_cache
 //  10 ddr_cache_bank_overlap
 //
+// Entry 991: a one-shot, stall-triggered snapshot of exactly what is
+// holding mpeg2_new_decoder_stream_ready low, since hardware testing found
+// entries 986 and 990's fixes were both real and correct but neither was
+// the actual dominant blocker - live counters in the corner telemetry
+// (presentation_stall_cycles, destination_stall_cycles) showed both hold
+// mechanisms this session has fixed contributed almost nothing, while
+// decoder_stall_cycles/b_stall_cycles accounted for nearly the entire
+// session. That points at mpeg2_new_decoder_stream_ready itself (the
+// picture bookkeeper's own stream_ready output, gated by its internal
+// parser_ready/p_hold_effective/b_parse_hold/b_persistence_wait terms -
+// see mpeg2_new_stall_probe_debug), not the two top-level holds this
+// session already fixed. Purely observational: drives no decode,
+// presentation or acceptance behavior. Reuses this project's established
+// one-shot-per-session pattern (armed once, frozen until reset_mpeg2)
+// rather than a live/continuously-updating signal, to avoid the CDC/timing
+// risk a truly live corner overlay carried when it was tried and removed
+// earlier this session (see the removed mpeg2_h262_live_deadlock_probe).
+localparam [31:0] MPEG2_NEW_STALL_DIAG_THRESHOLD_CYCLES = 32'd180_000_000;
+reg        mpeg2_new_stall_diag_captured;
+reg [31:0] mpeg2_new_stall_diag_cycles;
+reg [31:0] mpeg2_new_stall_diag_word;
+wire mpeg2_new_stall_condition =
+    !mpeg2_new_decoder_stream_ready && !mpeg2_stream_empty;
+always @(posedge clk_mpeg2) begin
+    if (reset_mpeg2) begin
+        mpeg2_new_stall_diag_captured <= 1'b0;
+        mpeg2_new_stall_diag_cycles   <= 32'd0;
+        mpeg2_new_stall_diag_word     <= 32'd0;
+    end else if (!mpeg2_new_stall_diag_captured) begin
+        if (!mpeg2_new_stall_condition)
+            mpeg2_new_stall_diag_cycles <= 32'd0;
+        else if (mpeg2_new_stall_diag_cycles >=
+                 MPEG2_NEW_STALL_DIAG_THRESHOLD_CYCLES - 32'd1) begin
+            mpeg2_new_stall_diag_captured <= 1'b1;
+            mpeg2_new_stall_diag_word <= {
+                11'd0,                                // [31:21] reserved
+                1'b1,                                 // [20]    valid
+                mpeg2_new_display_frame_bank,          // [19:18]
+                mpeg2_new_active_frame_bank,           // [17:16]
+                mpeg2_new_stream_ready,                // [15]
+                mpeg2_new_p_destination_ownership_hold,// [14]
+                mpeg2_new_b_presentation_hold,         // [13]
+                mpeg2_new_decoder_stream_ready,        // [12]
+                mpeg2_new_stall_probe_debug            // [11:0]
+            };
+        end else
+            mpeg2_new_stall_diag_cycles <= mpeg2_new_stall_diag_cycles + 32'd1;
+    end
+end
+
 // No decode, presentation, ownership or acceptance behavior is altered; the
 // acceptance term itself still drives the steady-ON state unchanged.
 wire [3:0] mpeg2_new_diag_error_code_live =
