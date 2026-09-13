@@ -133,6 +133,77 @@ wire        mpeg2_new_p_destination_ownership_hold;
 wire [32:0] mpeg2_new_extracted_pts_90k;
 wire        mpeg2_new_extracted_metadata_valid;
 wire        mpeg2_new_extracted_metadata_ready;
+
+// Entry 979 Stage B: a plain .mpg/.m2v/.mpeg file loaded through the F4 OSD
+// slot (MEDIAPLAYER_LOADER_VIDEO_FILE, ioctl_index 4 - see
+// host/main_mister/0004-mediaplayer-plain-video-generic-load.patch) carries
+// raw, undemuxed Program Stream bytes with no ARM helper involved at all,
+// unlike the legacy ioctl_index 1 channel the helper still uses for DVD/ISO
+// and standalone audio files. mpeg2_new_direct_demux_active selects which
+// of the two elementary-stream producers below - mpeg2_h262_inband_metadata
+// (legacy, expects the helper's own in-band escape protocol) or
+// mpeg2_h262_program_stream_demux (this stage, genuine PS/PES parsing) -
+// actually feeds mpeg2_h262_clean_video_queue this session. Both share the
+// one mpeg2_stream_fifo; only one is ever the active source at a time.
+wire        mpeg2_new_inband_input_ready;
+wire [7:0]  mpeg2_new_inband_stream_data;
+wire        mpeg2_new_inband_stream_valid;
+wire [32:0] mpeg2_new_inband_pts_90k_field;
+wire        mpeg2_new_inband_metadata_valid_field;
+wire        mpeg2_new_demux_input_ready;
+wire [7:0]  mpeg2_new_demux_video_data;
+wire        mpeg2_new_demux_video_valid;
+wire [32:0] mpeg2_new_demux_video_pts;
+wire        mpeg2_new_demux_video_pts_valid;
+wire [7:0]  mpeg2_new_demux_audio_data;
+wire        mpeg2_new_demux_audio_valid;
+wire [32:0] mpeg2_new_demux_audio_pts;
+wire        mpeg2_new_demux_audio_pts_valid;
+wire        mpeg2_new_demux_stream_end;
+wire        mpeg2_new_demux_error;
+
+reg  mpeg2_new_direct_demux_active_sys;
+always @(posedge clk_sys or posedge reset_request) begin
+    if (reset_request)
+        mpeg2_new_direct_demux_active_sys <= 1'b0;
+    else if (audio_download_start_sys)
+        mpeg2_new_direct_demux_active_sys <= (ioctl_index[5:0] == 6'd4);
+end
+
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] mpeg2_new_direct_demux_active_sync;
+always @(posedge clk_mpeg2 or posedge reset_mpeg2_base) begin
+    if (reset_mpeg2_base)
+        mpeg2_new_direct_demux_active_sync <= 3'b000;
+    else
+        mpeg2_new_direct_demux_active_sync <=
+            {mpeg2_new_direct_demux_active_sync[1:0], mpeg2_new_direct_demux_active_sys};
+end
+wire mpeg2_new_direct_demux_active = mpeg2_new_direct_demux_active_sync[2];
+
+assign mpeg2_new_system_input_ready =
+    mpeg2_new_direct_demux_active ? mpeg2_new_demux_input_ready :
+                                     mpeg2_new_inband_input_ready;
+assign mpeg2_new_extracted_stream_data =
+    mpeg2_new_direct_demux_active ? mpeg2_new_demux_video_data :
+                                     mpeg2_new_inband_stream_data;
+assign mpeg2_new_extracted_stream_valid =
+    mpeg2_new_direct_demux_active ? mpeg2_new_demux_video_valid :
+                                     mpeg2_new_inband_stream_valid;
+assign mpeg2_new_extracted_pts_90k =
+    mpeg2_new_direct_demux_active ? mpeg2_new_demux_video_pts :
+                                     mpeg2_new_inband_pts_90k_field;
+assign mpeg2_new_extracted_metadata_valid =
+    mpeg2_new_direct_demux_active ? mpeg2_new_demux_video_pts_valid :
+                                     mpeg2_new_inband_metadata_valid_field;
+
+// Both the legacy helper channel (index 1) and this stage's raw-file
+// channel (index 4, MEDIAPLAYER_LOADER_VIDEO_FILE) share one
+// mpeg2_stream_fifo; mpeg2_new_direct_demux_active above picks which
+// consumer actually reads what comes out the other end.
+wire mpeg2_new_stream_ioctl_index_active =
+    (ioctl_index[5:0] == 6'd1) || (ioctl_index[5:0] == 6'd4);
+
 wire [7:0]  display_record_data;
 wire        display_record_start;
 wire        display_record_last;
@@ -178,7 +249,7 @@ hps_io #(.CONF_STR(CONF_STR), .CONF_STR_BRAM(1), .WIDE(1), .MEDIA_BURST(1)) hps_
 	.ioctl_burst_credit(mpeg2_burst_credit),
 	.ioctl_burst_words(mpeg2_burst_words),
 	.ioctl_burst_digest(mpeg2_burst_digest),
-	.ioctl_burst_ready(mpeg2_burst_ready && ioctl_download && ioctl_index[5:0] == 6'd1),
+	.ioctl_burst_ready(mpeg2_burst_ready && ioctl_download && mpeg2_new_stream_ioctl_index_active),
 	.ioctl_burst_fault(mpeg2_burst_fault)
 );
 
@@ -662,7 +733,7 @@ end
 assign mpeg2_stream_wr =
 	ioctl_download &&
 	ioctl_wr &&
-	(ioctl_index[5:0] == 6'd1) &&
+	mpeg2_new_stream_ioctl_index_active &&
 	mpeg2_burst_ready &&
 	!mpeg2_stream_full;
 
@@ -731,18 +802,18 @@ mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 	.clk                (clk_mpeg2),
 	.reset              (reset_mpeg2),
 	.input_data         (mpeg2_fifo_data),
-	.input_valid        (mpeg2_new_system_input_valid),
-	.input_ready        (mpeg2_new_system_input_ready),
+	.input_valid        (mpeg2_new_system_input_valid && !mpeg2_new_direct_demux_active),
+	.input_ready        (mpeg2_new_inband_input_ready),
 	.input_end          (mpeg2_new_system_input_end),
-	.stream_data        (mpeg2_new_extracted_stream_data),
-	.stream_valid       (mpeg2_new_extracted_stream_valid),
+	.stream_data        (mpeg2_new_inband_stream_data),
+	.stream_valid       (mpeg2_new_inband_stream_valid),
 	.stream_ready       (mpeg2_new_clean_video_input_ready),
-	.pts_90k            (mpeg2_new_extracted_pts_90k),
+	.pts_90k            (mpeg2_new_inband_pts_90k_field),
 	.picture_structure  (mpeg2_new_inband_picture_structure),
 	.top_field_first    (mpeg2_new_inband_top_field_first),
 	.repeat_first_field (mpeg2_new_inband_repeat_first_field),
 	.progressive_frame  (mpeg2_new_inband_progressive_frame),
-	.metadata_valid     (mpeg2_new_extracted_metadata_valid),
+	.metadata_valid     (mpeg2_new_inband_metadata_valid_field),
 	.metadata_ready     (mpeg2_new_extracted_metadata_ready),
 	.metadata_count     (mpeg2_new_inband_count),
 	.pcm_left           (mpeg2_new_inband_pcm_left),
@@ -761,6 +832,32 @@ mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 	.overlay_valid      (display_record_valid),
 	.overlay_ready      (display_record_ready),
 	.overlay_protocol_error(dvd_overlay_extractor_error)
+);
+
+// Entry 979 Stage B: genuine Program Stream/PES demux for a raw .mpg file
+// loaded with no ARM helper. Audio is not yet decoded anywhere (that is
+// stage C - the MP2 decoder does not exist yet), so its elementary output
+// is only sunk here for now; audio_ready is tied high so the demux FSM
+// never stalls waiting on a consumer that does not exist yet.
+mpeg2_h262_program_stream_demux mpeg2_h262_program_stream_demux
+(
+	.clk               (clk_mpeg2),
+	.reset             (reset_mpeg2),
+	.in_data           (mpeg2_fifo_data),
+	.in_valid          (mpeg2_new_system_input_valid && mpeg2_new_direct_demux_active),
+	.in_ready          (mpeg2_new_demux_input_ready),
+	.video_data        (mpeg2_new_demux_video_data),
+	.video_valid       (mpeg2_new_demux_video_valid),
+	.video_ready       (mpeg2_new_clean_video_input_ready),
+	.video_pts         (mpeg2_new_demux_video_pts),
+	.video_pts_valid   (mpeg2_new_demux_video_pts_valid),
+	.audio_data        (mpeg2_new_demux_audio_data),
+	.audio_valid       (mpeg2_new_demux_audio_valid),
+	.audio_ready       (1'b1),
+	.audio_pts         (mpeg2_new_demux_audio_pts),
+	.audio_pts_valid   (mpeg2_new_demux_audio_pts_valid),
+	.stream_end        (mpeg2_new_demux_stream_end),
+	.demux_error       (mpeg2_new_demux_error)
 );
 
 mpeg2_h262_display_record_router mpeg2_h262_display_record_router
@@ -817,7 +914,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 	.wr_data  (mpeg2_stream_wr ? ioctl_dout : 16'd0),
 	.wr_en    (mpeg2_stream_wr),
 	.wr_full  (mpeg2_stream_full),
-	.wr_attempt(ioctl_download && ioctl_wr && ioctl_index[5:0] == 6'd1),
+	.wr_attempt(ioctl_download && ioctl_wr && mpeg2_new_stream_ioctl_index_active),
 	.burst_credit(mpeg2_burst_credit),
 	.burst_ready(mpeg2_burst_ready),
 	.burst_fault(mpeg2_burst_fault),

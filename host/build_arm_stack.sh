@@ -38,6 +38,7 @@ main_patches=(
     "$root_dir/host/main_mister/0001-mediaplayer-arm-loader.patch"
     "$root_dir/host/main_mister/0002-mediaplayer-overlay-trace.patch"
     "$root_dir/host/main_mister/0003-mediaplayer-ntsc-480i-hdmi.patch"
+    "$root_dir/host/main_mister/0004-mediaplayer-plain-video-generic-load.patch"
 )
 
 mkdir -p "$deps_dir" "$build_dir"

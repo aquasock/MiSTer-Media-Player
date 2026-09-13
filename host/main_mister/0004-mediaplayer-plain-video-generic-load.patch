@@ -1,0 +1,59 @@
+diff --git a/menu.cpp b/menu.cpp
+index 4603529..c6411d4 100644
+--- a/menu.cpp
++++ b/menu.cpp
+@@ -2759,7 +2759,12 @@ void HandleUI(void)
+ 					}
+ 					else
+ 					{
+-						if (mediaplayer_is_core() && mediaplayer_handles_file(selPath))
++						if (mediaplayer_is_core() && mediaplayer_is_plain_video_file(selPath))
++						{
++							mediaplayer_stop();
++							user_io_file_tx(selPath, idx, opensave, 0, 0, load_addr);
++						}
++						else if (mediaplayer_is_core() && mediaplayer_handles_file(selPath))
+ 						{
+ 							if (!mediaplayer_start(selPath, idx)) Info("MediaPlayer ARM helper failed to start");
+ 						}
+diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
+index 10c7dd7..68c9185 100644
+--- a/support/mediaplayer/mediaplayer.cpp
++++ b/support/mediaplayer/mediaplayer.cpp
+@@ -330,6 +330,24 @@ int mediaplayer_handles_file(const char *path)
+ 	                     !strcasecmp(extension, ".ogg"));
+ }
+ 
++// Rewrite stage B: a plain .mpg/.m2v/.mpeg elementary/Program Stream file no
++// longer needs the ARM helper at all - mpeg2_h262_program_stream_demux in
++// MediaPlayer.sv now does the Program Stream/PES demuxing that the helper
++// used to do in software. Route these through the same generic
++// user_io_file_tx() path any ROM-loading core uses, tagged with this file's
++// own F-slot index (MEDIAPLAYER_LOADER_VIDEO_FILE) rather than the helper's
++// fixed MEDIAPLAYER_STREAM_INDEX channel, so the two paths can never collide.
++// DVD/ISO/VOB and the standalone audio-file player are unaffected for now -
++// they still route through mediaplayer_start() below until later rewrite
++// stages replace or remove them.
++int mediaplayer_is_plain_video_file(const char *path)
++{
++	const char *extension = path ? strrchr(path, '.') : NULL;
++	return extension && (!strcasecmp(extension, ".m2v") ||
++	                     !strcasecmp(extension, ".mpg") ||
++	                     !strcasecmp(extension, ".mpeg"));
++}
++
+ static void finish_download(const char *reason, bool release_download)
+ {
+ 	const bool was_idle = idle_session;
+diff --git a/support/mediaplayer/mediaplayer.h b/support/mediaplayer/mediaplayer.h
+index 7d8eb80..f7d6b3c 100644
+--- a/support/mediaplayer/mediaplayer.h
++++ b/support/mediaplayer/mediaplayer.h
+@@ -16,6 +16,7 @@ enum
+ int mediaplayer_is_core();
+ int mediaplayer_is_physical_loader(unsigned char index);
+ int mediaplayer_handles_file(const char *path);
++int mediaplayer_is_plain_video_file(const char *path);
+ int mediaplayer_start(const char *path, unsigned char index);
+ int mediaplayer_start_physical(unsigned char index);
+ int mediaplayer_start_source(const char *source_spec, unsigned char index);
