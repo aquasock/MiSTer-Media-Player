@@ -1,3 +1,42 @@
+## 14 COMMIT Unreleased ??? 2026-09-13T13:28:53-07:00
+
+#### Coming From:
+
+Unreleased 62baf08
+
+#### Purpose:
+
+Implement frame-associated BT.601/BT.709 color matrix selection with user overrides and deterministic visual tests.
+
+#### Outcome:
+
+The user approved starting the investigated matrix correction while the three 62baf08 aspect/timing seeds finish. The active core ignores sequence color metadata and always converts with BT.601; a tagged BT.709 patch produced RGB 72,198,99 versus FFmpeg 62,179,96. The current encoding helper correctly converted the tested tagged source to BT.601 under local FFmpeg 8.0.1, so no helper failure was established. The investigation is retained in results/color-investigation-20260913/report.md. The approved scope is matrix selection, not gamut/gamma management, HDR, DVD support or interlaced playback; aspect remains manually selected 4:3 or 16:9.
+
+#### Next Steps:
+
+Parse sequence color-description fields, retain color context with reference and scratch pictures, transfer the displayed context safely, and provide Auto, BT.601 and BT.709 menu choices with a documented BT.601 compatibility fallback. Preserve existing 601 output, filter and sync alignment, and validate metadata/reset/reordering, matrix arithmetic, menu overrides and visual matching clips. Continue monitoring the existing seeds and report their independent timing results. Commit tested color source before its own clean builds and require fitted timing and CDC checks without extra frame buffers or relaxed constraints.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_06.svh
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- rtl/mpeg2_luma_framebuffer.sv
+- files.qip
+- tools/phase1p_timing.tcl
+- CHANGELOG.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 13 COMMIT Unreleased 62baf08 2026-09-13T13:05:36-07:00
 
 #### Coming From:
@@ -1271,35 +1310,6 @@ On top of `a45a67c` (STYLE-only reveal + background refresh), three more iterati
 #### Next Steps:
 
 Reverted `host/arm/media_player_helper.c` to exactly `a45a67c` plus only the one isolated, well-understood `flush_output()` fix (verified via `git diff --stat`: 8 insertions, 1 deletion) - dropping the wall-clock idle-while-paused loop, the seek PTS-anchor attempt, and the full monotonic_us() rewrite entirely.  This intentionally leaves both previously-reported cosmetic issues unresolved (overlay doesn't auto-hide while paused; a seek can still show a brief stale-timing flash) in exchange for the last build with no observed hangs.  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  `host/build/MediaPlayer_Helper` (SHA-256 `51a9c3968dbb9fa8415741392fcdb96e8166864538eb9412483a4a1d3efd9c94`) is built and deployed (current RBF `5ce3c1f`/seed99 and Main unaffected); the user is stress-testing this build now to confirm the hang is actually gone before this is considered resolved.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 973 COMMIT Unreleased a45a67c 2026-09-12T10:27:30-07:00
-
-#### Coming From:
-
-Unreleased 016f1e2
-
-#### Purpose:
-
-Fix the `.mpg` progress overlay still not appearing on pause: `016f1e2`'s reorder (full publish before `PAUSE_READY`) did not close the race after all - live testing showed Main's own overlay trace receiving the CONFIG record but never the matching COMMIT.
-
-#### Outcome:
-
-The user's retest of `016f1e2` reproduced the exact same symptom.  A live ARM diagnostic log (telemetry enabled) captured Main's `overlay_submit` trace for the failing pause: `config sequence=21` was received, but no `commit sequence=21` (or any `data` records) ever appeared, even though the helper is strictly sequential and cannot send `PAUSE_READY` until `video_overlay_publish()`'s writes have all already returned successfully.  This means the race is not about *when* the helper writes relative to `PAUSE_READY` at all - `PAUSE_READY` travels on a small, separate `control_fd` channel Main can process independently of how far its own asynchronous drain loop has gotten through the ~88 KiB already sitting in the bulk pipe from the publish.  A stale `pause_pipe_empty=true` (set from any earlier momentary gap, since `pause_pending` is already true from the moment Main decides to pause, well before the helper even starts processing the command) combined with `pause_ready` becoming true is enough for `pause_barrier_finish()` to fire and Main to stop draining, abandoning whatever of the publish it had not yet read - regardless of whether the helper sent it before or after `PAUSE_READY`.  The only way to make this safe is to keep the amount of data crossing the wire at pause time small enough that draining it is not itself a multi-poll-cycle operation - i.e. go back to `24a6bda`'s original small `MEDIA_PLAYER_OVERLAY_STYLE`-only reveal - and instead fix the actual staleness problem it was trading away: `video_overlay_service()` previously stopped publishing entirely once idle-hidden, so the plane content a later STYLE-only reveal could show was frozen at whatever was last rendered before the hide, potentially minutes stale.
-
-#### Next Steps:
-
-Reverted `video_overlay_pause_barrier()` back to the small `video_overlay_style()`-only reveal (restored the function `016f1e2` deleted).  Fixed the real problem instead: `video_overlay_publish()` now renders with `output->video_overlay_visible` (was hardcoded to always-visible) so a publish can update pixel content without also forcing the overlay on screen, and `video_overlay_service()` no longer stops entirely once idle-hidden - it keeps publishing fresh content in the background on a slower five-second cadence (`VIDEO_OVERLAY_BACKGROUND_REFRESH_TICKS`, vs. the one-second cadence used while visible) with `visible=0`, so the FPGA plane stays reasonably current the whole time the overlay is hidden.  These background refreshes happen during ordinary, non-barrier operation - the same proven-safe context as any other periodic refresh - so they carry none of the pause-time race risk; only the actual reveal at pause time still crosses the wire, and it is back to the small, safe record.  Native and ARM cross-compiled builds both pass `-Wall -Wextra -Werror` clean; no RTL change.  `host/build/MediaPlayer_Helper` (SHA-256 `e731e7f405e3530c4fa8bbac94e5b0ea12bab6ef0b5f595a17ef333e4bc25a1c`) is built; deliver it (current RBF `5ce3c1f`/seed99 and Main unaffected) for the user to retest: let the overlay auto-hide, then pause - it should reveal immediately with reasonably current TOTAL/ELAPSED/REMAIN (at most a few seconds stale, not minutes), and no longer race Main's drain detection since the pause-time transfer is tiny again.
 
 #### Files Modified:
 
