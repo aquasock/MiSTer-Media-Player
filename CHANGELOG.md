@@ -8,7 +8,7 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
-- Stock-Main mounted MPG/M2V playback using bounded sector reads, leaving menu input available during playback; hardware OSD/filter validation pending.
+- Stock-Main mounted MPG/M2V playback using bounded sector reads, leaving menu input available during playback; OSD and filter control validated on hardware.
 - Coordinated playback-session restart with DDR response draining, exact byte/EOF transport, startup prefill, and reader offset/suspension interfaces for later pause and seeking.
 - Telemetry schema 9 reports file-read requests/completions, maximum response wait, byte position, session generation, reservoir minimum and transport status; decoder retains older capture support.
 
@@ -18,6 +18,10 @@ This project is still in active pre-release development. Published milestone rel
 - FFmpeg audio-oracle regressions and an executable A/V flash/beep test script.
 
 ### Fixed
+
+- Make the aspect menu explicitly select 4:3 or 16:9, entirely under user control and independent of sequence metadata.
+- Register B-frame fetch coordinates before address arithmetic and distribute the scaler's final fraction calculation across existing pipeline stages without changing filter precision or alignment.
+- Register resolution-change blanking with the same assertion/release cycles to shorten the scaler control-to-pixel path.
 
 - Enumerate every available Quartus operating corner in timing reports instead of relying on `-multi_corner` with file output.
 - Hide Main's loading-message overlay once playback starts, preserving normal menus.

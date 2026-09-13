@@ -130,9 +130,6 @@ set_false_path \
 set_false_path -to [get_keepers {*|dcfifo:*|dcfifo_*:auto_generated|dffpipe_*:wraclr|dffe*a[0]}]
 set_false_path -to [get_keepers {*|dcfifo:*|dcfifo_*:auto_generated|dffpipe_*:rdaclr|dffe*a[0]}]
 
-# Slow sequence-aspect indication into the video domain.
-set_false_path -to [get_keepers {*|picture_4_3_sync[0]}]
-
 # Configuration mailbox: data remains fixed from request through acknowledgement.
 # Cut only the held bundle and first control synchronizer stages.
 # RTL disables shift-RAM inference and preserves all three control registers;

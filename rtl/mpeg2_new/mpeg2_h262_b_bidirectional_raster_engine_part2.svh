@@ -55,12 +55,25 @@ wire [3:0] block_phase0_word_span=
 wire [3:0] block_phase1_word_span=
     {1'b0,block_backward_src_x[2:0]}+4'd7+
     {3'd0,exec_bmvx[0]};
+// Capture coordinates at the launch decision. The registered start is consumed
+// on the following edge, leaving a full cycle for row-stride/address arithmetic.
+// No request or lookup latency changes; the successor uses its own snapshot.
+reg [11:0] block_addr_x0, block_addr_y0, block_addr_x1, block_addr_y1;
+reg [28:0] block_addr_off0, block_addr_off1;
+reg [2:0] block_addr_plane;
+always @(posedge clk) begin
+    block_addr_x0 <= block_phase0_src_x[11:0];
+    block_addr_y0 <= block_phase0_src_y[11:0];
+    block_addr_x1 <= block_backward_src_x[11:0];
+    block_addr_y1 <= block_backward_src_y[11:0];
+    block_addr_off0 <= block_phase0_backward ? future_off : past_off;
+    block_addr_off1 <= future_off;
+    block_addr_plane <= blk;
+end
 wire [28:0] block_phase0_base_addr=pixel_addr(
-    block_phase0_backward?future_off:past_off,blk,
-    block_phase0_src_x[11:0],block_phase0_src_y[11:0]);
+    block_addr_off0,block_addr_plane,block_addr_x0,block_addr_y0);
 wire [28:0] block_phase1_base_addr=pixel_addr(
-    future_off,blk,block_backward_src_x[11:0],
-    block_backward_src_y[11:0]);
+    block_addr_off1,block_addr_plane,block_addr_x1,block_addr_y1);
 wire [6:0] block_row_words=(blk<4)?7'd90:7'd45;
 
 // Entry 272: the successor footprint is derived from the already loaded
@@ -127,12 +140,22 @@ wire [3:0] successor_phase0_word_span=
 wire [3:0] successor_phase1_word_span=
     {1'b0,successor_phase1_src_x[2:0]}+4'd7+
     {3'd0,successor_bmvx[0]};
+reg [11:0] successor_addr_x0, successor_addr_y0, successor_addr_x1, successor_addr_y1;
+reg [28:0] successor_addr_off0, successor_addr_off1;
+reg [2:0] successor_addr_plane;
+always @(posedge clk) begin
+    successor_addr_x0 <= successor_phase0_src_x[11:0];
+    successor_addr_y0 <= successor_phase0_src_y[11:0];
+    successor_addr_x1 <= successor_phase1_src_x[11:0];
+    successor_addr_y1 <= successor_phase1_src_y[11:0];
+    successor_addr_off0 <= successor_phase0_backward ? future_off : past_off;
+    successor_addr_off1 <= future_off;
+    successor_addr_plane <= successor_blk;
+end
 wire [28:0] successor_phase0_base_addr=pixel_addr(
-    successor_phase0_backward?future_off:past_off,successor_blk,
-    successor_phase0_src_x[11:0],successor_phase0_src_y[11:0]);
+    successor_addr_off0,successor_addr_plane,successor_addr_x0,successor_addr_y0);
 wire [28:0] successor_phase1_base_addr=pixel_addr(
-    future_off,successor_blk,successor_phase1_src_x[11:0],
-    successor_phase1_src_y[11:0]);
+    successor_addr_off1,successor_addr_plane,successor_addr_x1,successor_addr_y1);
 wire [6:0] successor_row_words=successor_luma?7'd90:7'd45;
 
 wire [28:0] launch_phase0_base_addr=block_fetch_start_prefetch?

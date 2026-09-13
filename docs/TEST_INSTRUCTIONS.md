@@ -35,3 +35,18 @@ For the mounted-file build, select MPG or M2V through **Open MPEG-2 Video**. Dur
 Pause and seek controls are not exposed yet. Record the exact RBF hash and actual Main binary/version: a `main=MiSTer_MediaPlayer` ini override exists on the previously inspected hardware configuration, so stock-Main identity must be verified during acceptance. This build needs no custom Main and does not alter MiSTer.ini.
 
 Run `python3 tools/verify_media_file_reader.py` for host/session regressions and `python3 tools/verify_mpg_audio.py /tmp/mounted-playback.json` for byte/PTS/PCM comparison. Capture post-playback telemetry using the existing workflow; the decoder recognizes schema 9 at (8,280) as well as older captures. Transport status low four bits are error (0 none, 1 timeout, 2 malformed response, 3 size/offset range), bit 4 reader idle and bit 5 session cancellation. Maximum response wait is in 20 MHz system-clock cycles. Reservoir minimum includes normal tail drain and is not by itself an underrun indicator.
+
+## Manual aspect and timing validation
+
+The Aspect ratio menu offers only 4:3 and 16:9. The selected shape does not
+follow MPEG sequence metadata. On a 1920x1080 output, expect 1440x1080 centered
+for 4:3 and 1920x1080 for 16:9. Switch both ways during playback and confirm
+OSD and filter controls remain responsive. Letterboxing already encoded in a
+file remains part of the picture.
+
+Run `python3 tools/verify_manual_aspect.py` for the actual core-to-platform
+rectangle calculation, `python3 tools/verify_scaler_timing.py` with GHDL for
+fraction/blanking equivalence against a0f153a, and
+`python3 tools/verify_decoder_timing.py --output /tmp/decoder-timing` for the
+mixed I/P/B pixel oracle. These simulations do not replace hardware testing
+or fitted timing at every operating corner.

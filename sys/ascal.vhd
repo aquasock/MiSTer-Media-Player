@@ -570,8 +570,9 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_vpix_inner : arr_pix(0 TO 6);
 
 	SIGNAL o_vpe : std_logic;
-	SIGNAL o_div : arr_div(0 TO 2); --uint12;
+	SIGNAL o_div : arr_div(0 TO 3); --uint12;
 	SIGNAL o_dir : arr_frac(0 TO 2);
+	SIGNAL o_hdiv_last : unsigned(20 DOWNTO 0);
 	ATTRIBUTE ramstyle OF o_div, o_dir : SIGNAL IS "logic"; -- avoid blockram shift register
 	SIGNAL o_vdivi : unsigned(12 DOWNTO 0);
 	SIGNAL o_vdivr : unsigned(24 DOWNTO 0);
@@ -580,6 +581,7 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_hacpt,o_vacpt : unsigned(11 DOWNTO 0);
 	SIGNAL o_vacptl : unsigned(1 DOWNTO 0);
 	signal o_newres : integer range 0 to 3;
+	signal o_newres_blank : boolean;
 
 	-----------------------------------------------------------------------------
 	FUNCTION shift_ishift(shift : unsigned(0 TO 119);
@@ -1979,11 +1981,13 @@ BEGIN
 
 				IF (o_newres > 0) then
 					o_newres <= o_newres- 1;
+					o_newres_blank <= o_newres > 1;
 				END IF;
 			END IF;
 
 			IF (swblack = '1' and o_fb_ena = '0' and (o_ihsize /= i_hrsize or o_ivsize /= i_vrsize)) then
 				o_newres <= 3;
+				o_newres_blank <= true;
 			END IF;
 
 			-- Simultaneous change of input and output framebuffers
@@ -2339,7 +2343,7 @@ BEGIN
 					hpix_v:=(r=>o_fb_pal_dr(23 DOWNTO 16),g=>o_fb_pal_dr(15 DOWNTO 8),
 									 b=>o_fb_pal_dr(7 DOWNTO 0));
 				END IF;
-				IF (o_newres > 0) then
+				IF o_newres_blank THEN
 					hpix_v := (others => (others => '0'));
 				END IF;
 				o_hpix0<=hpix_v;
@@ -2638,17 +2642,25 @@ BEGIN
 				END IF;
 				dir_v(5):=NOT div_v(20);
 
+			END IF;
+			o_div(3)<=div_v;
+			o_hfrac(1)<=dir_v;
+
+			-- Finish the last quotient bit in the former fraction delay stage.
+			-- Retain its divisor too, including across a resolution change.
+			o_hdiv_last<=to_unsigned(o_hsize*2,21);
+			div_v:=o_div(3);
+			dir_v:=o_hfrac(1);
+			IF FRAC>6 THEN
 				IF div_v(20)='0' THEN
-					div_v:=div_v-to_unsigned(o_hsize*2,21);
+					div_v:=div_v-o_hdiv_last;
 				ELSE
-					div_v:=div_v+to_unsigned(o_hsize*2,21);
+					div_v:=div_v+o_hdiv_last;
 				END IF;
 				dir_v(4):=NOT div_v(20);
 			END IF;
-
-			-----------------------------------
-			o_hfrac(1)<=dir_v;
-			o_hfrac(2 TO 9) <= o_hfrac(1 TO 8);
+			o_hfrac(2)<=dir_v;
+			o_hfrac(3 TO 9)<=o_hfrac(2 TO 8);
 
 			o_copyv(1 TO 14)<=o_copyv(0 TO 13);
 			o_dcptv_clr(1 TO 12)<=o_dcpt_clr & o_dcptv_clr(1 TO 11);

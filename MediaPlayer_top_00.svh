@@ -65,22 +65,14 @@ assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////
 
-wire [1:0] ar;
-video_config_cdc #(.WIDTH(2)) aspect_config (
+// The OSD alone selects display shape; sequence metadata never overrides it.
+wire ar;
+video_config_cdc #(.WIDTH(1)) aspect_config (
  .src_clk(clk_sys), .dst_clk(clk_video),
- .src_data(status[122:121]), .dst_data(ar)
+ .src_data(status[121]), .dst_data(ar)
 );
-
-// Sequence aspect is stable during playback; synchronize the slow 4:3 flag.
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [2:0] picture_4_3_sync;
-always @(posedge clk_video) begin
-    if (reset_video) picture_4_3_sync <= 0;
-    else picture_4_3_sync <= {picture_4_3_sync[1:0],
-        mpeg2_new_aspect_ratio_information == 4'd2};
-end
-assign VIDEO_ARX = (!ar) ? (picture_4_3_sync[2] ? 12'd4 : 12'd16) : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? (picture_4_3_sync[2] ? 12'd3 : 12'd9) : 12'd0;
+assign VIDEO_ARX = ar ? 13'd16 : 13'd4;
+assign VIDEO_ARY = ar ? 13'd9 : 13'd3;
 
 `include "build_id.v"
 localparam CONF_STR = {
@@ -88,7 +80,7 @@ localparam CONF_STR = {
 	"S0,M2VMPG,Open MPEG-2 Video;",
 	"-;",
 	"-;",
-	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"O[121],Aspect ratio,4:3,16:9;",
 	"O[3:1],Audio test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
 	"-;",
 	"T[0],Reset;",

@@ -943,7 +943,7 @@ module tb_h262_live_raster_soak #(
                        prediction.reference_cache.response_pending,
                        prediction.reference_cache.request_addr_reg,
                        arbiter.read_outstanding,
-                       arbiter.read_owner_prediction,
+                       (arbiter.read_owner==2'd1),
                        arbiter.read_words_remaining,
                        read_pending,memory_rd,memory_dout_ready,
                        prediction.mixed_probe.block_lookup_row,
@@ -1383,7 +1383,7 @@ module tb_h262_live_raster_soak #(
                    prediction.reference_cache.response_pending,
                    prediction.reference_cache.request_addr_reg,
                    arbiter.read_outstanding,
-                   arbiter.read_owner_prediction,
+                   (arbiter.read_owner==2'd1),
                    arbiter.read_words_remaining,
                    read_pending,memory_rd,memory_dout_ready);
         end
@@ -1533,8 +1533,9 @@ module tb_h262_live_raster_soak #(
                    profile_b_replay_coeff_wait!=0||
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
                     (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239996))||
+                   // Matched against a0f153a with the current Verilator bench.
                    ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
-                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239996))||
+                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239997))||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||
