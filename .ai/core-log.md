@@ -1,4 +1,4 @@
-## 999 COMMIT Unreleased ??? 2026-09-13T07:53:13-07:00
+## 999 COMMIT Unreleased ace6b7b 2026-09-13T07:53:13-07:00
 
 #### Coming From:
 
@@ -11,10 +11,11 @@ Separate the registered reference-cache response word for the P and B prediction
 #### Outcome:
 
 The user requested stopping the two remaining Quartus builds and implementing the proposed handoff fix. Source 9fd1829 seed 87 compiled and completed focused timing in 1471 seconds, using 40824 ALMs, 55768 registers, 474 RAM blocks and 69 DSP blocks, but it is not timing-qualified: setup is -0.354 ns with four violations from shared_engine_dout_q[32] to B-fetcher word_data slots 11, 16, 4 and 24, totaling -0.745 ns. Other standard slacks are hold +0.245 ns, recovery +3.449 ns, removal +0.528 ns and pulse +1.122 ns; focused video setup is +7.825 ns and decoder recovery +9.400 ns. Seeds 52 and 61 were canceled by the user's instruction after 1952 seconds, and both process groups were confirmed exited. The prior handoff registration in ebf372e documents the same routing-dominated topology; this change will keep its one-cycle response latency and ownership rule while giving each consumer an independent data register. No RBF from this batch is recommended for hardware testing.
+ The implemented response_handoff module now retains independent owner-enabled 64-bit registers for mixed-P and B delivery, with dont_merge attributes to preserve that separation. The existing owned-valid pulses and one-cycle response latency are unchanged. A 10000-cycle simulation matches the prior handoff's observable data/valid behavior with 1849 mixed responses, 3668 B responses, 3692 ownership changes and reset every 127 cycles. The existing four-transaction, six-phase, 88-word fetcher regression passes immediate and delayed response, backpressure, simultaneous acceptance/response and invalid-footprint cases; the new module also passes Verilator lint without warnings. Full timing qualification of the fix remains pending.
 
 #### Next Steps:
 
-Implement separate owner-enabled response registers, verify observable data/valid equivalence across ownership changes and resets, and run the existing prediction-fetcher regression with direct and delayed responses. Commit the tested fix and run a fresh three-seed build batch, retaining seed 87 for a direct timing comparison and seeds 52 and 61 for placement alternatives. Require standard and focused timing before delivering an audio candidate.
+Run clean builds with seeds 52, 61 and 87 from this committed source, using seed 87 as the direct comparison against the prior routing failure. Require all standard and focused timing classes to pass before delivering a candidate for audible synchronized MPG playback and telemetry validation on hardware.
 
 #### Files Modified:
 
