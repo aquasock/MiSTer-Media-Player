@@ -1,3 +1,40 @@
+## 006 COMMIT Unreleased ??? 2026-09-13T11:04:15-07:00
+
+#### Coming From:
+
+Unreleased f8bebcd
+
+#### Purpose:
+
+Suppress the loading message during playback and repair synthesized video-configuration clock crossings.
+
+#### Outcome:
+
+The user approved a combined loading-overlay and timing repair cycle and explicitly excluded the earlier inaudible audio underrun from this work. Stock Main repeatedly publishes its loading progress message throughout a backpressured file transfer, so the proposed FPGA change will suppress message-mode OSD while playback is active while retaining ordinary menus and restoring message visibility at a new session or reset. Timing work will preserve actual request, acknowledgement and VS synchronization flip-flops, verify constraint endpoint matching, complete the LFB_EN, HDMI_PR and lowlat configuration crossings and address remaining decoder setup failures if present in the new fit. The user-authorized build PC may commit and push directly. The previous detailed build directory recorded under /home/vash/builds is absent on this PC; new clean builds will supply current netlist and timing evidence.
+
+#### Next Steps:
+
+Implement the reviewed changes, run focused OSD, mailbox, raster, cadence and playback regressions, commit and push the source, then run clean seeds 52, 61 and 87 with standard and focused timing reports. Deliver a timing-passing candidate for loading-overlay, flicker, audio and repeated-load hardware tests. Retain 1750154 seed 87 as the timing-passed and hardware-accepted rollback. Do not change audio behavior in this cycle.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer.sdc
+- rtl/video_config_cdc.sv
+- sys/emu_ports.vh
+- sys/sys_top.v
+- sys/osd.v
+- tools/verify_video_sync.py
+- tools/phase1p_timing.tcl
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 005 COMMIT Unreleased f8bebcd 2026-09-13T10:54:04-07:00
 
 #### Coming From:
@@ -1246,35 +1283,6 @@ Install `host/build/MiSTer_MediaPlayer` and `host/build/MediaPlayer_Helper` (RBF
 - host/arm/audio_ui.h
 - host/arm/media_player_helper.c
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 965 COMMIT Unreleased 1b1ab7a 2026-09-12T04:11:45-07:00
-
-#### Coming From:
-
-Unreleased b0372f6
-
-#### Purpose:
-
-Fix the residual multi-frame screen flash still seen on every standalone audio-file seek after `b0372f6`, reported by the user as Bob/Weave visibly affecting the visualizer image again.
-
-#### Outcome:
-
-The user installed and tested the `b0372f6`/`1a6297f` 3-seed build: `.mpg` seeking remains unaffected, standalone MP3 seek/pause/skip no longer freezes, pops or falls back to the idle visualizer, but a shorter screen flash on every seek remained, visible as Bob/Weave affecting the image.  A screenshot captured from the test MiSTer mid-issue via `tools/mister.sh screenshot` showed a corrupted block rather than a clean frame, which the user clarified is simply the visible signature of Bob motion-adaptive deinterlacing applied to the visualizer's static frame during the flash, the same mechanism as the original flicker report, not separate DDR corruption.  Investigation found a second module untouched by `b0372f6`: `mpeg2_luma_framebuffer`'s picture-present/generation tracking (`mpeg2_new_framebuffer_reset`) and the interlace-mode-change detector feeding it (`mpeg2_new_native_active_sync`) both still reset directly on `reset_mpeg2`, which includes the Entry 237 rearm pulse fired on every seek; `b0372f6` only protected `mpeg2_h262_audio_ui`'s own persistent `mode_active`/`display_bank` state, not this separate read-side module, so the framebuffer's "is a picture present yet" tracking still reset on every seek even though the underlying DDR content and its validity are completely unaffected, producing a visible multi-frame gap until the next audio UI commit recovered it.  Source `1b1ab7a` adds `reset_mpeg2_display_domain` (true reset unconditionally, the rearm pulse only when `audio_ui_mode_active` is false) and uses it in place of raw `reset_mpeg2` for both `mpeg2_new_native_active_sync` and `mpeg2_new_framebuffer_reset`, exempting them from the rearm while the audio UI owns the display.  All three seeds 26, 33 and 40 compiled with 0 errors and positive worst-case setup slack (positive 0.332 ns, positive 0.148 ns and positive 0.035 ns respectively); seed 26 was chosen for best margin as `.ai/current_results/MediaPlayer_audioseekunify2_seed26.rbf`, SHA-256 `766e20a57098bdd37e98c9fd8421c3c288b05be1a6479ccbdda477c101d89181`.  Main and the helper are unchanged from `964`'s delivered build.
-
-#### Next Steps:
-
-Deliver the RBF for the user to retest standalone MP3 seeking for a completely clean transition with no flash and no Bob/Weave sensitivity, while confirming `.mpg` seeking and normal video playback remain unaffected.
-
-#### Files Modified:
-
-- MediaPlayer.sv
 
 #### Status:
 
