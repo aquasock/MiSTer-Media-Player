@@ -75,3 +75,5 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_pes_picture_p
 set_global_assignment -name HEX_FILE rtl/audio/mp2_cos.hex
 set_global_assignment -name HEX_FILE rtl/audio/mp2_window.hex
 set_global_assignment -name HEX_FILE rtl/audio/mp2_scale.hex
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_reference_response_handoff.sv
