@@ -1,3 +1,32 @@
+## 005 COMMIT Unreleased f8bebcd 2026-09-13T10:54:04-07:00
+
+#### Coming From:
+
+Unreleased f8bebcd
+
+#### Purpose:
+
+Record user acceptance of seed 52 playback and the freshly captured early audio-underrun telemetry.
+
+#### Outcome:
+
+The user confirmed that everything played perfectly and identified seed 52, accepting visual and audible playback for this test of f8bebcd. A fresh uniquely named screenshot captured over FTP from 10.10.0.45 at 2026-09-13T10:52:38-07:00 decoded successfully as schema eight. Its one-shot snapshot froze approximately 0.207309 seconds into the session on error_flags 0x1000, identifying MP2 underrun, with four audio frames decoded and 4608 stereo sample pairs played; MP2 decode and timestamp errors were clear at capture. This is an early error snapshot, not end-of-playback telemetry: sequence_end_seen, presentation_complete, audio_finished and session_quiet were false at that early point and do not establish failure to finish the user's test. The snapshot recorded 74207 accepted bytes, three displayed pictures and a 100.1 ms display gap. The screenshot and decoded JSON are retained in results/telemetry-20260913-105236/. User acceptance does not resolve the underrun or the seed's setup -2.173 ns, hold -0.104 ns and decoder setup -0.061 ns timing failures. Passed records the user's hardware acceptance only. The user identified the current agent environment as the build PC and instructed ignoring keyboard LED commands; the user subsequently explicitly authorized pushing from this build PC.
+
+#### Next Steps:
+
+Prepare the next timing-repair proposal around preserving real synchronization flip-flops, checking matched timing endpoints and completing the remaining configuration clock crossings, with a separate investigation of the early MP2 underrun. Retain 1750154 seed 87 as the timing-passed and hardware-accepted rollback. Commit and push this checkpoint from the build PC under the user's explicit authorization.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 004 COMMIT Unreleased f8bebcd 2026-09-13T10:35:05-07:00
 
 #### Coming From:
@@ -1246,41 +1275,6 @@ Deliver the RBF for the user to retest standalone MP3 seeking for a completely c
 #### Files Modified:
 
 - MediaPlayer.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 964 COMMIT Unreleased b0372f6 2026-09-12T03:26:13-07:00
-
-#### Coming From:
-
-Unreleased adb4f53
-
-#### Purpose:
-
-Abandon the bespoke Main-side "skip the download reset" path for standalone audio-file seeking and instead unify standalone audio playback with the already-correct `.mpg` seek/play/pause architecture, fixing the visualizer's reset-visibility problem at its real cause instead of avoiding the shared reset.
-
-#### Outcome:
-
-Hardware testing of `39274a8`/`adb4f53` traced a second, deeper regression (premature clean end-of-stream a few seconds after a seek, falling back to the idle visualizer) that could not be pinned to any single mechanism through log analysis alone: transport-level SPI credit/digest validation never failed, and every identified buffer stage in the chain (Main's 16 KiB pending buffer, the 64 KiB OS pipe, the FPGA's 32 KiB `mpeg2_stream_fifo`, the PCM output adapter's sub-16384-sample counter) is too shallow to explain a multi-second gap through legitimate buffering, leaving the bespoke audio-only seek path's exact failure mode unresolved.  Rather than continue debugging a code path that exists only for standalone audio and has now produced two distinct regressions, the user redirected the design: this project only cares about direct file playback (DVD and Audio CD paths are out of scope), `.mpg` seeking already works perfectly through Main's ordinary full download-session reset (`MEDIA_CONTROL_READY`/`GO`, unconditional `user_io_set_download` toggle and reassert), and standalone audio-file playback should be structured identically to `.mpg` playback - the same session/seek/play/pause state machine, differing only in which "pipe" feeds it (H.262 video + MP2/AC3 audio demuxed from a Program Stream, versus the audio_ui/visualizer full-frame overlay + raw PCM decoded in ARM software) - which also sets up the audio UI's overlay protocol to later serve as the video player's subtitle renderer.  The originally reported flicker is most likely `mpeg2_h262_audio_ui`'s persistent `mode_active`/`display_bank` state being disrupted by `MediaPlayer.sv` Entry 237's elementary-stream rearm pulse on every download-session reset, which real H.262 video decode masks by continuously redrawing but the visualizer's persistent-frame overlay does not; the correct fix is to make that reset harmless to the audio UI's persistent display state, not to avoid the reset.
-
-`39274a8` and `adb4f53` are reverted (`03542c0`, `832a68d`), restoring `host/main_mister/0001-mediaplayer-arm-loader.patch` to byte-identical content with `4116a00`: standalone audio-file seeking now uses the exact same unconditional `MEDIA_CONTROL_READY`/`GO` full-reset path as `.mpg` seeking, with no Main-side branching on content type at all.  Source `b0372f6` implements the actual RTL fix: `mpeg2_h262_audio_ui` gains a `session_start` input, mirroring the existing `reset`/`session_start` split already used in `mpeg2_stream_fifo`, so only a true reset clears `mode_active`/`display_bank` while `session_start` (wired to `mpeg2_download_rearm_reset`, matching `reset` to `reset_mpeg2_base`) still resets the in-flight BEGIN/DATA/COMMIT parser state without disturbing which bank is on screen; both wired signals are already `clk_mpeg2`-domain, so no new CDC synchronizer or SDC exception was needed.  `tools/test_mpeg2_audio_ui.sv` gained coverage proving `mode_active`/`display_bank`/DDR bank addressing survive a `session_start` pulse mid-session while the protocol parser cleanly accepts a fresh frame afterward; this passed under `iverilog`/`vvp` prior to commit.  While reviewing the working tree, an unrelated hardware-validated fix from earlier in the session (forcing the HDMI Bob/Weave deinterlacer off while the audio UI owns the display, fixing the previously-reported visualizer interlace jutter) was found still uncommitted and was committed separately as `1a6297f` ahead of this entry's fix, since both needed the same build cycle.  Neither fix has been synthesized yet.
-
-#### Next Steps:
-
-All three seeds 26, 33 and 40 compiled with 0 errors.  Worst-case setup slack: seed 26 at positive 0.198 ns, seed 33 at positive 0.210 ns, seed 40 at negative 0.253 ns (fails timing, on `pll_hdmi`'s output-counter divider) with a TNS of negative 8.186; seed 33 was chosen as `.ai/current_results/MediaPlayer_audioseekunify_seed33.rbf`, SHA-256 `b93110b73214cb406e66f349f8968fd0c52c66d2e4291b7b612c804fc00f04f0`.  Main was rebuilt from the reverted, now-unified patch to `host/build/MiSTer_MediaPlayer`, SHA-256 `dcc00429096182dfaed319b889c99fe2e64dbc58e22f02abea6c2454e03b8e8e`; the helper is unchanged.  Deliver both files for the user to install and test: standalone MP3 seeking should show no blank/flicker/pop and no premature end-of-stream across repeated seeks, `.mpg` seeking must remain completely unaffected, and the visualizer should no longer show interlace jutter.
-
-#### Files Modified:
-
-- MediaPlayer.sdc
-- MediaPlayer.sv
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- rtl/mpeg2_new/mpeg2_h262_audio_ui.sv
-- tools/test_mpeg2_audio_ui.sv
 
 #### Status:
 
