@@ -776,8 +776,6 @@ wire mpeg2_new_system_input_end =
 
 wire mpeg2_new_transport_fatal_error =
 	mpeg2_new_syntax_error ||
-	mpeg2_new_phase1_probe_error ||
-	mpeg2_new_pred_error ||
 	mpeg2_new_inverse_quant_error ||
 	mpeg2_new_inverse_quant_unsupported_matrix ||
 	mpeg2_new_idct_error ||
@@ -798,6 +796,27 @@ wire mpeg2_new_transport_fatal_error =
 	// entry 986's fixed deadlock condition more than once, silently
 	// discarded the entire remainder of the file after the first
 	// occurrence.
+	//
+	// Entry 989: mpeg2_new_phase1_probe_error and mpeg2_new_pred_error are
+	// also excluded now, on the same evidence. A retest of entry 988's build
+	// showed presentation_hold correctly clearing (the deadlock fix works)
+	// but error_flags still latched all three of phase1_probe_error,
+	// pred_error and b_presentation_error together, and the file again
+	// drained unthrottled with the screen black - the same fatal_error_
+	// latched symptom, just tripped by the two sources still in this list.
+	// Reading mpeg2_h262_two_picture_probe_p_chain.sv found why: its
+	// publication_error and reference_progress_error terms (two of
+	// probe_error's five sources) are picture-bookkeeping consistency
+	// checks against reference_frame_bank/reference_frame_valid/
+	// reference_promotion_count - exactly the state entry 986's abort
+	// resets in the scheduler without this separate module knowing
+	// anything happened. mpeg2_new_pred_error's source module consumes
+	// those same bookkeeper outputs. Both are therefore the expected
+	// knock-on of the same recoverable abort, not independent faults;
+	// mpeg2_new_syntax_error, the two inverse_quant flags, idct, recon and
+	// both ddr flags are untouched, since none of them read this
+	// bookkeeping state and each represents a genuinely distinct failure
+	// mode.
 
 mpeg2_h262_stream_transport_gate mpeg2_h262_stream_transport_gate
 (
