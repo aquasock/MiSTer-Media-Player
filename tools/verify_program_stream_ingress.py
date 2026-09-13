@@ -64,3 +64,13 @@ with tempfile.TemporaryDirectory(prefix='mmp-ingress-') as tmp:
         if not expected.endswith(END): expected+=END
         replay('real-'+str(index),source.read_bytes(),expected)
     print('PASS: ingress byte fidelity, stalls, stream selection, EOF and restart')
+
+    # Production closes raw elementary streams too, allowing EOF seeks to drain.
+    bench = work/'ingress-raw-end'
+    run('iverilog', '-g2012', '-s', 'test_program_stream_ingress',
+        '-Ptest_program_stream_ingress.APPEND_RAW_END=1', '-o', bench,
+        ROOT/'tools/test_program_stream_ingress.sv', RTL/'mpeg2_program_stream_ingress.sv',
+        RTL/'mpeg2_h262_program_stream_demux.sv', RTL/'mpeg2_h262_inband_metadata.sv')
+    replay('raw-appended-end', video[:-4], video)
+    replay('raw-existing-end', video, video)
+    replay('raw-empty-end', b'', b'')

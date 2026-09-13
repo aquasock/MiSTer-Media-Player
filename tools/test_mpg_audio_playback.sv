@@ -59,11 +59,19 @@ wire ready=pcm_wr-pcm_rd_index<4096;
 reg pcm_end_written=0,origin_sent=0;
 reg [32:0] origin_value;
 wire pcm_pop,under,terr,finished;
+reg playback_pause=0;
 wire signed [15:0] output_l,output_r;
 wire [31:0] played;
 wire [66:0] pcm_q=pcm_mem[pcm_rd_index%4096];
-mp2_pcm_output sink(aclk,reset,origin_sent,origin_value,pcm_q,pcm_wr==pcm_rd_index,
+mp2_pcm_output #(.ENABLE_PLAYBACK_CONTROL(1)) sink(aclk,reset,playback_pause,1'b0,33'd0,origin_sent,origin_value,pcm_q,pcm_wr==pcm_rd_index,
     pcm_pop,output_l,output_r,under,terr,finished,played);
+initial begin
+ if($test$plusargs("pause")) begin
+  wait(played>=4800);@(negedge aclk);playback_pause=1;
+  repeat(2457600) @(negedge aclk);
+  playback_pause=0;
+ end
+end
 always @(posedge aclk) if(!reset&&pcm_pop) begin
     if(!pcm_q[66]) $fwrite(afd,"%d %d\n",$signed(pcm_q[31:16]),$signed(pcm_q[15:0]));
     pcm_rd_index<=pcm_rd_index+1;

@@ -15,6 +15,7 @@
 // same 3-I/22-P/47-B repeated-GOP transaction sequence as the 720x480 stream.
 module tb_h262_live_raster_soak #(
     parameter integer MIXED_PIXEL_MODE=0,
+    parameter integer PLAYBACK_CONTROL_MODE=0,
     parameter integer MEMORY_READ_LATENCY=1,
     parameter integer SWAP_WINDOW_CYCLES=10000,
     parameter integer FREEZE_TRACE_CYCLES=2000000,
@@ -389,11 +390,45 @@ module tb_h262_live_raster_soak #(
         .ddram_rd(memory_rd),.ddram_din(memory_din),.ddram_be(memory_be),
         .ddram_we(memory_we));
 
+    wire controlled_window;
+    wire seek_override;
+    generate if(PLAYBACK_CONTROL_MODE) begin: playback_test
+        reg seeking=1,paused=1;
+        wire done,rebase,fast;
+        wire [34:0] elapsed;
+        wire [32:0] seek_elapsed;
+        reg [3:0] saved_bank;
+        media_playback_control control(
+            .clk(clk),.reset(reset),.paused(paused),.seek_active(seeking),
+            .seek_target_q(35'd144000),.frame_rate_code(4'd3),
+            .swap_reset_count(framebuffer_swap_reset_count),
+            .first_picture_complete(picture_count!=0),.swap_window(swap_window_pulse),
+            .drained(1'b0),.fatal(1'b0),.display_pts_valid(1'b0),.display_pts(33'd0),
+            .elapsed_q(elapsed),.seek_done(done),.scheduler_window(controlled_window),
+            .fast_seek(fast),.rebase(rebase),.seek_elapsed_90k(seek_elapsed));
+        assign seek_override=seeking;
+        initial begin
+            wait(!reset);wait(done);@(negedge clk);
+            if(elapsed!=144000) $fatal(1,"reconstructed seek missed frame ten");
+            seeking=0;saved_bank={display_scratch,display_scratch_bank,display_frame_bank};
+            repeat(100000) begin
+                @(negedge clk);
+                if({display_scratch,display_scratch_bank,display_frame_bank}!=saved_bank)
+                    $fatal(1,"queued I/P/B changed display while paused");
+            end
+            paused=0;
+            $display("PLAYBACK RECONSTRUCTION PASS: seek to frame ten and retain display through queued decode");
+        end
+    end else begin
+        assign controlled_window=swap_window_pulse;
+        assign seek_override=1'b0;
+    end endgenerate
+
     mpeg2_h262_b_presentation_scheduler scheduler(
-        .clk(clk),.reset(reset),.swap_window_pulse(swap_window_pulse),
+        .clk(clk),.reset(reset),.swap_window_pulse(controlled_window),
         .frame_rate_code(4'h3),
-        .timestamp_candidate_active(1'b0),
-        .timestamp_candidate_due(1'b0),
+        .timestamp_candidate_active(seek_override),
+        .timestamp_candidate_due(seek_override),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
         .reference_promotion_count(reference_promotion_count),
@@ -1532,10 +1567,10 @@ module tb_h262_live_raster_soak #(
                    profile_b_replay_coeff_writes!=26591||
                    profile_b_replay_coeff_wait!=0||
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
-                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239996))||
+                    (MEMORY_READ_LATENCY==1)&&!PLAYBACK_CONTROL_MODE&&(total_cycles!=1239996))||
                    // Matched against a0f153a with the current Verilator bench.
                    ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
-                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239997))||
+                    (MEMORY_READ_LATENCY==1)&&!PLAYBACK_CONTROL_MODE&&(total_cycles!=1239997))||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||

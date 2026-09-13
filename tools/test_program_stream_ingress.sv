@@ -2,7 +2,7 @@
 // Replay actual file bytes through the same ingress + metadata boundary as
 // the core. Random readiness changes on every cycle catch output-byte loss;
 // a second session in the same simulation checks all reset/EOF state.
-module test_program_stream_ingress;
+module test_program_stream_ingress #(parameter APPEND_RAW_END=0);
 reg clk=0, reset=1;
 always #5 clk=~clk;
 reg [7:0] input_data;
@@ -12,7 +12,7 @@ wire [7:0] ingress_data, output_data;
 wire ingress_valid, ingress_ready, ingress_end, demux_error, output_valid;
 reg output_ready=0;
 wire metadata_valid;
-mpeg2_program_stream_ingress dut (
+mpeg2_program_stream_ingress #(.APPEND_RAW_END(APPEND_RAW_END)) dut (
     .clk(clk), .reset(reset), .input_data(input_data), .input_valid(input_valid),
     .input_ready(input_ready), .input_end(input_end),
     .output_data(ingress_data), .output_valid(ingress_valid),

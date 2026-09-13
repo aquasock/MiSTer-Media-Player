@@ -1,5 +1,5 @@
 wire mpeg2_new_framebuffer_reset =
-    reset_mpeg2 || (mpeg2_new_framebuffer_swap_reset_count != 3'd0);
+    reset_mpeg2 || media_seeking || (mpeg2_new_framebuffer_swap_reset_count != 3'd0);
 
 localparam [28:0] MPEG2_NEW_DDR_FRAME_BANK_WORDS     = 29'h00010000;
 localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH0_WORDS = 29'h00020000;

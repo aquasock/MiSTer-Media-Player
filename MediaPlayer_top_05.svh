@@ -126,11 +126,32 @@ mpeg2_h262_picture_timestamp mpeg2_h262_picture_timestamp
     .associated_count        (mpeg2_new_associated_count)
 );
 
-mpeg2_h262_pts_presentation_timeline mpeg2_h262_pts_presentation_timeline
+wire media_scheduler_window,media_fast_seek,media_rebase;
+wire [32:0] media_seek_elapsed;
+wire media_seek_drained=mpeg2_new_sequence_end_seen &&
+ !mpeg2_new_frame_waiting && !mpeg2_new_candidate_frame_valid &&
+ !mpeg2_new_b_scheduler_debug_state[26] &&
+ !mpeg2_new_b_scheduler_debug_state[0] &&
+ !mpeg2_new_b_presentation_hold && !mpeg2_new_p_destination_ownership_hold;
+media_playback_control media_playback_control(
+ .clk(clk_mpeg2),.reset(reset_mpeg2),.paused(media_paused),.seek_active(media_seeking),
+ .seek_target_q(media_target_q),.frame_rate_code(mpeg2_new_frame_rate_code),
+ .swap_reset_count(mpeg2_new_framebuffer_swap_reset_count),
+ .first_picture_complete(mpeg2_new_picture_420_complete),
+ .swap_window(mpeg2_new_swap_window_pulse),.drained(media_seek_drained),
+ .fatal(mpeg2_new_transport_fatal_error || (|media_telemetry[227:224])),
+ .display_pts_valid(mpeg2_new_display_pts_valid),.display_pts(mpeg2_new_display_pts),
+ .elapsed_q(media_elapsed_q),.seek_done(media_seek_done),
+ .scheduler_window(media_scheduler_window),.fast_seek(media_fast_seek),
+ .rebase(media_rebase),.seek_elapsed_90k(media_seek_elapsed));
+
+mpeg2_h262_pts_presentation_timeline #(.ENABLE_PLAYBACK_CONTROL(1)) mpeg2_h262_pts_presentation_timeline
 (
     .clk              (clk_mpeg2),
     .reset            (reset_mpeg2),
     .tick_90k         (mpeg2_new_stc_tick_90k),
+    .hold_time(media_seeking),.rebase(media_rebase),
+    .rebase_pts(media_seek_pts),
     .metadata_valid   (mpeg2_new_inband_valid),
     .metadata_pts     (av_is_ps ? av_origin : mpeg2_new_inband_pts_90k),
     .candidate_valid  (mpeg2_new_candidate_pts_valid),
@@ -145,11 +166,11 @@ mpeg2_h262_b_presentation_scheduler #(.ENABLE_REFRESH_SELECTION(1)) mpeg2_h262_b
 (
     .clk                         (clk_mpeg2),
     .reset                       (reset_mpeg2),
-    .swap_window_pulse           (mpeg2_new_swap_window_pulse),
+    .swap_window_pulse           (media_scheduler_window),
     .refresh_50                  (refresh_50_decoder),
     .frame_rate_code             (mpeg2_new_frame_rate_code),
-    .timestamp_candidate_active  (mpeg2_new_timestamp_candidate_active),
-    .timestamp_candidate_due     (mpeg2_new_timestamp_candidate_due),
+    .timestamp_candidate_active  (media_seeking || mpeg2_new_timestamp_candidate_active),
+    .timestamp_candidate_due     (media_seeking || mpeg2_new_timestamp_candidate_due),
     .frame_waiting               (mpeg2_new_frame_waiting),
     .completed_frame_bank        (mpeg2_new_completed_frame_bank),
     .reference_frame_bank        (mpeg2_new_reference_frame_bank),

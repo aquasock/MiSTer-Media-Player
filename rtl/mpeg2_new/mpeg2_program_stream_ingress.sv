@@ -1,7 +1,7 @@
 // Auto-detect Program Streams while preserving raw elementary bytes. Outputs
 // use ordinary valid/ready. ENABLE_AUDIO retains video-only regression use;
 // production enables the independent audio queue and forwards first-byte PTS.
-module mpeg2_program_stream_ingress #(parameter ENABLE_AUDIO=0) (
+module mpeg2_program_stream_ingress #(parameter ENABLE_AUDIO=0, parameter APPEND_RAW_END=0) (
     input wire clk, reset,
     input wire [7:0] input_data,
     input wire input_valid,
@@ -96,7 +96,7 @@ always @(posedge clk) begin
             // FFmpeg MPEG-PS can end without H.262 sequence_end_code.
             // Close the decoder only after the physical input and retained
             // output byte drain, so its final reordered reference can retire.
-            if (program_stream && video_seen && video_tail != 32'h000001b7) begin
+            if ((program_stream || APPEND_RAW_END) && video_seen && video_tail != 32'h000001b7) begin
                 end_index <= 0;
                 state <= END_CODE;
             end else state <= DONE;

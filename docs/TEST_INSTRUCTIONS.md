@@ -1,3 +1,62 @@
+# Keyboard playback controls
+
+Use a timing-qualified RBF from the playback-controls build. Hardware validation
+of these controls is pending; source and simulation success alone are not acceptance.
+Use stock Main with the existing mounted-file menu. No ini change is required.
+
+| Key | Action |
+| --- | --- |
+| Space | Toggle play/pause |
+| Left / Right | Backward / forward 10 seconds |
+| Ctrl + Left / Right | Backward / forward 30 seconds |
+| Ctrl + Alt + Left / Right | Backward / forward 5 minutes |
+
+Both left/right modifier keys work. Up/Down remain unassigned. Commands operate
+with the OSD closed; arrows and Space used in the OSD do not change playback.
+Each physical key press produces one command, without typematic repetition.
+During a seek, additional seek commands are ignored until completion; Space
+can still change whether playback will resume or remain paused.
+
+Pause should freeze the displayed movie frame and silence movie audio, while
+the raster and OSD keep running. Resume should continue the retained samples
+and frames without a catch-up burst. Leave Audio test Off during movie checks.
+
+Seeking flushes the prior session, reconstructs silently from the beginning,
+and resumes at the first frame at or after the requested time. PTS supply
+displayed-media time when available; unannotated pictures use the supported
+source frame rate, independent of the selected output refresh. The seek target
+is based on the displayed frame, not file-read position. Backward jumps clamp
+at zero; forward jumps beyond EOF finish on the last frame. Seeking while
+paused leaves the destination paused. Scanout is blank during reconstruction
+and the OSD remains usable. Long seeks can take substantial time: this initial
+implementation has no random-access index or bitrate-based offset shortcut.
+
+1. Play both a numbered M2V and an MPG with audible audio. Pause for 10 seconds,
+   open/close the OSD and adjust filters, then resume. Check frame retention,
+   silence, sample continuity and A/V alignment. Repeat several times.
+2. With a burned-in time/frame counter, compare the shown time before and after
+   all three jump sizes in both directions. Allow one source frame of rounding.
+   Use a file longer than six minutes for the five-minute forward jump.
+3. Repeat while paused. Verify the requested destination appears and stays still
+   until Space resumes. During a seek, toggle Space and check the resulting state.
+4. Seek backward near the start, forward near EOF, then backward after EOF.
+   Reload another file and use Reset during a seek; check clean recovery and
+   normal playback, with no old audio or reference-frame corruption.
+5. Repeat with 25 fps at 50 Hz and 29.97 fps at 59.94 Hz. Test OSD arrow navigation
+   and held keys to ensure they do not accidentally repeat playback commands.
+
+Cadence telemetry clears during deliberate pause/seek and measures the subsequent
+continuous playback segment. Audio sample telemetry counts played samples,
+excluding discarded seek preroll. Report the source/seed, format, source frame
+rate, output refresh, starting/landing time, elapsed seek time and any artifacts.
+
+Reproduce focused checks with:
+`python3 tools/verify_playback_controls.py --output /tmp/playback-controls.json`
+and the actual mixed I/P/B pixel oracle with:
+`python3 tools/verify_decoder_timing.py --playback-controls --output /tmp/playback-reconstruction`.
+
+---
+
 # FPGA audio hardware gate
 
 Use stock Main on MiSTer `10.10.0.45`. Keep the accepted `9233f07` seed-52 RBF

@@ -91,8 +91,25 @@ wire reset_mp2_out=mp2_reset_sync[2];
 wire signed [15:0] mp2_output_l,mp2_output_r;
 wire mp2_underrun,mp2_timestamp_error,mp2_finished;
 wire [31:0] mp2_samples_played;
-mp2_pcm_output mp2_pcm_output (
+// A single held bundle transfers pause, seek state and the destination PTS.
+reg [32:0] media_first_pts;
+reg media_first_pts_valid;
+always @(posedge clk_mpeg2) begin
+ if(reset_mpeg2) begin media_first_pts<=0;media_first_pts_valid<=0;end
+ else if(mpeg2_new_inband_valid&&!media_first_pts_valid) begin
+  media_first_pts<=mpeg2_new_inband_pts_90k;media_first_pts_valid<=1;
+ end
+end
+wire [32:0] media_seek_pts=media_first_pts+media_seek_elapsed;
+wire media_paused_audio,media_seeking_audio;
+wire [32:0] media_seek_pts_audio;
+video_config_cdc #(.WIDTH(35)) playback_audio_config(
+ .src_clk(clk_mpeg2),.dst_clk(CLK_AUDIO),
+ .src_data({media_paused,media_seeking,media_seek_pts}),
+ .dst_data({media_paused_audio,media_seeking_audio,media_seek_pts_audio}));
+mp2_pcm_output #(.ENABLE_PLAYBACK_CONTROL(1)) mp2_pcm_output (
     .clk(CLK_AUDIO),.reset(reset_mp2_out),
+    .pause(media_paused_audio),.seek(media_seeking_audio),.seek_target(media_seek_pts_audio),
     .origin_valid(!av_origin_empty),.origin_pts(av_origin_q),
     .fifo_data(mp2_fifo_data),.fifo_empty(mp2_fifo_empty),.fifo_rd(mp2_fifo_rd),
     .audio_l(mp2_output_l),.audio_r(mp2_output_r),.underrun(mp2_underrun),
@@ -121,7 +138,7 @@ end
 reg mp2_sample_toggle;
 always @(posedge CLK_AUDIO) begin
     if(reset_mp2_out) mp2_sample_toggle<=0;
-    else if(mp2_fifo_rd&&!mp2_fifo_data[66]) mp2_sample_toggle<=~mp2_sample_toggle;
+    else mp2_sample_toggle<=mp2_samples_played[0];
 end
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mp2_sample_sync,mp2_finished_sync;

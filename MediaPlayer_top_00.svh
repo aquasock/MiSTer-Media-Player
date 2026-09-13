@@ -122,8 +122,30 @@ wire [3:0] media_error;
 reg media_mount_d=0,media_user_reset_d=0;
 reg [63:0] media_file_size=0;
 wire media_user_reset=status[0] | buttons[1];
-wire media_restart=(media_img_mounted[0] && !media_mount_d) ||
+wire media_new_file=(media_img_mounted[0] && !media_mount_d) ||
                    (media_user_reset && !media_user_reset_d);
+wire media_paused_sys,media_seek_sys,media_seek_restart;
+wire [34:0] media_target_sys,media_elapsed_sys,media_elapsed_q;
+wire media_seek_done,media_seek_done_sys;
+wire [36:0] media_control_mpeg;
+wire media_paused=media_control_mpeg[36];
+wire media_seeking=media_control_mpeg[35];
+wire [34:0] media_target_q=media_control_mpeg[34:0];
+wire media_restart=media_new_file||media_seek_restart;
+(* preserve, altera_attribute="-name AUTO_SHIFT_REGISTER_RECOGNITION OFF; -name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] media_osd_sync=0;
+always @(posedge clk_sys) media_osd_sync<={media_osd_sync[1:0],OSD_STATUS};
+media_keyboard_control media_keyboard_control(
+ .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.enabled(media_file_size!=0),
+ .osd_open(media_osd_sync[2]),.key(ps2_key),.elapsed_q(media_elapsed_sys),
+ .seek_done(media_seek_done_sys),.paused(media_paused_sys),.seek_active(media_seek_sys),
+ .seek_target_q(media_target_sys),.restart(media_seek_restart));
+video_config_cdc #(.WIDTH(37)) playback_control_config(
+ .src_clk(clk_sys),.dst_clk(clk_mpeg2),
+ .src_data({media_paused_sys,media_seek_sys,media_target_sys}),.dst_data(media_control_mpeg));
+video_config_cdc #(.WIDTH(36)) playback_position_config(
+ .src_clk(clk_mpeg2),.dst_clk(clk_sys),
+ .src_data({media_seek_done,media_elapsed_q}),.dst_data({media_seek_done_sys,media_elapsed_sys}));
 always @(posedge clk_sys) begin
     media_mount_d<=media_img_mounted[0];media_user_reset_d<=media_user_reset;
     if(RESET) media_file_size<=0;
@@ -264,9 +286,17 @@ wire reset_mpeg2 = reset_mpeg2_base || media_decoder_reset;
 
 // The first scheduled frame starts playback. Keep message suppression through
 // subsequent bank swaps and EOF, clearing it only at reset or a fresh load.
+wire media_new_file_mpeg;
+video_config_cdc #(.WIDTH(1)) playback_hide_reset_config(
+ .src_clk(clk_sys),.dst_clk(clk_mpeg2),.src_data(media_new_file_hold),.dst_data(media_new_file_mpeg));
+reg media_new_file_hold=0;
+always @(posedge clk_sys) begin
+ if(RESET||media_new_file) media_new_file_hold<=1;
+ else if(media_reader_start) media_new_file_hold<=0;
+end
 reg playback_started = 0;
 always @(posedge clk_mpeg2) begin
-    if (reset_mpeg2) playback_started <= 0;
+    if (reset_mpeg2_base || media_new_file_mpeg) playback_started <= 0;
     else if (mpeg2_new_framebuffer_swap_reset_count != 0) playback_started <= 1;
 end
 video_config_cdc #(.WIDTH(1)) playback_osd_config (
@@ -575,7 +605,7 @@ wire [7:0] av_video_byte, av_audio_byte;
 wire av_video_valid,av_video_ready,av_ingress_end,av_is_ps;
 wire [32:0] av_video_pts,av_audio_pts;
 wire av_video_pts_valid,av_audio_pts_valid,av_audio_valid,av_audio_ready;
-mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1)) mpeg2_program_stream_ingress (
+mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1),.APPEND_RAW_END(1)) mpeg2_program_stream_ingress (
     .clk(clk_mpeg2), .reset(reset_mpeg2),
     .input_data(mpeg2_fifo_data), .input_valid(mpeg2_new_system_input_valid),
     .input_ready(mpeg2_new_system_input_ready), .input_end(mpeg2_new_system_input_end),
@@ -696,7 +726,7 @@ mpeg2_h262_system_time_clock mpeg2_h262_system_time_clock
 (
 	.clk           (CLK_AUDIO),
 	.reset         (stc_audio_reset),
-	.run           (1'b1),
+	.run           (!(media_paused_audio || media_seeking_audio)),
 	.load_valid    (1'b0),
 	.load_value    (33'd0),
 	.stc_90k       (stc_90k_value),

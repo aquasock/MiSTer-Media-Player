@@ -11,11 +11,13 @@
 // half are future timestamps.  Individually missing timestamps remain inactive
 // and therefore select the scheduler's established free-running cadence.
 //============================================================================
-module mpeg2_h262_pts_presentation_timeline
+module mpeg2_h262_pts_presentation_timeline #(parameter ENABLE_PLAYBACK_CONTROL=0)
 (
     input  wire        clk,
     input  wire        reset,
     input  wire        tick_90k,
+    input wire hold_time, rebase,
+    input wire [32:0] rebase_pts,
     input  wire        metadata_valid,
     input  wire [32:0] metadata_pts,
     input  wire        candidate_valid,
@@ -36,11 +38,15 @@ always @(posedge clk) begin
         anchored <= 1'b0;
         stc_90k  <= 33'd0;
     end
+    else if (ENABLE_PLAYBACK_CONTROL && rebase) begin
+        anchored <= 1;
+        stc_90k <= rebase_pts;
+    end
     else if (metadata_valid && !anchored) begin
         anchored <= 1'b1;
         stc_90k  <= metadata_pts;
     end
-    else if (anchored && tick_90k) begin
+    else if (anchored && tick_90k && !(ENABLE_PLAYBACK_CONTROL && hold_time)) begin
         stc_90k <= stc_90k + 33'd1;
     end
 end

@@ -36,8 +36,15 @@ with tempfile.TemporaryDirectory(prefix='mpg-audio-') as td:
     packets=json.loads(run('ffprobe','-v','error','-select_streams','v:0','-show_entries','packet=pts','-of','json',src))['packets']
     pts=np.loadtxt(str(out)+'.pts.txt',dtype=np.int64).reshape(-1,2)
     for offset,stamp in pts: assert packets[offsets.index(offset)].get('pts')==stamp
+    paused_out=td/'paused'
+    paused_log=run(sim/'Vtest_mpg_audio_playback','+input='+str(src),
+        '+output='+str(paused_out),'+pause')
+    paused_pcm=np.loadtxt(str(paused_out)+'.pcm.txt')
+    assert np.array_equal(paused_pcm,x), 'pause changed decoded/consumed PCM sequence'
+    assert Path(str(paused_out)+'.m2v').read_bytes()==video
+    print(paused_log)
     result={'played_sample_pairs':len(x),'max_sample_error':float(np.max(abs(x-y))),
-        'video_bytes':len(video),'picture_pts_checked':len(pts),'underrun':False,'timestamp_error':False,
+        'pause_100ms_pcm_exact':True,'video_bytes':len(video),'picture_pts_checked':len(pts),'underrun':False,'timestamp_error':False,
         'scope':'Mounted-file reader with periodic 2 ms host stalls + ideal bounded ingress/PCM FIFOs + timed sink; no full video decoder or vendor CDC simulation'}
     print(json.dumps(result,indent=2))
     if len(sys.argv)>1:Path(sys.argv[1]).write_text(json.dumps(result,indent=2)+'\n')

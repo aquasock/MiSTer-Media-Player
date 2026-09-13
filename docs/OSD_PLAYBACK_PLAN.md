@@ -1,6 +1,6 @@
 # OSD access during playback: proposed next build
 
-Status: implementation authorized and implemented; simulation validated, Quartus builds and hardware acceptance pending.
+Status: mounted-file OSD access is hardware accepted. Keyboard playback controls are now implemented and under validation.
 
 Base: source `07b8688`; seed 87 passed all four timing corners.
 
@@ -61,3 +61,27 @@ Session control uses preserved three-stage request/acknowledgement synchronizers
 Schema 9 has 49 words at overlay origin (8,280), including the existing audio fields and eight transport words before the checksum. A coalescing mailbox carries observational transport counters atomically to the profiler; they are not playback control inputs. The 84-register fitted audit covers all configuration/session control synchronizers. Source-read suspension and offset starts are tested primitives; user-facing pause and seek remain intentionally unexposed pending the later timeline/index implementation.
 
 Simulation validates the reader against actual hps_io slot-zero status and WIDE transfers (the bench declares two slots to avoid Icarus's single-element unpacked-array port limitation; slot one is inactive). It also validates exact tails, offsets, cancellation and timeout quarantine, DDR drain ordering, and FFmpeg video/PTS/PCM fidelity with periodic 2 ms host delays. Ingress/PCM queues in the timed integration test are ideal bounded models; physical CDC and full reconstructed video still require Quartus and hardware validation.
+
+
+## Keyboard controls follow-through
+
+Space pause/resume and Left/Right 10-second seeks (Ctrl 30 seconds, Ctrl+Alt
+300 seconds) now use the session boundary above. Pause stops logical media
+time and presentation admission while retaining compressed/PCM queues and
+the current display bank. A common audio-domain hold stops the video time tick
+and PCM time progression; clocks and OSD service remain active.
+
+The first seeking implementation always restarts at byte zero and reconstructs
+forward silently at decoder throughput. This supplies sequence and open-GOP
+reference context without arbitrary byte offsets or a new index. The display
+remains blank during reconstruction. Timestamped display time or exact rational
+source-frame periods select the destination; PCM is discarded up to the shared
+destination timestamp, then ordinary timed output resumes. Seek completion
+waits for a real vertical blank and preserves the requested paused state.
+Long-seek latency is the tradeoff; random-access indexing is a future optimization.
+
+The keyboard tracks press/release state even while OSD is open, excludes menu
+commands and suppresses typematic repeats. In-flight seeks are serialized.
+Configuration/result mailboxes and the original DDR/host retirement handshake
+separate commands from reset and prevent stale bytes entering a seek session.
+See TEST_INSTRUCTIONS.md for the current controls and hardware acceptance checks.

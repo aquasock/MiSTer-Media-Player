@@ -61,7 +61,7 @@ mpeg2_h262_hardware_cadence_profiler #(
     .audio_status({25'd0,mp2_timestamp_error_sync[2],mp2_underrun_sync[2],mp2_error,
         mp2_finished_sync[2],mp2_eof_queued,mp2_idle,av_is_ps}),
     .clk_mpeg2                 (clk_mpeg2),
-    .reset_mpeg2               (reset_mpeg2),
+    .reset_mpeg2               (reset_mpeg2 || media_paused || media_seeking),
     .clk_video                 (clk_video),
     .reset_video               (reset_video),
     .fifo_pending              (!mpeg2_stream_empty),

@@ -8,10 +8,16 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Space toggles play/pause; Left/Right seek backward/forward by 10 seconds,
+  Ctrl by 30 seconds, and Ctrl+Alt by 5 minutes. Menu navigation is excluded.
+- Transactional reconstruction seeks retain the requested paused state and
+  clamp at the start/end of media. This implementation reconstructs from the
+  beginning, so long seeks can take time; no custom Main or seek index is needed.
+
 - Compact 25-word telemetry schema 10 retains playback errors, basic cadence, audio and transport health while removing detailed performance history from default synthesis; compile-time detailed schema 9 remains available.
 - Screenshot decoding supports compact and legacy profiles, marks omitted diagnostics unavailable, and reports the correct final checksum word for each schema.
 
-- Manual 59.94/50 Hz progressive refresh selection with unchanged 720x480 active video, frame-boundary switching, and exact untimestamped cadence at both rates; audio and PTS clocks retain playback speed. Hardware qualification pending.
+- Manual 59.94/50 Hz progressive refresh selection with unchanged 720x480 active video, frame-boundary switching, and exact untimestamped cadence at both rates; audio and PTS clocks retain playback speed. Hardware accepted, with visibly smoother 29.97 fps motion at 59.94 Hz.
 - Deterministic 25/29.97 fps motion and stereo flash/beep checks from `tools/make_refresh_tests.py`.
 
 - Frame-associated BT.601/BT.709 color matrix selection with Auto and manual OSD overrides; untagged or unsupported matrices retain the BT.601 compatibility fallback.
@@ -45,6 +51,11 @@ This project is still in active pre-release development. Published milestone rel
 - Align telemetry coordinates with the framebuffer RGB/DE pipeline.
 
 ### Changed
+
+- Pause preserves queued movie PCM, sample phase, the displayed frame and the
+  shared media clock while keeping raster, OSD and filters responsive.
+- Raw elementary EOF now closes an unterminated sequence for final-frame drain.
+- Cadence telemetry restarts its observation window after deliberate pause/seek.
 
 - Restore progressive video from `a57079f` using stock MiSTer Main. Source
   `9233f07` seed 52 was hardware-accepted with the generated 30-second MPG.

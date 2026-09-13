@@ -145,3 +145,8 @@ set_false_path -to [get_keepers {*core_vs_sys_sync[0]}]
 # Session restart levels use preserved three-stage synchronizers.
 set_false_path -to [get_keepers {*|media_session_control:*|req_sync[0]}]
 set_false_path -to [get_keepers {*|media_session_control:*|ack_sync[0]}]
+
+# OSD status is observed only through a preserved system-clock synchronizer.
+set_false_path -to [get_keepers {*media_osd_sync[0]}]
+# Seek blanks/reinitializes scanout while reconstruction advances offscreen.
+set_false_path -from [get_keepers {*video_config_cdc:playback_control_config|dst_data[35]}] -to [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]

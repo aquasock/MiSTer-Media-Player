@@ -7,6 +7,7 @@ import subprocess
 
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--output',type=Path,required=True)
+parser.add_argument('--playback-controls',action='store_true')
 args=parser.parse_args()
 root=Path(__file__).resolve().parents[1]
 out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
@@ -19,7 +20,9 @@ with (out/'compile.log').open('w') as log:
     subprocess.run(['verilator','--binary','--timing','-j','6','-Wno-fatal',
         '-Wno-PINMISSING','-Wno-WIDTH','-Wno-UNOPTFLAT','-Wno-CASEINCOMPLETE',
         '-Wno-BLKANDNBLK','+incdir+rtl/mpeg2_new','--top-module',
-        'tb_h262_mixed_raster_pixels','--Mdir',str(obj),'-o','mixed',
+        'tb_h262_mixed_raster_pixels',
+        '-GPLAYBACK_CONTROL_MODE='+str(int(args.playback_controls)),
+        'rtl/media_playback_control.sv','--Mdir',str(obj),'-o','mixed',
         'tools/streams/tb_h262_mixed_raster_pixels.sv',
         'tools/streams/tb_h262_live_raster_soak.sv',*sources],
         cwd=root,stdout=log,stderr=subprocess.STDOUT,check=True)

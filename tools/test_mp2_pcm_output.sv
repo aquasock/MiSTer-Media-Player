@@ -6,7 +6,7 @@ reg [66:0] data;
 wire rd;wire signed [15:0] l,r;wire under,err,finished;wire [31:0] count;
 integer index=0,cycle=0,first_cycle=0,last_cycle=0,test;
 reg [32:0] first_pts;
-mp2_pcm_output dut(clk,reset,origin_valid,origin,data,empty,rd,l,r,under,err,finished,count);
+mp2_pcm_output dut(clk,reset,1'b0,1'b0,33'd0,origin_valid,origin,data,empty,rd,l,r,under,err,finished,count);
 always @(negedge clk) begin
  data={index==2304,index%1152==0,33'(first_pts+(index/1152)*2160),16'h1234,16'hfedc};
 end
