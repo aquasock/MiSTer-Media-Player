@@ -1,3 +1,34 @@
+## 980 COMMIT Unreleased b1864ab 2026-09-12T21:25:48-07:00
+
+#### Coming From:
+
+Unreleased 8527df9
+
+#### Purpose:
+
+Wire entry 979's Program Stream demux into MediaPlayer.sv and reroute Main so a plain .mpg file loads with no ARM helper process at all.
+
+#### Outcome:
+
+Instantiated `mpeg2_h262_program_stream_demux` alongside the existing `mpeg2_h262_inband_metadata`, muxed on a new `mpeg2_new_direct_demux_active` flag latched per-download-session from `ioctl_index`: index 1 (the legacy ARM helper channel) keeps using `mpeg2_h262_inband_metadata` unchanged, while index 4 (`MEDIAPLAYER_LOADER_VIDEO_FILE`, the existing F4 "Load MPEG-2 Video File" OSD slot) now feeds the new demux directly. Both share one `mpeg2_stream_fifo`; `mpeg2_stream_wr` and the `hps_io` burst-ready/`wr_attempt` gating were extended to accept either index, and the inactive consumer's input is gated to always-invalid so it stays completely inert regardless of which path is selected. On the Main side, cloned the pinned `Main_MiSTer` commit referenced by `host/build_arm_stack.sh`, applied all three existing patches, and added a fourth, `0004-mediaplayer-plain-video-generic-load.patch`: a plain `.mpg`/`.m2v`/`.mpeg` file selected via F4 now routes through the ordinary `user_io_file_tx()` path any ROM-loading core uses instead of launching the ARM helper, verified by a real ARM cross-compile of the four-patch stack with zero errors or warnings from the changed files. DVD/ISO/VOB and the standalone audio-file player are untouched and still route through the helper via F5 or the physical-loader path. Audio is not yet decoded anywhere on the new path - stage C's MP2 decoder does not exist yet - so the demux's audio elementary output is sunk with `audio_ready` tied high. `quartus_map` (analysis & synthesis) on seed99 completed with 0 errors and no warnings traced to any of the new or changed signals, confirming the wiring elaborates cleanly; no full timing-closed build or hardware test has been run yet, and the demux has only been exercised against synthetic Icarus test data, never a real captured `.mpg` byte sequence.
+
+#### Next Steps:
+
+Run a full three-seed timing-checked Quartus build of this RTL, install the resulting RBF and the four-patch Main alongside the still-functional helper-based `.rbf`/binary, and confirm silent (audio-muted) video-only playback of a real `.mpg` file loaded via F4 on hardware - watching in particular for anything the synthetic Icarus stream didn't exercise (unusual pack header placement, multiple audio streams, non-PTS-bearing PES packets). Once that is hardware-confirmed, proceed to stage C: an MP2 audio decoder consuming the demux's audio elementary output.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+- host/build_arm_stack.sh
+- host/main_mister/0004-mediaplayer-plain-video-generic-load.patch
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 979 COMMIT Unreleased 8527df9 2026-09-12T20:55:15-07:00
 
 #### Coming From:
@@ -1204,40 +1235,6 @@ Exit MediaPlayer and replace only `/media/fat/linux/MediaPlayer_Helper` with `ho
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 940 COMMIT Unreleased 177886b 2026-09-03T03:51:20-07:00
-
-#### Coming From:
-
-Unreleased 7759f87
-
-#### Purpose:
-
-Qualify, document and package the accepted v0.9.0 runtime set for the user's GitHub release publication.
-
-#### Outcome:
-
-The user reports that the complete v0.9.0 functional and regression matrix looks good and accepts the exact runtime set for release.  At the user's explicit direction, packaging invoked no build: it retained the already clean, reproducible, timing-qualified source-`dfe1057` RBF and byte-identical accepted source-`3689cca` Main, source-`0f1165c` helper and source-`366a227` visualizer pack with source-`932dc22` behavior.  The helper's protocol-one capability probe passes.  `host/build/MiSTer_Media_Player_v0.9.0.zip` contains the five runtime/launcher payloads, installation and source notes, the project licence, seven dependency licences and a 15-entry SHA-256 manifest.  A fresh extraction is byte-identical to its bounded staging directory, every manifest entry passes, ZIP integrity is clean, and Main/helper retain mode 755 while all other files use mode 644.  The 6,580,818-byte archive has SHA-256 `e8bc8e0c25291df85d6d53ad2688995d30ce156c547b7315b08058052863e1f9`; its 16 files total 10,476,902 uncompressed bytes.  Source `177886b` moves the changelog into the dated v0.9.0 milestone, starts a clean Unreleased section and finalizes the README, release notes, architecture, build and test guidance with the exact package identity, accepted validation and no-rebuild provenance.  Documentation link, fence, whitespace, package-identity and staged-diff audits pass.  No tag or GitHub Release was created.
-
-#### Next Steps:
-
-The repository and package are ready for the project owner to create annotated tag `v0.9.0` on the final metadata commit following source `177886b`, create a GitHub pre-release titled `MiSTer Media Player v0.9.0`, attach `host/build/MiSTer_Media_Player_v0.9.0.zip`, and use `docs/RELEASE_NOTES_v0.9.0.md` as the release description.  After publication, record the tag resolution, GitHub release time and downloaded-asset verification in a VERSION entry without changing the accepted runtime payloads.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- README.md
-- docs/ARCHITECTURE.md
-- docs/BUILDING.md
-- docs/RELEASE_NOTES_v0.9.0.md
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
