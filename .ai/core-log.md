@@ -1,3 +1,33 @@
+## 984 COMMIT Unreleased 3713581 2026-09-12T23:48:33-07:00
+
+#### Coming From:
+
+Unreleased 254fd3a
+
+#### Purpose:
+
+Fix the black screen: the demux never recognized the real test file's PES optional-header form at all.
+
+#### Outcome:
+
+Entry 983's diagnostic log showed the transfer running at full, unthrottled speed (constant maximum burst credit, zero backpressure) for 183MB with zero video ever appearing - meaning the FPGA was accepting bytes but the demux was never forwarding any of them as real payload. Pulled the actual file's header bytes over SSH and found the cause directly: the first video PES packet's optional header starts with `0x31`, whose top two bits are `00`, not the `10` marker this demux exclusively recognized - the legacy MPEG-1 PES header form (optional 0xFF stuffing, an optional 2-byte STD_buffer_scale/size field, then a bare PTS/PTS+DTS/no-timestamp marker with no `header_data_length` field), which entry 979 explicitly and wrongly assumed no real file still used. `host/arm/media_player_helper.c`'s own `parse_pes_header()` already handles this form in software. Added it to the RTL, and building an Icarus test from the file's actual captured bytes before touching hardware again caught three real bugs in the process: `legacy_prefix_bytes` was never initialized for the (real-file-common) case where the very first header byte is already the marker, the legacy PTS byte counter was off by one because the marker byte is shifted into `pts_shift` at detection time unlike the MPEG-2 path, and the STD field's own second byte was incorrectly matched against the timestamp-marker pattern instead of just being consumed. Four new Icarus passes cover the exact real-file byte sequence, a stuffed variant, and an STD-field variant, all now passing; `quartus_map` on seed99 remains clean, 0 errors, same warning count as before.
+
+#### Next Steps:
+
+Run the full three-seed timing build, deploy the RBF (Main is unchanged from entry 983 and does not need reinstalling), and reload the real `.mpg` via F4. Watch the diagnostic log for `credit` actually fluctuating now (evidence the FIFO is filling and draining against real decode consumption instead of racing unthrottled) and confirm video actually appears this time.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
+- tools/test_program_stream_demux.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 983 COMMIT Unreleased 254fd3a 2026-09-12T23:19:48-07:00
 
 #### Coming From:
@@ -1200,35 +1230,6 @@ Install the matched `MiSTer_StreamBoundary_ce5a826` and `MediaPlayer_Helper_Stre
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - tools/test_dvd_overlay_output.c
 - tools/test_main_seek_lifecycle.cpp
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 944 COMMIT Unreleased cea2add 2026-09-03T06:15:39-07:00
-
-#### Coming From:
-
-Unreleased cea2add
-
-#### Purpose:
-
-Use the physical Futurama result to distinguish the automatic-menu scheduler correction from an earlier terminal-still decoder-session freeze.
-
-#### Outcome:
-
-The physical `FUTURAMA_S1D1` run rejects source `cea2add` visually but proves the helper did not freeze.  The first authored ten-second still is finalized from 224,665 bytes of sequence-plus-I video, receives sequence end and transport drain, and is the only payload the schema-21 FPGA snapshot accepts: 224,780 bytes, one I picture, one reference and one displayed picture, sequence-end seen and presentation complete, with zero decoder error flags, transport blocks or audio underruns.  Three finite-still expirations then resume the same completed download session without a READY/GO decoder reset.  The helper continues, classifies later first-play video silent, enters the menu at 40.449462 seconds, rearms source `cea2add`, selects AC-3 substream `0x80`, publishes seven complete overlay planes and accepts an Up command at 63.111029 seconds that changes the authored button from one to four; it remains alive beyond 71 seconds.  Main submits through overlay offset 9,035,621, but telemetry retains zero overlay records, zero PCM samples and the first still's 224,780 accepted bytes, proving every later video, audio and overlay record remains outside the terminal FPGA session.  The black 1,600-by-1,200 screenshot contains valid telemetry but no decoded menu background.  The 1,477,359-byte log, 2,788-byte screenshot and 441-byte sidecar have SHA-256 `19bf6160b410268650e34db63b7507c1d7f5b21396a4d9314da5ebe3fc9d7518`, `bba7649ac2ac61c546f485a5f52d6f9bd09a7b9e4b17552b7ee0aed2ea380a1d` and `abe2bbe935177401657cdb1090b2e3b8b63d3c17368ccd20e4d5a990bf57318c`.  The helper-only menu rearm is therefore insufficient because it cannot reopen an FPGA session already closed by the first finite still.
-
-#### Next Steps:
-
-After user approval, replace the helper-only assumption with an explicit autonomous DVD stream-boundary handshake shared by Main and the helper while retaining the decoder and RTL.  Associate buffered libdvdnav transition metadata with its consumed payload position rather than exposing producer-ahead menu state; when a finite authored still expires or a synchronized automatic menu domain begins after a terminal or silent epoch, finish the intentional old transport, notify Main without requiring a user navigation command, drain rather than discard the completed boundary, deassert and reassert download exactly once, then send GO so the helper resets demux, audio, PTS, random-access and bounded scheduling before consuming the new epoch.  Remove the unsynchronized `cea2add` post-`find_start_code` rearm.  Add regressions for multiple finite first-play stills followed by a silent segment and an automatic video-plus-AC-3 menu, verifying one decoder reset per terminal boundary, consumer-position menu notification, accepted background video, PCM and overlay records, while retaining directional continuations, explicit navigation hops, staged menus, silent Program Streams, late-audio rejection, reserve ownership, seek, audio and sanitizer coverage.  Build Main and the static ARM helper locally; no RTL simulation is required unless implementation evidence unexpectedly reaches the transport decoder.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
