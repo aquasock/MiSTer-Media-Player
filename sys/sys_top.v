@@ -1517,13 +1517,18 @@ reg  [39:0] PhaseInc;
 `ifndef MISTER_DUAL_SDRAM
 	// Subcarrier generation for external encoders (independent of YC module)
 	reg         subcarrier;
+	wire [0:0] subcarrier_video;
+	video_config_cdc #(.WIDTH(1)) subcarrier_config (
+	 .src_clk(clk_sys), .dst_clk(clk_vid),
+	 .src_data(subcarrier), .dst_data(subcarrier_video)
+	);
 
 	reg  [39:0] sub_accum;
 	always @(posedge clk_vid) sub_accum <= sub_accum + PhaseInc;
 
 	// 1-bit output for positive/negative of wave, no LUT required. Output 1 if disabled for further logic
 	reg subcarrier_out;
-	always @(posedge clk_vid) subcarrier_out <= ~(subcarrier & csync_en & ~ypbpr_en & ~forced_scandoubler & ~vgas_en) | sub_accum[39];
+	always @(posedge clk_vid) subcarrier_out <= ~(subcarrier_video & csync_en & ~ypbpr_en & ~forced_scandoubler & ~vgas_en) | sub_accum[39];
 
 
 	wire VGA_DISABLE;
