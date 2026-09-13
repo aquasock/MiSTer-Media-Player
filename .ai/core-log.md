@@ -1,4 +1,4 @@
-## 002 COMMIT Unreleased ??? 2026-09-13T09:12:17-07:00
+## 002 COMMIT Unreleased f960c0e 2026-09-13T09:12:17-07:00
 
 #### Coming From:
 
@@ -14,7 +14,7 @@ The user accepted 1750154 seed 87 and authorized continuing the progressive outp
 
 #### Next Steps:
 
-Commit the prepared changes, run three clean Quartus seeds and require all standard and focused timing reports including the new 27 MHz video clock and HDMI scaler. Preserve the accepted 1750154 seed-87 RBF, compare frame edges, aspect and audio synchronization on hardware, and revisit the previously recorded video cadence outlier using retained telemetry.
+Changes are committed; run three clean Quartus seeds and require all standard and focused timing reports including the new 27 MHz video clock and HDMI scaler. Preserve the accepted 1750154 seed-87 RBF, compare frame edges, aspect and audio synchronization on hardware, and revisit the previously recorded video cadence outlier using retained telemetry.
 
 #### Files Modified:
 
