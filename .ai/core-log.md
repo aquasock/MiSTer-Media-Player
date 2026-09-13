@@ -1,3 +1,32 @@
+## 012 COMMIT Unreleased a0f153a 2026-09-13T12:54:32-07:00
+
+#### Coming From:
+
+Unreleased a0f153a
+
+#### Purpose:
+
+Record completed OSD builds, accepted interactive-menu hardware behavior and the remaining setup-timing work.
+
+#### Outcome:
+
+All three clean a0f153a seeds compiled and passed the fitted 84-register CDC audit and explicit four-corner hold, recovery, removal and pulse-width checks. Worst setup for seeds 52, 61 and 87 is -0.200, -0.137 and -0.234 ns respectively; no build is timing-qualified. Seed 52's worst path is the 60 MHz B-frame backward-motion/address calculation into phase1_base_addr_reg; seed 61 fails HDMI scaler fraction/address logic and seed 87 fails HDMI scaler control-to-pixel logic. Their ALM counts are 41237, 40806 and 40913, with 480 RAM blocks and 69 DSP blocks each. Build and timing times were approximately 1263, 1235 and 1436 seconds. Evidence is retained in results/build-a0f153a-20260913-122739/ and all three RBFs are copied under results/hardware-test-a0f153a/seed52, seed61 and seed87 with hashes and explicit timing status. At the user's request, seed 52 SHA-256 2fe49c2d3f05dd038062b76c1026dc261b03c2e53378967c2dfb632cf084d5af was delivered despite its disclosed timing failure. The user confirmed the fix works: OSD is controllable and filters work during playback. Passed here records that accepted OSD/filter scope, not timing qualification or unreported EOF/reload testing. The user explicitly excluded DVD and interlaced playback from the project; progressive-only scope supersedes the older roadmap in core.md and historical references, without automatically editing restricted core.md. A read-only FTP check confirmed current MiSTer.ini has MediaPlayer vsync_adjust=1, global video_mode=8 and direct_video=0, and no active MediaPlayer main override in the inspected section. This config matches HDMI to the fixed 60000/1001 Hz core raster, not to each movie frame rate. Source rates 24000/1001, 24, 25 and 30 still have noninteger repetition on that raster; 30000/1001 has a two-refresh cadence. Optional progressive source-matched raster/scheduler modes were investigated only and not implemented.
+
+#### Next Steps:
+
+Plan a focused timing cleanup of the B-frame address calculation and HDMI scaler arithmetic/control paths, preserving decoder values, filter quality and pixel/sync alignment. Require regression checks and positive setup at every operating corner; do not loosen clocks or hide genuine synchronous paths. Keep the accepted OSD behavior and progressive-only scope. Future refresh work can target twice-source-rate outputs where displays support them while retaining 59.94 Hz compatibility mode; leave vsync_adjust=1 configured. Await the user's direction before a new implementation cycle.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 011 COMMIT Unreleased a0f153a 2026-09-13T12:11:46-07:00
 
 #### Coming From:
@@ -1271,40 +1300,6 @@ Source `016f1e2` restructures `video_overlay_pause_barrier()` to force `video_ov
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 971 COMMIT Unreleased 5ce3c1f 2026-09-12T08:06:57-07:00
-
-#### Coming From:
-
-Unreleased 6ac6895
-
-#### Purpose:
-
-Remove RTL and OSD support for native (unscaled 480i) presentation, Bob/Weave deinterlacing, and DVD/CD physical-media and disc-image menu entries, since this project only ever plays progressive `.mpg` files and the progressive audio UI/visualizer through the standard scaled HDMI/analog path, in order to recover FPGA resources and improve timing margin (seed26 passed `6ac6895` at only +0.050 ns setup slack).
-
-#### Outcome:
-
-The user asked what could safely be removed from the RBF to help timing/resources now that interlace, Bob/Weave and native output are all unsupported project scope, then directed starting the removal, later narrowing it to "standard HDMI and analog video out" for video and "spdif, analog, and HDMI" for audio, and separately asked to drop the DVD-video and Audio-CD OSD load options.  A repo-wide search for video-SDI support found nothing to remove - the only "SDI" matches are `SDIO_DAT`/`SDIO_CMD`/`SDIO_CLK` (the SD card interface) and `ADC_SDI` (the audio ADC's SPI pin name), both generic MiSTer board-framework names unrelated to video SDI.  Removed: `rtl/mpeg2_native_timing_pattern.sv` (dead, unreferenced); the `mpeg2_hdmi_deinterlace_control` instantiation, tying `HDMI_BOB_DEINT` directly to `1'b0` and deleting `rtl/mpeg2_hdmi_deinterlace_control.sv` along with the now-orphaned `audio_ui_mode_active_video_sync`/`audio_ui_mode_active_video` synchronizer and its `MediaPlayer.sdc` false-path exception; the `"O[124],Deinterlacer Mode:,Bob,Weave;"` OSD entry; the `mpeg2_h262_native_field_order` instantiation and the `mpeg2_new_native_480i_request`/`mpeg2_new_presentation_request` decision chain it fed, simplifying `mpeg2_new_presentation_request` to `mpeg2_new_native_progressive_supported` directly since `mpeg2_new_progressive_sequence` is always true for this project's content, and tying `mpeg2_video_output_timing`'s `interlaced_request_async`/`top_field_first_async` ports to `1'b0`; the `mpeg2_new_film_mode_video_sync` synchronizer, simplifying `mpeg2_new_swap_window_video`'s assignment to `display_frame_window` directly; and the presentation scheduler's `native_film_mode` port, tied to `1'b0`.  Also removed `"P1,Load Physical Disc;"`, `"P1F1,DVD,Video DVD;"`, `"P1F2,CD,Audio CD;"`, `"P2,Load Disc Image;"` and `"P2F3,ISO,Video DVD;"` from `CONF_STR`, keeping `"F4,...;"`/`"F5,...;"` direct `.mpg`/audio-file loading - verified safe since Main's patch dispatches on a single fixed `MEDIAPLAYER_STREAM_INDEX = 1`, not the OSD slot number.  Deliberately deferred: `mpeg2_new_native_active_mpeg2`/`_sync`/`_mode_change`, which are already effectively dead for progressive-only content but are intertwined with the `reset_mpeg2_display_domain` fix from `fa0ebf6`, judged too risky to bundle into this same pass.  All three seeds 26, 33 and 40 compiled with 0 errors and did free real resources - logic utilization dropped from 34,684 to 34,511/34,506/34,456 ALMs respectively (about -0.4 to -0.7%), total registers dropped from 54,327 to 54,293/54,188/54,039, and DSP blocks dropped from 70 to 68 - but none passed timing: worst-case setup slack on the `pll_hdmi` divider-counter path was negative 0.115 ns, negative 0.209 ns and negative 0.297 ns respectively, all worse than `6ac6895`'s own seed26 result (positive 0.050 ns) on that identical critical path.  Removing logic elsewhere apparently shifted placement/routing enough to move this specific PLL path the wrong way on every seed this round, despite the real ALM/register/DSP reduction confirming the cleanup itself works as intended.  Seed 26 (best margin of the three, still failing) was delivered as `.ai/current_results/MediaPlayer_nativemoderemoval_seed26.rbf`, SHA-256 `6c0abc70d9a928b6aff1ed5478758f4eb862b7447cb6a68da1d995975bf42c06`, for reference only - not timing-qualified.  The previously delivered `6ac6895`/seed26 build (`.ai/current_results/MediaPlayer_nativestartupfix_seed26.rbf`) remained the current timing-qualified RBF while further seeds were tried.  A targeted retiming fix to `sys/ascal.vhd` (folding the extended-resolution line-buffer select into its read register, since TimeQuest traced every failing path to that exact structure inside the shared MiSTer scaler IP) was implemented and test-built, but made things measurably worse - setup slack dropped to negative 0.417 ns and a new, worse critical path appeared on the memory write-enable side, indicating the merge broke Quartus's clean M10K inference rather than removing a mux level - so it was reverted (never committed).  Fresh seeds 7, 52 and 99 were then tried on the plain `5ce3c1f` source: seed 99 passed, with worst-case setup slack positive 0.022 ns, logic utilization 34,467 ALMs and 54,220 registers (both below the pre-cleanup `6ac6895` baseline of 34,684 ALMs / 54,327 registers, confirming the cleanup's resource savings hold on a passing seed too).  Investigated whether any of this project's own prior `ascal.vhd` tuning commits (`a2debaa` through `dfe1057`) caused this tight margin: none of them touch the actual failing signals, which are unmodified since upstream commit `d93bc2e` (2025-07-09, predating all project-specific ascal work) - so the tightness is inherent to the shared scaler's extended-resolution line-buffer structure, not a regression introduced here.  Seed 99 was delivered as `.ai/current_results/MediaPlayer_nativemoderemoval_seed99.rbf`, SHA-256 `903f542edd472aaf1ecd326df0ff327688888af35d17231858caa08c52e529f6`.  Main and the helper are unchanged from `24a6bda`'s delivered build.
-
-#### Next Steps:
-
-Install `.ai/current_results/MediaPlayer_nativemoderemoval_seed99.rbf` (Main/helper unchanged from entry `24a6bda`) and retest: `.mpg` playback, seeking, pause/resume and the progress overlay, and standalone audio playback/visualizer should all behave exactly as before, with the Bob/Weave OSD option, the DVD/CD load menu entries, and the native-480i decision path gone, on a build that now also clears timing.
-
-#### Files Modified:
-
-- MediaPlayer.sdc
-- MediaPlayer.sv
-- files.qip
-- rtl/mpeg2_hdmi_deinterlace_control.sv
-- rtl/mpeg2_native_timing_pattern.sv
-- rtl/mpeg2_new/mpeg2_h262_native_field_order.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
