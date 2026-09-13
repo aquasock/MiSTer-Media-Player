@@ -1,4 +1,33 @@
-## 978 COMMIT Unreleased ??? 2026-09-12T20:29:13-07:00
+## 979 COMMIT Unreleased ??? 2026-09-12T20:55:15-07:00
+
+#### Coming From:
+
+Unreleased 39df52e
+
+#### Purpose:
+
+Adopt a `.mpg`-only architecture that moves Program Stream demux, MP2 audio decode and progress-bar overlay rendering into the FPGA core, eliminating the ARM helper process and the custom Main patches entirely.
+
+#### Outcome:
+
+While diagnosing entry 978's freeze, the user reconsidered why a custom ARM helper and heavily patched Main exist at all: originally for DVD/CD navigation and multi-format audio, neither of which is wanted any more. The user confirmed three scoping decisions: (1) drop the standalone MP3/FLAC/WAV/Ogg audio-file player entirely, (2) support MP2 (MPEG-1 Layer II) audio only, no AC-3, matching `core-reference.md`'s already-adopted H.222.0 Program Stream/PES records (H222-001 through H222-010) and the project's existing ARM-side MP2 decode experience, and (3) abandon entry 978's freeze investigation once this rebuilt RBF exists, since the bug lives entirely inside the cross-process pipe/SPI architecture being replaced, not in the H.262 decode pipeline itself. The target end state plays a `.mpg` file the same way a ROM-loading MiSTer core plays a ROM: stock Main streams the raw file bytes into the FPGA via the existing generic `ioctl_download` path, and the FPGA does everything downstream - Program Stream/PES demux, H.262 video decode (unchanged, already proven), a new MP2 subband decoder, a new glyph-based overlay text renderer, and pause/seek handled natively in RTL without a control-socket handshake to a separate process. Deleted at completion: all of `host/arm/` (11,016 lines), all three `host/main_mister/*.patch` files, the DVD-only RTL (`mpeg2_h262_dvd_overlay.sv` and the DVD leg of `mpeg2_h262_display_record_router.sv`), and the vendored libdvdnav/libdvdread/libdvdcss/liba52/minimp3 dependencies. No RTL, Main or build-script changes have been made yet; this entry records the plan before the first implementation commit.
+
+#### Next Steps:
+
+Stage the rewrite behind hardware-validated boundaries rather than one large change: (A) a Program Stream/PES demultiplexer module, verified in Icarus against real captured `.mpg` pack/PES byte sequences before touching hardware, producing the same elementary H.262 byte stream `mpeg2_h262_two_picture_probe_p_chain` already consumes; (B) reroute Main to stream raw file bytes with no helper process and confirm silent (audio-muted) video-only playback on hardware; (C) an MP2 audio decoder module, verified in simulation against reference PCM before wiring to the audio output path, then confirmed on hardware; (D) an RTL overlay text renderer replacing `audio_ui.c`'s glyph drawing, plus native pause/seek input handling in place of the control-socket protocol; (E) delete the ARM helper, the three Main patches, DVD-only RTL and the now-unused vendored dependencies, and update `files.qip` and the build scripts accordingly. Do not delete the current working (if buggy) helper/Main architecture until stage (C) is hardware-confirmed, so there is a fallback playable build throughout.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 978 COMMIT Unreleased 39df52e 2026-09-12T20:29:13-07:00
 
 #### Coming From:
 
@@ -14,7 +43,7 @@ Entry 977's ARM-side pipe-write deadlock fix did not resolve the freeze: hardwar
 
 #### Next Steps:
 
-Run the standard three-seed timing-checked Quartus build, deploy the resulting RBF, and have the user reproduce the same pause/resume hang; take a screenshot mid-hang, decode it with `tools/decode-live-deadlock-probe.py`, and compare the two progress counters and both hold bits against a screenshot taken a few seconds later to determine definitively whether decode, display, or neither has stopped advancing, and whether the suspected P-destination-ownership hold is the one actually latched. Use that direct evidence to scope the real fix rather than guessing further from source reading alone.
+Superseded before its timing build finished: the user decided, in the same session, to drop DVD/CD and the standalone audio-file player entirely and rebuild the project as `.mpg`-only with Program Stream demux, MP2 audio decode and overlay text rendering moved into the FPGA core, eliminating the custom Main patches and the ARM helper process outright - see entry 979. The three seed compiles this entry's Next Steps called for were killed unstarted-to-timing-closure; this probe and the freeze it was built to diagnose are abandoned along with the architecture that has the bug, not carried forward.
 
 #### Files Modified:
 
@@ -1208,41 +1237,6 @@ The repository and package are ready for the project owner to create annotated t
 
 - [x] Built
 - [x] Passed
-
----
-
-## 939 COMMIT Unreleased 7759f87 2026-09-03T03:19:43-07:00
-
-#### Coming From:
-
-Unreleased 0f1165c
-
-#### Purpose:
-
-Prepare the repository documentation and release-candidate notes for the v0.9.0 capability set accumulated since v0.8.0.
-
-#### Outcome:
-
-The user reports that the source-`0f1165c` candidate looks good and is conducting the final functional and regression pass independently.  Source `7759f87` reconciles the README, changelog, architecture, build and hardware-test documentation with the complete v0.9.0 candidate: native 480p and expanded native-480i decoding, Program Stream seeking and replay-ready EOF, standalone consumer audio and its timed visualizer overlay, encrypted ISO and direct-optical DVD playback, authored menus and scene selection, unsupported LPCM behavior, telemetry and current limitations.  It adds dedicated v0.9.0 release-candidate notes with the tested component identities, exact candidate artifact hashes and established timing/resources while explicitly reserving publication provenance for the clean release build.  It also adds a focused media-preparation guide and promotes the user's 720-by-480 exact-24-fps MPEG-2 Program Stream FFmpeg command as the project recipe.  That command produces the documented Main Profile, 4:2:0, 32:27-SAR output with a 48 kHz 320-kilobit MP2 track and also succeeds without an input audio stream; local links, code fences, whitespace and staged-diff checks pass.  No runtime source or artifact changed.
-
-#### Next Steps:
-
-Complete the user's functional and regression matrix, then perform the required clean/from-scratch Quartus, helper, Main and visualizer release build from the exact accepted source.  Once those artifacts reproduce and pass the final hardware gate, update the changelog from Unreleased to the dated v0.9.0 boundary, replace candidate language with final package filenames and hashes, and have the user create the annotated tag and pre-release from that exact documentation commit.  Do not tag or publish v0.9.0 before those gates close.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- README.md
-- docs/ARCHITECTURE.md
-- docs/BUILDING.md
-- docs/MEDIA_CONVERSION.md
-- docs/RELEASE_NOTES_v0.9.0.md
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
