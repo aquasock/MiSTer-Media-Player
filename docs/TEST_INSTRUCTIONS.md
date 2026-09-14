@@ -1,13 +1,22 @@
-# Unified player overlay candidate — qualification pending
+# Timing-qualified player overlay: b00920a seed 52
 
-Initial source `5373dae` compiled for all three seeds but fails HDMI setup
-through pixel-coordinate division, and exceeds the initial logic budget by
-351–454 ALMs. It is not recommended for testing. The follow-up replaces that
-path with a synchronous coordinate ROM, stores staging descriptors in RAM and
-uses a real modulo-four enable for scene arithmetic. Pixels remain full-rate;
-only the formatter's same-enable register paths receive multicycle constraints.
-Duration guards also reject malformed head evidence and mismatched stream IDs.
+Preferred RBF: `results/hardware-test-b00920a/seed52/MediaPlayer_20260914.rbf`.
+SHA-256: `bf7e9aff272e5f819e16358dba90d2d05e18b9ca78436df6e3cd204e1d520973`.
+Hardware validation is pending; no deployment has been performed.
 
+All three seeds pass all four timing corners, 159 CDC registers and the real
+modulo-four scene-enable audit. Seed 52 has minimum setup +0.135 ns and hold
++0.096 ns. Seeds 61 and 87 have setup +0.100/+0.028 ns and hold +0.069/+0.111 ns.
+Audit-only correction `9f16364` accounts for Quartus routing copies of the
+counter; source RTL, timing constraints and fitted binaries remain `b00920a`.
+
+Seed 52 uses **37,450 actual ALMs (89.4%) and 520/553 M10Ks**, leaving 4,460
+ALMs and 33 M10Ks free. The increase over accepted `3ff27c8` seed 52 is 1,676
+actual ALMs and 12 M10Ks. DSPs remain 69; registers total 46,904. Estimated
+ALMs needed are 31,755 (75.8%), distinct from actual placed ALMs.
+
+Initial `5373dae` fails timing and is not recommended. The intermediate
+`287cf6b` correction was cancelled during fitting. Use the RBF above.
 
 This change adds the historical progress strip and three time fields to normal
 scaled HDMI, after video filters and before the MiSTer menu. Keep accepted
@@ -18,7 +27,7 @@ It adds startup reads; ordinary seeks reuse the cached result. If sufficient
 endpoint evidence is unavailable (including raw M2V), Total and Remaining show
 `--:--:--` with a patterned track. Duration never comes from a byte-size ratio.
 
-Check the following on the eventual timing-qualified RBF:
+Check the following on this RBF:
 
 1. Open a complete short MPG and a whole movie, including a file above 4 GiB.
    Compare Total with the encoded stream duration, allowing timestamp rounding;

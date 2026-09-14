@@ -2,7 +2,8 @@
 
 Implementation baseline: hardware-accepted `3ff27c8` seed 52. The shared
 renderer and duration preflight now implement this design in RTL; hardware
-qualification is pending. The [interactive preview](ui/overlay-preview.html)
+candidate `b00920a` seed 52 passes four-corner timing and resource qualification;
+user hardware validation is pending. See `TEST_INSTRUCTIONS.md`. The [interactive preview](ui/overlay-preview.html)
 remains a design aid; deterministic RTL renderings are produced by the tests.
 
 ## Implemented interface and bounds
@@ -64,6 +65,8 @@ Regression commands:
 ```sh
 python3 tools/verify_ui_duration.py --media path/to/a/complete/test.mpg
 python3 tools/verify_player_overlay.py
+python3 tools/make_overlay_roms.py --check
+python3 tools/verify_overlay_timing.py --output results/ui-overlay/pixel-timing
 python3 tools/verify_media_file_reader.py
 python3 tools/verify_decoder_timing.py --playback-controls --display-ownership --output results/ui-overlay/reconstruction
 ```
@@ -73,7 +76,9 @@ retirement, including offsets above 4 GiB. The optional complete MPEG check
 compares the endpoint with ffprobe timestamps plus the exact frame period.
 `verify_player_overlay.py` checks every pixel at three HDMI sizes, time fields,
 unknown/hidden states, pause/seek, progress endpoints, timing alignment and
-retained-provider/epoch behavior. The synthesis CDC audit now expects 159
+retained-provider/epoch behavior. The isolated compositor fit checks internal
+register paths at 148.5 MHz; its virtual I/O exceptions are confined to that
+test and do not apply to full-core qualification. The synthesis CDC audit now expects 159
 preserved synchronizer registers, including the new six-stage mailbox.
 
 
