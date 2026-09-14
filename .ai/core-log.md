@@ -1,3 +1,32 @@
+## 101 COMMIT Unreleased ??? 2026-09-14T15:01:56-07:00
+
+#### Coming From:
+
+Unreleased 09a4d66
+
+#### Purpose:
+
+Implement streamed FLAC subframe parsing and reconstruction against independent test vectors.
+
+#### Outcome:
+
+The user authorizes continued FLAC work. Implement the subframe bitstream state machine, including constant/verbatim/fixed/LPC coding, wasted bits, both Rice parameter widths and escaped residuals, synchronous history/coefficient storage and the existing serial predictor. Validate exact samples and bit consumption with independently generated syntax vectors, stalls, invalid syntax and reset cancellation. Samples remain provisional until future outer frame CRC validation and DDR commit; no production file support is claimed by this subframe boundary.
+
+#### Next Steps:
+
+Complete subframe simulation and resource checks, then integrate outer FLAC headers/CRC and native HDMI control. Preserve native 44.1 kHz FLAC, 48 kHz movie input, future WAV's shared PCM boundary and the inherited output option without claiming 96 kHz media decoding.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 100 COMMIT Unreleased 09a4d66 2026-09-14T14:54:34-07:00
 
 #### Coming From:
@@ -1409,35 +1438,5 @@ Use the documented design as the implementation boundary for the shared overlay,
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 61 COMMIT Unreleased 3ff27c8 2026-09-14T05:13:13-07:00
-
-#### Coming From:
-
-Unreleased 3ff27c8
-
-#### Purpose:
-
-Record hardware acceptance of the IDCT intermediate RAM conversion as the new baseline.
-
-#### Outcome:
-
-The user reports everything works perfectly with the recommended 3ff27c8 seed 52 candidate. Passed records that user-reported hardware acceptance; detailed file and control coverage was not enumerated. The accepted RBF remains results/hardware-test-3ff27c8/seed52/MediaPlayer_20260914.rbf with verified SHA-256 236c9817ccfd04b10e23ff0ee052f2c11e5a39d7fcfdb88e3e42b29e969406f1. Its handoff metadata and README now record acceptance, and documentation commit e76bc84 updates the changelog and test instructions. This establishes the 35774 actual placed ALM, 508 M10K, 69 DSP seed 52 build as the current accepted baseline, with 45 M10Ks free. Runtime RTL is unchanged and no builds or deployment were performed. The requirement for standard HDMI timings and frequencies remains in force for future film-cadence work.
-
-#### Next Steps:
-
-Use 3ff27c8 seed 52 as the baseline for subsequent changes and retain dc1dfc2 seed 52 as the previous rollback. Investigate stock Main and scaler support for standard 23.976/24 Hz HDMI timing modes before proposing any film-cadence implementation; do not infer authorization for another implementation or build from this acceptance report.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
