@@ -181,3 +181,10 @@ and native/movie audio clocks, with a functional PLL/selector model. It checks
 1024 exact I2S words and SPDIF sample captures, pause, a simulated Main register
 write during playback, source position, final-sample drain and movie-rate
 restoration. It does not qualify physical HPS I2C or HDMI interoperability.
+
+The native clock monitor uses per-domain reset release. Generated clocks at
+the vendor selector output are physically exclusive; the two original PLL
+domains retain their existing CDC checks. The SDC requires the selector nodes
+to resolve uniquely, and the post-fit audit requires both generated clocks and
+all new reset/signal synchronizer stages. A preliminary map timing review found
+and corrected impossible cross-mode paths before the first routed candidate.

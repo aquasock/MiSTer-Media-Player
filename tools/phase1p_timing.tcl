@@ -65,6 +65,9 @@ update_timing_netlist
 # Reject a build whose mailbox/VS control chains vanished or became shift RAMs.
 # Check every stage of each required instance, not just a wildcard that could
 # accidentally match one surviving synchronizer elsewhere in the design.
+foreach name {audio_mux_cd audio_mux_movie} {
+    if {[get_collection_size [get_clocks $name]] != 1} {error "Missing selected audio clock: $name"}
+}
 set profiler_regs [get_collection_size [get_registers -nowarn {*mpeg2_h262_hardware_cadence_profiler:*|*}]]
 set diagnostic_audit [open "$output_dir/diagnostic_removal_audit.rpt" w]
 puts $diagnostic_audit "Cadence profiler registers: $profiler_regs"
@@ -180,7 +183,7 @@ foreach chain {req_sync ack_sync} {
         if {$count != 1} {error "Missing session synchronizer: $pattern"}
     }
 }
-foreach chain {select_sync lock_sync mute_movie_sync wr_reset_sync rd_reset_sync} {
+foreach chain {select_sync lock_sync mute_movie_sync wr_reset_sync rd_reset_sync ref_reset_sync movie_reset_sync out_reset_sync} {
     for {set stage 0} {$stage < 3} {incr stage} {
         set pattern [format {*media_native_audio:*|%s[%d]} $chain $stage]
         set count [get_collection_size [get_registers $pattern]]

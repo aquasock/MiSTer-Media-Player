@@ -15,6 +15,12 @@ module media_native_audio(
  input wire pad_scl,pad_sda,hps_scl_low,hps_sda_low,
  output wire hps_scl_in,hps_sda_in,drive_scl_low,drive_sda_low
 );
+ // Every new clock domain releases global reset on its own clock edges.
+ (* preserve, altera_attribute="-name AUTO_SHIFT_REGISTER_RECOGNITION OFF; -name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+ reg[2:0] ref_reset_sync=7,movie_reset_sync=7,out_reset_sync=7;
+ always @(posedge refclk or posedge reset)if(reset)ref_reset_sync<=7;else ref_reset_sync<={ref_reset_sync[1:0],1'b0};
+ always @(posedge movie_clock or posedge reset)if(reset)movie_reset_sync<=7;else movie_reset_sync<={movie_reset_sync[1:0],1'b0};
+ always @(posedge output_mclk or posedge reset)if(reset)out_reset_sync<=7;else out_reset_sync<={out_reset_sync[1:0],1'b0};
  wire[7:0] cfg_ref,cfg_cd;
  video_config_cdc #(.WIDTH(8)) config_ref(.src_clk(config_clk),.dst_clk(refclk),.src_data({want_cd,paused,movie_96k,attenuation}),.dst_data(cfg_ref));
  video_config_cdc #(.WIDTH(8)) config_cd(.src_clk(config_clk),.dst_clk(cd_clock),.src_data({want_cd,paused,movie_96k,attenuation}),.dst_data(cfg_cd));
@@ -25,8 +31,8 @@ module media_native_audio(
  // echo; neither a requested mode nor PLL lock alone acknowledges a handoff.
  (* preserve, altera_attribute="-name AUTO_SHIFT_REGISTER_RECOGNITION OFF; -name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *) reg[2:0] select_sync=0,lock_sync=0;
  reg clock_applied=0;reg[7:0] settle_count=0;
- always @(posedge output_mclk or posedge reset)begin
-  if(reset)begin select_sync<=0;lock_sync<=0;clock_applied<=0;settle_count<=0;end
+ always @(posedge output_mclk)begin
+  if(out_reset_sync[2])begin select_sync<=0;lock_sync<=0;clock_applied<=0;settle_count<=0;end
   else begin
    select_sync<={select_sync[1:0],select_cd};lock_sync<={lock_sync[1:0],cd_locked};
    if(clock_applied!=select_sync[2])begin clock_applied<=select_sync[2];settle_count<=0;end
@@ -43,7 +49,7 @@ module media_native_audio(
  reg old_movie_lr=0,movie_muted=0;reg[1:0] movie_quiet=0;
  always @(posedge movie_clock)begin
   mute_movie_sync<={mute_movie_sync[1:0],mute};old_movie_lr<=movie_lrclk;
-  if(reset)begin movie_muted<=1;movie_quiet<=0;end
+  if(movie_reset_sync[2])begin movie_muted<=1;movie_quiet<=0;end
   else if(old_movie_lr&&!movie_lrclk)begin
    movie_muted<=mute_movie_sync[2];
    if(!mute_movie_sync[2])movie_quiet<=0;else if(movie_quiet!=3)movie_quiet<=movie_quiet+1'b1;
@@ -52,7 +58,7 @@ module media_native_audio(
  wire movie_idle_ref,cd_idle_ref,cd_idle;
  video_config_cdc #(.WIDTH(1)) movie_idle_cdc(.src_clk(movie_clock),.dst_clk(refclk),.src_data(movie_muted&&movie_quiet>=2),.dst_data(movie_idle_ref));
  video_config_cdc #(.WIDTH(1)) cd_idle_cdc(.src_clk(cd_clock),.dst_clk(refclk),.src_data(cd_idle),.dst_data(cd_idle_ref));
- media_hdmi_audio_control #(.DRAIN_CYCLES(2048)) control(.clk(refclk),.reset(reset),.want_cd(cfg_ref[7]),.movie_96k(cfg_ref[5]),
+ media_hdmi_audio_control #(.DRAIN_CYCLES(2048)) control(.clk(refclk),.reset(ref_reset_sync[2]),.want_cd(cfg_ref[7]),.movie_96k(cfg_ref[5]),
   .clients_idle(select_cd?cd_idle_ref:movie_idle_ref),.clock_ready(clock_status[1]),.clock_applied_cd(clock_status[0]),
   .clock_cd(select_cd),.mute(mute),.cd_ready(cd_ready),.error(config_error),
   .pad_scl(pad_scl),.pad_sda(pad_sda),.hps_scl_low(hps_scl_low),.hps_sda_low(hps_sda_low),

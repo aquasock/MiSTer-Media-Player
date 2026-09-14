@@ -152,8 +152,24 @@ set_multicycle_path -hold -end 3 -from $player_scene_ce_regs -to $player_scene_c
 set_false_path -to [get_keepers {*media_native_audio:*|select_sync[0]}]
 set_false_path -to [get_keepers {*media_native_audio:*|lock_sync[0]}]
 set_false_path -to [get_keepers {*media_native_audio:*|mute_movie_sync[0]}]
-# Async reset assertions clear the FIFO and per-domain release synchronizers.
-foreach chain {wr_reset_sync rd_reset_sync} {
+# Async assertions target only reset-release chains. Stage-to-stage release
+# paths remain timed, including those on the selected output clock.
+foreach chain {wr_reset_sync rd_reset_sync ref_reset_sync movie_reset_sync out_reset_sync} {
     set target [format {*media_native_audio:*|%s[*]} $chain]
-    set_false_path -from [get_keepers {*|media_music_mode *|media_session_control:*|decoder_reset *|reset_mpeg2_sync[2] *|reset}] -to [get_keepers $target]
+    set_false_path -from [get_keepers {reset_req *|media_music_mode *|media_session_control:*|decoder_reset *|reset_mpeg2_sync[2]}] -to [get_keepers $target]
 }
+
+# Only the output of the vendor selector carries mutually exclusive clocks.
+# Keep the two original PLL domains unrelated to this exception: their CDCs
+# still require explicit mailboxes/synchronizers rather than a blanket cut.
+set music_master [get_clocks {*native_audio|clocks|cd_pll|*|divclk}]
+set movie_master [get_clocks {pll_audio|pll_audio_inst|altera_pll_i|*|divclk}]
+set music_mux_out [get_pins -compatibility_mode {*native_audio|clocks|selector|auto_generated|sd1|outclk}]
+set music_mux_in [get_pins -compatibility_mode {*native_audio|clocks|selector|auto_generated|sd2|inclk[3]}]
+set movie_mux_in [get_pins -compatibility_mode {*native_audio|clocks|selector|auto_generated|sd2|inclk[2]}]
+foreach collection [list $music_master $movie_master $music_mux_out $music_mux_in $movie_mux_in] {
+    if {[get_collection_size $collection] != 1} {error "Native audio clock selector constraint must resolve exactly one node"}
+}
+create_generated_clock -name audio_mux_cd -master_clock $music_master -source $music_mux_in -divide_by 1 $music_mux_out
+create_generated_clock -name audio_mux_movie -master_clock $movie_master -source $movie_mux_in -divide_by 1 -add $music_mux_out
+set_clock_groups -physically_exclusive -group [get_clocks audio_mux_cd] -group [get_clocks audio_mux_movie]
