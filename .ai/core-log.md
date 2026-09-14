@@ -1,3 +1,32 @@
+## 51 COMMIT Unreleased bcddb20 2026-09-14T03:36:49-07:00
+
+#### Coming From:
+
+Unreleased bcddb20
+
+#### Purpose:
+
+Record completed direct-seek timing qualification and deliver the preferred seed 61 candidate.
+
+#### Outcome:
+
+All three bcddb20 builds compiled and passed the 159-register CDC audit. Seed 61 passes all four timing corners with minimum setup +0.205 ns, hold +0.066 ns, recovery +2.388 ns, removal +0.098 ns and pulse width +0.925 ns. It uses 41223 ALMs, 56345 registers, 482 RAM blocks, 69 DSP blocks and three PLLs. The preferred RBF is results/hardware-test-bcddb20/seed61/MediaPlayer_20260914.rbf, hash verified as 98a3957e92ffb71112a31d373082854673a45c97fb5c5169c2b48971e75a2f24. Seeds 52 and 87 fail setup at -0.377 and -0.327 ns respectively; their other timing categories pass, and their packaged files are explicitly unqualified. Batch durations were 1294, 1424 and 1254 seconds for seeds 52, 61 and 87. Per-corner evidence remains under results/build-bcddb20-20260914-031001; the handoff includes checksums, build-info files and testing instructions. Documentation commit d3f141e identifies the candidate and corrects the remaining stale reference to the removed seek-fault observer; runtime source remains bcddb20. The earlier 90 percent baseline was an ALMs-needed estimate: 0b6eb0e seed 87 physically placed 40431 ALMs, versus 41119 in bcddb20 seed 87, a 688-ALM increase across playback/seek development. Most of the apparent percentage jump came from changed dense-packing recovery estimates. No new build or deployment was started.
+
+#### Next Steps:
+
+Have the user load seed 61 and test short and long direct seeks in both directions, paused seeks and resume, first-time distant destinations, EOF, reload, OSD access and audio alignment. Hardware acceptance remains pending; retain a229a01 seed 87 as rollback.
+
+#### Files Modified:
+
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 50 COMMIT Unreleased bcddb20 2026-09-14T03:10:33-07:00
 
 #### Coming From:
@@ -1289,57 +1318,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 011 COMMIT Unreleased a0f153a 2026-09-13T12:11:46-07:00
-
-#### Coming From:
-
-Unreleased 07b8688
-
-#### Purpose:
-
-Implement stock-Main mounted-file playback with interactive OSD access and session foundations for future pause and seeking.
-
-#### Outcome:
-
-The approved implementation was committed and pushed as a0f153a before three clean seed builds. Stock Main now mounts MPG/M2V files through S0; a 4 KiB sector staging RAM feeds a 32 KiB byte/EOF FIFO with prefill and exact final-byte handling. The session controller stops DDR grants, drains descriptor-owned responses and waits for host retirement before restarting clients and releasing FIFO reset. Tests passed 102757 exact bytes across tails, nonzero offsets, stalls, cancellation, malformed responses and timeout quarantine, plus actual hps_io status/WIDE transfer checks and DDR/session restart ordering. Timed mounted-reader MPG simulation with periodic 2 ms host delays matched 152679 video bytes, 15 picture timestamps and 24192 stereo sample pairs against FFmpeg with maximum one-unit PCM error and no underrun or timestamp error. Existing video/OSD/cadence, ingress and arbiter regressions passed. Schema 9 adds transport diagnostics and preserves older capture decoding, including capture of a first-read failure before any decoded byte. A synthesis preflight compiled and the post-map audit preserved all 84 required synchronizer registers. Formal fitted builds remain pending. Read-offset and request-suspension primitives are implemented and tested for future seeking/pause; user-facing controls and their timeline logic are deferred. No hardware files, Main binary or ini were touched during the user's baseline test.
-
-#### Next Steps:
-
-Finish clean seeds 52, 61 and 87 from a0f153a, require the fitted 84-register audit and all four explicit operating corners, then report RBF candidates and retained evidence. Hardware acceptance must verify stock Main identity, menu responsiveness, filter adjustment during uninterrupted playback, repeated loads/reset and EOF. The simulation queues are ideal bounded models and do not establish physical CDC behavior or full video reconstruction.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_06.svh
-- MediaPlayer_top_07.svh
-- docs/OSD_PLAYBACK_PLAN.md
-- docs/TEST_INSTRUCTIONS.md
-- files.qip
-- rtl/media_file_reader.sv
-- rtl/media_session_control.sv
-- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_stream_fifo.sv
-- tools/build_three_seeds.py
-- tools/phase1p_timing.tcl
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/test_media_file_reader.sv
-- tools/test_media_hps_io.sv
-- tools/test_media_session_control.sv
-- tools/test_mpg_audio_playback.sv
-- tools/verify_media_file_reader.py
-- tools/verify_mpg_audio.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
 
 ---
 
