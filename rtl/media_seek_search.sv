@@ -24,8 +24,11 @@ reg [40:0] low=0,high=0,best_pack=0,best_sequence=0;
 reg [32:0] target=0,movie_origin=0;
 reg [5:0] attempts=0;
 wire [32:0] relative_pts=point_pts-movie_origin;
-wire [32:0] distance=target-relative_pts;
-wire [40:0] midpoint=low+((high-low)>>1);
+// Widening retains the unsigned borrow for the before-target decision.
+wire [33:0] distance={1'b0,target}-{1'b0,relative_pts};
+// DECIDE only uses midpoint when high > low; widening prevents sum overflow.
+wire [41:0] midpoint_sum={1'b0,low}+{1'b0,high};
+wire [40:0] midpoint=midpoint_sum[41:1];
 wire [63:0] scanned=reader_position-{23'd0,start_offset};
 always @(posedge clk) begin
  restart<=0;
@@ -56,10 +59,10 @@ always @(posedge clk) begin
  START_PROBE: if(reader_start) state<=WAIT_PROBE;
  WAIT_PROBE: if(response_tag==tag) begin
   if(point_found) begin
-   if(!relative_pts[32] && relative_pts<=target) begin
+   if(!relative_pts[32] && !distance[33]) begin
     best_pack<=point_pack;best_sequence<=point_sequence;
     low<=point_sequence+41'd4;
-    if(distance<=33'd180000) begin
+    if(distance<=34'd180000) begin
      start_offset<=point_pack;video_start<=point_sequence;probing<=0;
      tag<=tag+1'b1;restart<=1;state<=FINAL_START;
     end else state<=DECIDE;

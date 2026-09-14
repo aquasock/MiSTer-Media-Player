@@ -13,10 +13,12 @@ module media_seek_point(
  output reg [32:0] point_pts=0,
  output reg [40:0] point_pack=0,point_sequence=0
 );
+// Output fields also hold the candidate until found validates them. Once found,
+// hold the complete result until reset so the CDC consumer sees a stable bundle.
 reg [1:0] zeros=0,header=0;
 reg code_next=0,sequence_seen=0,pending_valid=0,picture_valid=0;
-reg [40:0] prefix_position=0,prefix_pack=0,sequence_position=0,sequence_pack=0,marker=0;
-reg [32:0] pending_pts=0,picture_pts=0;
+reg [40:0] prefix_position=0,prefix_pack=0,marker=0;
+reg [32:0] pending_pts=0;
 wire [40:0] marker_distance=prefix_position-marker;
 always @(posedge clk) begin
  if(clear) begin origin_valid<=0;origin<=0;end
@@ -29,18 +31,20 @@ always @(posedge clk) begin
   if(header!=0) begin
    header<=header-1'b1;
    if(header==1 && data[5:3]==3'd1 && picture_valid && !found) begin
-    found<=1;point_pts<=picture_pts;point_pack<=sequence_pack;point_sequence<=sequence_position;
+    found<=1;
    end
   end
   if(code_next) begin
    code_next<=0;zeros<=0;
    if(data==8'hb3) begin
-    sequence_seen<=1;sequence_position<=prefix_position;sequence_pack<=prefix_pack;
+    sequence_seen<=1;
+    if(!found) begin point_sequence<=prefix_position;point_pack<=prefix_pack;end
    end
    if(data==0) begin
     // A PTS beginning inside this picture prefix belongs to a later picture.
     picture_valid<=sequence_seen && pending_valid && !marker_distance[40] && !pts_valid;
-    picture_pts<=pending_pts;sequence_seen<=0;header<=2;
+    if(!found) point_pts<=pending_pts;
+    sequence_seen<=0;header<=2;
     if(!marker_distance[40] && !pts_valid) pending_valid<=0;
    end
   end else if(data==0) begin

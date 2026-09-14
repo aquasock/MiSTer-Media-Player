@@ -19,6 +19,7 @@ a = p.parse_args()
 dest = a.output.resolve()
 dest.mkdir(parents=True, exist_ok=True)
 tests = {
+    'test_media_seek_point': ['rtl/media_seek_point.sv'],
     'test_media_seek_search': ['rtl/media_seek_search.sv'],
     'test_media_seek_video_filter': ['rtl/media_seek_video_filter.sv'],
     'test_direct_seek_restart': ['rtl/media_seek_search.sv', 'rtl/media_keyboard_control.sv',
