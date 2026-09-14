@@ -1,3 +1,32 @@
+## 72 COMMIT Unreleased 9076405 2026-09-14T08:31:24-07:00
+
+#### Coming From:
+
+Unreleased 3d48cc5
+
+#### Purpose:
+
+Provide the best completed duration candidate for the user's requested early hardware test.
+
+#### Outcome:
+
+After being informed that all 9076405 seeds fail setup, the user requests the best completed RBF to test. Seed 87 has the least negative setup at -0.184 ns and hold +0.115 ns. Its verified binary is results/hardware-test-9076405/seed87/MediaPlayer_20260914.rbf with SHA-256 d2bb095a9bd33018f0519aeb0f1c80c989de929a70536ad8fa7d75f8678d509c. Per-seed TESTING.md identifies this as timing-unqualified exploratory testing and asks the user to check Groove's approximately 01:18:25 total and remaining time, pause/seeks and file changes. The revised 3d48cc5 seeds continue compiling under results/build-3d48cc5-20260914-082959. No automatic deployment or hardware acceptance occurred.
+
+#### Next Steps:
+
+Review the user's early hardware results and finish corrected 3d48cc5 build qualification before recommending a timing-qualified replacement; retain tested b00920a seed 52 as rollback.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 71 COMMIT Unreleased 3d48cc5 2026-09-14T08:14:32-07:00
 
 #### Coming From:
@@ -1275,35 +1304,6 @@ The additional aad072a placement batch completed. Seed 88 passes all four timing
 #### Next Steps:
 
 Compare the same early Right-arrow seek on timing-qualified seed 88; if the failure persists, extend the exact-file reproduction to MPG/audio buffering and expose the decoder error subcode needed to isolate it.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 32 COMMIT Unreleased aad072a 2026-09-13T18:40:17-07:00
-
-#### Coming From:
-
-Unreleased aad072a
-
-#### Purpose:
-
-Record faster successful seeks and the early forward-seek decoder failure in Pee Strike.
-
-#### Outcome:
-
-The user requested the best first-batch RBF and received hash-verified aad072a seed 87 with its -0.010 ns setup miss explicitly disclosed. The user reports successful skips are faster, but one Right-arrow press a few seconds into 01 - Pee Strike.mpg froze playback. Captures under results/telemetry-20260913-183433 and results/telemetry-20260913-183457 contain the same schema-10 snapshot with error_flags 0x0004, which maps to the aggregate decoder probe error. MP2 decode, timestamp and underrun flags and transport error are zero. The latched record shows 69 associated pictures, 25 reference pictures, final B-picture temporal reference 22, 105519 audio samples and transport generation two; counters are snapshot values, not live progress. The user identified the exact non-lower MPG. The Git drive contains its MP4 and lower MPG, so a bounded 16 MiB prefix of the exact 887078912-byte MiSTer file was retrieved into results/seek-repro-pee. Its video is progressive 720x480 at 30000/1001. A diagnostic replay of the first 450 pictures is being prepared with a forward seek around 2.2 seconds and detailed decoder error reporting. No reset, reload or deployment was performed. Additional placement seeds 53/62/88 remain running, but timing qualification alone cannot establish that this decoder failure is fixed.
-
-#### Next Steps:
-
-Compare ordinary playback and an in-flight forward seek on the exact opening stream, isolate the aggregate decoder error source, and validate a correction before hardware acceptance; finish the existing placement reports separately.
 
 #### Files Modified:
 
