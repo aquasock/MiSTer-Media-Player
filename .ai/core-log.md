@@ -1,3 +1,33 @@
+## 67 COMMIT Unreleased ??? 2026-09-14T07:41:06-07:00
+
+#### Coming From:
+
+Unreleased 9f16364
+
+#### Purpose:
+
+Document and package the timing-qualified shared-overlay hardware candidate.
+
+#### Outcome:
+
+Clean b00920a seeds 52, 61 and 87 all pass four-corner setup, hold, recovery, removal and pulse-width timing, 159 preserved CDC registers and the corrected scene-enable audit from 9f16364. Minimum setup is +0.135, +0.100 and +0.028 ns; minimum hold is +0.096, +0.069 and +0.111 ns. Actual placed ALMs are 37450, 37424 and 37503, with 520 M10Ks, 69 DSPs and three PLLs. All meet the initial incremental budget. Package seed 52 as preferred with exact hash and hardware tests; retain hardware-accepted 3ff27c8 seed 52 as rollback. No deployment or hardware acceptance occurred.
+
+#### Next Steps:
+
+Complete the handoff documentation and have the user test duration, progress, pause/seek feedback and OSD/filter coexistence at the supported HDMI modes.
+
+#### Files Modified:
+
+- docs/TEST_INSTRUCTIONS.md
+- docs/UI_OVERLAY_PLAN.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 66 COMMIT Unreleased 9f16364 2026-09-14T07:38:35-07:00
 
 #### Coming From:
@@ -1283,36 +1313,6 @@ Use the documented per-core refresh override and finish the current build handof
 
 - README.md
 - docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 27 COMMIT Unreleased 58f74d7 2026-09-13T17:10:11-07:00
-
-#### Coming From:
-
-Unreleased 17743f8
-
-#### Purpose:
-
-Require successful seek-controller completion in the full I/P/B EOF reconstruction regression.
-
-#### Outcome:
-
-Committed and pushed 58f74d7: the full mixed-pixel bench now supports a seek beyond the file end as well as the existing frame-ten seek. Both modes verify the expected landing time and retained paused display bank; control-mode drain observation is extended so the bench cannot finish before the pause/seek checks complete. An explicit completion assertion prevents the pixel oracle alone from being mistaken for control acceptance. The extended EOF mode lands on frame 23 of the 24-picture stream with zero pixel mismatches, no decoder/presentation errors and clean control completion. These are test-only changes and do not change the 17743f8 RBF being built.
-
-#### Next Steps:
-
-Finish the 17743f8 build batch and deliver timing-qualified hardware candidates with the extended regression evidence; the test-only commit requires no separate FPGA build.
-
-#### Files Modified:
-
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/verify_decoder_timing.py
 
 #### Status:
 
