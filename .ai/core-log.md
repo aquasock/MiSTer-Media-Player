@@ -6,11 +6,11 @@ Unreleased 9076405
 
 #### Purpose:
 
-Finish duration build qualification and extend the independent oracle to untimestamped final frames.
+Qualify the duration correction and remove the decimal formatter timing bottleneck.
 
 #### Outcome:
 
-Clean 9076405 seeds 52, 61 and 87 have passed synthesis and are fitting. Additional media checks expose an oracle limitation: ffprobe leaves the final reference picture of test_progressive_mpg.mpg untimestamped despite decoding it. Extend the test-only comparison to count decoded display frames after the last available timestamp, independently of the RTL temporal-reference arithmetic. The updated comparison confirms 30.03 seconds for both test_progressive_mpg.mpg and test_av_sync.mpg; fellow_fixed.mpg also passes its bounded-tail comparison. No RTL change or new build is needed for this test-tool correction. Finish all-corner timing, 159 CDC and scene-enable audits and report actual resource deltas from tested b00920a seed 52 before packaging.
+Clean 9076405 seeds 52, 61 and 87 have passed synthesis and are fitting. Additional media checks expose an oracle limitation: ffprobe leaves the final reference picture of test_progressive_mpg.mpg untimestamped despite decoding it. Extend the test-only comparison to count decoded display frames after the last available timestamp, independently of the RTL temporal-reference arithmetic. The updated comparison confirms 30.03 seconds for both test_progressive_mpg.mpg and test_av_sync.mpg; fellow_fixed.mpg also passes its bounded-tail comparison. No RTL change or new build is needed for this test-tool correction. All three completed builds pass CDC and scene-enable audits but fail setup by -0.335, -0.295 and -0.184 ns; actual ALMs are 37721, 37686 and 37677 with unchanged 520 M10Ks and 69 DSPs. Seed 52 fails an existing scaler path; seeds 61 and 87 fail retimed combinational decimal divisions inside the UI formatter. Reuse the existing enabled sequential divider for decimal digit conversion to remove those arithmetic paths, then rerun pixel/lifetime tests and clean three-seed builds. In response to the user font question, also generate a standalone character sheet directly from the unchanged font ROM; it contains 54 visible glyphs.
 
 #### Next Steps:
 
@@ -19,6 +19,10 @@ Complete the remaining real-file comparison and build qualification, then record
 #### Files Modified:
 
 - tools/verify_ui_duration.py
+- tools/make_font_sheet.py
+- docs/ui/font-sheet.html
+- rtl/media_ui_scene.sv
+- MediaPlayer.sdc
 - docs/TEST_INSTRUCTIONS.md
 - docs/UI_OVERLAY_PLAN.md
 
