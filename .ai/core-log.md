@@ -1,4 +1,4 @@
-## 63 COMMIT Unreleased ??? 2026-09-14T06:07:40-07:00
+## 63 COMMIT Unreleased 5373dae 2026-09-14T06:07:40-07:00
 
 #### Coming From:
 
@@ -10,19 +10,39 @@ Implement the approved shared playback overlay and bounded timestamp duration pr
 
 #### Outcome:
 
-The user authorized continuing to the next build after the design and encoding discussion. Implement the approved UI_OVERLAY_PLAN using the accepted 3ff27c8 runtime baseline: post-scaler progress and Elapsed, Total and Remaining fields, pause and seek feedback, frame-atomic shared text and rectangle publication, and a bounded head/tail timestamp probe through the existing mounted-file reader. Unknown duration remains explicit. Subtitle loading, parsing and cue selection remain deferred, and existing stock Main, keyboard controls, HDMI modes and decoder behavior are retained. Target at most 2000 additional actual placed ALMs and 12 M10Ks, subject to measured fit.
+Source 5373dae implements the shared post-filter, pre-menu HDMI compositor with eight bounded text objects, four rectangles, synchronous glyph/text RAM, five-stage aligned RGB and sync delay, frame-boundary publication and stale session/seek epoch rejection. A retained synthetic-provider interface reserves future text functionality without subtitle loading or cue selection. The controls reproduce the historical progress bar and Elapsed, Total and Remaining fields, pause/seek feedback, independent ten-second wall-clock hiding and explicit unknown duration. A bounded 64 KiB head and 4 MiB tail preflight reuses the existing mounted reader RAM, validates PES timestamps, retains the maximum presentation PTS plus the frame period, and quarantines outstanding responses on cancellation or timeout. Reader integration testing caught and fixed a FINISH-state validity gate; the complete encoded sample now matches the independently calculated endpoint. Full-frame pixel oracles pass at 480p, 720p and 1080p, including unknown/hidden controls and progress endpoints. Scene lifetime, retained-provider, epoch, wall-clock, reordered/wrapped timestamp, large-file reader, remount, malformed response and timeout recovery tests pass. Existing transport/session, decoder pixel and real-file direct-seek regressions pass. Evidence is under results/ui-overlay. Resource and timing qualification remain pending; standard clean seeds 52, 61 and 87 are now compiling. No deployment occurred.
 
 #### Next Steps:
 
-Implement and verify rendering, asynchronous publication, duration endpoint qualification and safe reader ownership retirement. Run existing reconstruction and exact-file seek regressions, commit and push tested source, then compile clean seeds 52, 61 and 87 and audit all timing corners and resource use. Package a timing-qualified candidate for user testing without deploying it.
+Audit all four timing corners, 159 expected CDC synchronizer registers and actual placed ALMs versus the accepted 35774-ALM baseline; compare M10Ks with 508 baseline and the planned 2000-ALM/12-M10K incremental budgets. Correct any new synthesis or timing failures, package the best qualified RBF and have the user validate startup preflight, fields, pause/seek, menu/filter priority, file changes and EOF. Keep accepted 3ff27c8 seed 52 as rollback.
 
 #### Files Modified:
 
-- docs/UI_OVERLAY_PLAN.md
+- CHANGELOG.md
 - MediaPlayer_top_00.svh
-- sys/sys_top.v
-- sys/emu_ports.vh
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- docs/UI_OVERLAY_PLAN.md
 - files.qip
+- rtl/media_duration_probe.sv
+- rtl/media_duration_window.sv
+- rtl/media_overlay_compositor.sv
+- rtl/media_overlay_font.hex
+- rtl/media_player_overlay.sv
+- rtl/media_ui_divider.sv
+- rtl/media_ui_scene.sv
+- rtl/media_ui_state.sv
+- rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
+- sys/emu_ports.vh
+- sys/sys_top.v
+- tools/phase1p_timing.tcl
+- tools/test_media_duration_reader.sv
+- tools/test_media_duration_window.sv
+- tools/test_media_player_overlay.sv
+- tools/test_media_ui_lifetime.sv
+- tools/test_media_ui_state.sv
+- tools/verify_player_overlay.py
+- tools/verify_ui_duration.py
 
 #### Status:
 
