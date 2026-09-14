@@ -1,3 +1,32 @@
+## 54 COMMIT Unreleased bcddb20 2026-09-14T03:59:43-07:00
+
+#### Coming From:
+
+Unreleased bcddb20
+
+#### Purpose:
+
+Record the completed seed 61 maximum-packing comparison.
+
+#### Outcome:
+
+The single HIGH-packing bcddb20 seed 61 experiment compiled and passes all four timing corners and the 159-register CDC audit. Minimum setup is +0.028 ns, hold +0.111 ns, recovery +2.751 ns, removal +0.112 ns and pulse width +0.925 ns. It places 41230 ALMs versus 41145 in the original MEDIUM seed 61, an increase of 85; ALMs-needed estimates are 41329 versus 41223. Registers are 56346 versus 56345, with 482 RAM blocks, 69 DSPs and three PLLs unchanged. HIGH therefore offers no area benefit and less setup margin than the original +0.205 ns candidate. Compile took 1145 seconds and compile plus audit 1226.7 seconds versus 1424.1 seconds for the original; HIGH ran alone while the original ran alongside two seeds, so elapsed time does not isolate packing effort. The separate experimental RBF at results/hardware-test-bcddb20-packing-high/seed61/MediaPlayer_20260914.rbf is hash verified as 4cd4eadd5ee8a3eef1ed11158d8d3157d2002cc47389d5e47e43971681f0fa82. Comparison JSON, exact settings diff and timing evidence are retained under results/build-bcddb20-packing-high-20260914-033800. No source settings, baseline RBF or MiSTer state were changed, and no additional builds were started. Built refers to the successful HIGH experiment; Passed remains unchecked because hardware acceptance applies only to the original MEDIUM candidate.
+
+#### Next Steps:
+
+Retain the user's hardware-accepted MEDIUM seed 61 as preferred and leave production packing effort unchanged. Any further area reduction should be separately planned from resource evidence rather than assuming HIGH packing reduces occupied logic.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 53 COMMIT Unreleased bcddb20 2026-09-14T03:41:24-07:00
 
 #### Coming From:
@@ -1262,52 +1291,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 14 COMMIT Unreleased 24d3de0 2026-09-13T13:28:53-07:00
-
-#### Coming From:
-
-Unreleased 62baf08
-
-#### Purpose:
-
-Implement frame-associated BT.601/BT.709 color matrix selection with user overrides and deterministic visual tests.
-
-#### Outcome:
-
-Committed and pushed 24d3de0 with optional sequence-display color-matrix parsing, frame-associated reference/scratch matrix context, Auto/BT.601/BT.709 overrides and frame-boundary application through two acknowledged mailboxes. Missing/unspecified/unsupported tags use the documented BT.601 compatibility fallback. Exhaustive simulation covers all 16777216 input triples: BT.601 is exact against 62baf08 and BT.709 differs from the BT.709-6 reference by at most one RGB code. Metadata, reset, repeated/truncated descriptions, all 256 tag values, queued B pictures, simultaneous header/commit and override CDC tests pass. Colored stalled-DDR scanout checks 345600 exact pixels and continuous sync; existing video/OSD/cadence and integrated mixed I/P/B regressions also pass. Deterministic 601/709 matching clips and an untagged 709 clip are generated under results/color-matrix-tests. The consulted BT.709-6 items 3.2 through 3.4 are added to core-reference.md with notification to the user; the H.262 metadata interpretation uses the already-controlled 02/2000 baseline. Gamut and gamma conversion are explicitly excluded by the user. The independent 62baf08 seeds are now complete: seed 61 passes all four operating corners with setup +0.395 ns, hold +0.103 ns, recovery +3.149 ns, removal +0.152 ns and pulse width +0.925 ns, and all 84 audited synchronizer registers. Its RBF SHA-256 is 1d0b6dfcb917df72f567f760956280638696d866fa190362fe7f3d03357c47ff, with 41267 ALMs, 57463 registers, 480 RAM blocks and 69 DSP blocks. Seed 52 fails setup at -0.159 ns on a P-frame address path and seed 87 at -0.032 ns on scaler vertical interpolation; other timing classes and audits pass. All three files are under results/hardware-test-62baf08/, with seed 61 delivered as the timing-qualified aspect/OSD candidate and no hardware acceptance yet. Clean color seeds 52, 61 and 87 are running under results/build-24d3de0-20260913-134011; the fitted audit now requires 96 synchronizer registers. No matrix-enabled hardware result is available yet.
-
-#### Next Steps:
-
-Complete the three color builds, require all four operating-corner timing classes and all 96 audited registers, compare resource use against 62baf08 and provide timing-qualified candidates. Hardware should validate Auto on both tagged clips, the manual override on the untagged clip, frame-boundary changes, subsequent file reload and uninterrupted OSD/filter/aspect behavior. Continue using the delivered 62baf08 seed 61 for the independent aspect/timing hardware test.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_06.svh
-- docs/TEST_INSTRUCTIONS.md
-- files.qip
-- rtl/media_color_control.sv
-- rtl/mpeg2_luma_framebuffer.sv
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- rtl/mpeg2_new/mpeg2_h262_picture_color.sv
-- rtl/mpeg2_new/mpeg2_ycbcr_to_rgb_bt601.sv
-- tools/make_color_matrix_tests.py
-- tools/phase1p_timing.tcl
-- tools/test_media_color_control.sv
-- tools/test_picture_color.sv
-- tools/verify_color_matrix.py
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
