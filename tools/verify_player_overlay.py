@@ -16,16 +16,16 @@ def oracle(w,h,known,shown,paused,seeking,pos=1340400000,total=2629890000,patter
  background=im.copy()
  if not shown:return im
  scale=9 if h>=1000 else 6 if h>=700 else 4
- labels=['Elapsed: '+timestamp(pos//360000),'Total: '+(timestamp((total+359999)//360000) if known else '--:--:--'),'Remaining: '+(timestamp((max(0,total-pos)+359999)//360000) if known else '--:--:--')]
+ labels=[timestamp(pos//360000),(timestamp((total+359999)//360000) if known else '--:--:--'),(timestamp((max(0,total-pos)+359999)//360000) if known else '--:--:--')]
  status='Seeking' if seeking else 'Paused' if paused else ''
  labels.append(status)
- im[h*438//480:h*452//480,w*32//720:w*688//720]=colors[2]
- x0=w*34//720;x1=w*686//720;y0=h*441//480;y1=h*449//480
+ im[h*452//480:h*466//480,w*32//720:w*688//720]=colors[2]
+ x0=w*34//720;x1=w*686//720;y0=h*455//480;y1=h*463//480
  if known: im[y0:y1,x0:x0+(min(pos,total)*(x1-x0)//total)]=colors[3]
  else:
   for x in range(x0,x1):
    if x&8:im[y0:y1,x]=((background[y0:y1,x].astype(np.uint16)*95+np.array(colors[1],dtype=np.uint16)*160)//255).astype(np.uint8)
- for label,center,y in zip(labels,[141,360,579,360],[422,422,422,403]):
+ for label,center,y in zip(labels,[141,360,579,360],[436,436,436,403]):
   x0=w*center//720-len(label)*6*scale//8;y0=h*y//480
   for dy in range((7*scale+3)//4):
    gy=dy*4//scale

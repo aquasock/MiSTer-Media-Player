@@ -306,3 +306,13 @@ Audit updated CDC endpoints and every timing corner; compare actual placed ALMs
 separately from Quartus's estimate. Package the preferred passing RBF for testing
 against accepted `3ff27c8` seed 52. No subtitle or new HDMI-mode implementation
 belongs in that build.
+
+## Current compact clock layout
+
+The next revision retains the three horizontal field centers and displays only
+`HH:MM:SS` (or unknown `--:--:--`), without Elapsed/Total/Remaining prefixes.
+On the 720x480 reference canvas, clocks move from y=422 to y=436, the track
+from [438,452) to [452,466), and its fill from [441,449) to [455,463).
+The 14-pixel displacement is one outer bar height and scales with HDMI height.
+The separate Paused/Seeking status stays at y=403. This supersedes the labeled
+clock geometry above; the retained future subtitle provider is unchanged.

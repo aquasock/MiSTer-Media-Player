@@ -38,11 +38,11 @@ function render(){
  // One list of drawing objects feeds one compositing pass.
  const objects=[];
  if(el('hud').checked){
-  const fields=[['Elapsed: '+time(pos),32,218],['Total: '+(known?time(total):'--:--:--'),250,220],['Remaining: '+(known?time(total-pos):'--:--:--'),470,218]];
-  for(const [s,x,width] of fields)objects.push({kind:'text',s,x:(x+width/2)/720*w-textWidth(s,k)/2,y:422*k,k,color:3});
-  objects.push({kind:'rect',x:32/720*w,y:438*k,width:656/720*w,height:14*k,color:2});
-  if(known)objects.push({kind:'rect',x:34/720*w,y:441*k,width:652/720*w*pos/total,height:8*k,color:3});
-  else for(let x=34;x<686;x+=12)objects.push({kind:'rect',x:x/720*w,y:441*k,width:6/720*w,height:8*k,color:1});
+  const fields=[[time(pos),32,218],[(known?time(total):'--:--:--'),250,220],[(known?time(total-pos):'--:--:--'),470,218]];
+  for(const [s,x,width] of fields)objects.push({kind:'text',s,x:(x+width/2)/720*w-textWidth(s,k)/2,y:436*k,k,color:3});
+  objects.push({kind:'rect',x:32/720*w,y:452*k,width:656/720*w,height:14*k,color:2});
+  if(known)objects.push({kind:'rect',x:34/720*w,y:455*k,width:652/720*w*pos/total,height:8*k,color:3});
+  else for(let x=34;x<686;x+=12)objects.push({kind:'rect',x:x/720*w,y:455*k,width:6/720*w,height:8*k,color:1});
   let status=performance.now()<seekUntil?seekLabel:paused?'Paused':'';
   if(status)objects.push({kind:'text',s:status,x:w/2-textWidth(status,k)/2,y:403*k,k,color:3});
  }

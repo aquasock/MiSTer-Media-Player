@@ -8,6 +8,9 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Lower the playback progress bar and three clocks by one bar height; show
+  clock values without Elapsed, Total or Remaining prefixes.
+
 - Store each IDCT's intermediate transform results in eight synchronous M10K
   row banks. Column-ahead prefetch preserves arithmetic, output order and cycle
   timing while replacing register storage. Hardware accepted with seed 52;

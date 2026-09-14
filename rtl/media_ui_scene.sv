@@ -60,18 +60,12 @@ reg [23:0] time_digits=0;
 wire known=snapshot[70];
 wire [34:0] duration=snapshot[69:35],position=snapshot[34:0];
 
-wire [5:0] length=field==0?17:field==1?15:field==2?19:snapshot[71]?7:snapshot[72]?6:0;
-wire [5:0] label_length=field==0?9:field==1?7:11;
-function [7:0] label_glyph;
- input [2:0] f;input [5:0] index;
- reg [87:0] label;
- begin
-  case(f)
-   0:label={"Elapsed: ",16'd0};1:label={"Total: ",32'd0};
-   2:label="Remaining: ";default:label={"Seeking",32'd0};
-  endcase
-  label_glyph=label[87-index*8 -:8];
- end
+// Clocks occupy eight glyphs; the fourth field remains playback status.
+wire [5:0] length=field<3?8:snapshot[71]?7:snapshot[72]?6:0;
+function [7:0] seeking_glyph;
+ input [5:0] index;
+ reg [55:0] label;
+ begin label="Seeking";seeking_glyph=label[55-index*8 -:8];end
 endfunction
 function [7:0] time_glyph;
  input [5:0] index;
@@ -136,10 +130,9 @@ always @(posedge clk) begin
    text_we<=1;text_addr<={field,ch};
    if(ch>=length) text_data<=0;
    else if(field==3) begin
-    if(snapshot[71]) text_data<=label_glyph(3,ch);
+    if(snapshot[71]) text_data<=seeking_glyph(ch);
     else case(ch) 0:text_data<="P";1:text_data<="a";2:text_data<="u";3:text_data<="s";4:text_data<="e";default:text_data<="d";endcase
-   end else if(ch<label_length) text_data<=label_glyph(field,ch);
-   else text_data<=time_glyph(ch-label_length);
+   end else text_data<=time_glyph(ch);
    if(ch==63) state<=6;else ch<=ch+1'b1;
   end
   6:multiply({36'd0,w},field==0?12'd141:field==2?12'd579:12'd360,46);
@@ -147,7 +140,7 @@ always @(posedge clk) begin
   7:begin
    tw<=(text_span+12'd3)>>2;th<=scale==9?12'd16:scale==6?12'd11:12'd7;
    tx<=quotient[11:0]-(text_span>>3);
-   multiply({36'd0,h},field==3?12'd403:12'd422,47);
+   multiply({36'd0,h},field==3?12'd403:12'd436,47);
   end
   47:divide(product,35'd480,8);
   8:begin ty<=quotient[11:0];state<=9;end
@@ -174,13 +167,13 @@ always @(posedge clk) begin
   52:divide(product,35'd720,23);
   23:begin fill_x0<=quotient[11:0];multiply({36'd0,w},12'd686,53);end
   53:divide(product,35'd720,24);
-  24:begin fill_x1<=quotient[11:0];multiply({36'd0,h},12'd438,54);end
+  24:begin fill_x1<=quotient[11:0];multiply({36'd0,h},12'd452,54);end
   54:divide(product,35'd480,25);
-  25:begin track_y0<=quotient[11:0];multiply({36'd0,h},12'd452,55);end
+  25:begin track_y0<=quotient[11:0];multiply({36'd0,h},12'd466,55);end
   55:divide(product,35'd480,26);
-  26:begin track_y1<=quotient[11:0];multiply({36'd0,h},12'd441,56);end
+  26:begin track_y1<=quotient[11:0];multiply({36'd0,h},12'd455,56);end
   56:divide(product,35'd480,27);
-  27:begin fill_y0<=quotient[11:0];multiply({36'd0,h},12'd449,57);end
+  27:begin fill_y0<=quotient[11:0];multiply({36'd0,h},12'd463,57);end
   57:divide(product,35'd480,28);
   28:begin
    fill_y1<=quotient[11:0];

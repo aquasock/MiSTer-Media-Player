@@ -1,3 +1,11 @@
+# Next build: lower progress strip and clocks without labels
+
+The three clocks retain their elapsed / total / remaining order, left to right,
+but display only times or unknown dashes. The clocks and bar move down one
+outer bar height (14 pixels at 480p, 21 at 720p, approximately 32 at 1080p).
+Check centering, the bottom margin and unknown times at all three resolutions,
+plus pause, seeking and automatic hiding. Timing qualification is pending.
+
 # Sparse-timestamp duration correction — 3d48cc5 seed 87 ready
 
 Preferred RBF: `results/hardware-test-3d48cc5/seed87/MediaPlayer_20260914.rbf`.
