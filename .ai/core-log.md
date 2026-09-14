@@ -1,3 +1,32 @@
+## 94 COMMIT Unreleased ??? 2026-09-14T13:49:03-07:00
+
+#### Coming From:
+
+Unreleased 54d64d2
+
+#### Purpose:
+
+Correct shared-IDCT Quartus syntax compatibility and restart the authorized three-seed batch.
+
+#### Outcome:
+
+The user explicitly authorizes building again, superseding the previous stop. Add an explicit generate/endgenerate region and separately declared genvar for the shared coefficient-bank loop rejected by Quartus 17. Preserve arithmetic, request arbitration and memory behavior. Run the existing shared-IDCT differential test and isolated Quartus analysis/elaboration before restarting clean MEDIUM seeds 52/61/87. Keep accepted 7eb5088 seed 61 and the failed original batch unchanged.
+
+#### Next Steps:
+
+Commit the compatibility correction, restart the three builds and inspect for early errors; then qualify timing, resource savings, one-engine/eight-intermediate/three-staging RAM structure and all existing CDC/removal checks before hardware handoff.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_shared_idct.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 93 COMMIT Unreleased 54d64d2 2026-09-14T13:45:57-07:00
 
 #### Coming From:
@@ -1408,35 +1437,6 @@ Menu removal is ready for the next build; adapt future build summaries to 153 CD
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 54 COMMIT Unreleased bcddb20 2026-09-14T03:59:43-07:00
-
-#### Coming From:
-
-Unreleased bcddb20
-
-#### Purpose:
-
-Record the completed seed 61 maximum-packing comparison.
-
-#### Outcome:
-
-The single HIGH-packing bcddb20 seed 61 experiment compiled and passes all four timing corners and the 159-register CDC audit. Minimum setup is +0.028 ns, hold +0.111 ns, recovery +2.751 ns, removal +0.112 ns and pulse width +0.925 ns. It places 41230 ALMs versus 41145 in the original MEDIUM seed 61, an increase of 85; ALMs-needed estimates are 41329 versus 41223. Registers are 56346 versus 56345, with 482 RAM blocks, 69 DSPs and three PLLs unchanged. HIGH therefore offers no area benefit and less setup margin than the original +0.205 ns candidate. Compile took 1145 seconds and compile plus audit 1226.7 seconds versus 1424.1 seconds for the original; HIGH ran alone while the original ran alongside two seeds, so elapsed time does not isolate packing effort. The separate experimental RBF at results/hardware-test-bcddb20-packing-high/seed61/MediaPlayer_20260914.rbf is hash verified as 4cd4eadd5ee8a3eef1ed11158d8d3157d2002cc47389d5e47e43971681f0fa82. Comparison JSON, exact settings diff and timing evidence are retained under results/build-bcddb20-packing-high-20260914-033800. No source settings, baseline RBF or MiSTer state were changed, and no additional builds were started. Built refers to the successful HIGH experiment; Passed remains unchecked because hardware acceptance applies only to the original MEDIUM candidate.
-
-#### Next Steps:
-
-Retain the user's hardware-accepted MEDIUM seed 61 as preferred and leave production packing effort unchanged. Any further area reduction should be separately planned from resource evidence rather than assuming HIGH packing reduces occupied logic.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
