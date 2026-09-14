@@ -1,3 +1,32 @@
+## 52 COMMIT Unreleased bcddb20 2026-09-14T03:38:42-07:00
+
+#### Coming From:
+
+Unreleased bcddb20
+
+#### Purpose:
+
+Compare maximum ALM register packing effort against the timing-passing seed 61 build.
+
+#### Outcome:
+
+While testing the core, the user authorized exactly one additional build of passing seed 61 at maximum packing effort. A clean bcddb20 export started at 2026-09-14T03:38:00-07:00 under results/build-bcddb20-packing-high-20260914-033800. ALM_REGISTER_PACKING_EFFORT changes from MEDIUM to HIGH, the highest documented level; source, seed, six-worker count and all other effective QSF settings match the passing seed 61 baseline. The exact QSF comparison is asserted and saved as settings.diff alongside experiment.json and the single-seed runner. The runner compiles then runs the existing timing audit. Its result checker processes seed 61 only, requires 159 CDC registers and packages to a separate hardware-test-bcddb20-packing-high directory so the user's current candidate remains intact. Local master and GitHub were verified synchronized. No source settings or MiSTer state were changed, and no other seeds were launched.
+
+#### Next Steps:
+
+Finish this single build and compare actual placed ALMs separately from ALMs-needed and dense-packing estimates, plus registers, RAM, DSPs, all timing corners and the 159-register CDC audit. Report any savings and timing tradeoff; do not select the experiment over the existing candidate without evaluating both. Hardware feedback for the original bcddb20 seed 61 remains pending.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 51 COMMIT Unreleased bcddb20 2026-09-14T03:36:49-07:00
 
 #### Coming From:
@@ -1289,35 +1318,6 @@ Complete all three clean builds and the fitted 84-register CDC audit, inspect ev
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 012 COMMIT Unreleased a0f153a 2026-09-13T12:54:32-07:00
-
-#### Coming From:
-
-Unreleased a0f153a
-
-#### Purpose:
-
-Record completed OSD builds, accepted interactive-menu hardware behavior and the remaining setup-timing work.
-
-#### Outcome:
-
-All three clean a0f153a seeds compiled and passed the fitted 84-register CDC audit and explicit four-corner hold, recovery, removal and pulse-width checks. Worst setup for seeds 52, 61 and 87 is -0.200, -0.137 and -0.234 ns respectively; no build is timing-qualified. Seed 52's worst path is the 60 MHz B-frame backward-motion/address calculation into phase1_base_addr_reg; seed 61 fails HDMI scaler fraction/address logic and seed 87 fails HDMI scaler control-to-pixel logic. Their ALM counts are 41237, 40806 and 40913, with 480 RAM blocks and 69 DSP blocks each. Build and timing times were approximately 1263, 1235 and 1436 seconds. Evidence is retained in results/build-a0f153a-20260913-122739/ and all three RBFs are copied under results/hardware-test-a0f153a/seed52, seed61 and seed87 with hashes and explicit timing status. At the user's request, seed 52 SHA-256 2fe49c2d3f05dd038062b76c1026dc261b03c2e53378967c2dfb632cf084d5af was delivered despite its disclosed timing failure. The user confirmed the fix works: OSD is controllable and filters work during playback. Passed here records that accepted OSD/filter scope, not timing qualification or unreported EOF/reload testing. The user explicitly excluded DVD and interlaced playback from the project; progressive-only scope supersedes the older roadmap in core.md and historical references, without automatically editing restricted core.md. A read-only FTP check confirmed current MiSTer.ini has MediaPlayer vsync_adjust=1, global video_mode=8 and direct_video=0, and no active MediaPlayer main override in the inspected section. This config matches HDMI to the fixed 60000/1001 Hz core raster, not to each movie frame rate. Source rates 24000/1001, 24, 25 and 30 still have noninteger repetition on that raster; 30000/1001 has a two-refresh cadence. Optional progressive source-matched raster/scheduler modes were investigated only and not implemented.
-
-#### Next Steps:
-
-Plan a focused timing cleanup of the B-frame address calculation and HDMI scaler arithmetic/control paths, preserving decoder values, filter quality and pixel/sync alignment. Require regression checks and positive setup at every operating corner; do not loosen clocks or hide genuine synchronous paths. Keep the accepted OSD behavior and progressive-only scope. Future refresh work can target twice-source-rate outputs where displays support them while retaining 59.94 Hz compatibility mode; leave vsync_adjust=1 configured. Await the user's direction before a new implementation cycle.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
