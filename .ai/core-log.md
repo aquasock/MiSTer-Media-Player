@@ -1,3 +1,32 @@
+## 33 COMMIT Unreleased aad072a 2026-09-13T23:54:38-07:00
+
+#### Coming From:
+
+Unreleased aad072a
+
+#### Purpose:
+
+Record timing-qualified seed 88 and the first exact-file seek replay comparison.
+
+#### Outcome:
+
+The additional aad072a placement batch completed. Seed 88 passes all four timing corners with setup +0.084 ns, hold +0.103 ns, recovery +3.150 ns, removal +0.231 ns and pulse width +0.925 ns, and passes the 135-register CDC audit. It uses 40462 ALMs, 54737 registers, 480 RAM blocks, 69 DSPs and three PLLs; its RBF SHA-256 is 983a08a8f3b90befc3ea66a4fd9e64393493f7effca1cb62db43716d3522d52e. Seeds 53 and 62 fail setup at -0.131 and -0.059 ns respectively, with other timing categories and CDC passing. Batch times are 1210 to 1221 seconds. Seed 88 is hash verified and marked preferred under results/hardware-test-aad072a, with the unresolved seed-87 decoder failure explicitly documented. An exact-file video-only simulation of Pee Strike completed ordinary playback to four seconds and a forward seek from about 2.2 to 12.2 seconds without the hardware decoder error. Evidence is under results/seek-repro-pee, including bounded-stream provenance, extracted diagnostic harness, logs and diagnosis.json. This is a decoder/reconstruction comparison, not full MPG/audio buffering or FPGA timing reproduction. The initial short-fixture watchdog stopped before the seek; final runs disabled that cutoff and required explicit boundary completion. A log-reading wrapper exceeded memory after baseline simulation completed, but its underlying log records successful completion. The root cause remains unresolved and seed 88 is not hardware accepted. No reset, reload or deployment was performed.
+
+#### Next Steps:
+
+Compare the same early Right-arrow seek on timing-qualified seed 88; if the failure persists, extend the exact-file reproduction to MPG/audio buffering and expose the decoder error subcode needed to isolate it.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 32 COMMIT Unreleased aad072a 2026-09-13T18:40:17-07:00
 
 #### Coming From:
@@ -1339,35 +1368,6 @@ Sync to all three seed build directories, run the full timing build, deploy the 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 992 COMMIT Unreleased 2f413b4 2026-09-13T03:48:42-07:00
-
-#### Coming From:
-
-Unreleased 14af685
-
-#### Purpose:
-
-Fix the actual stall entry 991's live diagnostic pinpointed: parse_hold stuck inside mpeg2_h262_b_core_probe, not either hold already fixed this session.
-
-#### Outcome:
-
-Deployed entry 991's stall-diagnostic build (seed33, +0.039ns margin) and asked the user to reload and let it stall past the 3-second arm threshold. `stall_diag_valid=true` with `stall_diag_b_parse_hold=true`, `stall_diag_b_candidate=true`, `stall_diag_b_error=true`, `stall_diag_b_seen=false`, `stall_diag_b_picture_inflight=false`, all other flags (parser_ready=true, p_hold_raw/p_hold_effective=false, b_persistence_wait=false) clear - decoder_stream_ready held low purely by mpeg2_h262_b_core_probe's own parse_hold, not by anything entries 986 or 990 touched. Traced the module (spread across mpeg2_h262_b_core_probe_part0-5.svh) and found parse_hold's only release paths are the row-completion state (R_FINISH) receiving external row_retired credit, or a fresh slice start reaching a rearm branch at the bottom of the FSM. Several `replay_error` assignment sites set the module's error output without also clearing parse_hold, unlike the `parser_error` sites, which consistently pair the two. If parse_hold is already asserted (waiting on row_retired) when one of these fires, nothing clears it: row_retired's only source is a downstream B-prediction engine (`mpeg2_h262_reference_pipeline_probe_rearm.sv`) that itself only activates via `b_motion_transport` from this same module - a signal needing the forward progress parse_hold is blocking. Worse, the rearm branch that could otherwise recover sits inside a `stream_valid`-gated block, which never fires again once stream_ready (derived from parse_hold) has gone permanently low - no further bytes ever arrive to reach it. Source `2f413b4` adds one unconditional statement at the very end of the module's always block, deliberately outside the stream_valid gate so it keeps evaluating with no new bytes arriving: whenever `parser_error`, `replay_error` or `prior_error` is latched, clear `parse_hold`. Matches this module's own stated design intent ("a failed B parser/replay transaction must never retain ownership of the compressed-stream path") and the identical recovery pattern the wrapper already applies one layer up for `b_picture_inflight`/`b_persistence_verified` on `b_error`. Attempted an Icarus reproduction feeding the real file's demuxed bytes directly into this module in isolation; it never left its idle state for reasons not fully understood (likely a sequencing precondition the narrow harness didn't model), so the reproduction was inconclusive and the exploratory testbench was not committed - this fix rests on the real hardware diagnostic's precise bit-level evidence plus the code-level tracing above, not a verified simulation. `quartus_map` on seed99 is clean, 0 errors, same warning count, negligible logic change.
-
-#### Next Steps:
-
-Sync to all three seed build directories, run the full timing build (margins have been thin the last two cycles - seed99 alone passed at +0.001ns two cycles ago, then failed entirely last cycle while seed26/seed33 passed near +0.01-0.04ns; watch for the possibility that none pass this time and a margin-recovery pass becomes necessary before any further hardware test), deploy the best-passing seed, and ask the user to reload the file. If `mpeg2_new_decoder_stream_ready` still stalls, pull fresh telemetry - `stall_diag_valid`/`stall_diag_b_parse_hold` should now read differently (either clear, confirming the fix, or the stall should shift to a new signal, which would mean this fix was necessary but not sufficient and the next blocker needs identifying from fresh evidence, not assumed to be a variant of this one). If decode proceeds past this point, watch for whether video actually starts displaying, since this is the first fix in this whole session that touches the path required to reach a first real picture at all.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
 
 #### Status:
 
