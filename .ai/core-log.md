@@ -1,4 +1,4 @@
-## 74 COMMIT Unreleased ??? 2026-09-14T09:09:57-07:00
+## 74 COMMIT Unreleased ffafc79 2026-09-14T09:09:57-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Lower the playback progress strip by one bar height and show only clock values i
 
 #### Outcome:
 
-The user requests this visual adjustment for the next build. Move the progress track, fill and three clocks down 14 reference pixels on the 720x480 layout, scaling with HDMI height, and remove Elapsed, Total and Remaining prefixes while retaining clock centering and unknown dashes. Keep the separate pause/seek status and auxiliary provider behavior. Update the preview and existing pixel oracle, run the overlay regression, then build clean seeds 52, 61 and 87.
+Implemented the requested 14-reference-pixel downward shift for track, fill and three centered clocks, removing their static prefixes. Elapsed, total and remaining retain their left-to-right order; unknown fields retain dashes. Separate pause/seek status and retained auxiliary provider behavior are unchanged. Updated the preview, pixel oracle, plan, test instructions and changelog. All nine full-frame cases pass at 480p, 720p and 1080p, totaling 5414400 matching pixels, plus retained-provider lifetime, UI state and 518 enabled-divider cases. Source ffafc79 is pushed and clean seeds 52, 61 and 87 are compiling; supervisor output is /tmp/ui-lower-clocks-build.log. No hardware deployment occurred. The user's statement that everything looks good follows the encoding correction; it is not treated as explicit acceptance of a particular duration RBF.
 
 #### Next Steps:
 
-Verify rendered pixels and provider behavior, commit source and launch the next three-seed timing qualification.
+Audit the completed three-seed timing and resource results, package the best qualified RBF and have the user check clock centering, bottom margin, unknown times and playback controls on hardware.
 
 #### Files Modified:
 
