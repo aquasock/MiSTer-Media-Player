@@ -1,3 +1,26 @@
+# IDCT intermediate RAM candidate: 3ff27c8 seed 52
+
+Preferred RBF: `results/hardware-test-3ff27c8/seed52/MediaPlayer_20260914.rbf`.
+SHA-256: `236c9817ccfd04b10e23ff0ee052f2c11e5a39d7fcfdb88e3e42b29e969406f1`.
+Hardware acceptance is pending.
+
+Seeds 52 and 87 pass all four timing corners and the 153-register CDC audit.
+Seed 52 has minimum setup +0.133 ns and hold +0.110 ns; seed 87 has +0.067
+and +0.074 ns. Seed 61 fails setup at -0.152 ns and is not recommended.
+
+Seed 52 uses 35,774 actually placed ALMs (85.4%), saving 2,016 against
+accepted dc1dfc2 seed 52. Quartus estimates 29,791 ALMs needed (71.1%), which
+is a different metric. Registers total 43,508. All seeds use 508/553 M10Ks,
+69/112 DSPs and three PLLs. The 24 additional M10Ks leave 45 free; each new
+bank is verified at a physical M10K site in the fitter report. Requested
+RAM type is reported as AUTO despite the RTL attribute, so inspect physical
+placement. See the handoff README and per-seed intermediate-ram.json.
+
+Differential IDCT outputs and cycles match dc1dfc2; mixed-picture pixel and
+seek tests plus the actual Pee Strike A/V direct restart pass. Expect the
+same playback, picture quality and seek speed. Retain dc1dfc2 seed 52 as
+rollback and follow the tests below. No new refresh modes are included.
+
 # IDCT intermediate RAM conversion
 
 The current change moves only the intermediate arrays of all three IDCT
@@ -24,8 +47,7 @@ display ownership using the existing replay tool.
 
 Quartus qualification must confirm all 24 intermediate banks infer M10K,
 measure total RAM blocks and actual placed ALMs separately from estimated
-ALMs, and pass all four timing corners plus 153 CDC registers. The budget
-is 24 additional M10Ks (508 total), not a measured result until compilation.
+ALMs, and pass all four timing corners plus 153 CDC registers. Compilation confirms 24 additional M10Ks (508 total).
 No candidate from this change is hardware accepted yet.
 
 On hardware test clean playback at both refresh rates, repeated forward and
