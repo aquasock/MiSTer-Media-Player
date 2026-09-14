@@ -104,5 +104,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_ui_divider.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_ui_scene.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_overlay_compositor.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_player_overlay.sv
-set_global_assignment -name HEX_FILE rtl/media_overlay_font.hex
-set_global_assignment -name HEX_FILE rtl/media_overlay_coordinates.hex
+set_global_assignment -name MISC_FILE rtl/media_overlay_font.mem
+set_global_assignment -name MISC_FILE rtl/media_overlay_coordinates.mem
+set_global_assignment -name HEX_FILE rtl/media_overlay_blend_rg.hex
+set_global_assignment -name HEX_FILE rtl/media_overlay_blend_b.hex

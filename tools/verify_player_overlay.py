@@ -9,8 +9,11 @@ with (o/'compile.log').open('w') as log:subprocess.run(['verilator','--binary','
 glyphs=json.loads(re.search(r'const glyphs=(\{.*?\});',Path('docs/ui/overlay-preview.html').read_text()).group(1))
 colors={1:(24,27,32),2:(104,125,137),3:(238,242,244)}
 def timestamp(s):return f'{s//3600:02}:{s//60%60:02}:{s%60:02}'
-def oracle(w,h,known,shown,paused,seeking,pos=1340400000,total=2629890000):
+def oracle(w,h,known,shown,paused,seeking,pos=1340400000,total=2629890000,pattern=0):
  im=np.full((h,w,3),(32,48,64),dtype=np.uint8)
+ if pattern:
+  ys,xs=np.indices((h,w));im=np.stack((xs%256,(xs+ys)%256,(xs*7+ys)%256),axis=-1).astype(np.uint8)
+ background=im.copy()
  if not shown:return im
  scale=9 if h>=1000 else 6 if h>=700 else 4
  labels=['Elapsed: '+timestamp(pos//360000),'Total: '+(timestamp((total+359999)//360000) if known else '--:--:--'),'Remaining: '+(timestamp((max(0,total-pos)+359999)//360000) if known else '--:--:--')]
@@ -21,7 +24,7 @@ def oracle(w,h,known,shown,paused,seeking,pos=1340400000,total=2629890000):
  if known: im[y0:y1,x0:x0+(min(pos,total)*(x1-x0)//total)]=colors[3]
  else:
   for x in range(x0,x1):
-   if x&8:im[y0:y1,x]=((np.array((32,48,64),dtype=np.uint16)*95+np.array(colors[1],dtype=np.uint16)*160)//255).astype(np.uint8)
+   if x&8:im[y0:y1,x]=((background[y0:y1,x].astype(np.uint16)*95+np.array(colors[1],dtype=np.uint16)*160)//255).astype(np.uint8)
  for label,center,y in zip(labels,[141,360,579,360],[422,422,422,403]):
   x0=w*center//720-len(label)*6*scale//8;y0=h*y//480
   for dy in range((7*scale+3)//4):
@@ -32,10 +35,11 @@ def oracle(w,h,known,shown,paused,seeking,pos=1340400000,total=2629890000):
  return im
 cases=[(720,480,1,1,0,0),(1280,720,1,1,1,0),(1920,1080,1,1,0,1),(720,480,0,1,0,0),(720,480,1,0,0,0)]
 cases=[(*c,1340400000,2629890000) for c in cases]+[(720,480,1,1,0,0,0,36000000),(720,480,1,1,0,0,40000000,36000000)]
-for w,h,known,shown,paused,seeking,pos,total in cases:
- name=f'{w}x{h}-k{known}-v{shown}-p{paused}-s{seeking}-q{pos}';path=o/(name+'.ppm')
- r=subprocess.run([str(o/'obj/Vtest_media_player_overlay'),f'+OUT={path}',f'+W={w}',f'+H={h}',f'+KNOWN={known}',f'+SHOWN={shown}',f'+PAUSED={paused}',f'+SEEK={seeking}',f'+POSITION={pos}',f'+TOTAL={total}'],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT);(o/(name+'.log')).write_text(r.stdout);r.check_returncode()
- pixels=path.read_bytes().split(b'\n',3)[3];actual=np.frombuffer(pixels,dtype=np.uint8).reshape(h,w,3);expected=oracle(w,h,known,shown,paused,seeking,pos,total)
+cases=[(*c,0) for c in cases]+[(720,480,0,1,0,0,1340400000,2629890000,1),(720,480,1,0,0,0,1340400000,2629890000,1)]
+for w,h,known,shown,paused,seeking,pos,total,pattern in cases:
+ name=f'{w}x{h}-k{known}-v{shown}-p{paused}-s{seeking}-q{pos}-r{pattern}';path=o/(name+'.ppm')
+ r=subprocess.run([str(o/'obj/Vtest_media_player_overlay'),f'+OUT={path}',f'+W={w}',f'+H={h}',f'+KNOWN={known}',f'+SHOWN={shown}',f'+PAUSED={paused}',f'+SEEK={seeking}',f'+POSITION={pos}',f'+TOTAL={total}',f'+PATTERN={pattern}'],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT);(o/(name+'.log')).write_text(r.stdout);r.check_returncode()
+ pixels=path.read_bytes().split(b'\n',3)[3];actual=np.frombuffer(pixels,dtype=np.uint8).reshape(h,w,3);expected=oracle(w,h,known,shown,paused,seeking,pos,total,pattern)
  bad=np.any(actual!=expected,axis=2);count=int(bad.sum());print(name,'mismatched pixels',count,flush=True)
  if count:
   ys,xs=np.where(bad);print('first:',[(int(x),int(y),actual[y,x].tolist(),expected[y,x].tolist()) for x,y in zip(xs[:10],ys[:10])]);raise RuntimeError('pixel mismatch')

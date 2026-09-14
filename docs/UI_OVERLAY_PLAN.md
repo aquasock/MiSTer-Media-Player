@@ -17,9 +17,11 @@ Mailbox inputs, provider writes, pixel logic and compositor-facing outputs
 retain single-cycle timing. A pending latch captures short publication acks. The compositor starts publication at the next VS
 rising edge, copies twelve descriptors from staging RAM during blanking, then
 acknowledges the complete scene. Incomplete copies never draw. Session/seek epochs reject stale scenes without blocking playback.
-The actual pixel pipeline delays RGB, HS, VS and DE together by six registers.
+The actual pixel pipeline delays RGB, HS, VS and DE together by ten registers. Axis comparisons, qualification, priority selection and coordinate subtraction
+have separate stages. Fixed-palette alpha blending also uses byte lookup RAM,
+with red and green sharing a dual-read table.
 Pixel glyph-coordinate conversion uses a small synchronous lookup ROM instead
-of cascaded divisions. `tools/make_overlay_roms.py --check` verifies both ROMs.
+of cascaded divisions. `tools/make_overlay_roms.py --check` verifies the glyph, coordinate and blend ROMs.
 
 The scene holds eight text objects (64 eight-bit glyph IDs each) and four
 rectangles. Slots 0–3 carry controls; slots 4–7 are reserved for a retained
