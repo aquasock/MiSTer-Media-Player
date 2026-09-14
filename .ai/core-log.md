@@ -1,4 +1,34 @@
-## 25 COMMIT Unreleased ??? 2026-09-13T16:38:32-07:00
+## 26 COMMIT Unreleased ??? 2026-09-13T17:02:36-07:00
+
+#### Coming From:
+
+Unreleased 6b22b6e
+
+#### Purpose:
+
+Retain the frame-rounded seek destination through the audio acknowledgement handoff.
+
+#### Outcome:
+
+Review found that media_playback_control reverted seek_elapsed_90k to the unrounded request after seek_active fell, allowing the audio mailbox to rebase to a different time than the displayed frame. A new regression fails on 6b22b6e after the first fractional-rate seek. Latching the actual destination at completion until the next decoder reset fixes the handoff and passes all focused playback regressions. This is a correction within the authorized playback-controls implementation; the superseded build batch was stopped before qualification.
+
+#### Next Steps:
+
+Commit the corrected controller and regression, then run clean seeds 52/61/87 with complete timing and CDC audits.
+
+#### Files Modified:
+
+- rtl/media_playback_control.sv
+- tools/test_media_playback_control.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 25 COMMIT Unreleased 6b22b6e 2026-09-13T16:38:32-07:00
 
 #### Coming From:
 
@@ -10,27 +40,43 @@ Implement keyboard play/pause and time-based seeks using the existing stock-Main
 
 #### Outcome:
 
-The user authorizes Space play/pause and backward/forward arrow jumps of 10 seconds, Ctrl 30 seconds and Ctrl+Alt 300 seconds. Left and Right select direction; OSD navigation must not trigger playback commands. Pause will hold presentation and both media clocks, retain queues and silence movie output without consuming samples. Seeking will use the existing quiesce/flush restart and silently reconstruct from the beginning at decoder throughput to the requested displayed-media time, preserving reference correctness and the requested paused state. This first implementation has no byte-rate estimate or random-access index, so long seeks can take time. Physical raster and OSD service remain active. Seek targets clamp at the start and drain safely at EOF. Commands, CDC, timeline behavior, queued audio, repeated controls and decoder ownership need regression coverage before three clean seeded builds.
+Committed 6b22b6e implementing Space pause and Left/Right 10/30/300-second seeks with both modifier sides, OSD exclusion and typematic suppression. Playback time, queued PCM and display ownership are retained on pause; seeks reconstruct from byte zero with silent PCM discard and frame-boundary completion. Keyboard, exact rational target rounding at five rates, timestamp wrap, PCM retention/EOF, three asynchronous restart transactions, reader retirement and raw EOF closure tests pass. The real MPG oracle retains all 24192 sample pairs through a 100 ms pause with at most one code of FFmpeg error, and the mixed 24-picture I/P/B oracle has zero pixel mismatches in normal and seek/pause modes. Video/OSD regressions also pass. Full-top Verilator lint encountered an internal tool fault with vendor simulation libraries, so it was not counted as a pass. Three clean builds under results/build-6b22b6e-20260913-165629 reached fitting but were stopped after review found that the rounded audio landing time could revert to the requested time after seek acknowledgement. A new regression reproduces that defect. No RBF from this source is qualified or delivered.
 
 #### Next Steps:
 
-Implement and validate the controls and restart integration, commit source, run seeds 52/61/87 with complete timing and CDC audits, then deliver qualified candidates and hardware instructions.
+Latch the final rounded destination until the next session reset, repeat the focused regression, and rebuild the corrected source in three clean seeds.
 
 #### Files Modified:
 
-- rtl/media_playback_control.sv
-- rtl/media_keyboard_control.sv
-- rtl/audio/mp2_pcm_output.sv
-- rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
+- CHANGELOG.md
+- MediaPlayer.sdc
+- MediaPlayer_av.svh
 - MediaPlayer_top_00.svh
 - MediaPlayer_top_05.svh
 - MediaPlayer_top_06.svh
-- MediaPlayer_av.svh
-- files.qip
-- tools/phase1p_timing.tcl
-- MediaPlayer.sdc
+- MediaPlayer_top_07.svh
+- docs/OSD_PLAYBACK_PLAN.md
 - docs/TEST_INSTRUCTIONS.md
-- CHANGELOG.md
+- files.qip
+- rtl/audio/mp2_pcm_output.sv
+- rtl/media_keyboard_control.sv
+- rtl/media_playback_control.sv
+- rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
+- rtl/mpeg2_new/mpeg2_program_stream_ingress.sv
+- tools/phase1p_timing.tcl
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_mixed_raster_pixels.sv
+- tools/test_media_keyboard_control.sv
+- tools/test_media_playback_control.sv
+- tools/test_mp2_pcm_output.sv
+- tools/test_mp2_playback_control.sv
+- tools/test_mpg_audio_playback.sv
+- tools/test_playback_restart.sv
+- tools/test_program_stream_ingress.sv
+- tools/verify_decoder_timing.py
+- tools/verify_mpg_audio.py
+- tools/verify_playback_controls.py
+- tools/verify_program_stream_ingress.py
 
 #### Status:
 
@@ -1312,35 +1358,6 @@ Run the full three-seed timing build, deploy, and reload the real `.mpg` via F4.
 
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/test_b_presentation_scheduler_deadlock.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 985 COMMIT Unreleased 3713581 2026-09-13T00:08:46-07:00
-
-#### Coming From:
-
-Unreleased 3713581
-
-#### Purpose:
-
-Build and deploy entry 984's legacy-PES-header fix for hardware testing.
-
-#### Outcome:
-
-Ran the three-seed timing build. seed99 (this project's usual best seed) failed setup timing this time, but seed26 and seed33 both passed cleanly - seed26 with the better margin (+0.397ns worst case vs seed33's +0.088ns). Installed seed26's RBF (`.ai/current_results/MediaPlayer_stageB_legacyfix_seed26.rbf`, SHA-256 `75c81cf0970372bdb2b7d6c0e99f38056fd55cd17e4a4a8e3fa4afa2e48c38c1`) onto the test MiSTer via `tools/mister.sh install`, confirmed by re-reading the installed file's checksum over SSH. Main is unchanged from entry 983 and was not reinstalled. Not yet tested.
-
-#### Next Steps:
-
-Reload the real `.mpg` via F4 and check whether video now actually decodes and displays - the load should also be fast this time, since a correctly-parsed elementary stream should let the FIFO fill and drain against real decode consumption rather than racing unthrottled through the whole file. Pull the diagnostic log afterward regardless of outcome and check whether `credit` fluctuates now instead of staying pinned at maximum.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
