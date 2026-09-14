@@ -1,4 +1,4 @@
-## 37 COMMIT Unreleased ??? 2026-09-14T00:24:33-07:00
+## 37 COMMIT Unreleased 6eb49e1 2026-09-14T00:24:33-07:00
 
 #### Coming From:
 
@@ -10,15 +10,34 @@ Diagnose the hardware seek freeze with persistent first-fault telemetry and comb
 
 #### Outcome:
 
-The user approved adding a bounded seek diagnostic snapshot that remains active during seeking, extending exact-file simulation to combined demux, audio buffering and video reconstruction, and comparing audio frame bypass enabled and disabled. The existing captures establish an aggregate decoder error on both movies but do not establish its source or fault order. No root cause is assumed.
+Source 6eb49e1 adds a fourteen-word first-observed seek snapshot, decoder subcodes, seek state, timestamps and queue observations; the new observer survives pause and decoder restart and clears on reset or a fresh file. A diagnostic OSD option disables only compressed MP2 frame bypass for comparison within one RBF. Actual RTL overlay pixels decode successfully, first-fault retention and seek timeout regressions pass, legacy telemetry compatibility passes, and the existing MPG audio/PTS oracle remains exact with no audio errors. The combined exact-file replay includes mounted input, demux, bounded queues, MP2 output, video reconstruction and PTS scheduling, with ideal CDC and separate compressed-video DDR service explicitly outside the hardware-equivalence claim. Source is pushed and the clean seed 52/61/87 batch has started. No freeze fix or hardware acceptance is claimed.
 
 #### Next Steps:
 
-Implement and verify first-fault retention, decoder subcodes, seek state, timestamps and queue observations; replay the exact opening with seek phase and storage stalls varied and audio bypass compared. Commit the source and build diagnostic candidates for user hardware testing without deploying them.
+Complete the timing/resource audit and exact-file bypass/seek-phase/storage-stall comparisons, then provide a qualified diagnostic RBF for user hardware testing. Retain first-fault evidence before changing the playback algorithm.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer_av.svh
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_07.svh
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/audio/av_stream_fifo.sv
+- rtl/audio/mp2_pcm_fifo.sv
+- rtl/media_seek_diagnostics.sv
+- rtl/mpeg2_new/mpeg2_av_ddr_fifo.sv
+- tools/phase1p_timing.tcl
+- tools/replay_mpg_seek.py
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/mpg_replay_control.svh
+- tools/streams/mpg_replay_ingress.svh
+- tools/test_av_ddr_fifo.sv
+- tools/test_media_seek_diagnostics.sv
+- tools/test_mpg_audio_ingress.sv
+- tools/test_mpg_audio_playback.sv
+- tools/verify_seek_diagnostics.py
 
 #### Status:
 
