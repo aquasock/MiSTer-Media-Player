@@ -1,3 +1,34 @@
+## 66 COMMIT Unreleased ??? 2026-09-14T07:38:35-07:00
+
+#### Coming From:
+
+Unreleased b00920a
+
+#### Purpose:
+
+Qualify the completed overlay builds with an audit that recognizes fitted counter duplicates.
+
+#### Outcome:
+
+All three b00920a seeds compile successfully, using 37450, 37424 and 37503 actual placed ALMs for seeds 52, 61 and 87, with 520 M10Ks and 69 DSPs. These meet the initial incremental resource budgets. The new scene-enable audit stops before all-corner reporting because its two-register wildcard also returns routing duplicates. A direct fitted-netlist query confirms the two original scene_phase bits and one duplicate of each, plus 1144 scoped formatter registers. Correct the audit to require both original bits, accept only explicitly named routing copies and report those separately; do not alter RTL, timing constraints or fitted binaries. Rerun qualification on the existing clean archives and record the audit-tool revision separately from the RBF source. Hardware acceptance remains pending.
+
+#### Next Steps:
+
+Complete all-corner and CDC qualification, package the best passing seed and update hardware instructions with measured resources, timing and its exact RBF hash.
+
+#### Files Modified:
+
+- tools/phase1p_timing.tcl
+- docs/TEST_INSTRUCTIONS.md
+- docs/UI_OVERLAY_PLAN.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 65 COMMIT Unreleased b00920a 2026-09-14T07:02:57-07:00
 
 #### Coming From:
@@ -1284,36 +1315,6 @@ Finish the 17743f8 build batch and deliver timing-qualified hardware candidates 
 
 - tools/streams/tb_h262_live_raster_soak.sv
 - tools/verify_decoder_timing.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 26 COMMIT Unreleased 17743f8 2026-09-13T17:02:36-07:00
-
-#### Coming From:
-
-Unreleased 6b22b6e
-
-#### Purpose:
-
-Retain the frame-rounded seek destination through the audio acknowledgement handoff.
-
-#### Outcome:
-
-Committed and pushed 17743f8 to latch the frame-rounded destination until the next decoder reset. The added assertion fails on 6b22b6e and passes on the corrected controller, including all five source rates and all three seek intervals. All focused keyboard, asynchronous restart, PCM pause/seek, timestamp wrap and legacy sink checks pass. The canceled 6b22b6e process group was confirmed stopped, and replacement clean seeds 52/61/87 are running under results/build-17743f8-20260913-170250. All three pass synthesis; seed 87 reports 52905 synthesized registers with unchanged 3754315 memory bits, 69 DSPs and three PLLs. Fitted utilization and timing remain pending. Seven-minute 25/29.97 fps counter clips were generated with the committed make_cadence_motion_tests.py --seconds 420 under results/playback-control-tests; all four raw/MPG files pass full decode and frame-count checks. No playback-controls RBF is hardware accepted.
-
-#### Next Steps:
-
-Finish all seeded builds and timing/CDC audits, retain the seven-minute counter media for hardware checks, and extend the reconstruction regression to require explicit end-of-file seek completion.
-
-#### Files Modified:
-
-- rtl/media_playback_control.sv
-- tools/test_media_playback_control.sv
 
 #### Status:
 
