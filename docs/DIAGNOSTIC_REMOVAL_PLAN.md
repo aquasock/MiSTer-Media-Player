@@ -59,6 +59,11 @@ checks that gate reads or prevent malformed input being classified as clean
 EOF. Do not delete production decoder modules named probe or diagnostic.
 Update CDC counts/constraints only for endpoints actually removed.
 
+The user also authorizes deleting the frozen `rtl/mpeg2fpga/` reference copy
+in gate two. Check and remove unused legacy integration wrappers and update
+references, preserving attribution required by any retained code. Git history
+keeps the old implementation; this cleanup does not save FPGA resources.
+
 Hardware checks: repeat all four files, including long/backward seeks,
 replacement movies and clean EOF. Retain gate one's accepted RBF.
 

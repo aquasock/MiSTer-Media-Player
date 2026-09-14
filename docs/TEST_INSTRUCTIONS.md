@@ -14,7 +14,18 @@ empty/full/unknown progress, at both 50 and 59.94 Hz. Keep hardware-accepted
 b05b76f seed 87 as rollback. Gate two waits for your acceptance of this gate.
 
 Simulation evidence is under results/gate1-subtitles, results/gate1-mixed and
-results/gate1-controls.json. Build timing/resources remain pending. See
+results/gate1-controls.json. All three 8e418b3 seeds pass four timing corners,
+183 CDC register checks and the zero-profiler-register audit. Preferred seed 52
+has setup +0.397 ns and hold +0.114 ns. Seeds 61/87 have setup +0.397/+0.197 ns
+and hold +0.099/+0.089 ns. No timing fixes or extra builds were needed.
+
+Preferred RBF: `results/hardware-test-8e418b3/seed52/MediaPlayer_20260914.rbf`.
+SHA-256: `78501002b4e4d9669635ffa30e9f744e47103baf0e12740e09594f2a40c625a8`.
+Actual placed ALMs are 37267/37169/37350 for seeds 52/61/87; estimated ALMs
+are 31787/31731/31708. All retain 527 M10Ks and 75 DSPs. Compared with accepted
+b05b76f seed 87, seed 52 reduces estimated ALMs by 964 but physical occupancy
+by only 143 because fitter packing differs. Gate-one hardware acceptance is
+pending. See
 [the three-gate plan](DIAGNOSTIC_REMOVAL_PLAN.md).
 
 # Audio timestamp warning tolerance
