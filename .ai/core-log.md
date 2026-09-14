@@ -1,3 +1,36 @@
+## 49 COMMIT Unreleased ??? 2026-09-14T03:08:16-07:00
+
+#### Coming From:
+
+Unreleased 3ab6615
+
+#### Purpose:
+
+Remove the added seek-fault telemetry hardware to recover placement capacity.
+
+#### Outcome:
+
+The user authorized removing the added telemetry after all reduced-source builds exceeded LAB capacity. The seek-fault observer, its 449-bit clock-domain mailbox and overlay renderer account for 712 combinational ALUTs and 1291 registers in the source 3ab6615 seed 87 synthesis hierarchy. Remove their production instantiation and project inclusion, connect video directly to the retained cadence output, and remove the obsolete mailbox from the required CDC audit. Retain compact playback-health telemetry, audio comparison controls, playback and seek control signals, and offline decoding support for historical captures.
+
+#### Next Steps:
+
+Update current testing instructions and changelog, run retained telemetry and seek regressions, verify the required CDC count decreases from 165 to 159, then commit and push. Actual placement savings and timing require the next authorized build; do not deploy automatically.
+
+#### Files Modified:
+
+- MediaPlayer_top_07.svh
+- files.qip
+- tools/phase1p_timing.tcl
+- CHANGELOG.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 48 COMMIT Unreleased 3ab6615 2026-09-14T03:06:59-07:00
 
 #### Coming From:
@@ -1303,35 +1336,6 @@ Have the user validate the seed-87 candidate on hardware. Preserve the timing re
 
 - sys/sys_top.v
 - tools/phase1p_timing.tcl
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 009 COMMIT Unreleased 0710e81 2026-09-13T11:55:45-07:00
-
-#### Coming From:
-
-Unreleased 0710e81
-
-#### Purpose:
-
-Record partial hardware validation of loading-message suppression and the user's instruction to defer menu-access work.
-
-#### Outcome:
-
-At the user's explicit request, the timing-failing 0710e81 seed-87 RBF was provided for hardware testing while the corrected 07b8688 builds ran. It is retained at results/hardware-test-0710e81-seed87/MediaPlayer_20260913.rbf with SHA-256 ef3026b9b2e3eda03865c70a6df327b8002c510ac3b81ee04198dd8ae13b4d63 and a build-info.json marking setup -1.525 ns and timing_passed false. The user reported that the loading bar is gone, but pressing the menu button still cannot bring up the OSD during playback. This confirms the visual message-suppression behavior only; it does not establish interactive menu access. That remaining limitation is consistent with Main's blocking file-transfer loop and was identified in the approved proposal; preserving ordinary menu rendering in RTL does not make Main service the menu button during that loop. The user explicitly instructed leaving the behavior as-is for now and waiting for the three current timing results. Source 07b8688 adds only the subcarrier mailbox and its six audit stages and was committed and pushed before clean seeds 52, 61 and 87 began under results/build-07b8688-20260913-114641/. No Main or audio changes were made.
-
-#### Next Steps:
-
-Finish the three 07b8688 builds and their timing checks, including the fitted 60-register synchronizer audit and explicit operating-corner reports. Report the results and any passing candidate without further implementation changes; menu access during playback is deferred by the user's instruction.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
