@@ -228,3 +228,19 @@ stereo combinational unit, DDR transport, PCM buffering, clock handoff and
 HDMI control are outside this fit. Virtual I/O fitting is area evidence, not
 integrated timing closure. RTL lint is clean with the intentional unconnected
 MAC status port excluded.
+
+## External frame store and native output controls
+
+The next connected decoder fit includes two external provisional/committed
+frame banks and stereo reconstruction: **1,953 placed ALMs, two M10Ks and one
+DSP**. Complete corpus files pass through a stalled/delayed DDR model to exact
+PCM. Cancellation drains held commands/responses before reusing storage.
+Native I2S and the connected HDMI ownership/configuration/reapply controller
+also pass component and serial-wire tests. The native clock plus vendor
+selector fits using Cyclone V PLL selector inputs 2/3.
+
+[FLAC_OUTPUT_INTEGRATION.md](FLAC_OUTPUT_INTEGRATION.md) records the interface,
+resource measurements, reproducible tests and remaining production wiring.
+The new blocks are not yet a playable FLAC RBF. Real HPS bus behavior, the
+shared port/CDC/output integration and HDMI receiver acceptance remain to be
+qualified before claiming native hardware playback.

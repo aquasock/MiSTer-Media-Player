@@ -1,7 +1,9 @@
 # Standalone CD-quality FLAC playback plan
 
-Implementation started with isolated arithmetic simulation, a verified corpus
-and clock/resource feasibility probes. Production integration is pending. Baseline: hardware-accepted
+Complete-file decoding now runs through the external frame-store RTL to exact
+PCM in simulation. Native I2S, exclusive HDMI configuration/reapplication and
+PLL/clock-selector feasibility are also tested; see FLAC_OUTPUT_INTEGRATION.md.
+Production mounted-file, CDC and output integration is pending. Baseline: hardware-accepted
 b639ccc MEDIUM seed 52; timing audit db4bc3f. Free physical resources are
 6,002 ALMs, 41 M10Ks and 53 DSP blocks. Preserve this RBF for regression.
 
