@@ -1,3 +1,27 @@
+# Audio timestamp warning tolerance
+
+Fellow and Groove triggered only the audio timestamp warning at played sample
+4609. Exact-byte opening replays reproduce a 15/90000-second (167 us) backward
+step in the second audio PES timestamp: frame five says 56477 while the
+continuous 48 kHz sample grid reaches 56492. Jiggler and Star Wars say 56492
+and do not warn. This is a file timestamp discrepancy, with no missing PCM
+samples or underrun in the reproduction.
+
+The next source revision allows up to 90 ticks (1 ms) of lateness in the warning
+only. This is a diagnostic tolerance, not a format limit or a change to audio
+scheduling. Sample output, PTS handling, seek behavior and underrun detection
+are unchanged. Tests must still flag 91-tick and 900-tick lateness, preserve
+512-clock sample spacing and every PCM sample, and cover PTS wrap.
+
+Use `python3 tools/replay_audio_startup.py --output results/audio-startup --expect-clean /path/to/fellow.mpg /path/to/Groove.mpg /path/to/Jiggler.mpg /path/to/StarWars.mpg`.
+The replay reads at most 1 MiB of each original file without remuxing, stops
+after 9216 consumed sample pairs and records timestamps plus prefix hashes.
+It uses production clock rates, ideal bounded CDC queues and synthetic video
+consumption; it is not a full video or vendor FIFO simulation. On hardware,
+reload each file and leave playback running through startup before trying
+pause/seek. Verify that the unwanted warning stays absent and audio is clean.
+The completed b05b76f EOF builds do not contain this warning adjustment.
+
 # EOF-to-startup qualification
 
 At a clean physical EOF, finish queued video and audio, retain the final image
@@ -23,7 +47,19 @@ and `python3 tools/verify_decoder_timing.py --output results/eof-mixed --eof-con
 The controller regression covers all five source frame rates, longer audio,
 pause/seek/probe inhibition, CDC generation races, and delayed host/DDR drain.
 The mixed raster oracle verifies completion after real I/P/B presentation with
-423,936 reconstructed pixels checked. Hardware timing qualification is pending.
+423,936 reconstructed pixels checked.
+
+All b05b76f seeds compiled; 52 and 87 pass all four timing corners, 183 CDC
+registers and scene-enable checks. Seed 61 misses setup by 0.009 ns. Preferred
+seed 87 has setup +0.358 ns, hold +0.099 ns, 37,410 actual ALMs, 527/553 M10Ks
+and 75/112 DSPs. This leaves 4,500 placed ALMs and 26 M10Ks free. Physical
+packing varies across seeds; the change in occupancy is not a logic-removal
+claim. Seed 52 also passes with setup +0.258 ns and hold +0.115 ns.
+
+Preferred EOF RBF: `results/hardware-test-b05b76f/seed87/MediaPlayer_20260914.rbf`.
+SHA-256: `e9ac8007db6a50877ea9ebc7b666b7879f0c30954bf168beefe3569fff08b093`.
+It includes the UI layout revision but not the subsequent audio warning tolerance.
+Hardware EOF acceptance remains pending.
 
 # Next layout: clocks below the progress bar
 

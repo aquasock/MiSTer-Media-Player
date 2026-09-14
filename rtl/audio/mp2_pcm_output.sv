@@ -33,6 +33,11 @@ reg [24:0] tick_phase;
 reg [8:0] sample_phase;
 wire [25:0] tick_sum={1'b0,tick_phase}+26'd90000;
 wire [32:0] lateness=stc-fifo_data[64:32];
+// Encoded PES timestamps can jitter relative to the continuous sample grid.
+// Fellow/Groove move backward 15 ticks (167 us) at their second audio PES.
+// Allow up to 1 ms in this diagnostic only: never drop samples or rebase the
+// clock to chase that jitter. Larger lateness and all underruns remain flagged.
+localparam [32:0] TIMESTAMP_WARNING_TICKS=33'd90;
 wire eof=fifo_data[66];
 wire has_pts=fifo_data[65];
 wire due=anchored&&(!has_pts||!lateness[32]);
@@ -71,7 +76,7 @@ always @(posedge clk) begin
             else if(!skipping) begin
                 started<=1;sample_phase<=0;sample_l<=fifo_data[31:16];sample_r<=fifo_data[15:0];
                 samples_played<=samples_played+32'd1;
-                if(has_pts&&!lateness[32]&&lateness>33'd2) timestamp_error<=1;
+                if(has_pts&&!lateness[32]&&lateness>TIMESTAMP_WARNING_TICKS) timestamp_error<=1;
             end
         end else if(sample_tick&&!paused&&!skipping) begin
             sample_l<=0;sample_r<=0;

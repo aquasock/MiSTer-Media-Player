@@ -18,6 +18,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Allow 1 ms of audio timestamp lateness in the diagnostic warning, avoiding
+  startup warnings from the measured 167 us PES timestamp step in Fellow/Groove.
+  Audio samples, cadence and underrun detection are unchanged.
+
 - Place time fields below the progress bar, Paused/Seeking on the bar with
   contrasting lettering, and subtitles two lines lower following hardware
   acceptance of manual SRT playback.

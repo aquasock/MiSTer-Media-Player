@@ -11,6 +11,7 @@ p.add_argument('--output', type=Path, required=True)
 a = p.parse_args()
 root = Path(__file__).resolve().parents[1]
 tests = {
+    'test_mp2_timestamp_tolerance': ['rtl/audio/mp2_pcm_output.sv'],
     'test_media_eof_control': ['rtl/media_eof_control.sv',
         'rtl/media_session_control.sv', 'rtl/video_config_cdc.sv'],
     'test_playback_restart': ['rtl/media_keyboard_control.sv',

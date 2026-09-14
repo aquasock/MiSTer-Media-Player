@@ -1,11 +1,12 @@
 `timescale 1ns/1fs
 module test_mpg_audio_playback;
-reg aclk=0;always #12.20703125 aclk=~aclk;
-reg clk=0;always #5 clk=~clk;
+reg aclk=0;always #20.345052083333 aclk=~aclk;
+reg clk=0;always #8.333333333333 clk=~clk;
 reg reset=1,iv=0,ie=0;reg [7:0] ib;
 wire ir,ve,vv,vr,apv,av,ar,vpv,ps,de;
 wire [7:0] vb,ab;wire [32:0] vp,ap;
 reg [7:0] bytes[0:16777215];integer size,fd,vfd,afd,pfd,idx=0,cycles=0,n=0;
+integer startup_samples=0;
 reg [1023:0] path,outpath;reg [31:0] rng=32'h795137ba;
 // Actual mounted-file reader at 20 MHz, with an ideal bounded byte/EOF CDC
 // reservoir. Host service includes periodic 2 ms scheduling delays.
@@ -85,6 +86,12 @@ initial begin
  end
 end
 always @(posedge aclk) if(!reset&&pcm_pop) begin
+    if(startup_samples!=0 && !pcm_q[66] && pcm_q[65])
+        $display("AUDIO_PTS sample=%0d pts=%0d stc=%0d lateness=%0d",played,pcm_q[64:32],sink.stc,$signed(sink.lateness));
+    if(startup_samples!=0 && played>=startup_samples)begin
+        $display("AUDIO_STARTUP samples=%0d underrun=%0d timestamp_error=%0d",played,under,terr);
+        $finish;
+    end
     if(!pcm_q[66]&&!sink.skipping) $fwrite(afd,"%d %d\n",$signed(pcm_q[31:16]),$signed(pcm_q[15:0]));
     pcm_rd_index<=pcm_rd_index+1;
 end
@@ -129,6 +136,7 @@ always @(posedge clk) if(!reset) begin
 end
 always @(negedge clk) rng={rng[30:0],rng[31]^rng[21]^rng[1]^rng[0]};
 initial begin
+ if($value$plusargs("startup_samples=%d",startup_samples))begin end
  if(!$value$plusargs("input=%s",path)||!$value$plusargs("output=%s",outpath)) $fatal;
  fd=$fopen(path,"rb");size=$fread(bytes,fd);$fclose(fd);
  vfd=$fopen({$sformatf("%0s",outpath),".m2v"},"wb");afd=$fopen({$sformatf("%0s",outpath),".pcm.txt"},"w");pfd=$fopen({$sformatf("%0s",outpath),".pts.txt"},"w");
