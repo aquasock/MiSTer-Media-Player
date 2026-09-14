@@ -1,3 +1,35 @@
+## 65 COMMIT Unreleased ??? 2026-09-14T07:02:57-07:00
+
+#### Coming From:
+
+Unreleased 287cf6b
+
+#### Purpose:
+
+Remove the remaining identified pixel-path arithmetic bottlenecks before final overlay qualification.
+
+#### Outcome:
+
+Additional isolated timing analysis of fitted 5373dae finds the unchanged alpha blend also fails by -6.017 ns, independent of coordinate divisions and scene formatting. The 287cf6b batch passes synthesis but is stopped early during fitting to avoid completing another known-incomplete timing fix. Its status and cancellation reason are retained under results/build-287cf6b-20260914-065802. Replace the fixed dark-palette blend with synchronous byte lookup tables and pipeline the bounds, object selection and coordinate subtraction separately. These corrections preserve the approved pixels and shared provider design while using the reserved RAM budget; existing 287cf6b duration guards, coordinate/staging RAM and enabled formatter remain the basis. No hardware deployment or acceptance occurred.
+
+#### Next Steps:
+
+Verify full-frame RGB and sync alignment with varying pixel colors as well as fixed backgrounds, confirm unchanged palette and text, then commit and run the clean three-seed qualification. Check all corners, 159 CDC registers, the real four-clock scene enable and actual resource budgets before packaging an RBF.
+
+#### Files Modified:
+
+- rtl/media_overlay_compositor.sv
+- tools/make_overlay_roms.py
+- tools/test_media_player_overlay.sv
+- tools/verify_player_overlay.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 64 COMMIT Unreleased 287cf6b 2026-09-14T06:34:44-07:00
 
 #### Coming From:
@@ -1273,63 +1305,6 @@ Finish all seeded builds and timing/CDC audits, retain the seven-minute counter 
 
 - rtl/media_playback_control.sv
 - tools/test_media_playback_control.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 25 COMMIT Unreleased 6b22b6e 2026-09-13T16:38:32-07:00
-
-#### Coming From:
-
-Unreleased 6da4771
-
-#### Purpose:
-
-Implement keyboard play/pause and time-based seeks using the existing stock-Main playback path.
-
-#### Outcome:
-
-Committed 6b22b6e implementing Space pause and Left/Right 10/30/300-second seeks with both modifier sides, OSD exclusion and typematic suppression. Playback time, queued PCM and display ownership are retained on pause; seeks reconstruct from byte zero with silent PCM discard and frame-boundary completion. Keyboard, exact rational target rounding at five rates, timestamp wrap, PCM retention/EOF, three asynchronous restart transactions, reader retirement and raw EOF closure tests pass. The real MPG oracle retains all 24192 sample pairs through a 100 ms pause with at most one code of FFmpeg error, and the mixed 24-picture I/P/B oracle has zero pixel mismatches in normal and seek/pause modes. Video/OSD regressions also pass. Full-top Verilator lint encountered an internal tool fault with vendor simulation libraries, so it was not counted as a pass. Three clean builds under results/build-6b22b6e-20260913-165629 reached fitting but were stopped after review found that the rounded audio landing time could revert to the requested time after seek acknowledgement. A new regression reproduces that defect. No RBF from this source is qualified or delivered.
-
-#### Next Steps:
-
-Latch the final rounded destination until the next session reset, repeat the focused regression, and rebuild the corrected source in three clean seeds.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sdc
-- MediaPlayer_av.svh
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_06.svh
-- MediaPlayer_top_07.svh
-- docs/OSD_PLAYBACK_PLAN.md
-- docs/TEST_INSTRUCTIONS.md
-- files.qip
-- rtl/audio/mp2_pcm_output.sv
-- rtl/media_keyboard_control.sv
-- rtl/media_playback_control.sv
-- rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
-- rtl/mpeg2_new/mpeg2_program_stream_ingress.sv
-- tools/phase1p_timing.tcl
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_mixed_raster_pixels.sv
-- tools/test_media_keyboard_control.sv
-- tools/test_media_playback_control.sv
-- tools/test_mp2_pcm_output.sv
-- tools/test_mp2_playback_control.sv
-- tools/test_mpg_audio_playback.sv
-- tools/test_playback_restart.sv
-- tools/test_program_stream_ingress.sv
-- tools/verify_decoder_timing.py
-- tools/verify_mpg_audio.py
-- tools/verify_playback_controls.py
-- tools/verify_program_stream_ingress.py
 
 #### Status:
 
