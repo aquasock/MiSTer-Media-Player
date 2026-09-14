@@ -1,3 +1,37 @@
+## 74 COMMIT Unreleased ??? 2026-09-14T09:09:57-07:00
+
+#### Coming From:
+
+Unreleased 1d58018
+
+#### Purpose:
+
+Lower the playback progress strip by one bar height and show only clock values in its three fields.
+
+#### Outcome:
+
+The user requests this visual adjustment for the next build. Move the progress track, fill and three clocks down 14 reference pixels on the 720x480 layout, scaling with HDMI height, and remove Elapsed, Total and Remaining prefixes while retaining clock centering and unknown dashes. Keep the separate pause/seek status and auxiliary provider behavior. Update the preview and existing pixel oracle, run the overlay regression, then build clean seeds 52, 61 and 87.
+
+#### Next Steps:
+
+Verify rendered pixels and provider behavior, commit source and launch the next three-seed timing qualification.
+
+#### Files Modified:
+
+- rtl/media_ui_scene.sv
+- tools/verify_player_overlay.py
+- docs/ui/overlay-preview.html
+- docs/UI_OVERLAY_PLAN.md
+- docs/TEST_INSTRUCTIONS.md
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 73 COMMIT Unreleased 1d58018 2026-09-14T08:49:53-07:00
 
 #### Coming From:
@@ -1277,35 +1311,6 @@ The user reports both tested RBFs freeze alike and reran the latest candidate un
 #### Next Steps:
 
 Use the repeated decoder failure as the primary reproduction target, include combined MPG/audio flow and host stalls, and capture error subcodes and first-fault ordering rather than infer causality from the latched summary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 34 COMMIT Unreleased aad072a 2026-09-14T00:05:22-07:00
-
-#### Coming From:
-
-Unreleased aad072a
-
-#### Purpose:
-
-Record the repeated seek freeze on timing-qualified seed 88.
-
-#### Outcome:
-
-The user reports that seed 88 froze in the same way after seeking. Fresh screenshots at 00:03:48 and 00:04:30 on September 14 show pixel-identical nonblack movie frames, confirming no visible frame change across 42 seconds. Neither screenshot contains decodable telemetry, so the previous seed-87 error 0x0004 cannot be assigned to this occurrence. Evidence and comparison.json are under results/telemetry-20260914-000348 and results/telemetry-20260914-000430. Passing all timing corners has not resolved the observed freeze; root cause remains undetermined. The core and loaded file were left untouched. Seed 88 remains timing qualified but fails hardware playback-control acceptance.
-
-#### Next Steps:
-
-Extend the exact-file reproduction to the combined MPG/audio buffering path and add bounded playback-control state and decoder error subcode visibility if required to distinguish seek, pause, starvation and fatal decoder states.
 
 #### Files Modified:
 
