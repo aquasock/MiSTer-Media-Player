@@ -1,3 +1,33 @@
+## 79 COMMIT Unreleased 47630c7 2026-09-14T10:30:19-07:00
+
+#### Coming From:
+
+Unreleased ec56250
+
+#### Purpose:
+
+Qualify and package the manually loaded subtitle builds for hardware testing.
+
+#### Outcome:
+
+All ec56250 seeds compile and pass all four timing corners, 171 CDC registers and scene-enable checks. Seeds 52/61/87 have setup +0.116/+0.136/+0.338 ns, hold +0.115/+0.108/+0.110 ns and actual placed ALMs 37536/38678/38773. All use 527 M10Ks and 75 DSPs, adding seven RAM blocks and six DSPs and leaving 26 M10Ks free. Fitter confirms four subtitle-reader RAM blocks and two parser buffers, with the overlay hierarchy rising from 15 to 16. Estimated ALMs 33032/32933/32936 exceed baseline ffafc79 seed 87's 31987; seed 52's lower physical occupancy reflects packing rather than a functional logic reduction. Preferred seed 87 has the strongest setup margin; seed 52 is a passing lower-occupancy alternative. Hash-verified RBFs and testing notes are under results/hardware-test-ec56250, including Subtitle Test.srt. Preferred seed87/MediaPlayer_20260914.rbf SHA-256 is 765fc4eea7ec7e5a4d2701a3ac470d0f6e4dacadfaef4acd5f771b517bb59752. The audit tool now accepts a scope string instead of incorrectly describing subtitle builds as framework-only. No hardware deployment or acceptance occurred.
+
+#### Next Steps:
+
+Have the user test manual SRT selection, cue timing, pause and all seek sizes/directions, Off/On, file changes, controls hiding and subtitle placement at supported HDMI resolutions. Retain ffafc79 seed 87 as rollback; session resume and EOF policy remain separate release tasks.
+
+#### Files Modified:
+
+- docs/TEST_INSTRUCTIONS.md
+- tools/audit_three_seeds.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 78 COMMIT Unreleased ec56250 2026-09-14T09:56:47-07:00
 
 #### Coming From:
@@ -1294,35 +1324,6 @@ Keep new builds on hold until the user requests them. When a fixed RBF is availa
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 39 COMMIT Unreleased 6eb49e1 2026-09-14T01:07:15-07:00
-
-#### Coming From:
-
-Unreleased 6eb49e1
-
-#### Purpose:
-
-Record the first detailed hardware seek fault and the display-bank ownership mechanism consistent with it.
-
-#### Outcome:
-
-The user confirms 01 - Pee Strike.mpg is frozen after one seek. The checksum-valid screenshot under results/telemetry-20260914-010332 contains both legacy and persistent seek telemetry. The first observed error is 0x0004, specifically the prediction/reconstruction aggregate bit, with prediction source three and detail nine: the B-picture raster engine timeout. The syntax/publication-chain probe source and P probe source are zero. Entry errors were zero; capture occurred 67432806 decoder cycles, approximately 1.124 seconds, after seek entry, while seeking remained active with audio bypass enabled. Elapsed time was 18.5185 seconds and target 28.4517667 seconds. Video RAM held 1048576 unread words, compressed audio and PCM queues were empty, and audio/transport error flags were clear. Inspection found that forward seek resets the display framebuffer while preserving the DDR arbiter, whose last accepted display-bank ownership remains valid until reset or another display read. A focused simulation of the unchanged arbiter reproduces indefinite scratch-writer blocking after display reads stop and drain, and releases writes when another display bank is accepted. This is a concrete mechanism consistent with the B timeout, not yet an end-to-end reproduction of this hardware occurrence; the snapshot does not expose writer wait or retained reader-bank state and seed 52 is not timing qualified. The shared-DDR combined replay also completed its 2.2-to-12.2-second seek without errors, but lacks display-reader ownership, explaining why that comparison does not test this mechanism. The capture, focused harness, simulation log and diagnosis are preserved together. No runtime source change or additional build was started.
-
-#### Next Steps:
-
-Propose retiring display-bank protection during seek only after outstanding display reads have drained, preserving normal and paused-frame protection. Validate actual seek/display ownership transitions with a regression before any future build; respect the user's instruction not to start more builds.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
