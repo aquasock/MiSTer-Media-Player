@@ -1,3 +1,32 @@
+## 30 COMMIT Unreleased ??? 2026-09-13T17:56:12-07:00
+
+#### Coming From:
+
+Unreleased 17743f8
+
+#### Purpose:
+
+Reduce forward seek latency by retaining the current decoder session and validate repeated MPG seeks.
+
+#### Outcome:
+
+The user accepts play/pause, identifies the earlier duplicated display as a monitor problem, and confirms the long black-screen seek in fellow.mpg eventually resumed without reset. Captures at 17:52:14 and 17:52:31 are pure black; the 17:53:28 capture shows the movie again. This supports excessive reconstruction latency rather than a permanent hang in that trial; destination accuracy remains unmeasured. The user is stress testing and authorizes faster seeking for the next build. Implement forward reconstruction from the current decoder position, retain the safe restart for backward seeks, refresh destination handoff state on every seek, and test repeated forward and backward transitions with paused and playing audio/video. Review audio processing costs for a safe acceleration opportunity. Lack of telemetry during seeks is not proof of error-free operation because the current profiler is held reset there.
+
+#### Next Steps:
+
+Implement and verify the retained-session forward path with integrated stream backpressure, preserve paused state and EOF behavior, document remaining backward seek cost, then commit and build three seeds for hardware comparison.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 29 COMMIT Unreleased 17743f8 2026-09-13T17:24:06-07:00
 
 #### Coming From:
@@ -1338,31 +1367,3 @@ Sync to all three seed build directories, run the full three-seed timing build, 
 
 ---
 
-## 989 COMMIT Unreleased 2967e0b 2026-09-13T01:50:32-07:00
-
-#### Coming From:
-
-Unreleased 5764dd4
-
-#### Purpose:
-
-Exclude the two remaining sources still latching the transport gate's fatal-error kill switch after entry 988's partial fix.
-
-#### Outcome:
-
-Deployed entry 988's build (excluding only `mpeg2_new_b_presentation_error`) and asked the user to reload the file. Fresh telemetry confirmed `presentation_hold=False` throughout (entry 986's deadlock fix is genuinely working) but `presentation_error=True` with `error_flags=518` still latched, and a fresh Main log pull showed the same unthrottled full-speed drain pattern as before (`credit` pegged at max, ~2020 bytes consumed per poll, matching entry 987's `sent=887078912`-at-completion rate) with the screen staying black - the exact `fatal_error_latched` symptom, this time tripped by `phase1_probe_error`/`pred_error`, which entry 988 deliberately left in the fatal-error list pending evidence. Reading `rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv` found that evidence directly: two of `probe_error`'s five OR-terms, `publication_error` and `reference_progress_error`, are consistency checks against `reference_frame_bank`/`reference_frame_valid`/`reference_promotion_count` - the exact picture-bookkeeping state entry 986's scheduler abort resets in its own module without this separate bookkeeper module ever being told. `mpeg2_new_pred_error`'s source module (`mpeg2_h262_p_frame_predictor` wiring at `MediaPlayer.sv:1650-1697`) reads those same bookkeeper outputs (`reference_frame_valid`, `reference_frame_bank`, `destination_frame_bank`). Both are therefore the expected knock-on of the same recoverable abort, not independent faults. Source `2967e0b` removes both from `mpeg2_new_transport_fatal_error` in `MediaPlayer.sv`, leaving `mpeg2_new_syntax_error`, both `inverse_quant` flags, `idct`, `recon`, and both `ddr` flags untouched, since none of them read the reference-bank bookkeeping and each represents a genuinely distinct failure mode. `quartus_map` on seed99 is clean, 0 errors, 156 warnings, matching prior baselines.
-
-#### Next Steps:
-
-Sync to all three seed build directories, run the full three-seed timing build, deploy the best-passing seed, and ask the user to reload the file again. If it still does not play, pull fresh telemetry and check `error_flags` again - if all nine remaining sources are clear and `presentation_error` alone is the only bit set, the transport gate should no longer latch at all, and any remaining failure is a different, new symptom, not a continuation of this one. If some other error flag now appears instead, it should be treated as a distinct root cause, not assumed to be the same bookkeeping-desync issue.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
