@@ -1,4 +1,4 @@
-## 66 COMMIT Unreleased ??? 2026-09-14T07:38:35-07:00
+## 66 COMMIT Unreleased 9f16364 2026-09-14T07:38:35-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Qualify the completed overlay builds with an audit that recognizes fitted counte
 
 #### Outcome:
 
-All three b00920a seeds compile successfully, using 37450, 37424 and 37503 actual placed ALMs for seeds 52, 61 and 87, with 520 M10Ks and 69 DSPs. These meet the initial incremental resource budgets. The new scene-enable audit stops before all-corner reporting because its two-register wildcard also returns routing duplicates. A direct fitted-netlist query confirms the two original scene_phase bits and one duplicate of each, plus 1144 scoped formatter registers. Correct the audit to require both original bits, accept only explicitly named routing copies and report those separately; do not alter RTL, timing constraints or fitted binaries. Rerun qualification on the existing clean archives and record the audit-tool revision separately from the RBF source. Hardware acceptance remains pending.
+All three b00920a seeds compile successfully, using 37450, 37424 and 37503 actual placed ALMs for seeds 52, 61 and 87, with 520 M10Ks and 69 DSPs. These meet the initial incremental resource budgets. The new scene-enable audit stops before all-corner reporting because its two-register wildcard also returns routing duplicates. A direct fitted-netlist query confirms the two original scene_phase bits and one duplicate of each, plus 1144 scoped formatter registers. Audit revision 9f16364 requires both original bits, accepts only explicitly named routing copies and reports those separately. RTL, timing constraints and fitted binaries are unchanged. Qualification is rerunning on the existing archives; status.json records the original audit failure and the new audit-tool revision separately from the RBF source. Hardware acceptance remains pending.
 
 #### Next Steps:
 
@@ -19,8 +19,6 @@ Complete all-corner and CDC qualification, package the best passing seed and upd
 #### Files Modified:
 
 - tools/phase1p_timing.tcl
-- docs/TEST_INSTRUCTIONS.md
-- docs/UI_OVERLAY_PLAN.md
 
 #### Status:
 
