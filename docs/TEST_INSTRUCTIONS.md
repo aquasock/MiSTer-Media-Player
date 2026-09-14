@@ -27,7 +27,26 @@ reader-error cancellation, pause/seek and EOF controls. Both mixed and seek-EOF
 oracles check 423936 reconstruction pixels without mismatches. Audio compares
 48384 stereo pairs against FFmpeg within one PCM unit, retains exact pause/seek
 sequences, and checks 30 picture timestamps without underrun or timestamp warning.
-Hardware acceptance and fitted resource/timing results remain pending.
+Hardware acceptance remains pending. All three 7eb5088 builds completed;
+seeds 61 and 87 pass all four timing corners. All three pass the 183-stage CDC,
+formatter-enable, profiler/reporting-removal and Audio test absence/retained-PCM
+audits. No extra timing-fix builds were started.
+
+| Seed | Setup slack | Hold slack | Actual ALMs | Estimated ALMs | M10Ks |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 52 | -0.191 ns | +0.114 ns | 37,029 | 31,287 | 525 |
+| 61 (preferred) | +0.334 ns | +0.074 ns | 37,044 | 31,325 | 525 |
+| 87 | +0.083 ns | +0.115 ns | 36,916 | 31,285 | 525 |
+
+All use 75 DSPs and three PLLs. Seed 61 saves 282 actual ALMs, 495 estimated
+ALMs and two M10Ks versus accepted gate-two seed 87, leaving 4,866 ALMs and
+28 M10Ks free. Seed 52 is packaged with a timing-failure marker.
+
+Preferred RBF: `results/hardware-test-7eb5088/seed61/MediaPlayer_20260914.rbf`.
+SHA-256: `bbd4c36588e5db22343e5e688ef177ed1f54ce24cb4206b8d76332e1d74b84fc`.
+Evidence: `results/build-7eb5088-20260914-125028/corner-summary.json`.
+Retain accepted `results/hardware-test-100ab07/seed87/MediaPlayer_20260914.rbf`.
+
 
 # Diagnostic removal gate two
 
