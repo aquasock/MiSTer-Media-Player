@@ -1,3 +1,33 @@
+## 62 COMMIT Unreleased ea05269 2026-09-14T05:41:58-07:00
+
+#### Coming From:
+
+Unreleased 3ff27c8
+
+#### Purpose:
+
+Design one playback overlay for progress and timing fields with a shared rendering framework for future subtitles.
+
+#### Outcome:
+
+The user requested bundling wishlist items 1, 2 and 7 into one UI layer while explicitly excluding subtitle implementation from the first build. Historical af7f570 audio_ui.c and media_player_helper.c supply the reference: Elapsed left, Total center, Remaining right in HH:MM:SS at y422 above the x32/y438/656-by-14 bar, muted blue-gray track and pale fill/text from the final video-overlay palette. The old font lacks lowercase despite mixed-case labels, so the preview adds readable lowercase in the same pixel style. Design commit ea05269 adds docs/UI_OVERLAY_PLAN.md and an interactive local HTML preview covering aspect, output size, pause/seek, unknown duration and a future subtitle-region guide. Its JavaScript executes across three output sizes and three picture aspects with a mocked DOM/canvas; this is not browser pixel validation. The proposed compositor sits after HDMI scaling/filters/shadow mask and before the existing MiSTer menu, with small text/glyph storage, frame-atomic scene publication, independent controls/subtitle visibility and no decoder-bank ownership or playback backpressure. The user selected a bounded timestamp probe with unknown total/remaining when unavailable; byte-ratio duration estimation is excluded. The plan covers head/tail probes, reordered PTS, endpoint qualification, large-file offsets, response retirement and session invalidation. Initial implementation budgets are 2000 additional actual ALMs and 12 M10Ks, not measured costs. No RTL, duration probe, subtitle parser, HDMI mode change or RBF was implemented; hardware-accepted runtime baseline remains 3ff27c8 seed 52. This commit completes design artifacts only.
+
+#### Next Steps:
+
+Use the documented design as the implementation boundary for the shared overlay, progress/time fields and duration probe, retaining existing controls and standard HDMI timing/frequency requirements. Before compilation require renderer, asynchronous scene-publication, duration-probe/late-response and existing decoder/seek regressions, then the standard three-seed timing/resource audit. Subtitle loading, decoding and cue selection remain deferred. No builds are running.
+
+#### Files Modified:
+
+- docs/UI_OVERLAY_PLAN.md
+- docs/ui/overlay-preview.html
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 61 COMMIT Unreleased 3ff27c8 2026-09-14T05:13:13-07:00
 
 #### Coming From:
@@ -1262,35 +1292,6 @@ Have the user compare the same 25 fps clip at 50 and 59.94 Hz, then use the 29.9
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 22 COMMIT Unreleased 0b6eb0e 2026-09-13T16:01:34-07:00
-
-#### Coming From:
-
-Unreleased 0b6eb0e
-
-#### Purpose:
-
-Record user acceptance of the compact core and withdraw the reported hang as a core defect.
-
-#### Outcome:
-
-The user states that they caused the reported hang and instructs the agent to ignore it, then reports the new core works perfectly like the preceding core. This accepts ordinary hardware behavior of the delivered compact seed 87 by handoff context; no running hash was independently captured. The earlier freeze is no longer an open core defect. The user is still qualifying the visible refresh-rate benefit and requests more discriminating test media because the existing clips make the difference difficult to see.
-
-#### Next Steps:
-
-Retain compact source 0b6eb0e seed 87 as the hardware-accepted baseline and produce motion-focused media to compare 25 fps at 50/59.94 Hz.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
