@@ -1,3 +1,36 @@
+## 64 COMMIT Unreleased ??? 2026-09-14T06:34:44-07:00
+
+#### Coming From:
+
+Unreleased 5373dae
+
+#### Purpose:
+
+Tighten duration qualification and correct any measured implementation issues before delivering the shared overlay.
+
+#### Outcome:
+
+The first overlay implementation 5373dae passes its regression suite and all three seeds pass synthesis; placement and routing remain in progress. A follow-up code audit identifies two conservative duration checks to add: reject malformed timestamp evidence in the head window, and require the head and tail parsers to have selected the same video stream. These corrections remain within the approved timestamp-probe plan and must be included before hardware delivery. The initial batch remains useful for actual resource and timing measurements; no candidate has been deployed or accepted.
+
+#### Next Steps:
+
+Add adversarial head/tail qualification tests, apply the guards and address any new timing or budget failures revealed by the ongoing builds. Repeat affected regressions, commit the corrected source, and qualify clean seeds before packaging a candidate. Preserve the accepted 3ff27c8 seed 52 rollback and the initial batch evidence.
+
+#### Files Modified:
+
+- rtl/media_duration_probe.sv
+- rtl/media_duration_window.sv
+- rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
+- tools/test_media_duration_reader.sv
+- tools/audit_three_seeds.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 63 COMMIT Unreleased 5373dae 2026-09-14T06:07:40-07:00
 
 #### Coming From:
@@ -1287,35 +1320,6 @@ Latch the final rounded destination until the next session reset, repeat the foc
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 24 COMMIT Unreleased 6da4771 2026-09-13T16:23:17-07:00
-
-#### Coming From:
-
-Unreleased 6da4771
-
-#### Purpose:
-
-Record user acceptance of the refresh-rate comparison using the generated motion tests.
-
-#### Outcome:
-
-The user confirms the refresh switch is working and clearly observes smoother motion with the 29.97 fps test at 59.94 Hz. They cannot readily distinguish the two output settings with the 25 fps clip, so that visual comparison remains inconclusive rather than a failure. This accepts the observed refresh-dependent cadence benefit on the existing hardware-accepted compact core 0b6eb0e seed 87 by handoff context. No independent running-RBF hash, measured HDMI refresh, or specific raw-versus-program-stream test coverage was reported. The media generator passed its software checks; no new FPGA build was needed for this cycle.
-
-#### Next Steps:
-
-Retain the accepted compact core and manual refresh selection, with 59.94 Hz for 29.97 fps content and 50 Hz available for 25 fps content; no corrective implementation is indicated by this test.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [x] Passed
 
 ---
 
