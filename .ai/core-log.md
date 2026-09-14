@@ -1,4 +1,4 @@
-## 92 COMMIT Unreleased ??? 2026-09-14T13:22:12-07:00
+## 92 COMMIT Unreleased 54d64d2 2026-09-14T13:22:12-07:00
 
 #### Coming From:
 
@@ -10,15 +10,36 @@ Reduce duplicated IDCT hardware with measured shared transform service.
 
 #### Outcome:
 
-The user authorizes the deferred IDCT logic reduction while the isolated HIGH-packing build continues. The accepted intermediate-buffer M10K conversion is already present and its savings must not be counted again. Begin with simulation-only transaction overlap and service measurements, then implement block-granular shared transform ownership with bounded coefficient staging if supported by evidence. Preserve arithmetic, rounding, per-client sample ordering, functional errors and reset/seek cancellation. Verify one-outstanding-block assumptions and exact per-client samples against independent existing engines, including concurrent arrivals and resets; verify mixed decoding and actual-file seek recovery before a hardware candidate. Accepted 7eb5088 MEDIUM seed 61 remains the baseline. The packing experiment is isolated and must not be interrupted or overwrite accepted artifacts.
+The user authorizes the deferred shared-IDCT reduction while the isolated packing run continues. Source 54d64d2 routes intra/P/B clients to one unchanged arithmetic engine, preserving immediate uncontended strobes and using three M10K coefficient banks, sparse masks and round-robin service for contention. Per-client completion/error state and global reset cancellation preserve ownership. Production selects external service; standalone wrappers retain local engines for offline tests. Simulation-only traces measure 288 intra, 1053 P and 1418 B blocks with no overlap in the mixed sample and 5518 request/completion event cycles identical to dedicated engines. The shared-unit oracle passes 79008 exact samples, independent producers, single-cycle sparse blocks, 220 reset offsets and malformed input recovery. Arithmetic/storage equivalence passes 164020 cycles and 52128 samples. Three-client repeated seeks, paired EOF and 50 Hz cases each retain 423936 pixel comparisons and identical reconstruction/cycle accounting. Adding real intra demand exposed the old stubbed-intra fixed cycle budget in both baseline and shared EOF tests; the variant now requires paired baseline accounting instead. The 16 MiB Pee Strike prefix passes normal opening plus ten-second forward seek with shared DDR and intra demand, then confirms audio/video progress without underrun or timestamp warning at cycle 432419997. This harness models bounded ideal CDC and initialized I reference pixels, not a complete physical intra DDR path; independent transform oracles establish numerical equivalence. Expected savings are 16 DSPs and 13 M10Ks; actual ALM savings await fitting. Source is pushed and clean MEDIUM seeds 52/61/87 run under /tmp/shared-idct-build.log. Fitted checks require exactly one six-bit IDCT index, eight intermediate M10Ks and three staging M10Ks alongside all existing CDC/diagnostic-removal audits. Meanwhile 7eb5088 HIGH seed 61 completes in 767.7 seconds: 36245 actual ALMs, 31461 estimated ALMs, 44768 registers, 525 M10Ks, 75 DSPs, setup -0.021 ns and hold +0.114 ns. Its 799 placed-ALM saving comes with failed setup, so accepted MEDIUM 7eb5088 seed 61 remains baseline. The HIGH RBF is hash-verified and separately packaged under results/hardware-test-7eb5088-packing-high/seed61 with a timing-failure marker; no deployment or further HIGH run is performed.
 
 #### Next Steps:
 
-Measure client demand and ownership, select the supported sharing boundary, implement and run differential and playback regressions. Measure fitted area and timing only after correctness checks; obtain user input if evidence requires a material scope change. Keep all measurements simulation-only without restoring hardware telemetry.
+Audit the three 54d64d2 builds for shared-engine and memory inference, timing and resources using accepted MEDIUM 7eb5088 seed 61 baseline 37044 ALMs/525 M10Ks and all diagnostic-removal requirements. Package the best RBF for four-file hardware acceptance at both refresh settings, including pause/seek/reset/replacement, subtitles/filters and EOF. Keep accepted baseline and failed HIGH experiment distinct. No additional timing-fix batches without user direction.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_03.svh
+- docs/SHARED_IDCT.md
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_idct.sv
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
+- rtl/mpeg2_new/mpeg2_h262_shared_idct.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- tools/audit_three_seeds.py
+- tools/phase1p_timing.tcl
+- tools/replay_mpg_seek.py
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_mixed_raster_pixels.sv
+- tools/test_shared_idct.sv
+- tools/verify_decoder_timing.py
+- tools/verify_shared_idct.py
 
 #### Status:
 
