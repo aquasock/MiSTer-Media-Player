@@ -1,8 +1,12 @@
-# Seek display-bank ownership fix (source only)
+# Seek display-bank ownership fix
 
 The updated source releases the stopped display reader's bank protection during
-seeking after pending DDR reads drain. The seek diagnostic RBF from 6eb49e1 does
-not contain this fix. No new Quartus build has been started, as requested.
+seeking after pending DDR reads drain. Source **a229a01, seed 87** now passes
+all timing corners and the 147-register CDC audit, with worst setup +0.104 ns
+and hold +0.077 ns. Its local test RBF is:
+`results/hardware-test-a229a01/seed87/MediaPlayer_20260914.rbf`.
+Hardware acceptance remains pending. The earlier 6eb49e1 diagnostic RBF does
+not contain the bank-release fix.
 
 The regression now models periodic display reads that continue during pause
 and stop during seeking. With release disabled, reconstruction fails its
@@ -20,14 +24,14 @@ python3 tools/verify_decoder_timing.py --playback-controls --display-ownership -
 python3 tools/verify_decoder_timing.py --playback-controls --display-ownership --disable-display-release --output results/seek-old
 ```
 
-Once a fixed RBF is built, repeat the captured Pee Strike seek near 18.45 seconds,
+Repeat the captured Pee Strike seek near 18.45 seconds with the fixed RBF,
 then test repeated forward seeks from both moving and paused playback, backward
 seeks, resume, and seeking past EOF. Keep the file loaded if first-fault telemetry
 appears. The diagnostic audio bypass comparison remains available.
 
-# Seek freeze diagnostic candidate
+# Retained seek diagnostics and audio comparison
 
-This build adds observation and an audio-bypass comparison, not a claimed freeze fix.
+The fixed build retains the first-fault observer and audio-bypass comparison.
 Use the same file, refresh setting and seek key for both runs:
 
 1. Set **Seek audio bypass** to **On**, reload `01 - Pee Strike.mpg`, and
