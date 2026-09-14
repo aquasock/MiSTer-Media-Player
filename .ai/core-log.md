@@ -1,4 +1,33 @@
-## 28 COMMIT Unreleased ??? 2026-09-13T17:17:06-07:00
+## 29 COMMIT Unreleased 17743f8 2026-09-13T17:24:06-07:00
+
+#### Coming From:
+
+Unreleased 62f4741
+
+#### Purpose:
+
+Deliver timing-qualified keyboard pause and seek candidates from the completed three-seed build.
+
+#### Outcome:
+
+All three clean 17743f8 seeds compile and pass the expanded 135-register CDC audit. Seed 52 passes all timing categories at all four corners with minimum setup +0.065 ns, hold +0.116 ns, recovery +2.865 ns, removal +0.260 ns and pulse width +0.925 ns; it is the preferred candidate and uses 40233 ALMs, 54615 registers, 480 RAM blocks, 69 DSPs and three PLLs. Its RBF SHA-256 is be8e0a26c4b3df7d12eb35db4a83067457ae8111551ec9310201cc509fe07607. Seed 61 also passes, with setup +0.005 ns, hold +0.108 ns, recovery +2.611 ns, removal +0.217 ns and pulse width +0.925 ns, using 40530 ALMs and 54621 registers. Seed 87 uses 40413 ALMs and 54622 registers but fails setup at -0.481 ns from ASCAL vertical position to output VS; its other timing categories pass. Total compile plus timing durations are 1161, 1111 and 1169 seconds for seeds 52, 61 and 87. Relative to compact source 0b6eb0e, synthesis adds 906 combinational ALUTs and 534 registers with unchanged memory bits, DSPs and PLLs; larger fitted ALM differences include placement effects. Evidence is under results/build-17743f8-20260913-170250 and hash-verified RBFs plus explicit timing status and instructions are under results/hardware-test-17743f8. The extended EOF seek oracle lands on the last frame with zero pixel mismatches and explicitly completes its paused-display check. Seven-minute numbered raw/MPG clips are under results/playback-control-tests. No new core has been deployed or hardware accepted; 0b6eb0e seed 87 remains the accepted baseline.
+
+#### Next Steps:
+
+Have the user load the preferred seed 52 and verify Space pause/resume, all three Left/Right seek sizes, paused seeking, EOF clamps, repeated commands, OSD isolation, audio continuity and both output refresh rates using the documented vsync_adjust=1 override; record landing times and reconstruction latency.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
+## 28 COMMIT Unreleased 62f4741 2026-09-13T17:17:06-07:00
 
 #### Coming From:
 
@@ -10,11 +39,11 @@ Document the required HDMI refresh override and align setup guidance with curren
 
 #### Outcome:
 
-The user asks how vsync_adjust interacts with the new refresh menu and specifically what happens at zero. Official MiSTer video documentation confirms that mode one follows core refresh while zero uses the configured output timing, potentially adding cadence conversion. Keep [MediaPlayer] vsync_adjust=1 even if the global setting is zero. README still describes an older baseline, metadata-controlled aspect and no seeking; update those statements to the accepted compact baseline and the current hardware-pending keyboard controls. This is documentation only and does not change the 17743f8 builds.
+Committed and pushed 62f4741 documenting [MediaPlayer] vsync_adjust=1 even when the global setting is zero. Official MiSTer video documentation confirms mode one follows core refresh while zero uses configured output timing and can introduce repeat/drop cadence conversion. README now describes accepted compact baseline 0b6eb0e seed 87, fully manual aspect and refresh, color matrix selection, keyboard controls pending hardware validation and reconstruction-seek latency. The hardware instructions include the override and no longer claim pause/seek are unexposed. Whitespace review passes; documentation-only changes require no FPGA build and do not modify the running 17743f8 batch.
 
 #### Next Steps:
 
-Update README and hardware setup instructions with the per-core ini snippet, current manual aspect/refresh/color controls and clear seek latency/validation status, then finish the running builds.
+Use the documented per-core refresh override and finish the current build handoff for hardware playback-control testing.
 
 #### Files Modified:
 
@@ -1326,35 +1355,6 @@ Deployed entry 988's build (excluding only `mpeg2_new_b_presentation_error`) and
 #### Next Steps:
 
 Sync to all three seed build directories, run the full three-seed timing build, deploy the best-passing seed, and ask the user to reload the file again. If it still does not play, pull fresh telemetry and check `error_flags` again - if all nine remaining sources are clear and `presentation_error` alone is the only bit set, the transport gate should no longer latch at all, and any remaining failure is a different, new symptom, not a continuation of this one. If some other error flag now appears instead, it should be treated as a distinct root cause, not assumed to be the same bookkeeping-desync issue.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 988 COMMIT Unreleased 5764dd4 2026-09-13T01:22:47-07:00
-
-#### Coming From:
-
-Unreleased e6e5a4c
-
-#### Purpose:
-
-Stop entry 986's scheduler-abort fix from silently discarding the rest of the file's decode.
-
-#### Outcome:
-
-Hardware testing of entry 987's build confirmed the deadlock itself is fixed (`hold=False`, presentation duration ~2.5M cycles instead of ~1.79 billion) but the user reported the file still froze the same way; fresh telemetry showed `error=True` with three simultaneous bits (`b_presentation_error`, `pred_error`, `phase1_probe_error`), all LEDs steady off, and a full Main log pull showed the *entire* 887MB file had transferred (`finish reason=complete sent=887078912 polls=435207`) with nothing ever decoded afterward. Reading `rtl/mpeg2_new/mpeg2_h262_stream_transport_gate.sv` directly found the cause: its `fatal_error_latched` register is permanently sticky (only `reset_mpeg2` clears it), and once any of the OR-aggregated `mpeg2_new_transport_fatal_error` sources fires, the gate keeps draining `mpeg2_stream_fifo` unthrottled forever (`fifo_read` ungated) while permanently zeroing `decoder_valid` - exactly matching the observed symptom. `mpeg2_h262_b_presentation_scheduler`'s own header states its aborts are intentionally recoverable ("fails the transaction without retaining compressed-stream backpressure") and it already resets its own bookkeeping to clean idle on `presentation_error`; wiring that signal into a project-wide permanent kill switch contradicted the module's own documented design. Source `5764dd4` removes `mpeg2_new_b_presentation_error` from the `mpeg2_new_transport_fatal_error` OR-list in `MediaPlayer.sv`, leaving the other eight sources (syntax, phase1_probe, pred, inverse_quant x2, idct, recon, ddr_store, ddr_cache) untouched, since `phase1_probe_error` and `pred_error` also cover genuinely unsupported I/P syntax unrelated to B-scheduler aborts and were not removed without independent evidence they are similarly safe to exclude - even though both were also latched in the same telemetry snapshot and are suspected to be direct knock-on effects of the same aborted transaction rather than independent faults. `quartus_map` on seed99 is clean, 0 errors, 156 warnings, matching prior baselines.
-
-#### Next Steps:
-
-Sync this change to all three seed build directories and run the full three-seed `quartus_sh --flow compile` timing build, deploy the best-passing seed's RBF, and ask the user to reload the real `.mpg` via F4. If video still does not play, pull fresh `--json` telemetry immediately rather than assuming the same cause, and check whether `phase1_probe_error`/`pred_error` are independently still tripping the same sticky latch - if so they likely also need excluding from `mpeg2_new_transport_fatal_error`, or the scheduler's abort path needs to properly signal the phase1-probe/prediction-reader modules to stop too.
 
 #### Files Modified:
 
