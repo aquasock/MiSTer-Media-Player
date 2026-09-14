@@ -1,3 +1,36 @@
+## 55 COMMIT Unreleased ??? 2026-09-14T04:07:41-07:00
+
+#### Coming From:
+
+Unreleased bcddb20
+
+#### Purpose:
+
+Remove the diagnostic seek-audio menu switch while retaining normal compressed-audio bypass.
+
+#### Outcome:
+
+The user authorized removing the Seek audio bypass menu entry during a read-only historical RAM optimization audit. Remove the option and its one-bit CDC mailbox, connect MP2 seeking directly to media_seeking and remove the obsolete mailbox from the timing audit, reducing required synchronizer checks from 159 to 153. Preserve the existing bypass algorithm and full-frame synthesis preroll; saved status bit seven must no longer affect behavior. Separately, Git history confirms that progressive restoration 9233f07 lost the 047f5b2 parser row-buffer BRAM conversion and 6e44472 configuration-ROM BRAM enable. Current P and B row_bytes arrays are each 512 by 8 with combinational reads, and CONF_STR_BRAM defaults to zero. Historical entry 420 records 7082 fewer estimated ALMs and two additional RAM blocks for the row-buffer conversion, followed by hardware acceptance in entry 422; those historical savings are not a current-build prediction. Large residual plans and shared residual storage already use M10K. The attempted 19-to-20-bit coefficient padding in 5fb7d5d saved nothing because synthesis removed the unused bit and was reverted by 3e89189. No RAM conversion is authorized or implemented in this menu-removal boundary.
+
+#### Next Steps:
+
+Remove the diagnostic control, update documentation, verify the MP2 seek regression and reduced audit list, commit and push without launching builds. Recommend porting the historical row-buffer conversion with differential parser and current seeking tests, followed by the smaller configuration-ROM change, as the next resource-recovery work.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_av.svh
+- tools/phase1p_timing.tcl
+- CHANGELOG.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 54 COMMIT Unreleased bcddb20 2026-09-14T03:59:43-07:00
 
 #### Coming From:
@@ -1263,35 +1296,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 15 COMMIT Unreleased 24d3de0 2026-09-13T14:09:33-07:00
-
-#### Coming From:
-
-Unreleased 24d3de0
-
-#### Purpose:
-
-Record the completed color-matrix builds and timing-qualified hardware candidates.
-
-#### Outcome:
-
-All three clean 24d3de0 seeds compiled successfully and passed the fitted 96-register CDC audit. Seed 52 passes every timing class at all four operating corners with minimum setup +0.266 ns, hold +0.044 ns, recovery +2.335 ns, removal +0.141 ns and pulse width +0.925 ns; its SHA-256 is 256ff2b2eade4f525785364a38f989c91d32fc50178ed87d5d950d80d9c3815c. Seed 87 also passes, with setup +0.069 ns, hold +0.036 ns, recovery +3.543 ns, removal +0.188 ns and pulse width +0.925 ns; its SHA-256 is edd3f3ce51b2d4ecead3c668fd86188387806ad06ad670f82fbc9fb166c656e6. Seed 61 fails setup at -0.096 ns on the presentation-scheduler pending-bank path into the P parser; its other timing classes pass. The preferred candidate is seed 52, while the previously delivered seed 87 remains timing-qualified. RBFs, hashes and explicit timing status are under results/hardware-test-24d3de0/seed52, seed61 and seed87, with complete reports under results/build-24d3de0-20260913-134011. Synthesis adds 126 combinational ALUTs and 46 registers versus 62baf08, with unchanged block-memory bits and DSP count. Fitted seeds 52, 61 and 87 use 41274, 41004, 41011 ALMs respectively; every seed uses 480 RAM blocks and 69 DSP blocks. Total build/timing durations were approximately 1654, 1176 and 1347 seconds. Regression evidence and generated matching/untagged clips are retained; no matrix-enabled or new aspect hardware acceptance has been reported. Gamma and gamut conversion remain explicitly excluded.
-
-#### Next Steps:
-
-Test the preferred seed 52 with results/color-matrix-tests: Auto should match the tagged 601 and 709 clips, while the untagged 709 clip requires the manual BT.709 override. Verify frame-boundary color changes, subsequent file reload, uninterrupted OSD/filter controls and manual 4:3/16:9 aspect switching. Await hardware feedback before further implementation or release; do not treat seed 61 as timing-qualified.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
