@@ -1,10 +1,24 @@
-# Sparse-timestamp duration correction — revised build qualification pending
+# Sparse-timestamp duration correction — 3d48cc5 seed 87 ready
+
+Preferred RBF: `results/hardware-test-3d48cc5/seed87/MediaPlayer_20260914.rbf`.
+SHA-256: `d6f66b6870113e53e46f8d229b11c90b0d0f8870e5c6cb621cc99cf1991a80e7`.
+Seed 87 passes all four corners with minimum setup **+0.427 ns** and hold
+**+0.107 ns**, plus all 159 CDC registers and the scene-enable audit.
+Seed 61 also passes (+0.089 ns setup/hold); seed 52 fails setup (-0.381 ns).
+Use seed 87 for hardware validation; it has not been deployed or accepted yet.
+
+Seed 87 uses **37,715 actual ALMs**, **520/553 M10Ks**, 69 DSPs and 47,267
+registers, leaving **4,195 ALMs and 33 M10Ks**. Compared with tested b00920a
+seed 52, this adds 265 actual ALMs and no M10Ks or DSPs. Estimated ALMs are
+31,901, distinct from actual placed usage. The earlier b00920a overlay was
+accepted by the user; retain it as rollback. Conversion-induced stutter in
+Groove/fellow is separate; see [encoding cadence](ENCODING_CADENCE.md).
 
 Initial `9076405` builds compile but fail setup in scaler/decimal formatter
 paths. They are not recommended. The revision uses the existing sequential
 divider for decimal digits; pixels and time-field contents are unchanged.
 
-The next candidate resolves `Groove.mpg` using MPEG picture-order information
+This candidate resolves `Groove.mpg` using MPEG picture-order information
 between timestamp anchors. The exact file's bounded-window RTL replay now
 reports approximately **01:18:25** total, matching independently decoded video
 endpoint timing within one 90 kHz tick. Star Wars LOWER, Pee Strike and fellow
@@ -21,7 +35,8 @@ elapsed position behave correctly. Retain the tested b00920a seed 52 below.
 
 Preferred RBF: `results/hardware-test-b00920a/seed52/MediaPlayer_20260914.rbf`.
 SHA-256: `bf7e9aff272e5f819e16358dba90d2d05e18b9ca78436df6e3cd204e1d520973`.
-Hardware validation is pending; no deployment has been performed.
+The user accepted this overlay on hardware; sparse-timestamp duration recovery
+is supplied by the newer candidate above.
 
 All three seeds pass all four timing corners, 159 CDC registers and the real
 modulo-four scene-enable audit. Seed 52 has minimum setup +0.135 ns and hold
