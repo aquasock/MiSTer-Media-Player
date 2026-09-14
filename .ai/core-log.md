@@ -1,3 +1,33 @@
+## 90 COMMIT Unreleased ??? 2026-09-14T13:10:02-07:00
+
+#### Coming From:
+
+Unreleased a206435
+
+#### Purpose:
+
+Record gate-three hardware acceptance and the completed diagnostic-removal cycle.
+
+#### Outcome:
+
+The user reports all tests pass after the preferred 7eb5088 seed 61 handoff, completing the three-gate diagnostic-removal cycle including the compact black-clock progress bar and lowered subtitles. Seed 61 becomes the hardware-accepted baseline; its packaged RBF hash is verified and local build metadata records acceptance. Source 7eb5088 retains four-corner timing qualification, setup +0.334 ns, hold +0.074 ns, 37044 actual ALMs, 31325 estimated ALMs, 525 M10Ks and 75 DSPs, leaving 4866 ALMs and 28 M10Ks. Functional protection and playback remain; standalone diagnostic modules are retained only for offline simulation where applicable. Update test instructions and the removal plan to mark completion. No source logic changes, new builds, deployment or release are requested.
+
+#### Next Steps:
+
+Use 7eb5088 seed 61 as the accepted baseline for future authorized work and retain 100ab07 seed 87 as rollback; no further diagnostic-removal gate remains.
+
+#### Files Modified:
+
+- docs/DIAGNOSTIC_REMOVAL_PLAN.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 89 COMMIT Unreleased a206435 2026-09-14T13:07:28-07:00
 
 #### Coming From:
@@ -1386,35 +1416,6 @@ Have the user load seed 61 and test short and long direct seeks in both directio
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 50 COMMIT Unreleased bcddb20 2026-09-14T03:10:33-07:00
-
-#### Coming From:
-
-Unreleased bcddb20
-
-#### Purpose:
-
-Build the telemetry-reduced direct-seek core with three placement seeds.
-
-#### Outcome:
-
-The user authorized the next build batch. Local master and GitHub were verified synchronized, and clean exports of source bcddb20 started at 2026-09-14T03:10:01-07:00 with seeds 52, 61 and 87 and six workers each under results/build-bcddb20-20260914-031001. Only seed and worker settings differ from committed source. The per-batch result checker now requires 159 CDC registers and identifies bcddb20 as its source, with all four timing corners still mandatory. Compilation is running; no new RBF or measured resource savings are available yet. The MiSTer remains unchanged.
-
-#### Next Steps:
-
-Finish the authorized batch, inspect resource fit and all timing classes, and package the best completed RBF with source, seed, checksum and qualification status. Retain the prior a229a01 seed 87 rollback and let the user load and validate the selected new build.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
