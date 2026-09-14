@@ -1,4 +1,4 @@
-## 67 COMMIT Unreleased ??? 2026-09-14T07:41:06-07:00
+## 67 COMMIT Unreleased aa8d067 2026-09-14T07:41:06-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Document and package the timing-qualified shared-overlay hardware candidate.
 
 #### Outcome:
 
-Clean b00920a seeds 52, 61 and 87 all pass four-corner setup, hold, recovery, removal and pulse-width timing, 159 preserved CDC registers and the corrected scene-enable audit from 9f16364. Minimum setup is +0.135, +0.100 and +0.028 ns; minimum hold is +0.096, +0.069 and +0.111 ns. Actual placed ALMs are 37450, 37424 and 37503, with 520 M10Ks, 69 DSPs and three PLLs. All meet the initial incremental budget. Package seed 52 as preferred with exact hash and hardware tests; retain hardware-accepted 3ff27c8 seed 52 as rollback. No deployment or hardware acceptance occurred.
+Clean b00920a seeds 52, 61 and 87 all pass four-corner setup, hold, recovery, removal and pulse-width timing, 159 preserved CDC registers and the corrected scene-enable audit from 9f16364. Minimum setup is +0.135, +0.100 and +0.028 ns; minimum hold is +0.096, +0.069 and +0.111 ns. Actual placed ALMs are 37450, 37424 and 37503, with 520 M10Ks, 69 DSPs and three PLLs. All meet the initial incremental budget. Preferred seed 52 is packaged at results/hardware-test-b00920a/seed52/MediaPlayer_20260914.rbf with SHA-256 bf7e9aff272e5f819e16358dba90d2d05e18b9ca78436df6e3cd204e1d520973, per-seed build metadata, README and TESTING instructions. It leaves 4460 actual ALMs and 33 M10Ks free. Documentation distinguishes estimated logic from actual placement and audit-tool revision from unchanged binary source. Hardware-accepted 3ff27c8 seed 52 remains rollback. No deployment or hardware acceptance occurred.
 
 #### Next Steps:
 
-Complete the handoff documentation and have the user test duration, progress, pause/seek feedback and OSD/filter coexistence at the supported HDMI modes.
+Have the user test duration, progress, pause/seek feedback and OSD/filter coexistence at the supported HDMI modes.
 
 #### Files Modified:
 
