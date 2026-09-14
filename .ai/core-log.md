@@ -1,4 +1,4 @@
-## 44 COMMIT Unreleased ??? 2026-09-14T01:57:50-07:00
+## 44 COMMIT Unreleased 2fac1cb 2026-09-14T01:57:50-07:00
 
 #### Coming From:
 
@@ -10,15 +10,45 @@ Implement direct timestamp-guided file seeking in both directions for the next b
 
 #### Outcome:
 
-The user reports no freeze so far with fixed seed 87 and authorizes approximate GOP landing. The revised user-approved plan supersedes the playback-only index proposal: probe arbitrary file positions without decoding audio or video, locate a Program Stream pack and sequence header with a timestamped I-picture, and refine the byte bounds toward the requested time. Forward and backward MPG seeks will share this bounded search and restart path, including previously unseen content. The existing offset reader and DDR-drain handshake will be reused, with configuration acknowledged before restarting clients, original movie timestamp origin retained, and video before the chosen sequence header discarded. Unsupported elementary streams and unusable timestamps retain reconstruction fallback. No custom Main or offline index is required.
+The user-approved revised plan is implemented in 2fac1cb and pushed. Both MPG directions now search byte positions without codec reconstruction, locate timestamped sequence-header/I-picture restart points, and decode a short lead-in. Searches use at most 18 probes with a 4 MiB reader-progress cap per probe; no usable timestamp or raw M2V falls back to byte-zero reconstruction. The reader offset and DDR-drain handshake are retained, with tagged configuration acknowledged before reset release, stale probe replies excluded, and movie timestamp origin preserved. Direct startup discards leading open-GOP B-pictures requiring an unavailable reference and validates two consecutive MP2 headers to recover from partial audio frames. Tests pass for VBR search, offsets over 4 GiB, PTS wrap, EOF fallback, new-file invalidation, asynchronous repeated forward/backward paused seeks, metadata byte filtering and exact PCM recovery after malformed/partial prefixes. Actual Pee Strike prefix probes find 5-, 10- and 20-second destinations in three to five probes. Combined shared-DDR/display-ownership reconstruction resumes at 10.01 seconds with audio bypass enabled; the 20.02-second bypass-disabled run is being repeated with final two-header audio validation. The normal opening playback regression is also finishing. Evidence is under results/direct-seek. User reports no freeze so far with prior bank-release seed 87; new source hardware acceptance and timing/resource qualification remain pending.
 
 #### Next Steps:
 
-Implement and test bidirectional probing, bounded search and EOF fallback, nonzero reader restart, timestamp continuity, paused and repeated seeking, new-file invalidation and actual MPG reconstruction. Commit validated source and build the next hardware candidate; report timing, resources and limitations before hardware acceptance.
+Finish the running A/V regressions and compile the next source candidate using the standard three seeds. Audit timing and 165 CDC registers, package the best RBF, and let the user test short and long jumps in both directions, paused destinations, EOF and audio alignment. Do not deploy automatically or start further placement batches without a new request.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer_av.svh
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_07.svh
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/audio/mp2_decoder.sv
+- rtl/media_keyboard_control.sv
+- rtl/media_playback_control.sv
+- rtl/media_seek_point.sv
+- rtl/media_seek_search.sv
+- rtl/media_seek_video_filter.sv
+- rtl/media_session_control.sv
+- rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
+- rtl/mpeg2_new/mpeg2_program_stream_ingress.sv
+- tools/phase1p_timing.tcl
+- tools/replay_mpg_seek.py
+- tools/streams/mpg_replay_control.svh
+- tools/streams/mpg_replay_ingress.svh
+- tools/test_direct_seek_restart.sv
+- tools/test_media_playback_control.sv
+- tools/test_media_seek_probe.sv
+- tools/test_media_seek_search.sv
+- tools/test_media_seek_video_filter.sv
+- tools/test_mp2_decoder.sv
+- tools/test_mpg_audio_ingress.sv
+- tools/test_mpg_audio_playback.sv
+- tools/verify_direct_seek.py
+- tools/verify_mp2_seek.py
 
 #### Status:
 
