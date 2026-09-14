@@ -1,10 +1,17 @@
-# Next build: lower progress strip and clocks without labels
+# Timing-qualified ffafc79 seed 87: lower progress strip and clocks without labels
 
 The three clocks retain their elapsed / total / remaining order, left to right,
 but display only times or unknown dashes. The clocks and bar move down one
 outer bar height (14 pixels at 480p, 21 at 720p, approximately 32 at 1080p).
 Check centering, the bottom margin and unknown times at all three resolutions,
-plus pause, seeking and automatic hiding. Timing qualification is pending.
+plus pause, seeking and automatic hiding. All three seeds pass all four timing
+corners, 159 CDC registers and the scene-enable audit. Preferred seed 87 has
+setup +0.371 ns and hold +0.110 ns; seeds 52/61 have setup +0.196/+0.224 ns
+and hold +0.097/+0.103 ns. Seed 87 uses 37,713 actual ALMs, 520 M10Ks and
+69 DSPs, leaving 4,197 ALMs and 33 M10Ks. Hardware acceptance is pending.
+
+RBF: `results/hardware-test-ffafc79/seed87/MediaPlayer_20260914.rbf`.
+SHA-256: `3d229f28cb7e12b0cde1f2da716754f6c307a80f94678e5668303f9896c93f0d`.
 
 # Sparse-timestamp duration correction — 3d48cc5 seed 87 ready
 
