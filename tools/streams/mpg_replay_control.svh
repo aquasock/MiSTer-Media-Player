@@ -6,7 +6,8 @@
         wire [32:0] seek_elapsed;
         integer at_q=792792,delay_cycles=0;
         integer landed_swaps=0,landed_audio=0;
-        media_playback_control control(
+        media_playback_control #(.ENABLE_MOVIE_ORIGIN(1)) control(
+            .movie_origin_valid(replay_start_offset!=0),.movie_origin({1'b0,replay_movie_origin[31:0]}),
             .clk(clk),.reset(reset),.paused(1'b0),.seek_active(seeking),
             .seek_target_q(target),.frame_rate_code(4'd4),
             .swap_reset_count(framebuffer_swap_reset_count),
@@ -23,7 +24,12 @@
             if($value$plusargs("AT_Q=%d",at_q)) begin end
             if($value$plusargs("SEEK_DELAY=%d",delay_cycles)) begin end
             wait(!reset);
-            if(!$test$plusargs("NO_SKIP")) begin
+            if(replay_start_offset!=0) begin
+                @(negedge clk);target=at_q;seeking=1;
+                $display("DIRECT SEEK BEGIN pack=%0d sequence=%0d target_q=%0d",replay_start_offset,replay_video_start,target);
+                wait(done);@(negedge clk);seeking=0;
+                $display("DIRECT SEEK END cycle=%0d elapsed_q=%0d",total_cycles,elapsed);
+            end else if(!$test$plusargs("NO_SKIP")) begin
                 wait(elapsed>=at_q);repeat(delay_cycles) @(negedge clk);
                 @(negedge clk);target=elapsed+3600000;seeking=1;
                 $display("SEEK BEGIN cycle=%0d elapsed_q=%0d target_q=%0d byte=%0d",total_cycles,elapsed,target,stream_index);

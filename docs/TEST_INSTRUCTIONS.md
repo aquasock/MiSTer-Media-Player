@@ -1,3 +1,29 @@
+# Direct file seeking candidate
+
+The next build adds timestamp-guided byte-position probing for both directions,
+including unseen forward destinations. It retains the a229a01 bank-release fix.
+The older RBF documented below does not contain this direct-seek path.
+
+```sh
+python3 tools/verify_direct_seek.py --output results/direct-seek-check --input path/to/bounded-prefix.mpg
+python3 tools/verify_mp2_seek.py results/mp2-seek-history.json
+```
+
+The search uses at most 18 probes, each capped at 4 MiB of reader progress,
+and prefers a timestamped I-picture within two seconds before the target.
+These are implementation bounds, not MPEG requirements. If no usable point
+is found, it reconstructs from the beginning. Original movie PTS origin is
+retained across seeks. Raw M2V uses reconstruction fallback in both directions.
+The first-fault stall observer monitors decoder reconstruction, excluding the
+header-only probe phase.
+
+Test 10-second, 30-second and five-minute jumps both ways in Pee Strike and
+fellow.mpg, including a first-time jump far ahead and a backward jump late in
+the movie. Allow approximate GOP landing initially. Repeat while paused, resume,
+open the OSD during a search, and check audio synchronization. Test near zero,
+past EOF, and after selecting a different file. Compare audio-bypass On and Off.
+Leave a failed state loaded for telemetry; report the file and key combination.
+
 # Seek display-bank ownership fix
 
 The updated source releases the stopped display reader's bank protection during
@@ -39,7 +65,7 @@ Use the same file, refresh setting and seek key for both runs:
 2. If it freezes, leave the file loaded for a screenshot. A new black/white
    diagnostic block at x192/y280 records the first observed fault after a seek.
 3. Set **Seek audio bypass** to **Off**, reload the same file and repeat.
-   This disables only compressed MP2 frame bypass; forward decoder retention,
+   This disables only compressed MP2 frame bypass; file-position searching,
    PCM draining, target calculation and video reconstruction remain enabled.
    Set the option before reloading and do not change it during a seek.
 
@@ -115,26 +141,23 @@ Pause should freeze the displayed movie frame and silence movie audio, while
 the raster and OSD keep running. Resume should continue the retained samples
 and frames without a catch-up burst. Leave Audio test Off during movie checks.
 
-Forward seeking retains the decoder session and reconstructs only the skipped
-interval. Backward seeking flushes the session and reconstructs from the
-beginning. Both resume at the first frame at or after the requested time. PTS supply
-displayed-media time when available; unannotated pictures use the supported
-source frame rate, independent of the selected output refresh. The seek target
-is based on the displayed frame, not file-read position. Backward jumps clamp
-at zero; forward jumps beyond EOF finish on the last frame. Seeking while
-paused leaves the destination paused. Scanout is blank during reconstruction
-and the OSD remains usable. Audio frames ending at least 24 ms before the
-destination bypass synthesis; at least one complete decoded audio frame
-restores filter history before output resumes. Backward seeks and large forward
-jumps can still take substantial time; there is no random-access index. Compare
-a 10-second forward jump near the beginning and late in the same movie: its
-reconstruction work should depend on the interval, not the absolute position.
+MPG seeks in both directions search the file for timestamped sequence headers
+and I-pictures, then reconstruct from a nearby restart point. This includes
+unseen forward destinations. Files without usable timestamps use the byte-zero
+reconstruction fallback. The target uses displayed movie time rather than the
+reader's buffered position, and the original movie timestamp origin survives
+restarts. Backward jumps clamp at zero; forward jumps beyond EOF finish on the
+last available frame. Seeking while paused leaves the destination paused.
+The screen is blank during seeking and the OSD remains usable. MP2 startup
+finds a complete audio header after a partial frame; early frames bypass
+synthesis, with decoded preroll restoring history before output resumes.
+Leading B-pictures requiring a reference from before the restart are discarded.
 
 1. Play both a numbered M2V and an MPG with audible audio. Pause for 10 seconds,
    open/close the OSD and adjust filters, then resume. Check frame retention,
    silence, sample continuity and A/V alignment. Repeat several times.
 2. With a burned-in time/frame counter, compare the shown time before and after
-   all three jump sizes in both directions. Allow one source frame of rounding.
+   all three jump sizes in both directions. Allow approximate GOP landing in this initial direct-seek build.
    Use a file longer than six minutes for the five-minute forward jump.
 3. Repeat while paused. Verify the requested destination appears and stays still
    until Space resumes. During a seek, toggle Space and check the resulting state.

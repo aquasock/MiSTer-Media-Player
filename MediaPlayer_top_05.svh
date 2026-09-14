@@ -133,8 +133,9 @@ wire media_seek_drained=mpeg2_new_sequence_end_seen &&
  !mpeg2_new_b_scheduler_debug_state[26] &&
  !mpeg2_new_b_scheduler_debug_state[0] &&
  !mpeg2_new_b_presentation_hold && !mpeg2_new_p_destination_ownership_hold;
-media_playback_control media_playback_control(
+media_playback_control #(.ENABLE_MOVIE_ORIGIN(1)) media_playback_control(
  .clk(clk_mpeg2),.reset(reset_mpeg2),.paused(media_paused),.seek_active(media_seeking),
+ .movie_origin_valid(media_movie_origin_valid),.movie_origin(media_movie_origin),
  .seek_target_q(media_target_q),.frame_rate_code(mpeg2_new_frame_rate_code),
  .swap_reset_count(mpeg2_new_framebuffer_swap_reset_count),
  .first_picture_complete(mpeg2_new_picture_420_complete),

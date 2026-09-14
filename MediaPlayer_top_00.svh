@@ -132,14 +132,49 @@ wire [36:0] media_control_mpeg;
 wire media_paused=media_control_mpeg[36];
 wire media_seeking=media_control_mpeg[35];
 wire [34:0] media_target_q=media_control_mpeg[34:0];
-wire media_restart=media_new_file||media_seek_restart;
+wire media_search_restart,media_search_busy,media_probe_sys;
+wire [40:0] media_start_offset,media_video_start;
+wire [7:0] media_search_tag,media_search_echo;
+wire [90:0] media_seek_config_mpeg;
+wire [7:0] media_search_tag_mpeg=media_seek_config_mpeg[90:83];
+wire media_probe_mpeg=media_seek_config_mpeg[82];
+wire [40:0] media_start_offset_mpeg=media_seek_config_mpeg[81:41];
+wire [40:0] media_video_start_mpeg=media_seek_config_mpeg[40:0];
+wire media_movie_origin_valid;
+wire [32:0] media_movie_origin;
+wire media_point_found;
+wire [32:0] media_point_pts;
+wire [40:0] media_point_pack,media_point_sequence;
+wire [159:0] media_probe_response_sys;
+wire media_restart=media_new_file||media_search_restart;
+video_config_cdc #(.WIDTH(91)) seek_file_config(
+ .src_clk(clk_sys),.dst_clk(clk_mpeg2),
+ .src_data({media_search_tag,media_probe_sys,media_start_offset,media_video_start}),
+ .dst_data(media_seek_config_mpeg));
+video_config_cdc #(.WIDTH(8)) seek_file_echo_config(
+ .src_clk(clk_mpeg2),.dst_clk(clk_sys),.src_data(media_search_tag_mpeg),.dst_data(media_search_echo));
+video_config_cdc #(.WIDTH(160)) seek_probe_config(
+ .src_clk(clk_mpeg2),.dst_clk(clk_sys),
+ .src_data({media_search_tag_mpeg,av_is_ps,media_movie_origin_valid,media_movie_origin,
+            media_point_found,av_raw_end,media_point_pts,media_point_pack,media_point_sequence}),
+ .dst_data(media_probe_response_sys));
+media_seek_search media_seek_search(
+ .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.request(media_seek_restart),
+ .program_stream(media_probe_response_sys[151]),.origin_valid(media_probe_response_sys[150]),
+ .origin(media_probe_response_sys[149:117]),.target_q(media_target_sys),.file_size(media_file_size),
+ .reader_start(media_reader_start),.reader_position(media_byte_position),
+ .response_tag(media_probe_response_sys[159:152]),.point_found(media_probe_response_sys[116]),
+ .probe_end(media_probe_response_sys[115]),.point_pts(media_probe_response_sys[114:82]),
+ .point_pack(media_probe_response_sys[81:41]),.point_sequence(media_probe_response_sys[40:0]),
+ .busy(media_search_busy),.probing(media_probe_sys),.restart(media_search_restart),
+ .tag(media_search_tag),.start_offset(media_start_offset),.video_start(media_video_start));
 (* preserve, altera_attribute="-name AUTO_SHIFT_REGISTER_RECOGNITION OFF; -name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] media_osd_sync=0;
 always @(posedge clk_sys) media_osd_sync<={media_osd_sync[1:0],OSD_STATUS};
-media_keyboard_control media_keyboard_control(
+media_keyboard_control #(.RESTART_BOTH_DIRECTIONS(1)) media_keyboard_control(
  .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.enabled(media_file_size!=0),
  .osd_open(media_osd_sync[2]),.key(ps2_key),.elapsed_q(media_elapsed_sys),
- .seek_done(media_seek_done_sys),.restart_complete(media_reader_start),
+ .seek_done(media_seek_done_sys && !media_search_busy),.restart_complete(media_reader_start && !media_probe_sys),
  .paused(media_paused_sys),.seek_active(media_seek_sys),
  .seek_target_q(media_target_sys),.restart(media_seek_restart));
 video_config_cdc #(.WIDTH(37)) playback_control_config(
@@ -153,9 +188,10 @@ always @(posedge clk_sys) begin
     if(RESET) media_file_size<=0;
     else if(media_img_mounted[0]) media_file_size<=media_img_size;
 end
-media_session_control media_session_control (
+media_session_control #(.ENABLE_START_READY(1)) media_session_control (
  .clk_sys(clk_sys),.clk_mpeg2(clk_mpeg2),.reset(RESET),.restart(media_restart),
  .reader_idle(media_reader_idle),.ddr_idle(media_ddr_idle),
+ .start_ready(media_search_echo==media_search_tag),
  .reader_cancel(media_reader_cancel),.fifo_reset(media_fifo_reset),
  .reader_start(media_reader_start),.quiesce(media_quiesce),
  .decoder_reset(media_decoder_reset),.generation(media_generation)
@@ -163,7 +199,7 @@ media_session_control media_session_control (
 media_file_reader media_file_reader (
  .clk(clk_sys),.reset(RESET),.start(media_reader_start && media_file_size!=0),
  .cancel(media_reader_cancel || media_fatal_sys),.suspend(1'b0),
- .file_size(media_file_size),.start_offset(64'd0),
+ .file_size(media_file_size),.start_offset({23'd0,media_start_offset}),
  .sd_lba(media_sd_lba[0]),.sd_blk_cnt(media_sd_blocks[0]),.sd_rd(media_sd_rd[0]),
  .sd_ack(media_sd_ack[0]),.sd_buff_wr(media_sd_wr),
  .sd_buff_addr(media_sd_addr),.sd_buff_dout(media_sd_data),
@@ -606,17 +642,53 @@ mpeg2_h262_stream_transport_gate mpeg2_h262_stream_transport_gate
 wire [7:0] av_video_byte, av_audio_byte;
 wire av_video_valid,av_video_ready,av_ingress_end,av_is_ps;
 wire [32:0] av_video_pts,av_audio_pts;
+wire [7:0] av_raw_video,av_raw_audio;
+wire av_raw_valid,av_raw_pts_valid,av_raw_audio_valid,av_raw_end,av_raw_error;
+wire [32:0] av_raw_pts;
+wire [40:0] av_file_position,av_pack_position;
+wire av_discard_video=media_probe_mpeg || av_file_position<media_video_start_mpeg;
+wire av_filter_ready;
+wire av_raw_ready=av_discard_video || av_filter_ready;
+reg av_gate_pts_valid=0;
+reg [32:0] av_gate_pts=0;
+always @(posedge clk_mpeg2) begin
+ if(reset_mpeg2) av_gate_pts_valid<=0;
+ else if(av_raw_valid && av_raw_ready) begin
+  if(!av_discard_video) av_gate_pts_valid<=0;
+  else if(av_raw_pts_valid) begin av_gate_pts_valid<=1;av_gate_pts<=av_raw_pts;end
+ end
+end
+media_seek_video_filter media_seek_video_filter(
+ .clk(clk_mpeg2),.reset(reset_mpeg2),.resync_start(media_video_start_mpeg!=0),
+ .input_data({(av_raw_pts_valid || av_gate_pts_valid),
+              (av_raw_pts_valid ? av_raw_pts : av_gate_pts),av_raw_video}),
+ .input_valid(av_raw_valid && !av_discard_video),.input_end(av_raw_end && !media_probe_mpeg),
+ .input_ready(av_filter_ready),.output_data({av_video_pts_valid,av_video_pts,av_video_byte}),
+ .output_valid(av_video_valid),.output_end(av_ingress_end),.output_ready(av_video_ready));
+assign av_audio_byte=av_raw_audio;
+assign av_audio_valid=av_raw_audio_valid && !media_probe_mpeg;
+assign mpeg2_demux_error=av_raw_error && !media_probe_mpeg;
+media_seek_point media_seek_point(
+ .clk(clk_mpeg2),.clear(reset_mpeg2_base || media_new_file_mpeg),.reset(reset_mpeg2),
+ .data(av_raw_video),.valid(av_is_ps && av_raw_valid && av_raw_ready),
+ .pts_valid(av_raw_pts_valid),.pts(av_raw_pts),
+ .file_position(av_file_position),.pack_position(av_pack_position),
+ .origin_valid(media_movie_origin_valid),.origin(media_movie_origin),
+ .found(media_point_found),.point_pts(media_point_pts),
+ .point_pack(media_point_pack),.point_sequence(media_point_sequence));
 wire av_video_pts_valid,av_audio_pts_valid,av_audio_valid,av_audio_ready;
-mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1),.APPEND_RAW_END(1)) mpeg2_program_stream_ingress (
+mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1),.APPEND_RAW_END(1),.ENABLE_FILE_POSITION(1)) mpeg2_program_stream_ingress (
     .clk(clk_mpeg2), .reset(reset_mpeg2),
     .input_data(mpeg2_fifo_data), .input_valid(mpeg2_new_system_input_valid),
     .input_ready(mpeg2_new_system_input_ready), .input_end(mpeg2_new_system_input_end),
-    .output_data(av_video_byte), .output_valid(av_video_valid),
-    .output_ready(av_video_ready), .output_end(av_ingress_end),
-    .video_pts(av_video_pts),.video_pts_valid(av_video_pts_valid),
-    .audio_data(av_audio_byte),.audio_valid(av_audio_valid),.audio_ready(av_audio_ready),
+    .force_program_stream(media_start_offset_mpeg!=0),.start_file_position(media_start_offset_mpeg),
+    .video_file_position(av_file_position),.video_pack_position(av_pack_position),
+    .output_data(av_raw_video), .output_valid(av_raw_valid),
+    .output_ready(av_raw_ready), .output_end(av_raw_end),
+    .video_pts(av_raw_pts),.video_pts_valid(av_raw_pts_valid),
+    .audio_data(av_raw_audio),.audio_valid(av_raw_audio_valid),.audio_ready(media_probe_mpeg || av_audio_ready),
     .audio_pts(av_audio_pts),.audio_pts_valid(av_audio_pts_valid),.is_program_stream(av_is_ps),
-    .demux_error(mpeg2_demux_error)
+    .demux_error(av_raw_error)
 );
 
 `include "MediaPlayer_av.svh"

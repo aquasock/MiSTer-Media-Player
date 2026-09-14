@@ -30,6 +30,18 @@ with tempfile.TemporaryDirectory(prefix='mp2-seek-') as directory:
         baseline = d/(name+'-baseline.txt')
         run(d/'obj/Vtest_mp2_decoder', '+input='+str(src), '+output='+str(baseline))
         full = np.loadtxt(baseline).reshape(2, -1, 2)
+        # Direct seek can start inside the preceding compressed audio frame.
+        # Invalid sync-like prefixes must not become a decoder failure.
+        for prefix in (b'\x12', b'\x00\xff\xfb\x00\x00\xff\xfd\x00\x00' + b'\x55'*573, data[:4]+b'\x55'*1600):
+            partial = d/(name+'-partial.mp2')
+            partial.write_bytes(prefix+data)
+            out = d/(name+'-resync.txt')
+            log = run(d/'obj/Vtest_mp2_decoder', '+input='+str(partial),
+                '+output='+str(out), '+start_sync=1')
+            actual = np.loadtxt(out).reshape(2, -1, 2)
+            assert np.array_equal(actual, full)
+            report.append(dict(fixture=name, discarded_prefix_bytes=len(prefix),
+                resynchronized_pcm_exact=True, sessions=2))
         for origin in ('15f90', '1ffffd000'):
             out = d/(name+'-'+origin+'.txt')
             log = run(d/'obj/Vtest_mp2_decoder', '+input='+str(src),

@@ -56,13 +56,15 @@ the displayed frame and queued samples while silencing movie audio. Seeking
 while paused leaves the destination paused. Additional seek commands are
 ignored while a seek is in progress; Space still controls the final pause state.
 
-Forward seeking continues from the current decoder position, reconstructing
-only the skipped interval. Backward seeking restarts from the beginning to
-restore reference frames safely. Audio frames well before the destination
-are bypassed, with decoded preroll to restore audio filter history. The screen
-is blank during reconstruction and the OSD remains usable. **Backward seeks
-and large forward jumps can still take substantial time**; there is no random-access
-index yet. Jumps clamp at the start/end of media.
+MPG seeks in either direction probe file positions for timestamped sequence
+headers and I-pictures, then restart nearby and decode the short lead-in.
+This works for previously unseen content without decoding the whole skipped
+interval. Partial audio frames are resynchronized, and leading B-pictures
+that need an unavailable reference are discarded during startup. The screen
+is blank during seeking and the OSD remains usable. Jumps clamp at the start/end
+of media. Files without usable restart timestamps, including raw M2V, use the
+slower reconstruction fallback. Sparse headers or unusual timestamps can also
+make a seek slower; initial GOP landing may be approximate.
 See the [hardware test procedure](docs/TEST_INSTRUCTIONS.md) for validation.
 
 ## Decoder and output scope

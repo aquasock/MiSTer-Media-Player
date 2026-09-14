@@ -1,14 +1,15 @@
 // Four-phase restart handshake. Stop DDR grants, drain accepted responses,
 // then reset clients. FIFO reset precedes start; source waits for decoder reset
 // acknowledgement AND host response retirement. Raster clocks never stop.
-module media_session_control(
+module media_session_control #(parameter ENABLE_START_READY=0)(
     input wire clk_sys,clk_mpeg2,reset,restart,
     input wire reader_idle,ddr_idle,
     output wire reader_cancel,fifo_reset,
     output reg reader_start=0,
     output wire quiesce,
     output reg decoder_reset=1,
-    output reg [31:0] generation=0
+    output reg [31:0] generation=0,
+    input wire start_ready
 );
 localparam WAIT_RESET=0,WAIT_RELEASE=1,SETTLE=2,RUN=3;
 reg [1:0] state=WAIT_RESET;
@@ -34,7 +35,7 @@ always @(posedge clk_sys) begin
         if(reset) begin generation<=0;ack_sync<=3'b111;end
         else generation<=generation+1'b1;
     end else case(state)
-    WAIT_RESET: if(ack_sync[2] && reader_idle) begin
+    WAIT_RESET: if(ack_sync[2] && reader_idle && (!ENABLE_START_READY || start_ready)) begin
         if(delay_count==15) begin request<=0;flush<=0;state<=WAIT_RELEASE;delay_count<=0;end
         else delay_count<=delay_count+1'b1;
     end else delay_count<=0;

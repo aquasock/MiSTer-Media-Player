@@ -72,6 +72,9 @@ def main():
     ap.add_argument('--display-ownership',action='store_true')
     ap.add_argument('--disable-display-release',action='store_true')
     ap.add_argument('--at-q',type=int,default=792792)
+    ap.add_argument('--start-offset',type=int,default=0)
+    ap.add_argument('--video-start',type=int,default=0)
+    ap.add_argument('--movie-origin',type=int,default=0)
     ap.add_argument('--seek-delay',type=int,default=0)
     ap.add_argument('--host-stall',type=int,default=40000)
     ap.add_argument('--no-audio-bypass',action='store_true')
@@ -80,7 +83,7 @@ def main():
     bench=generate(dest,args.shared_ddr);binary=dest/'obj/Vtb_h262_live_raster_soak'
     rtl=re.findall(r'SYSTEMVERILOG_FILE (rtl/mpeg2_new/\S+)',(ROOT/'files.qip').read_text())
     rtl += ['rtl/audio/'+x+'.sv' for x in ('mp2_decoder','mp2_synthesis','mp2_pcm_output','av_stream_fifo')]
-    rtl += ['rtl/media_playback_control.sv','rtl/media_file_reader.sv','rtl/video_config_cdc.sv']
+    rtl += ['rtl/media_seek_video_filter.sv','rtl/media_playback_control.sv','rtl/media_file_reader.sv','rtl/video_config_cdc.sv']
     fingerprint=hashlib.sha256(str((args.display_ownership,args.disable_display_release)).encode()+bench.read_bytes()+b''.join((ROOT/p).read_bytes() for p in rtl)).hexdigest()
     manifest=dest/'obj/replay-build.json'
     if args.reuse:
@@ -100,10 +103,15 @@ def main():
     data=args.input.read_bytes()
     if not 0<len(data)<=16777216:raise ValueError('supply a bounded MPG prefix of at most 16 MiB')
     hexpath=dest/'source.hex'
-    with hexpath.open('w') as f:
-        for b in data:f.write(f'{b:02x}\n')
-    label=f"{'shared-' if args.shared_ddr else ''}seek-{args.at_q}-{args.seek_delay}-stall{args.host_stall}-bypass{int(not args.no_audio_bypass)}-baseline{int(args.no_skip)}"
+    source_hash=hashlib.sha256(data).hexdigest()
+    hashpath=dest/'source.sha256'
+    if not hexpath.exists() or not hashpath.exists() or hashpath.read_text().strip()!=source_hash:
+        with hexpath.open('w') as f:
+            for byte in data:f.write(f'{byte:02x}\n')
+        hashpath.write_text(source_hash+'\n')
+    label=f"offset{args.start_offset}-{'shared-' if args.shared_ddr else ''}seek-{args.at_q}-{args.seek_delay}-stall{args.host_stall}-bypass{int(not args.no_audio_bypass)}-baseline{int(args.no_skip)}"
     cmd=[str(binary),f'+HEX={hexpath}',f'+LEN={len(data)}','+GENERIC_STREAM','+PROGRESS=20000000',
+         f'+START_OFFSET={args.start_offset}',f'+VIDEO_START={args.video_start}',f'+MOVIE_ORIGIN={args.movie_origin}',
          f'+AT_Q={args.at_q}',f'+SEEK_DELAY={args.seek_delay}',f'+HOST_STALL={args.host_stall}']
     if args.no_audio_bypass:cmd.append('+NO_AUDIO_BYPASS')
     if args.no_skip:cmd.append('+NO_SKIP')

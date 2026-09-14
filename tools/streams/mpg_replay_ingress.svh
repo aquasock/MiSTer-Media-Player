@@ -2,6 +2,12 @@
 // Host and PCM CDC queues are bounded behavioral models, not vendor CDC proof.
 reg replay_sys_clk=0;always #25 replay_sys_clk=~replay_sys_clk;
 reg replay_audio_clk=0;always #20.345052083333 replay_audio_clk=~replay_audio_clk;
+integer replay_start_offset=0,replay_video_start=0,replay_movie_origin=0;
+initial begin
+ if($value$plusargs("START_OFFSET=%d",replay_start_offset))begin end
+ if($value$plusargs("VIDEO_START=%d",replay_video_start))begin end
+ if($value$plusargs("MOVIE_ORIGIN=%d",replay_movie_origin))begin end
+end
 reg replay_start=0,replay_ack=0,replay_wr=0;
 reg [12:0] replay_addr=0;reg [15:0] replay_data=0;
 wire [31:0] replay_lba;wire [5:0] replay_blocks;wire replay_rd;
@@ -10,7 +16,7 @@ reg [8:0] replay_reservoir[0:32767];integer replay_head=0,replay_tail=0;
 reg replay_prefill=0,replay_end=0;
 wire replay_ready;
 media_file_reader replay_reader(.clk(replay_sys_clk),.reset(reset),.start(replay_start),
- .cancel(1'b0),.suspend(1'b0),.file_size({32'd0,stream_len[31:0]}),.start_offset(64'd0),
+ .cancel(1'b0),.suspend(1'b0),.file_size({32'd0,stream_len[31:0]}),.start_offset({32'd0,replay_start_offset[31:0]}),
  .sd_lba(replay_lba),.sd_blk_cnt(replay_blocks),.sd_rd(replay_rd),.sd_ack(replay_ack),
  .sd_buff_wr(replay_wr),.sd_buff_addr(replay_addr),.sd_buff_dout(replay_data),
  .stream_data(replay_byte),.stream_valid(replay_valid),
@@ -43,9 +49,35 @@ initial begin
 end
 wire [7:0] rvb,rab;wire rvv,rvr,rve,rapv,rav,rar,rvpv,rps,rde;
 wire [32:0] rvp,rap;
-mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1)) replay_demux(
- clk,reset,replay_reservoir[replay_head%32768][7:0],replay_input_valid,replay_ready,replay_end,
- rvb,rvv,rvr,rve,rvp,rvpv,rab,rav,rar,rap,rapv,rps,rde);
+wire [7:0] raw_rvb;
+wire raw_rvv,raw_rvpv,raw_ready;
+wire [32:0] raw_rvp;
+wire [40:0] replay_file_position,replay_pack_position;
+wire replay_filter_ready,replay_raw_end;
+wire replay_discard=replay_file_position<{9'd0,replay_video_start[31:0]};
+reg replay_gate_pts_valid=0;
+reg [32:0] replay_gate_pts=0;
+assign raw_ready=replay_discard||replay_filter_ready;
+media_seek_video_filter replay_filter(
+ .clk(clk),.reset(reset),.resync_start(replay_video_start!=0),
+ .input_data({(raw_rvpv||replay_gate_pts_valid),(raw_rvpv?raw_rvp:replay_gate_pts),raw_rvb}),
+ .input_valid(raw_rvv&&!replay_discard),.input_end(replay_raw_end),.input_ready(replay_filter_ready),
+ .output_data({rvpv,rvp,rvb}),.output_valid(rvv),.output_end(rve),.output_ready(rvr));
+always @(posedge clk) begin
+ if(reset)replay_gate_pts_valid<=0;
+ else if(raw_rvv&&raw_ready) begin
+  if(!replay_discard)replay_gate_pts_valid<=0;
+  else if(raw_rvpv)begin replay_gate_pts_valid<=1;replay_gate_pts<=raw_rvp;end
+ end
+end
+mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1),.ENABLE_FILE_POSITION(1)) replay_demux(
+ .clk(clk),.reset(reset),.input_data(replay_reservoir[replay_head%32768][7:0]),
+ .input_valid(replay_input_valid),.input_ready(replay_ready),.input_end(replay_end),
+ .output_data(raw_rvb),.output_valid(raw_rvv),.output_ready(raw_ready),.output_end(replay_raw_end),
+ .video_pts(raw_rvp),.video_pts_valid(raw_rvpv),.audio_data(rab),.audio_valid(rav),
+ .audio_ready(rar),.audio_pts(rap),.audio_pts_valid(rapv),.is_program_stream(rps),.demux_error(rde),
+ .force_program_stream(replay_start_offset!=0),.start_file_position({9'd0,replay_start_offset[31:0]}),
+ .video_file_position(replay_file_position),.video_pack_position(replay_pack_position));
 wire [41:0] raq;wire raqv,raqr,rae;wire [10:0] ra_level;
 av_stream_fifo replay_audio_queue(clk,reset,{rapv,rap,rab},rav,rar,raq,raqv,raqr,rae,ra_level);
 wire rpv,rpe,rpi;wire signed [15:0] rpl,rpr;wire [32:0] rpp;wire rppv;wire [31:0] rframes;
@@ -55,15 +87,16 @@ reg replay_pcm_eof=0;
 wire replay_pop,replay_under,replay_terr,replay_finished;
 wire signed [15:0] replay_l,replay_r;wire [31:0] replay_played;
 reg replay_origin_valid=0;reg [32:0] replay_origin=0;
-wire [32:0] replay_target=replay_origin+9000+playback_test.seek_elapsed;
+wire [32:0] replay_target=(replay_start_offset!=0 ? {1'b0,replay_movie_origin[31:0]} : replay_origin+9000)+playback_test.seek_elapsed;
 wire replay_seek_audio;wire [32:0] replay_target_audio;
 video_config_cdc #(.WIDTH(34)) replay_audio_control(.src_clk(clk),.dst_clk(replay_audio_clk),
  .src_data({seek_override,replay_target}),.dst_data({replay_seek_audio,replay_target_audio}));
-mp2_decoder #(.ENABLE_SEEK_SKIP(1)) replay_mp2(
+mp2_decoder #(.ENABLE_SEEK_SKIP(1),.ENABLE_START_SYNC(1)) replay_mp2(
  .clk(clk),.reset(reset),.input_data(raq[7:0]),.input_valid(raqv),.input_ready(raqr),
  .input_end(rve&&rae),.input_pts(raq[40:8]),.input_pts_valid(raq[41]),
  .pcm_valid(rpv),.pcm_ready(replay_pcm_ready),.pcm_left(rpl),.pcm_right(rpr),.pcm_pts(rpp),
  .pcm_pts_valid(rppv),.error(rpe),.idle(rpi),.frames_decoded(rframes),
+ .resync_start(replay_start_offset!=0),
  .seek(seek_override&&!$test$plusargs("NO_AUDIO_BYPASS")),.seek_target(replay_target));
 mp2_pcm_output #(.ENABLE_PLAYBACK_CONTROL(1)) replay_sink(
  replay_audio_clk,reset,1'b0,replay_seek_audio,replay_target_audio,replay_origin_valid,replay_origin,
@@ -97,7 +130,8 @@ mpeg2_h262_inband_metadata replay_metadata(.clk(clk),.reset(reset),.input_data(r
  .stream_valid(stream_valid),.stream_ready(stream_ready),.metadata_valid(rmv),.pts_90k(rmp));
 always @(posedge clk)if(!reset)begin
  if(stream_valid)stream_index<=stream_index+1;
- if(rmv&&!replay_origin_valid)begin replay_origin<=rmp-9000;replay_origin_valid<=1;end
+ if(replay_start_offset!=0&&!replay_origin_valid)begin replay_origin<=replay_movie_origin-9000;replay_origin_valid<=1;end
+ else if(rmv&&!replay_origin_valid)begin replay_origin<=rmp-9000;replay_origin_valid<=1;end
  if(frontend.syntax_error)$fatal(1,"MPG_REPLAY_SYNTAX_ERROR source=%0d byte=%0d",frontend.syntax_error_source,stream_index);
  if(replay_source_error||rde||rpe)$fatal(1,"MPG_REPLAY_ERROR reader=%d demux=%d mp2=%d",replay_source_error,rde,rpe);
 end

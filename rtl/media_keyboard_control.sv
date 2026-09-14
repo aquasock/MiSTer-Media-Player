@@ -1,6 +1,6 @@
 // One command per physical key press. Track releases even while OSD is open,
 // so menu navigation and typematic repeats cannot leak into playback.
-module media_keyboard_control(
+module media_keyboard_control #(parameter RESTART_BOTH_DIRECTIONS=0)(
  input wire clk,reset,new_file,enabled,osd_open,
  input wire [10:0] key,
  input wire [34:0] elapsed_q,
@@ -45,10 +45,10 @@ always @(posedge clk) begin
         !osd_open&&!new_file&&!seek_active&&!seek_done) begin
       if(key[8:0]==9'h16b) seek_target_q<=elapsed_q<jump_q?35'd0:elapsed_q-jump_q;
       else seek_target_q<=forward_q[35]?{35{1'b1}}:forward_q[34:0];
-      // Forward reconstruction keeps the decoder references and queued stream.
-      // Only backward seeks need the byte-zero restart/retirement handshake.
-      seek_active<=1;restart<=key[8:0]==9'h16b;
-      wait_restart<=key[8:0]==9'h16b;
+      // Legacy integrations may retain forward reconstruction. Production
+      // direct seeking restarts either direction through the same search.
+      seek_active<=1;restart<=RESTART_BOTH_DIRECTIONS || key[8:0]==9'h16b;
+      wait_restart<=RESTART_BOTH_DIRECTIONS || key[8:0]==9'h16b;
      end
     end
    endcase

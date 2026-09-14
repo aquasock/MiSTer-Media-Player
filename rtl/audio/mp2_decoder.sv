@@ -1,7 +1,7 @@
 // MPEG-1 Layer II, 48 kHz, 112..384 kb/s stereo/dual/joint stereo.
 // One bounded frame buffer; no HPS software or soft CPU. CRC-protected frames
 // are explicitly rejected until CRC checking is implemented.
-module mp2_decoder #(parameter ENABLE_SEEK_SKIP=0) (
+module mp2_decoder #(parameter ENABLE_SEEK_SKIP=0, parameter ENABLE_START_SYNC=0) (
     input wire clk, reset,
     input wire [7:0] input_data,
     input wire input_valid,
@@ -18,13 +18,14 @@ module mp2_decoder #(parameter ENABLE_SEEK_SKIP=0) (
     output reg [31:0] frames_decoded,
     output wire idle,
     input wire seek,
-    input wire [32:0] seek_target
+    input wire [32:0] seek_target,
+    input wire resync_start
 );
 localparam COLLECT=0, HEADER=1, BEGIN_FRAME=2, GET_WAIT=3, GET_BIT=4,
     ALLOC=5, ALLOC_DONE=6, SCFSI=7, SCFSI_DONE=8, SCALE=9, SCALE_DONE=10,
     SAMPLES=11, CODE_DONE=12, UNGROUP=13, REQUANT=14, REQUANT_WAIT=15,
     REQUANT_MUL=16, STORE=17, ADVANCE=18, ZERO=19, SYNTH_START=20,
-    SYNTH_WAIT=21, FINISH=22, FAILED=23;
+    SYNTH_WAIT=21, FINISH=22, FAILED=23, FIND_HEADER=24, SEED_HEADER=25, VERIFY_HEADER=26;
 reg [4:0] state, return_state;
 reg [7:0] frame_mem [0:2047];
 reg [10:0] received, frame_size;
@@ -53,6 +54,9 @@ reg sample_wr, synth_start;
 reg [7:0] sample_addr;
 reg signed [23:0] sample_data;
 wire synth_busy, synth_done;
+reg [2:0] pending_age;
+reg syncing,verify_first,lookahead;
+reg [1:0] verify_count;
 reg [32:0] pending_pts;
 reg pending_pts_valid;
 reg [32:0] frame_pts;
@@ -74,8 +78,8 @@ wire [7:0] sf_addr={2'd0,sb,channel}*8'd3+{6'd0,part};
 wire [16:0] trial_remainder={remainder,grouped_code[divide_bit]};
 wire [15:0] levels = quant==1 ? 16'd3 : quant==2 ? 16'd5 : quant==3 ? 16'd7 :
     quant==4 ? 16'd9 : (16'hffff >> (17-quant));
-assign input_ready = state==COLLECT && !error;
-assign idle=state==COLLECT && received==0;
+assign input_ready = (state==COLLECT || state==FIND_HEADER || state==VERIFY_HEADER) && !error;
+assign idle=(state==COLLECT && received==0) || state==FIND_HEADER;
 initial $readmemh("rtl/audio/mp2_scale.hex",scale_rom);
 mp2_synthesis synthesis (
     .clk(clk),.reset(reset),.sample_wr(sample_wr),.sample_addr(sample_addr),
@@ -131,21 +135,61 @@ task next_band;
         end else state<=again;
     end
 endtask
+wire [31:0] sync_header={header[23:0],input_data};
+wire sync_header_valid=sync_header[31:21]==11'h7ff && sync_header[20:19]==3 &&
+ sync_header[18:17]==2 && sync_header[16] && sync_header[11:10]==1 &&
+ sync_header[7:6]!=3 && bytes_for_rate(sync_header[15:12])!=0;
 always @(posedge clk) begin
     byte_q<=frame_mem[bit_pos[13:3]];
     scale_q<=scale_rom[{quant,scalefactor[sf_addr]}];
     scaled_product<=centered*$signed({1'b0,scale_q});
     sample_wr<=0; synth_start<=0;
     if(reset) begin
-        state<=COLLECT; received<=0; frame_size<=0; header<=0; bit_pos<=0;
+        state<=(ENABLE_START_SYNC && resync_start)?FIND_HEADER:COLLECT;
+        syncing<=ENABLE_START_SYNC && resync_start;
+        verify_first<=ENABLE_START_SYNC && resync_start;lookahead<=0;verify_count<=0;pending_age<=0;
+        received<=0; frame_size<=0; header<=0; bit_pos<=0;
         error<=0; frames_decoded<=0; pending_pts_valid<=0;
         frame_pts<=0; frame_pts_valid<=0; pcm_pts<=0; pcm_pts_valid<=0;
         sb<=0; channel<=0; part<=0; granule<=0; sample_index<=0;
         scale_index<=0; shared_right<=0; quant<=0; centered<=0;
     end else begin
         if(pcm_valid&&pcm_ready) pcm_pts_valid<=0;
-        if(input_valid&&input_ready&&input_pts_valid) begin pending_pts<=input_pts; pending_pts_valid<=1; end
+        if(input_valid&&input_ready) begin
+            if(pending_age!=7) pending_age<=pending_age+1'b1;
+            if(input_pts_valid) begin pending_pts<=input_pts; pending_pts_valid<=1;pending_age<=0;end
+        end
         case(state)
+        FIND_HEADER: if(input_valid) begin
+            header<=sync_header;
+            if(sync_header_valid) begin
+                state<=HEADER;received<=0;
+                frame_pts<=pending_pts;
+                frame_pts_valid<=pending_pts_valid && pending_age>=2 && !input_pts_valid;
+            end
+        end
+        VERIFY_HEADER: begin
+            // Confirm the next header at the declared frame length. This
+            // rejects accidental sync patterns inside an arbitrary frame tail.
+            if(input_valid) begin
+                header<=sync_header;verify_count<=verify_count+1'b1;
+                if(verify_count==3) begin
+                    if(sync_header_valid) begin
+                        lookahead<=1;verify_first<=0;state<=BEGIN_FRAME;
+                        if(frame_pts_valid && pending_pts==frame_pts && !input_pts_valid) pending_pts_valid<=0;
+                    end else begin state<=FIND_HEADER;syncing<=1;received<=0;end
+                end
+            end else if(input_end) begin
+                // A complete final frame needs no following header at EOF.
+                verify_first<=0;lookahead<=0;state<=BEGIN_FRAME;
+            end
+        end
+        SEED_HEADER: begin
+            // One RAM write per cycle preserves the existing frame-buffer RAM.
+            frame_mem[received]<=header[31:24];header<={header[23:0],8'd0};
+            received<=received+1'b1;
+            if(received==3) begin syncing<=0;state<=COLLECT;end
+        end
         COLLECT: begin
             if(input_valid) begin
                 frame_mem[received]<=input_data;
@@ -158,7 +202,9 @@ always @(posedge clk) begin
                 end
                 received<=received+11'd1;
                 if(received==3) state<=HEADER;
-                else if(received>=4 && received+11'd1==frame_size) state<=BEGIN_FRAME;
+                else if(received>=4 && received+11'd1==frame_size) begin
+                    state<=verify_first?VERIFY_HEADER:BEGIN_FRAME;verify_count<=0;
+                end
             end else if(input_end && received!=0) begin error<=1; state<=FAILED; end
         end
         HEADER: begin
@@ -168,7 +214,7 @@ always @(posedge clk) begin
             else begin
                 frame_size<=bytes_for_rate(header[15:12])+{10'd0,header[9]};
                 bound<=header[7:6]==1 ? ({3'd0,header[5:4]}+5'd1)<<2 : 5'd27;
-                state<=COLLECT;
+                state<=syncing?SEED_HEADER:COLLECT;
             end
         end
         BEGIN_FRAME: begin
@@ -286,7 +332,15 @@ always @(posedge clk) begin
                 else begin part<=part+2'd1; state<=ZERO; end
             end else begin granule<=granule+2'd1; state<=ZERO; end
         end
-        FINISH: begin frames_decoded<=frames_decoded+32'd1; frame_pts<=frame_pts+33'd2160; received<=0; state<=COLLECT; end
+        FINISH: begin
+            frames_decoded<=frames_decoded+32'd1;frame_pts<=frame_pts+33'd2160;received<=0;
+            if(lookahead) begin
+                lookahead<=0;syncing<=1;state<=HEADER;
+                if(pending_pts_valid && pending_age>=3) begin
+                    frame_pts<=pending_pts;frame_pts_valid<=1;pending_pts_valid<=0;
+                end
+            end else state<=COLLECT;
+        end
         FAILED: error<=1;
         default: begin error<=1; state<=FAILED; end
         endcase

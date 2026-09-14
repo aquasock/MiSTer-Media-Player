@@ -4,11 +4,11 @@ reg reset=1,iv=0,ie=0,ready=0, ipt=0;
 reg [7:0] data; wire ir,pv,error,idle; wire signed [15:0] l,r;
 wire [32:0] pts; wire pts_valid; wire [31:0] frames;
 reg [32:0] pts_origin=90000;
-integer seek_frame=0;
+integer seek_frame=0,start_sync=0;
 wire [32:0] seek_target=pts_origin+seek_frame*2160;
-mp2_decoder #(.ENABLE_SEEK_SKIP(1)) dut(.clk(clk),.reset(reset),.input_data(data),.input_valid(iv),.input_ready(ir),.input_end(ie),
+mp2_decoder #(.ENABLE_SEEK_SKIP(1),.ENABLE_START_SYNC(1)) dut(.clk(clk),.reset(reset),.input_data(data),.input_valid(iv),.input_ready(ir),.input_end(ie),
 .input_pts(pts_origin),.input_pts_valid(ipt),.pcm_valid(pv),.pcm_ready(ready),.pcm_left(l),.pcm_right(r),
-.pcm_pts(pts),.pcm_pts_valid(pts_valid),.error(error),.frames_decoded(frames),.idle(idle),.seek(seek_frame!=0),.seek_target(seek_target));
+.pcm_pts(pts),.pcm_pts_valid(pts_valid),.error(error),.frames_decoded(frames),.idle(idle),.seek(seek_frame!=0),.seek_target(seek_target),.resync_start(start_sync!=0));
 integer fd,ofd,index=0,size,n=0,cycles=0,rc,session,expect_error=0;
 reg hold_input=0,held_pcm=0;reg [31:0] held_sample;
 reg [7:0] bytes [0:1048575]; reg [1023:0] path; reg [31:0] rng=32'habcde123;
@@ -34,6 +34,7 @@ initial begin
  ofd=$fopen(path,"w");
  rc=$value$plusargs("expect_error=%d",expect_error);
  rc=$value$plusargs("seek_frame=%d",seek_frame);
+ rc=$value$plusargs("start_sync=%d",start_sync);
  rc=$value$plusargs("pts_origin=%h",pts_origin);
  for(session=0;session<2;session=session+1) begin
  reset=1;iv=0;ie=0;hold_input=0;index=0;n=0;cycles=0;

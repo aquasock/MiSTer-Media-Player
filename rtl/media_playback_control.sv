@@ -1,7 +1,7 @@
 // Decoder-domain presentation time and reconstruction seek controller.
 // Quarter-90-kHz units represent all supported progressive frame periods exactly.
-// Forward seeks retain the live session; backward seeks restart at byte zero.
-module media_playback_control(
+// Supports retained reconstruction and direct restarts with a movie-wide PTS origin.
+module media_playback_control #(parameter ENABLE_MOVIE_ORIGIN=0)(
  input wire clk,reset,paused,seek_active,
  input wire [34:0] seek_target_q,
  input wire [3:0] frame_rate_code,
@@ -14,7 +14,9 @@ module media_playback_control(
  output wire scheduler_window,
  output wire fast_seek,
  output reg rebase=0,
- output wire [32:0] seek_elapsed_90k
+ output wire [32:0] seek_elapsed_90k,
+ input wire movie_origin_valid,
+ input wire [32:0] movie_origin
 );
 reg [2:0] swap_q=0;
 reg first_picture=0,origin_valid=0;
@@ -27,7 +29,8 @@ wire presented=swap_reset_count==4 && swap_q!=4;
 wire [14:0] period_q=frame_rate_code==1?15'd15015:
  frame_rate_code==2?15'd15000:frame_rate_code==3?15'd14400:
  frame_rate_code==4?15'd12012:15'd12000;
-wire [32:0] relative_pts=display_pts-origin_pts;
+wire [32:0] relative_pts=display_pts-
+ ((ENABLE_MOVIE_ORIGIN && movie_origin_valid) ? movie_origin : origin_pts);
 wire at_target=first_picture && elapsed_q>=seek_target_q;
 assign fast_seek=seek_active&&!seek_done&&!reached;
 assign scheduler_window=!reset && (seek_active ?

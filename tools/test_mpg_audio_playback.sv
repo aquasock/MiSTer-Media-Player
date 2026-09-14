@@ -49,7 +49,7 @@ initial forever begin
  @(negedge sys_clk);host_wr=0;host_ack=0;
  repeat(10) @(negedge sys_clk);
 end
-mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1)) ingress(clk,reset,ib,iv,ir,ie,vb,vv,vr,ve,vp,vpv,ab,av,ar,ap,apv,ps,de);
+mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1)) ingress(clk,reset,ib,iv,ir,ie,vb,vv,vr,ve,vp,vpv,ab,av,ar,ap,apv,ps,de,1'b0,41'd0,,);
 wire [41:0] aq;wire aqv,aqr,ae;
 av_stream_fifo audio_fifo(clk,reset,{apv,ap,ab},av,ar,aq,aqv,aqr,ae,);
 wire pv,pe,pi;wire signed [15:0] pl,pr;wire [32:0] pp;wire ppv;wire [31:0] frames;

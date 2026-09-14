@@ -92,3 +92,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_keyboard_control.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_playback_control.sv
 
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_seek_diagnostics.sv
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_seek_point.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_seek_search.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_seek_video_filter.sv

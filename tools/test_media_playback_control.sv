@@ -11,6 +11,7 @@ reg [32:0] display_pts=0;
 wire [34:0] elapsed_q;
 wire seek_done,scheduler_window,fast_seek,rebase;
 wire [32:0] seek_elapsed_90k;
+wire movie_origin_valid=1'b0;wire [32:0] movie_origin=0;
 media_playback_control dut(.*);
 reg tick_90k=1;
 wire anchored,active,due;

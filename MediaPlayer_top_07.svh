@@ -115,7 +115,7 @@ wire seek_snapshot_valid,seek_snapshot_video_valid;
 wire [447:0] seek_snapshot,seek_snapshot_video;
 media_seek_diagnostics seek_diagnostics(
  .clk(clk_mpeg2),.clear(reset_mpeg2_base || media_new_file_mpeg),
- .seeking(media_seeking),.paused(media_paused),
+ .seeking(media_seeking && !media_probe_mpeg),.paused(media_paused),
  .progress(mpeg2_new_decode_stream_valid || media_rebase ||
            mpeg2_new_framebuffer_swap_reset_count==3'd4),
  .state_flags({media_audio_skip_disabled,av_is_ps,media_paused,media_seeking,

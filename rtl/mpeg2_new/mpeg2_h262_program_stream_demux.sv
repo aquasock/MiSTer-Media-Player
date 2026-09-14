@@ -26,7 +26,7 @@
 // ready/valid streams, each with its own directly-attached PTS, so nothing
 // downstream needs to parse an invented escape protocol back out again.
 //============================================================================
-module mpeg2_h262_program_stream_demux
+module mpeg2_h262_program_stream_demux #(parameter ENABLE_FILE_POSITION=0)
 (
     input  wire        clk,
     input  wire        reset,
@@ -48,7 +48,9 @@ module mpeg2_h262_program_stream_demux
     output reg         audio_pts_valid,
 
     output reg         stream_end,
-    output reg         demux_error
+    output reg         demux_error,
+    input wire [40:0] input_file_position,
+    output reg [40:0] video_file_position, video_pack_position
 );
 
 localparam [4:0]
@@ -95,6 +97,16 @@ assign in_ready = (!video_valid || video_ready) &&
                   (!audio_valid || audio_ready);
 
 wire accept = in_valid && in_ready;
+reg [40:0] pack_position;
+always @(posedge clk) begin
+    if(reset) begin pack_position<=0; video_file_position<=0; video_pack_position<=0; end
+    else if(ENABLE_FILE_POSITION && accept) begin
+        if(state==S_CODE && in_data==8'hba) pack_position<=input_file_position-41'd3;
+        if(state==S_PES_PAYLOAD && is_video) begin
+            video_file_position<=input_file_position; video_pack_position<=pack_position;
+        end
+    end
+end
 
 wire [32:0] decoded_pts = {
     pts_shift[35:33],

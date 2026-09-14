@@ -15,19 +15,25 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Direct timestamp-guided MPG seeking in both directions, including unseen
+  destinations, with bounded byte-position probes and nearby reconstruction.
+- Partial MP2 frame resynchronization and open-GOP leading B-picture removal
+  at direct restart, with movie timestamp origin retained across seeks.
+- Direct seek control, real-file probe, byte-filter and PCM recovery regressions.
+
 - Persistent first-observed seek fault snapshot with decoder subcodes, state,
   timestamps and queue observations, independent of seek/pause profiler resets.
 - Diagnostic OSD audio-bypass comparison and exact-MPG combined replay harness.
-  Hardware seek freeze remains unresolved pending diagnostic evidence.
+  The captured display-bank ownership freeze is addressed by the fix above.
 
 - Space toggles play/pause; Left/Right seek backward/forward by 10 seconds,
   Ctrl by 30 seconds, and Ctrl+Alt by 5 minutes. Menu navigation is excluded.
 - Transactional reconstruction seeks retain the requested paused state and
-  clamp at the start/end of media. Forward seeks retain decoder state and
-  reconstruct only the skipped interval; backward seeks restart at the beginning.
+  clamp at the start/end of media. MPG uses direct file seeking; raw streams
+  and missing restart timestamps retain reconstruction from the beginning.
   MP2 audio before the destination bypasses synthesis with a full frame of
   decoded preroll to restore filter history. Long seeks can still take time.
-- Backward seek completion waits for the restarted reader, preventing a stale
+- Seek completion waits for the final restarted reader, preventing a stale
   completion from the old decoder session during storage retirement.
 
 - Compact 25-word telemetry schema 10 retains playback errors, basic cadence, audio and transport health while removing detailed performance history from default synthesis; compile-time detailed schema 9 remains available.

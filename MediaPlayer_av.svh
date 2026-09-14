@@ -47,13 +47,14 @@ wire signed [15:0] mp2_pcm_l,mp2_pcm_r;
 wire [32:0] mp2_pcm_pts;
 wire mp2_pcm_pts_valid;
 wire [31:0] mp2_frames_decoded;
-mp2_decoder #(.ENABLE_SEEK_SKIP(1)) mp2_decoder (
+mp2_decoder #(.ENABLE_SEEK_SKIP(1),.ENABLE_START_SYNC(1)) mp2_decoder (
     .clk(clk_mpeg2),.reset(reset_mpeg2),.input_data(av_audio_q[7:0]),.input_valid(av_audio_q_valid),
     .input_ready(av_audio_q_ready),.input_end(av_ingress_end&&av_audio_empty),
     .input_pts(av_audio_q[40:8]),.input_pts_valid(av_audio_q[41]),
     .pcm_valid(mp2_pcm_valid),.pcm_ready(mp2_pcm_ready),.pcm_left(mp2_pcm_l),.pcm_right(mp2_pcm_r),
     .pcm_pts(mp2_pcm_pts),.pcm_pts_valid(mp2_pcm_pts_valid),.error(mp2_error),
     .frames_decoded(mp2_frames_decoded),.idle(mp2_idle),
+    .resync_start(media_start_offset_mpeg!=0),
     .seek(media_seeking && !media_audio_skip_disabled),.seek_target(media_seek_pts)
 );
 wire mp2_fifo_full,mp2_fifo_empty,mp2_fifo_rd;
@@ -73,11 +74,12 @@ mp2_pcm_fifo mp2_pcm_fifo (
 );
 // Origin is common to the video scheduler and PCM sink. A 100 ms preroll
 // permits independent codec startup without consuming movie audio early.
-wire [32:0] av_origin=mpeg2_new_inband_pts_90k-33'd9000;
+wire av_seek_origin=media_seeking && media_movie_origin_valid && !media_probe_mpeg;
+wire [32:0] av_origin=(av_seek_origin ? media_movie_origin : mpeg2_new_inband_pts_90k)-33'd9000;
 reg av_origin_sent;
 wire av_origin_full,av_origin_empty;
 wire [32:0] av_origin_q;
-wire av_origin_wr=av_is_ps&&mpeg2_new_inband_valid&&!av_origin_sent&&!av_origin_full;
+wire av_origin_wr=av_is_ps&&(mpeg2_new_inband_valid||av_seek_origin)&&!av_origin_sent&&!av_origin_full;
 always @(posedge clk_mpeg2) begin
     if(reset_mpeg2) av_origin_sent<=0;
     else if(av_origin_wr) av_origin_sent<=1;
@@ -107,7 +109,7 @@ always @(posedge clk_mpeg2) begin
   media_first_pts<=mpeg2_new_inband_pts_90k;media_first_pts_valid<=1;
  end
 end
-wire [32:0] media_seek_pts=media_first_pts+media_seek_elapsed;
+wire [32:0] media_seek_pts=(media_movie_origin_valid ? media_movie_origin : media_first_pts)+media_seek_elapsed;
 wire media_paused_audio,media_seeking_audio;
 wire [32:0] media_seek_pts_audio;
 video_config_cdc #(.WIDTH(35)) playback_audio_config(

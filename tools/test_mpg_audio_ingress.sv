@@ -5,7 +5,7 @@ wire ir,ve,vv,vr,apv,av,ar,vpv,ps,de;
 wire [7:0] vb,ab;wire [32:0] vp,ap;
 reg [7:0] bytes[0:16777215];integer size,fd,vfd,afd,pfd,idx=0,cycles=0,n=0;
 reg [1023:0] path,outpath;reg [31:0] rng=32'h795137ba;
-mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1)) ingress(clk,reset,ib,iv,ir,ie,vb,vv,vr,ve,vp,vpv,ab,av,ar,ap,apv,ps,de);
+mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1)) ingress(clk,reset,ib,iv,ir,ie,vb,vv,vr,ve,vp,vpv,ab,av,ar,ap,apv,ps,de,1'b0,41'd0,,);
 wire [41:0] aq;wire aqv,aqr,ae;
 av_stream_fifo audio_fifo(clk,reset,{apv,ap,ab},av,ar,aq,aqv,aqr,ae,);
 wire pv,pe,pi;wire signed [15:0] pl,pr;wire [32:0] pp;wire ppv;wire [31:0] frames;
