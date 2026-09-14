@@ -1,4 +1,4 @@
-## 30 COMMIT Unreleased ??? 2026-09-13T17:56:12-07:00
+## 30 COMMIT Unreleased aad072a 2026-09-13T17:56:12-07:00
 
 #### Coming From:
 
@@ -10,15 +10,32 @@ Reduce forward seek latency by retaining the current decoder session and validat
 
 #### Outcome:
 
-The user accepts play/pause, identifies the earlier duplicated display as a monitor problem, and confirms the long black-screen seek in fellow.mpg eventually resumed without reset. Captures at 17:52:14 and 17:52:31 are pure black; the 17:53:28 capture shows the movie again. This supports excessive reconstruction latency rather than a permanent hang in that trial; destination accuracy remains unmeasured. The user is stress testing and authorizes faster seeking for the next build. Implement forward reconstruction from the current decoder position, retain the safe restart for backward seeks, refresh destination handoff state on every seek, and test repeated forward and backward transitions with paused and playing audio/video. Review audio processing costs for a safe acceleration opportunity. Lack of telemetry during seeks is not proof of error-free operation because the current profiler is held reset there.
+Committed and pushed aad072a. Forward seeks retain the live decoder session; backward seeks keep the byte-zero retirement handshake and ignore old-session completion until the new reader starts. Every seek refreshes its audio destination instead of retaining the previous landing time. MP2 frames ending at least 24 ms before the target bypass decoding and synthesis; at least one decoded frame restores finite synthesis history before playback. Tests pass repeated retained-session I/P/B seeks with zero reconstruction mismatches, EOF clamping, three forward/backward asynchronous control cycles with delayed DDR/host retirement, all key modifiers and paused state. The MPG regression bypasses 16 audio frames, resumes at the exact expected sample with no audio errors, preserves all 307021 video bytes and validates 30 picture timestamps. Independent quantizer/joint-stereo tests verify exact post-preroll PCM across timestamp wrap and two reset sessions. Legacy MP2, mounted reader, OSD, raster, refresh and CDC regressions pass. Evidence is under results/build-aad072a-20260913-180758/regressions; clean seeds 52/61/87 are compiling. The user confirms the previous black-screen seek eventually resumed and the earlier display duplication was a monitor issue; previous pause is accepted, faster seeks remain untested on hardware.
 
 #### Next Steps:
 
-Implement and verify the retained-session forward path with integrated stream backpressure, preserve paused state and EOF behavior, document remaining backward seek cost, then commit and build three seeds for hardware comparison.
+Finish all three builds and timing/CDC audits, deliver a qualified RBF, and compare forward skip duration near the start and late in fellow.mpg; verify backward seeks, paused seeks, EOF and audible continuity.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer_av.svh
+- MediaPlayer_top_00.svh
+- README.md
+- docs/OSD_PLAYBACK_PLAN.md
+- docs/TEST_INSTRUCTIONS.md
+- rtl/audio/mp2_decoder.sv
+- rtl/media_keyboard_control.sv
+- rtl/media_playback_control.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/test_media_keyboard_control.sv
+- tools/test_media_playback_control.sv
+- tools/test_mp2_decoder.sv
+- tools/test_mpg_audio_ingress.sv
+- tools/test_mpg_audio_playback.sv
+- tools/test_playback_restart.sv
+- tools/verify_mp2_seek.py
+- tools/verify_mpg_audio.py
 
 #### Status:
 
