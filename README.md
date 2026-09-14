@@ -93,3 +93,9 @@ Supported output targets are HDMI through 1920x1080 and standard CRT resolutions
 ASCAL image width is capped at 2048 pixels; the analog output path is retained.
 The unused Linux ALSA path and legacy LED blink diagnostics are disabled;
 FPGA movie audio and the screen telemetry remain enabled.
+
+On a clean end of file, the core finishes queued video and audio and returns to
+the startup screen, clearing times, playback controls and loaded subtitles.
+Select a movie to start again; playback positions are not remembered. Paused
+playback stays paused at the endpoint until resumed. Opening another movie
+replaces the previous session immediately through the safe restart path.

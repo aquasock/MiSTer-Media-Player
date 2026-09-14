@@ -8,6 +8,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Return to startup after physical EOF and drained audio/video, with a final-frame
+  hold, pause/seek protection and generation-safe replacement-file handling. Clear
+  subtitles, duration and controls without retaining a resume position.
+
 - Manual SRT loading through a second stock Main file slot, with presentation-
   timed cues, pause/seek synchronization and an independent shared-overlay
   visibility group. Initial display supports two lines of printable ASCII.

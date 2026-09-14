@@ -15,6 +15,7 @@
 // same 3-I/22-P/47-B repeated-GOP transaction sequence as the 720x480 stream.
 module tb_h262_live_raster_soak #(
     parameter integer MIXED_PIXEL_MODE=0,
+    parameter integer EOF_CONTROL_MODE=0,
     parameter integer DISPLAY_OWNERSHIP_MODE=0,
     parameter integer SEEK_DISPLAY_RELEASE=1,
     parameter integer PLAYBACK_CONTROL_MODE=0,
@@ -259,6 +260,32 @@ module tb_h262_live_raster_soak #(
     wire [2:0] framebuffer_swap_reset_count;
     reg swap_window_pulse=0;
     integer swap_counter=0;
+
+    wire eof_close;
+    reg eof_observed=0;
+    generate if(EOF_CONTROL_MODE)begin : eof_test
+        wire drained=sequence_end_seen && !frame_waiting &&
+            !scheduler.scheduled_frame_valid && !scheduler.pending_frame_valid &&
+            !scheduler.reorder_active && !presentation_hold &&
+            !destination_ownership_hold && presentation_complete &&
+            !scheduler.promotion_active && framebuffer_swap_reset_count==0 &&
+            !pred_rd && !writer_we;
+        // Accelerate only the final-frame timer; the pixel pipeline is unmodified.
+        media_eof_control control(.clk_sys(clk),.clk_mpeg2(clk),
+            .reset_sys(reset),.reset_decoder(reset),.new_file(1'b0),.loaded(1'b1),
+            .sys_paused(1'b0),.sys_seeking(1'b0),.preflight(1'b0),.generation(32'd0),
+            .input_eof(stream_index==stream_len),.video_drained(drained),
+            .audio_finished(1'b1),.paused(1'b0),.seeking(1'b0),
+            .fatal(probe_error || pred_error || writer_error || presentation_error),
+            .tick_90k(1'b1),.frame_rate_code(4'd3),.close_file(eof_close));
+        always @(posedge clk)if(eof_close)begin
+            if(!drained || pred_active || stream_index!=stream_len)
+                $fatal(1,"EOF closed before reconstruction/presentation drained");
+            eof_observed<=1;
+            $display("EOF MIXED DRAIN PASS");
+        end
+    end else assign eof_close=1'b0;
+    endgenerate
 
     reg [31:0] picture_window=0;
     wire [31:0] picture_window_next={picture_window[23:0],stream_data};
@@ -1494,6 +1521,7 @@ module tb_h262_live_raster_soak #(
                    probe_error,writer_error,pred_error,presentation_error);
 
         if(quiet_cycles==(PLAYBACK_CONTROL_MODE?130000:30000))begin
+            if(EOF_CONTROL_MODE && !eof_observed)$fatal(1,"EOF did not close drained mixed stream");
             if(PLAYBACK_CONTROL_MODE&&!playback_test_complete)
                 $fatal(1,"seek control did not complete: pending=%b reorder=%b candidate=%b frame_waiting=%b seq=%b hold=%b",
                     scheduler.pending_frame_valid,scheduler.reorder_active,

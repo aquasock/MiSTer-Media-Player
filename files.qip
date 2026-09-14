@@ -115,3 +115,4 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_srt_parser.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_subtitles.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_sd_owner.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_subtitle_cdc.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_eof_control.sv

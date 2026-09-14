@@ -1,6 +1,7 @@
 `timescale 1ns/1ps
 
 module tb_h262_mixed_raster_pixels #(
+    parameter integer EOF_CONTROL_MODE=0,
     parameter integer MEMORY_READ_LATENCY=1,
     parameter integer PLAYBACK_CONTROL_MODE=0,
     parameter integer DISPLAY_OWNERSHIP_MODE=0,
@@ -10,6 +11,7 @@ module tb_h262_mixed_raster_pixels #(
 );
     tb_h262_live_raster_soak #(
         .MIXED_PIXEL_MODE(1),
+        .EOF_CONTROL_MODE(EOF_CONTROL_MODE),
         .PLAYBACK_CONTROL_MODE(PLAYBACK_CONTROL_MODE),
         .DISPLAY_OWNERSHIP_MODE(DISPLAY_OWNERSHIP_MODE),
         .SEEK_DISPLAY_RELEASE(SEEK_DISPLAY_RELEASE),

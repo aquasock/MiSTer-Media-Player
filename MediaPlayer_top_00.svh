@@ -125,8 +125,10 @@ wire [3:0] media_error;
 reg media_mount_d=0,media_user_reset_d=0;
 reg [63:0] media_file_size=0;
 wire media_user_reset=status[0] | buttons[1];
-wire media_new_file=(media_img_mounted[0] && !media_mount_d) ||
-                   (media_user_reset && !media_user_reset_d);
+wire media_eof_close;
+wire media_external_new_file=(media_img_mounted[0] && !media_mount_d) ||
+                            (media_user_reset && !media_user_reset_d);
+wire media_new_file=media_external_new_file || media_eof_close;
 wire media_paused_sys,media_seek_sys,media_seek_restart;
 wire [34:0] media_target_sys,media_elapsed_sys,media_elapsed_q;
 wire media_seek_done,media_seek_done_sys;
@@ -189,6 +191,7 @@ always @(posedge clk_sys) begin
     media_mount_d<=media_img_mounted[0];media_user_reset_d<=media_user_reset;
     if(RESET) media_file_size<=0;
     else if(media_img_mounted[0]) media_file_size<=media_img_size;
+    else if(media_eof_close) media_file_size<=0;
 end
 // Duration preflight owns the same reader until every accepted response drains.
 wire media_duration_busy,media_duration_start,media_duration_cancel,media_duration_ready;
@@ -355,8 +358,8 @@ wire reset_video = reset_video_sync[2];
 
 wire reset_mpeg2 = reset_mpeg2_base || media_decoder_reset;
 
-// The first scheduled frame starts playback. Keep message suppression through
-// subsequent bank swaps and EOF, clearing it only at reset or a fresh load.
+// The first scheduled frame starts playback. EOF closure follows the same
+// reset/drain path as a fresh load and restores startup message behavior.
 wire media_new_file_mpeg;
 video_config_cdc #(.WIDTH(1)) playback_hide_reset_config(
  .src_clk(clk_sys),.dst_clk(clk_mpeg2),.src_data(media_new_file_hold),.dst_data(media_new_file_mpeg));

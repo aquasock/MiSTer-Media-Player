@@ -1,3 +1,30 @@
+# EOF-to-startup qualification
+
+At a clean physical EOF, finish queued video and audio, retain the final image
+for one source-frame interval, then return to the startup screen. Clear the
+progress/times/status overlay and subtitle association. Do not loop or remember
+a resume position. Opening any file, including the same movie, starts fresh.
+Main may still display the previously mounted filename until another selection.
+
+Test a short MPG to completion with subtitles visible near the end, then load
+another movie and confirm startup playback with no old cue or time. Repeat with
+raw M2V, video-only MPG, and a file whose audio lasts longer than its video (such
+as Groove). Unknown total/remaining must not prevent EOF completion. Pause near
+the end and leave it paused: the frame stays until playback continues. Repeat
+short/long forward and backward seeks near the end, including seeking beyond
+the endpoint. Once a seek completes and playback is unpaused, EOF returns to
+startup; reopening starts from the beginning. Replace the movie just before
+its endpoint and confirm the old EOF cannot close the replacement. Keep the OSD
+open across completion and verify the menu and filters still work. Check both
+50 and 59.94 Hz output. Fatal/truncated streams are not classified as clean EOF.
+
+Simulation: `python3 tools/verify_playback_controls.py --output results/eof-controls.json`
+and `python3 tools/verify_decoder_timing.py --output results/eof-mixed --eof-control`.
+The controller regression covers all five source frame rates, longer audio,
+pause/seek/probe inhibition, CDC generation races, and delayed host/DDR drain.
+The mixed raster oracle verifies completion after real I/P/B presentation with
+423,936 reconstructed pixels checked. Hardware timing qualification is pending.
+
 # Next layout: clocks below the progress bar
 
 The subtitle baseline ec56250 was accepted on hardware. The next revision moves
@@ -5,7 +32,13 @@ all three time fields below the progress bar, Paused/Seeking onto the bar, and
 subtitles two lines lower. Status has dark text on a light inset. Check the
 bottom margin at 480p/720p/1080p, empty/full/unknown progress with status, and
 subtitles with the controls shown and hidden. Playback and SRT parsing are
-unchanged. New build timing qualification is pending; keep ec56250 seed 87.
+unchanged. All three b5a17cf seeds pass all four timing corners and 171 CDC checks.
+Seed 52 is preferred: setup +0.508 ns, hold +0.113 ns, 38,593 actual ALMs,
+527 M10Ks and 75 DSPs. Seeds 61/87 have setup +0.436/+0.313 ns and hold
++0.098/+0.076 ns. Hardware layout confirmation remains pending.
+The layout-only RBF is `results/hardware-test-b5a17cf/seed52/MediaPlayer_20260914.rbf`
+(SHA-256 `399c7ba28c2a3ad74cfb9879e197267bc8ac8ddcbc02e61d968b0a758c86fa55`).
+Keep hardware-accepted ec56250 seed 87 as rollback.
 
 # Timing-qualified ec56250 seed 87: manually loaded SRT subtitles
 
@@ -397,8 +430,9 @@ and I-pictures, then reconstruct from a nearby restart point. This includes
 unseen forward destinations. Files without usable timestamps use the byte-zero
 reconstruction fallback. The target uses displayed movie time rather than the
 reader's buffered position, and the original movie timestamp origin survives
-restarts. Backward jumps clamp at zero; forward jumps beyond EOF finish on the
-last available frame. Seeking while paused leaves the destination paused.
+restarts. Backward jumps clamp at zero; forward jumps beyond EOF land on the
+last available frame and then return to startup when playback is unpaused.
+Seeking while paused leaves the destination paused.
 The screen is blank during seeking and the OSD remains usable. MP2 startup
 finds a complete audio header after a partial frame; early frames bypass
 synthesis, with decoded preroll restoring history before output resumes.
@@ -412,7 +446,7 @@ Leading B-pictures requiring a reference from before the restart are discarded.
    Use a file longer than six minutes for the five-minute forward jump.
 3. Repeat while paused. Verify the requested destination appears and stays still
    until Space resumes. During a seek, toggle Space and check the resulting state.
-4. Seek backward near the start, forward near EOF, then backward after EOF.
+4. Seek backward near the start, forward near EOF, then reload after clean EOF has returned to startup.
    Reload another file and use Reset during a seek; check clean recovery and
    normal playback, with no old audio or reference-frame corruption.
 5. Repeat with 25 fps at 50 Hz and 29.97 fps at 59.94 Hz. Test OSD arrow navigation

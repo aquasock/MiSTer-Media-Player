@@ -328,25 +328,23 @@ remains deferred, with only its shared overlay framework in place.
 
 ## Current next-release target
 
-The user's revised target supersedes the earlier playlist and automatic
-same-name subtitle discovery proposal:
-
-- Resume playback from the last position, remembered only while this core stays
-  loaded; no persistence across reboot or core reload is required.
-- Predictable end-of-file behavior.
-- Subtitle playback from a separate `.srt` selected through a menu entry.
+The current scope is predictable end-of-file behavior and manually loaded SRT
+subtitles. Resume from the last position has been dropped. Opening another
+movie forgets the previous session, and a completed movie returns to startup.
 
 Keep stock Main. Manual SRT loading replaces automatic filename discovery;
-playlists and N/P playlist navigation are outside this release target.
-Audio-track selection remains excluded. Existing timing-qualified source
-ffafc79 seed 87 is the candidate baseline, pending user hardware acceptance.
+playlists, N/P playlist navigation and audio-track selection remain excluded.
+The ec56250 subtitle implementation is hardware accepted. The b5a17cf layout
+revision passes all three seeds; its hardware confirmation remains pending.
 
-Implementation planning should settle clean audio/video draining and idle
-transition at EOF, session resume identification and completed-file handling,
-and the separate SRT load interface with bounded parsing/storage and character
-coverage. Subtitle timing must follow pause and actual seek landing, and use
-the shared overlay independently of the controls' hide timer. Exact limits
-and resume matching rules remain to be designed and tested.
+EOF closure uses physical input EOF and decoder/presentation/audio drain,
+followed by one source-frame interval. A reset-generation-tagged mailbox
+requests the existing safe file-change reset. Logical file size, subtitle
+association, duration, controls and playback message suppression are cleared.
+The mounted file may remain named in Main, but the core issues no replay reads
+and waits for a fresh file selection. Pause and seeking inhibit closure;
+malformed or fatal streams retain the existing diagnostic behavior. Duration
+estimates, including unknown duration, do not control completion.
 
 ## Manual SRT implementation boundary
 

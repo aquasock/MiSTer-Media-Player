@@ -3,7 +3,7 @@
 from pathlib import Path
 import argparse,json,re,hashlib,shutil,datetime
 p=argparse.ArgumentParser(description=__doc__)
-p.add_argument('build',type=Path);p.add_argument('--cdc-registers',type=int,default=171)
+p.add_argument('build',type=Path);p.add_argument('--cdc-registers',type=int,default=183)
 p.add_argument('--baseline-alms',type=int,default=35774);p.add_argument('--baseline-ram',type=int,default=508)
 p.add_argument('--scope',default='See the source-specific test instructions for feature scope and hardware acceptance.')
 a=p.parse_args();base=a.build.resolve();state=json.loads((base/'status.json').read_text());summary={}
