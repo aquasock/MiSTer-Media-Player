@@ -1,3 +1,32 @@
+## 31 COMMIT Unreleased aad072a 2026-09-13T18:30:07-07:00
+
+#### Coming From:
+
+Unreleased aad072a
+
+#### Purpose:
+
+Record the first seek-acceleration build results and continue timing qualification.
+
+#### Outcome:
+
+All three aad072a seeds compile and pass the 135-register CDC audit, but none passes setup at every corner. Seed 52 uses 40401 ALMs and 54723 registers with setup -0.311 ns on scaler pixel unpacking; seed 61 uses 40612 ALMs and 54703 registers with setup -0.382 ns on scaler vertical polyphase rounding; seed 87 uses 40339 ALMs and 54709 registers with setup -0.010 ns on scaler horizontal position to picture-enable. Hold, recovery, removal and pulse width pass in all seeds. All retain 480 RAM blocks, 69 DSPs and three PLLs. Synthesis versus 17743f8 uses 147 fewer combinational ALUTs and 30 more registers, with unchanged block memory bits and DSP/PLL counts. Full build plus audits took 1157 to 1197 seconds. Evidence and explicitly unqualified RBFs are under results/build-aad072a-20260913-180758 and results/hardware-test-aad072a. A second clean placement batch of seeds 53, 62 and 88 from the identical aad072a source is running under results/build-aad072a-20260913-182853; playback logic and timing constraints are unchanged. No candidate has been deployed or hardware accepted.
+
+#### Next Steps:
+
+Finish the additional placement batch and deliver a timing-qualified seek acceleration candidate; if no seed qualifies, address the reported scaler timing paths before qualification.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 30 COMMIT Unreleased aad072a 2026-09-13T17:56:12-07:00
 
 #### Coming From:
@@ -1343,39 +1372,6 @@ Sync to all seed build directories and run the full timing build - given entry 9
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 - tools/decode-hardware-telemetry.py
 - tools/test_telemetry_visibility.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 990 COMMIT Unreleased 03b033f 2026-09-13T02:28:44-07:00
-
-#### Coming From:
-
-Unreleased 2967e0b
-
-#### Purpose:
-
-Fix the third deadlock hardware testing surfaced after entries 986/988/989's fixes shipped: a frozen bank in the picture bookkeeper, not the scheduler or the transport gate.
-
-#### Outcome:
-
-Deployed entry 989's build and asked the user to reload the file again. Fresh telemetry confirmed `presentation_hold=False` throughout (all three earlier fixes are genuinely working - no more indefinite hold, no more fatal-latch drain), but a fresh Main log pull showed `sent` frozen at 143590 bytes with `credit=0` held for 670,000+ poll cycles - real FIFO backpressure this time, not the old unthrottled drain, and a much earlier, smaller failure point than before. Traced it by direct code reading, no simulation needed to find the mechanism (though Icarus reproduction was still used to verify the fix before any hardware build): entry 986's abort deliberately abandons the in-flight overlap reference picture mid-decode, so `picture_420_complete`/`p_persistence_complete` never pulse for it. The separate picture bookkeeper inside `mpeg2_h262_two_picture_probe_p_chain.sv` only advances its own `active_frame_bank_reg` on those same completion pulses, so it freezes on the abandoned picture's bank forever - nothing else in that module resets or advances it. The very next real picture header is then classified by `MediaPlayer.sv`'s separate P-destination-ownership-hold watcher (Commit 162) against that frozen bank; since nothing has moved display since the abort, it very likely collides, latching a hold that can only release once display moves to a new bank - which requires a new picture to decode and get promoted, which requires `stream_ready`, which this same hold blocks. A genuine third circular wait, confirmed in the code before writing any fix. Source `03b033f` adds a new one-cycle pulse output, `overlap_reference_abandoned`, fired by the scheduler in the same cycle as its entry-986 abort, wired into the bookkeeper to advance `active_frame_bank_reg` exactly as a real completion would (the same 0->1->2->0 rotation) while deliberately leaving `completed_frame_bank_reg`, `picture_count_reg`, `reference_frame_valid_reg`, `reference_frame_bank_reg` and `reference_promotion_count_reg` untouched, since this picture was never actually reconstructed and must never be published as a usable reference - only the one frozen value the ownership-hold check reads is corrected. Two testbenches verify this: `tools/test_two_picture_probe_abandon.sv` (new) drives the bookkeeper in isolation and confirms three abandon pulses wrap the bank 0->1->2->0 while every reference/publication field stays at reset, and that a single pulse advances exactly one step, not a level; `tools/test_b_presentation_scheduler_deadlock.sv` (updated) confirms the scheduler's abort pulses `overlap_reference_abandoned` for exactly one cycle. Both pass. `quartus_map` on seed99 is clean, 0 errors, 156 warnings, matching prior baselines.
-
-#### Next Steps:
-
-Sync to all three seed build directories, run the full three-seed timing build, deploy the best-passing seed, and ask the user to reload the file again. If it still stalls, pull fresh telemetry and a fresh Main log immediately and characterize the new failure precisely (unthrottled drain vs real backpressure, and how far it got) rather than assuming it is a variant of any of the first three; three distinct real deadlocks have now surfaced from decoding this one file, each in a different subsystem (the B-reorder scheduler, the transport gate's fatal-error latch, and now the picture bookkeeper/ownership-hold pair), so a fourth is plausible and should be diagnosed from evidence again, not guessed at.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- tools/test_b_presentation_scheduler_deadlock.sv
-- tools/test_two_picture_probe_abandon.sv
 
 #### Status:
 
