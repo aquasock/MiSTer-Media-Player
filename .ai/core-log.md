@@ -1,4 +1,4 @@
-## 71 COMMIT Unreleased ??? 2026-09-14T08:14:32-07:00
+## 71 COMMIT Unreleased 3d48cc5 2026-09-14T08:14:32-07:00
 
 #### Coming From:
 
@@ -10,21 +10,21 @@ Qualify the duration correction and remove the decimal formatter timing bottlene
 
 #### Outcome:
 
-Clean 9076405 seeds 52, 61 and 87 have passed synthesis and are fitting. Additional media checks expose an oracle limitation: ffprobe leaves the final reference picture of test_progressive_mpg.mpg untimestamped despite decoding it. Extend the test-only comparison to count decoded display frames after the last available timestamp, independently of the RTL temporal-reference arithmetic. The updated comparison confirms 30.03 seconds for both test_progressive_mpg.mpg and test_av_sync.mpg; fellow_fixed.mpg also passes its bounded-tail comparison. No RTL change or new build is needed for this test-tool correction. All three completed builds pass CDC and scene-enable audits but fail setup by -0.335, -0.295 and -0.184 ns; actual ALMs are 37721, 37686 and 37677 with unchanged 520 M10Ks and 69 DSPs. Seed 52 fails an existing scaler path; seeds 61 and 87 fail retimed combinational decimal divisions inside the UI formatter. Reuse the existing enabled sequential divider for decimal digit conversion to remove those arithmetic paths, then rerun pixel/lifetime tests and clean three-seed builds. In response to the user font question, also generate a standalone character sheet directly from the unchanged font ROM; it contains 54 visible glyphs.
+Clean 9076405 seeds 52, 61 and 87 have passed synthesis and are fitting. Additional media checks expose an oracle limitation: ffprobe leaves the final reference picture of test_progressive_mpg.mpg untimestamped despite decoding it. Extend the test-only comparison to count decoded display frames after the last available timestamp, independently of the RTL temporal-reference arithmetic. The updated comparison confirms 30.03 seconds for both test_progressive_mpg.mpg and test_av_sync.mpg; fellow_fixed.mpg also passes its bounded-tail comparison. No RTL change or new build is needed for this test-tool correction. All three completed builds pass CDC and scene-enable audits but fail setup by -0.335, -0.295 and -0.184 ns; actual ALMs are 37721, 37686 and 37677 with unchanged 520 M10Ks and 69 DSPs. Seed 52 fails an existing scaler path; seeds 61 and 87 fail retimed combinational decimal divisions inside the UI formatter. The corrected formatter reuses the existing enabled sequential divider for decimal digit conversion, eliminating the combinational /10 and %10 networks. All 5,414,400 pixel comparisons, provider lifetime/state checks and 518 divider cases pass; the duration RTL remains unchanged from its eight successful real-file comparisons. Clean three-seed qualification follows. In response to the user font question, a standalone character sheet is generated directly from the unchanged font ROM; it contains 54 visible glyphs.
 
 #### Next Steps:
 
-Complete the remaining real-file comparison and build qualification, then record the preferred RBF hash, resources and hardware instructions without changing the MiSTer automatically.
+Complete corrected build qualification, then record the preferred RBF hash, resources and hardware instructions without changing the MiSTer automatically.
 
 #### Files Modified:
 
-- tools/verify_ui_duration.py
-- tools/make_font_sheet.py
-- docs/ui/font-sheet.html
-- rtl/media_ui_scene.sv
 - MediaPlayer.sdc
 - docs/TEST_INSTRUCTIONS.md
 - docs/UI_OVERLAY_PLAN.md
+- docs/ui/font-sheet.html
+- rtl/media_ui_scene.sv
+- tools/make_font_sheet.py
+- tools/verify_ui_duration.py
 
 #### Status:
 
