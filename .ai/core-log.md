@@ -1,3 +1,32 @@
+## 81 COMMIT Unreleased ??? 2026-09-14T10:59:57-07:00
+
+#### Coming From:
+
+Unreleased b5a17cf
+
+#### Purpose:
+
+Return completed playback to the startup state after safely draining audio and video.
+
+#### Outcome:
+
+The user narrows the remaining work to EOF only and explicitly drops resume; replacement files continue forgetting the previous state. Add a completion controller requiring physical input EOF, decoder ingress completion, an empty presentation path and finished audio, with one final frame interval before closure and no closure while paused or seeking. Tag completion across clock domains by the existing restart generation so old EOF cannot close a replacement movie. Reuse the existing safe file-change reset/drain path with logical file size cleared, including subtitles, duration, controls and message suppression. Test terminal boundaries, longer audio tails, pause/seek inhibition, stale completion and replacement races, then qualify a new build after the ongoing layout batch.
+
+#### Next Steps:
+
+Implement and validate EOF-to-startup behavior without resume or unrelated playback changes; preserve the accepted subtitle baseline and finish the existing layout builds.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 80 COMMIT Unreleased b5a17cf 2026-09-14T10:42:12-07:00
 
 #### Coming From:
@@ -1295,35 +1324,6 @@ Let the user test seed 87 against the captured Pee Strike freeze and repeated/pa
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 41 COMMIT Unreleased a229a01 2026-09-14T01:18:38-07:00
-
-#### Coming From:
-
-Unreleased a229a01
-
-#### Purpose:
-
-Build the simulation-verified seek display-bank release for hardware testing.
-
-#### Outcome:
-
-The user has now authorized proceeding after the source-only fix, lifting the build hold for this cycle. The standard clean seed 52/61/87 batch will use exact committed source a229a01. Normal playback, repeated retained seeks, EOF seeking, pixel oracles and DDR ownership/drain regressions already pass; no source changes are planned before this batch. The original diagnostic seed 61 is finishing timing independently and does not contain the fix.
-
-#### Next Steps:
-
-Compile the three fixed candidates, audit all timing corners and 147 CDC registers, package hash-verified RBFs, and identify the best completed candidate for the user. Do not deploy or start another placement batch without a further user request.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
