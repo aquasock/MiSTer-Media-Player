@@ -111,3 +111,10 @@ The old reporting bus also carried the reader-error bit used to terminate a
 failed seek. Gate two replaces that payload with a dedicated one-bit
 `reader_error_config` mailbox, retaining all six audited synchronizer stages.
 The required CDC total stays 183 while the 256-bit statistics payload disappears.
+
+Gate two is hardware accepted by the user. Gate three also includes the user's
+compact UI request: black clocks on the bar, removal of Paused/Seeking glyph
+selection and status payload bits, and bar/subtitles lowered one 14-pixel line.
+Activity detection remains functional for bar visibility and seek preview.
+Standalone Audio test modules remain available to offline tests but are excluded
+from files.qip; fitted audits prove no test hardware remains in the core.

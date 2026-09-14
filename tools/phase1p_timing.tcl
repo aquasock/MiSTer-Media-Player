@@ -90,6 +90,25 @@ foreach pattern {
     if {$count != 0} {error "Gate two still contains reporting registers: $pattern"}
 }
 close $reporting_audit
+# Gate three removes the independent tone path, not the movie PCM sink.
+set audio_audit [open "$output_dir/audio_test_removal_audit.rpt" w]
+foreach pattern {
+    {*audio_pcm_test_source:*|*} {*audio_pcm_fifo:*|*}
+    {*audio_pcm_output_adapter:*|*} {*audio_mode_src_fifo*}
+    {*audio_restart_out_fifo*} {*audio_mode_*} {*audio_test_mode*}
+    {*audio_fifo_reset_stretch*} {*audio_src_reset_count*}
+    {*audio_out_reset_count*} {*reset_audio_out_sync*}
+} {
+    set count [get_collection_size [get_registers -nowarn $pattern]]
+    puts $audio_audit "$pattern: $count registers"
+    if {$count != 0} {error "Gate three still contains Audio test registers: $pattern"}
+}
+foreach pattern {{*mp2_pcm_output:*|*} {*mp2_pcm_fifo:*|*} {*mp2_finished_sync*}} {
+    set count [get_collection_size [get_registers -nowarn $pattern]]
+    puts $audio_audit "Retained $pattern: $count registers"
+    if {$count == 0} {error "Gate three lost functional PCM state: $pattern"}
+}
+close $audio_audit
 set cdc_audit [open "$output_dir/configuration_cdc_audit.rpt" w]
 foreach instance {eof_generation_config eof_complete_config subtitle_command_config subtitle_ack_config player_ui_config seek_file_config seek_file_echo_config seek_probe_config playback_control_config playback_position_config playback_audio_config playback_hide_reset_config refresh_request_config refresh_applied_config color_mode_config display_color_config media_prefill_config media_fatal_config reader_error_config aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
     if {[string first "|" $instance] < 0} {

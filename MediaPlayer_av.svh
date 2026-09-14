@@ -119,8 +119,8 @@ mp2_pcm_output #(.ENABLE_PLAYBACK_CONTROL(1)) mp2_pcm_output (
     .audio_l(mp2_output_l),.audio_r(mp2_output_r),.underrun(),
     .timestamp_error(),.finished(mp2_finished),.samples_played()
 );
-assign audio_pcm_output_l=audio_mode_out!=0?audio_test_output_l:mp2_output_l;
-assign audio_pcm_output_r=audio_mode_out!=0?audio_test_output_r:mp2_output_r;
+assign audio_pcm_output_l=mp2_output_l;
+assign audio_pcm_output_r=mp2_output_r;
 wire av_picture_pts_valid;
 wire [32:0] av_picture_pts;
 mpeg2_pes_picture_pts av_picture_pts_bind (

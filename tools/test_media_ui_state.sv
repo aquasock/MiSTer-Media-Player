@@ -12,7 +12,7 @@ initial begin
  @(negedge clk);new_file=0;loaded=1;
  @(negedge clk);if(!state_out[73]) $fatal(1,"first playback hidden");
  elapsed=3600000;paused=1;@(negedge clk);
- if(!state_out[72] || state_out[34:0]!=elapsed) $fatal(1,"pause state");
+ if(state_out[72:71]!=0 || state_out[34:0]!=elapsed) $fatal(1,"pause state");
  repeat(41) @(negedge clk);if(state_out[73]) $fatal(1,"paused wall-clock timeout");
  target=7200000;seeking=1;@(negedge clk);
  if(!state_out[73] || state_out[34:0]!=target || state_out[90:75]!=2) $fatal(1,"seek preview/epoch");

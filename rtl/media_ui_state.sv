@@ -14,7 +14,8 @@ reg [31:0] hide_count=0;
 reg invalid_duration=0;
 wire activity=paused!=paused_d || seeking!=seeking_d || (seeking && target_q!=target_d) || (loaded&&!loaded_d);
 wire known=duration_valid && !invalid_duration;
-assign scene_state={session,loaded,loaded&&(seeking||hide_count!=0),paused,seeking,known,
+// Bits 72:71 are reserved after removal of playback-status labels.
+assign scene_state={session,loaded,loaded&&(seeking||hide_count!=0),2'b00,known,
  duration_q,seeking?target_q:elapsed_q};
 always @(posedge clk) begin
  paused_d<=paused;seeking_d<=seeking;loaded_d<=loaded;target_d<=target_q;

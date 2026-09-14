@@ -1,6 +1,6 @@
 // Scene assembler. Only this producer writes the compositor's inactive page.
-// A future cue producer may update the retained auxiliary provider (slots 4-7)
-// and publish its epoch. No subtitle parser, transport or cue selection exists.
+// Subtitle content uses the retained auxiliary provider (slots 4-7).
+// Slot 3 is disabled; playback status labels are no longer generated.
 module media_ui_scene(
  input wire clk,ce,input wire [90:0] state_in,input wire [11:0] width,height,
  input wire pending,acknowledged,
@@ -62,13 +62,8 @@ reg [23:0] time_digits=0;
 wire known=snapshot[70];
 wire [34:0] duration=snapshot[69:35],position=snapshot[34:0];
 
-// Clocks occupy eight glyphs; the fourth field remains playback status.
-wire [5:0] length=field<3?8:field==3?(snapshot[71]?7:snapshot[72]?6:0):field==4?aux_length0[5:0]:field==5?aux_length1[5:0]:0;
-function [7:0] seeking_glyph;
- input [5:0] index;
- reg [55:0] label;
- begin label="Seeking";seeking_glyph=label[55-index*8 -:8];end
-endfunction
+// Three black clocks share the bar. Slot 3 stays disabled for object stability.
+wire [5:0] length=field<3?8:field==4?aux_length0[5:0]:field==5?aux_length1[5:0]:0;
 function [7:0] time_glyph;
  input [5:0] index;
  begin
@@ -131,10 +126,7 @@ always @(posedge clk) begin
   5:begin
    text_we<=1;text_addr<={field,ch};
    if(ch>=length) text_data<=0;
-   else if(field==3) begin
-    if(snapshot[71]) text_data<=seeking_glyph(ch);
-    else case(ch) 0:text_data<="P";1:text_data<="a";2:text_data<="u";3:text_data<="s";4:text_data<="e";default:text_data<="d";endcase
-   end else text_data<=time_glyph(ch);
+   else text_data<=time_glyph(ch);
    if(ch==63) state<=6;else ch<=ch+1'b1;
   end
   6:multiply({36'd0,w},field==0?12'd141:field==2?12'd579:12'd360,46);
@@ -142,17 +134,21 @@ always @(posedge clk) begin
   7:begin
    tw<=(text_span+12'd3)>>2;th<=scale==9?12'd16:scale==6?12'd11:12'd7;
    tx<=quotient[11:0]-(text_span>>3);
-   multiply({36'd0,h},field==3?12'd455:field==4?(aux_length1!=0?12'd417:12'd431):field==5?12'd431:12'd469,47);
+   multiply({36'd0,h},field==4?(aux_length1!=0?12'd431:12'd445):field==5?12'd445:12'd469,47);
   end
   47:divide(product,35'd480,8);
   8:begin ty<=quotient[11:0];state<=9;end
   9:begin
    object_we<=1;object_addr<={1'b0,field};
-   object_data<={length!=0,(field>=4),(field==3?2'd1:2'd3),4'd0,(tx+tw),(ty+th),ty,tx};
+   object_data<={length!=0,(field>=4),(field<3?2'd1:2'd3),4'd0,(tx+tw),(ty+th),ty,tx};
    if(field==4)subtitle_rect0<={length!=0,1'b1,2'd1,4'd0,(ty+th+12'd2),(tx+tw+12'd2),(ty-12'd2),(tx-12'd2)};
    if(field==5)subtitle_rect1<={length!=0,1'b1,2'd1,4'd0,(ty+th+12'd2),(tx+tw+12'd2),(ty-12'd2),(tx-12'd2)};
-   if(field>=3) begin field<=field+1'b1;ch<=0;state<=10;end
+   if(field>=4) begin field<=field+1'b1;ch<=0;state<=10;end
+   else if(field==2) state<=13;
    else begin field<=field+1'b1;state<=1;end
+  end
+  13:begin // Explicitly disable the unused former status object on each page.
+   object_we<=1;object_addr<=3;object_data<=0;field<=4;ch<=0;state<=10;
   end
   10:state<=11; // synchronous retained-provider character read
   11:begin
@@ -171,13 +167,13 @@ always @(posedge clk) begin
   52:divide(product,35'd720,23);
   23:begin fill_x0<=quotient[11:0];multiply({36'd0,w},12'd686,53);end
   53:divide(product,35'd720,24);
-  24:begin fill_x1<=quotient[11:0];multiply({36'd0,h},12'd452,54);end
+  24:begin fill_x1<=quotient[11:0];multiply({36'd0,h},12'd466,54);end
   54:divide(product,35'd480,25);
-  25:begin track_y0<=quotient[11:0];multiply({36'd0,h},12'd466,55);end
+  25:begin track_y0<=quotient[11:0];multiply({36'd0,h},12'd480,55);end
   55:divide(product,35'd480,26);
-  26:begin track_y1<=quotient[11:0];multiply({36'd0,h},12'd455,56);end
+  26:begin track_y1<=quotient[11:0];multiply({36'd0,h},12'd469,56);end
   56:divide(product,35'd480,27);
-  27:begin fill_y0<=quotient[11:0];multiply({36'd0,h},12'd463,57);end
+  27:begin fill_y0<=quotient[11:0];multiply({36'd0,h},12'd477,57);end
   57:divide(product,35'd480,28);
   28:begin
    fill_y1<=quotient[11:0];

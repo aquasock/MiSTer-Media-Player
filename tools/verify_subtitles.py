@@ -24,7 +24,7 @@ for w,h,shown,lines,epoch in [(720,480,0,1,1),(720,480,1,2,1),(1280,720,0,2,1),(
  expected=oracle(w,h,1,shown,0,0)
  if epoch==1:
   scale=9 if h>=1000 else 6 if h>=700 else 4
-  for text,y in zip(['Hello, world!','Subtitle line two.'][:lines],[417,431] if lines==2 else [431]):
+  for text,y in zip(['Hello, world!','Subtitle line two.'][:lines],[431,445] if lines==2 else [445]):
    x0=w//2-len(text)*6*scale//8;y0=h*y//480
    tw=(len(text)*6*scale+3)//4;th=(7*scale+3)//4
    # Existing dark-alpha palette behind the text, using reserved rectangles.

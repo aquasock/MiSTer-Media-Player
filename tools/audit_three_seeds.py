@@ -7,6 +7,7 @@ p.add_argument('build',type=Path);p.add_argument('--cdc-registers',type=int,defa
 p.add_argument('--baseline-alms',type=int,default=35774);p.add_argument('--baseline-ram',type=int,default=508)
 p.add_argument('--require-no-profiler',action='store_true')
 p.add_argument('--require-no-reporting',action='store_true')
+p.add_argument('--require-no-audio-test',action='store_true')
 p.add_argument('--scope',default='See the source-specific test instructions for feature scope and hardware acceptance.')
 a=p.parse_args();base=a.build.resolve();state=json.loads((base/'status.json').read_text());summary={}
 for seed in (52,61,87):
@@ -54,9 +55,12 @@ for seed in (52,61,87):
  reporting_file=root/'phase1p_timing_reports/reporting_removal_audit.rpt'
  reporting_lines=reporting_file.read_text().splitlines() if reporting_file.exists() else []
  reporting_absent=len(reporting_lines)==17 and all(x.endswith(': 0 registers') for x in reporting_lines)
- passed=cdc and enable_ok and (not a.require_no_reporting or reporting_absent) and (not a.require_no_profiler or profiler_absent) and all(v>=0 for v in minima.values())
+ audio_file=root/'phase1p_timing_reports/audio_test_removal_audit.rpt'
+ audio_lines=audio_file.read_text().splitlines() if audio_file.exists() else []
+ audio_absent=len(audio_lines)==14 and all(x.endswith(': 0 registers') for x in audio_lines[:11]) and all(re.search(r': [1-9][0-9]* registers$',x) for x in audio_lines[11:])
+ passed=(not a.require_no_audio_test or audio_absent) and cdc and enable_ok and (not a.require_no_reporting or reporting_absent) and (not a.require_no_profiler or profiler_absent) and all(v>=0 for v in minima.values())
  item={'source':state['source'],'seed':seed,'corners':corners,'minimum_slack_ns':minima,
- 'reporting_absent':reporting_absent,'profiler_absent':profiler_absent,'scene_enable_audit_passed':enable_ok,'cdc_registers':len(lines),'cdc_audit_passed':cdc,'timing_passed':passed,'resource_budget_passed':budget,
+ 'audio_test_absent_and_pcm_retained':audio_absent,'reporting_absent':reporting_absent,'profiler_absent':profiler_absent,'scene_enable_audit_passed':enable_ok,'cdc_registers':len(lines),'cdc_audit_passed':cdc,'timing_passed':passed,'resource_budget_passed':budget,
  'hardware_accepted':False,'rbf_sha256':info['rbf_sha256'],'resources':resources,
  'scope':a.scope}
  summary[str(seed)]=item

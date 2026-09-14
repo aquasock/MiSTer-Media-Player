@@ -1,3 +1,34 @@
+# Diagnostic removal gate three and compact time bar
+
+Gate two (100ab07 seed 87) is hardware accepted: the user reports all tests pass.
+Retain it as rollback. This candidate removes Audio test and its independent
+source, test FIFOs, control/reset state and output adapter. Movie PCM connects
+directly to the existing MiSTer audio outputs; old menu status bits 1–3 are
+reserved and cannot select a tone or override movie sound.
+
+Elapsed, total and remaining time are black glyphs on the progress bar.
+Paused/Seeking labels and their character-selection logic are removed.
+The bar and subtitles move down one 14-pixel logical line: at 720×480 the
+bar occupies y=466–479, clocks start at y=469, and subtitle lines at y=431/445.
+Pause/seek still reveal the bar; seek previews, unknown-time dashes and normal
+visibility timeout remain. The pixel pipeline and subtitle styling remain intact.
+
+Repeat Fellow, Groove, Jiggler and Star Wars at 50/59.94 Hz: startup/audio,
+pause/resume, short/long/backward/repeated seeks, OSD and audio/video filters,
+SRT loading/cue timing, replacement movies and clean EOF including audio tails.
+Check the black clocks over empty/full/unknown progress and no bottom clipping.
+No Paused/Seeking labels or Audio test menu should remain. Fitted audits require
+all test-audio registers absent and movie PCM/FIFO/finished state present, plus
+all 183 functional CDC stages. Timing is reported without extra closure builds.
+
+Gate-three regressions pass under results/gate3-*: 12 full-frame player cases
+and five subtitle cases (480p/720p/1080p), subtitle transport and lifetime,
+reader-error cancellation, pause/seek and EOF controls. Both mixed and seek-EOF
+oracles check 423936 reconstruction pixels without mismatches. Audio compares
+48384 stereo pairs against FFmpeg within one PCM unit, retains exact pause/seek
+sequences, and checks 30 picture timestamps without underrun or timestamp warning.
+Hardware acceptance and fitted resource/timing results remain pending.
+
 # Diagnostic removal gate two
 
 Gate two removes the remaining telemetry mailbox, reporting crossings and

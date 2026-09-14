@@ -18,6 +18,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Remove Audio test menu and hardware; connect movie PCM directly to outputs
+  and reserve old status bits 1–3. Retain functional playback audio and filters.
+- Draw all three clocks in black on the progress bar, remove Paused/Seeking
+  labels and rendering logic, and lower the bar/subtitles one logical text line.
+
 - Diagnostic-removal gate two removes reporting connections/crossings and
   legacy LED-success wiring, with named functional scheduler drain outputs.
   Keep live decode/transport protection and Audio test; retain standalone
