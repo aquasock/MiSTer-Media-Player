@@ -1,3 +1,32 @@
+## 106 COMMIT Unreleased b3e4f1d 2026-09-14T16:50:07-07:00
+
+#### Coming From:
+
+Unreleased b3e4f1d
+
+#### Purpose:
+
+Record the completed first production FLAC builds and their timing qualification.
+
+#### Outcome:
+
+All three clean b3e4f1d seeds 52/61/87 compiled and completed timing audits. Setup and hold pass across all four corners, but recovery fails in the new selected audio and native CD clock domains, so no seed is fully timing-qualified. Seed 87 has setup +0.354 ns, hold +0.102 ns and recovery -12.538 ns; it uses 37919 placed ALMs, 507 M10Ks, 61 DSPs and four PLLs. Seed 61 uses 37979 ALMs with setup +0.284 ns, hold +0.112 ns and recovery -12.210 ns. Seed 52 uses 38066 ALMs with setup +0.080 ns, hold +0.094 ns and recovery -12.691 ns. Resource counts other than ALMs are common to all three. RBFs and the complete report are packaged under results/hardware-test-b3e4f1d. Physical native 44.1 kHz output remains untested. The separate pending subtitle work targets the user's final 0.50x to 1.50x speed range and is absent from these build snapshots.
+
+#### Next Steps:
+
+Inspect and correct audio reset-recovery paths before claiming timing closure, and bundle the prepared subtitle controls into the next authorized FLAC build. Preserve the accepted b639ccc seed 52 rollback and perform native audio plus four-movie hardware regression before acceptance.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 105 COMMIT Unreleased ??? 2026-09-14T16:40:32-07:00
 
 #### Coming From:
@@ -1407,35 +1436,6 @@ Have the user test duration, progress, pause/seek feedback and OSD/filter coexis
 
 - docs/TEST_INSTRUCTIONS.md
 - docs/UI_OVERLAY_PLAN.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 66 COMMIT Unreleased 9f16364 2026-09-14T07:38:35-07:00
-
-#### Coming From:
-
-Unreleased b00920a
-
-#### Purpose:
-
-Qualify the completed overlay builds with an audit that recognizes fitted counter duplicates.
-
-#### Outcome:
-
-All three b00920a seeds compile successfully, using 37450, 37424 and 37503 actual placed ALMs for seeds 52, 61 and 87, with 520 M10Ks and 69 DSPs. These meet the initial incremental resource budgets. The new scene-enable audit stops before all-corner reporting because its two-register wildcard also returns routing duplicates. A direct fitted-netlist query confirms the two original scene_phase bits and one duplicate of each, plus 1144 scoped formatter registers. Audit revision 9f16364 requires both original bits, accepts only explicitly named routing copies and reports those separately. RTL, timing constraints and fitted binaries are unchanged. Qualification is rerunning on the existing archives; status.json records the original audit failure and the new audit-tool revision separately from the RBF source. Hardware acceptance remains pending.
-
-#### Next Steps:
-
-Complete all-corner and CDC qualification, package the best passing seed and update hardware instructions with measured resources, timing and its exact RBF hash.
-
-#### Files Modified:
-
-- tools/phase1p_timing.tcl
 
 #### Status:
 
