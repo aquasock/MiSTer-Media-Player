@@ -44,14 +44,26 @@ instance of the existing PES parser; it does not duplicate the reader RAM.
 The first validated head video PTS is the movie origin; malformed head
 evidence and a different selected video-stream ID in the tail are rejected. The tail requires sequence/rate
 metadata, timestamped pictures, slice evidence and a complete packet boundary.
-It retains the maximum relative PTS plus a progressive frame period, rather
-than taking the last decoded B-picture timestamp. Missing timestamps after
-the latest maximum leave the endpoint unknown. Earlier missing timestamps can
-be superseded by a later qualified maximum in the continuous-timeline scope.
-This is header-based endpoint qualification, not a full tail decode or proof
-of arbitrary concatenated-file continuity. Repeat-field/extended-rate cases,
-ambiguous half-wrap spans, malformed headers and insufficient evidence remain
-unknown. A presented position beyond the qualified endpoint invalidates it.
+The sparse-timestamp correction reconstructs picture presentation times from
+PTS anchors, temporal references and the supported progressive frame period.
+Reference pictures unwrap the modulo-1024 temporal reference; B-pictures use
+their position before the following reference. A late B-picture anchor can
+therefore establish the endpoint of an earlier-coded future reference. Group
+boundaries carry the previous group's endpoint into the next group, including
+when that group has no new PTS. A serialized multiplier performs both picture
+and maximum-group offsets without adding DSPs. Up to one 90 kHz tick of anchor
+quantization is accepted; conflicting anchors make the duration unknown.
+
+This follows the temporal-reference semantics in the project's controlled
+[H.262 (02/2000), clause 6.3.9](https://www.itu.int/rec/T-REC-H.262-200002-S/en).
+It remains header-based qualification of the video endpoint, not full decoding
+or proof of arbitrary concatenated-file continuity. Unanchored windows, mixed
+frame rates, repeat-field/extended-rate cases, ambiguous half-wrap timestamp
+spans, invalid picture order, malformed headers and insufficient final slice
+or packet evidence remain unknown. The temporal-index implementation is bounded
+to 20 bits per group inside the fixed-size probe window. No whole-file scan or
+file-size duration estimate is used. A presented position beyond the qualified
+endpoint still invalidates it.
 The 25-second preflight watchdog stops work; an outstanding storage request
 still has to retire before playback can safely take ownership.
 
@@ -73,7 +85,8 @@ python3 tools/verify_decoder_timing.py --playback-controls --display-ownership -
 
 `verify_ui_duration.py` checks synthetic endpoint cases and actual shared-reader
 retirement, including offsets above 4 GiB. The optional complete MPEG check
-compares the endpoint with ffprobe timestamps plus the exact frame period.
+decodes only the bounded tail with ffprobe and compares reconstructed display
+timestamps plus the exact frame period. Repeat `--media` to check multiple files.
 `verify_player_overlay.py` checks every pixel at three HDMI sizes, time fields,
 unknown/hidden states, pause/seek, progress endpoints, timing alignment and
 retained-provider/epoch behavior. The isolated compositor fit checks internal

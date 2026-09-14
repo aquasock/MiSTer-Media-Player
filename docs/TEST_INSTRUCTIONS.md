@@ -1,3 +1,18 @@
+# Sparse-timestamp duration correction — build qualification pending
+
+The next candidate resolves `Groove.mpg` using MPEG picture-order information
+between timestamp anchors. The exact file's bounded-window RTL replay now
+reports approximately **01:18:25** total, matching independently decoded video
+endpoint timing within one 90 kHz tick. Star Wars LOWER, Pee Strike and fellow
+also pass that comparison. Audio-track/container duration may differ from the
+video endpoint used by these fields.
+
+Load speed retains the same 64 KiB head / 4 MiB tail read limits. Files without
+sufficient bounded evidence still show dashes, as requested; there is no full
+file scan. On the timing-qualified candidate, check Groove's Total and Remaining,
+then pause, seek and switch to Star Wars LOWER to confirm cached duration and
+elapsed position behave correctly. Retain the tested b00920a seed 52 below.
+
 # Timing-qualified player overlay: b00920a seed 52
 
 Preferred RBF: `results/hardware-test-b00920a/seed52/MediaPlayer_20260914.rbf`.

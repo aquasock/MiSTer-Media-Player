@@ -16,6 +16,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Fixed
 
+- Infer duration between sparse MPEG picture timestamps using presentation-order
+  references, including reordered B-pictures and following groups without new
+  timestamps. Groove and three other real-file tail checks match decoded video
+  endpoints. Head/tail reads stay bounded; insufficient evidence remains unknown.
+
 - Seeking now retires the stopped display reader's retained DDR bank protection
   after outstanding reads drain. This allows reconstruction to reuse the bank
   instead of stalling until its watchdog expires. Normal display and pause
