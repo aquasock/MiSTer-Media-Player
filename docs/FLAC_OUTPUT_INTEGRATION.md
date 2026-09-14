@@ -188,3 +188,12 @@ domains retain their existing CDC checks. The SDC requires the selector nodes
 to resolve uniquely, and the post-fit audit requires both generated clocks and
 all new reset/signal synchronizer stages. A preliminary map timing review found
 and corrected impossible cross-mode paths before the first routed candidate.
+
+The final clock wrapper explicitly gates output off, waits sixteen 50 MHz
+cycles, selects PLL input 2 or 3, waits sixteen more cycles, then reenables
+output through three-stage per-PLL enable synchronizers. The vendor automatic
+switch wrapper is disabled because its internal select register powers up at
+input zero; with PLLs only on 2/3 it cannot clock itself into a valid selection.
+The integration simulation now executes the actual production sequencing RTL,
+models only the PLL and hard falling-edge gate, and rejects selection while
+the output gate is enabled or an output-clock pulse shorter than 20 ns.

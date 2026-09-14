@@ -164,7 +164,7 @@ foreach chain {wr_reset_sync rd_reset_sync ref_reset_sync movie_reset_sync out_r
 # still require explicit mailboxes/synchronizers rather than a blanket cut.
 set music_master [get_clocks {*native_audio|clocks|cd_pll|*|divclk}]
 set movie_master [get_clocks {pll_audio|pll_audio_inst|altera_pll_i|*|divclk}]
-set music_mux_out [get_pins -compatibility_mode {*native_audio|clocks|selector|auto_generated|sd1|outclk}]
+set music_mux_out [get_pins -compatibility_mode {*native_audio|clocks|selector|auto_generated|sd2|outclk}]
 set music_mux_in [get_pins -compatibility_mode {*native_audio|clocks|selector|auto_generated|sd2|inclk[3]}]
 set movie_mux_in [get_pins -compatibility_mode {*native_audio|clocks|selector|auto_generated|sd2|inclk[2]}]
 foreach collection [list $music_master $movie_master $music_mux_out $music_mux_in $movie_mux_in] {
@@ -173,3 +173,11 @@ foreach collection [list $music_master $movie_master $music_mux_out $music_mux_i
 create_generated_clock -name audio_mux_cd -master_clock $music_master -source $music_mux_in -divide_by 1 $music_mux_out
 create_generated_clock -name audio_mux_movie -master_clock $movie_master -source $movie_mux_in -divide_by 1 -add $music_mux_out
 set_clock_groups -physically_exclusive -group [get_clocks audio_mux_cd] -group [get_clocks audio_mux_movie]
+
+# Gate requests cross through three preserved stages before the hard gate.
+set_false_path -to [get_keepers {*media_audio_clocks:*|cd_gate_sync[0]}]
+set_false_path -to [get_keepers {*media_audio_clocks:*|movie_gate_sync[0]}]
+# The same held select bit chooses both PLL and its synchronized gate request.
+# The opposite-clock enable is therefore unreachable at the selected gate.
+set_false_path -from [get_keepers {*media_audio_clocks:*|movie_gate_sync[2]}] -to [get_clocks audio_mux_cd]
+set_false_path -from [get_keepers {*media_audio_clocks:*|cd_gate_sync[2]}] -to [get_clocks audio_mux_movie]

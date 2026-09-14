@@ -1,10 +1,23 @@
 `timescale 1ns/1ps
-// PLL/clock-switch functional model only. Quartus independently fits the real
-// vendor clock primitives; simulation does not qualify physical clock switching.
-module media_audio_clocks(input refclk,reset,movie_clock,select_cd,enable,output reg cd_clock=0,output cd_locked,output output_clock);
- always #22.144274 cd_clock=~cd_clock;
- assign cd_locked=!reset;
- assign output_clock=enable?(select_cd?cd_clock:movie_clock):0;
+// Functional PLL and hard clock-control primitive models only. The real
+// production media_audio_clocks state machine is included in this test.
+module altera_pll #(
+ parameter fractional_vco_multiplier="",reference_clock_frequency="",operation_mode="",number_of_clocks=1,
+ output_clock_frequency0="",phase_shift0="",duty_cycle0=50,pll_type="",pll_subtype=""
+)(input refclk,rst,fbclk,output reg outclk=0,output locked,fboutclk);
+ always #22.144274 outclk=~outclk;
+ assign locked=!rst;assign fboutclk=0;
+endmodule
+module altclkctrl #(
+ parameter clock_type="",number_of_clocks=4,width_clkselect=2,ena_register_mode="",use_glitch_free_switch_over_implementation=""
+)(input[3:0] inclk,input[1:0] clkselect,input ena,output outclk);
+ reg gate=0;wire selected=inclk[clkselect];
+ always @(negedge selected)gate<=ena;
+ assign outclk=selected&&gate;
+ always @(clkselect)if(gate)$fatal(1,"clock selection changed while enabled");
+ initial begin
+  if(use_glitch_free_switch_over_implementation!="OFF"||ena_register_mode!="falling edge")$fatal(1,"primitive model supports the explicit gated handoff only");
+ end
 endmodule
 module test_media_native_audio;
  reg refclk=0,config_clk=0,wr_clk=0,movie_clock=0;
@@ -30,6 +43,11 @@ module test_media_native_audio;
  wire pad_scl=!(drive_scl_low||slave_scl_low),pad_sda=!(drive_sda_low||slave_sda_low);
  wire readback_pass=dut.control.config_controller.pass==2;
  media_native_audio dut(.*);
+ realtime last_clock_edge=0;
+ always @(output_mclk)if(!reset)begin
+  if(last_clock_edge!=0&&$realtime-last_clock_edge<20.0)$fatal(1,"short output clock pulse during handoff");
+  last_clock_edge=$realtime;
+ end
  `include "i2c_register_model.svh"
  always @(posedge wr_clk)if(pcm_valid&&pcm_ready)sent<=sent+1;
  reg[15:0] serial_shift=0,left_word=0,right_word=0;

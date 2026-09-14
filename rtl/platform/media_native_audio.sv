@@ -25,7 +25,7 @@ module media_native_audio(
  video_config_cdc #(.WIDTH(8)) config_ref(.src_clk(config_clk),.dst_clk(refclk),.src_data({want_cd,paused,movie_96k,attenuation}),.dst_data(cfg_ref));
  video_config_cdc #(.WIDTH(8)) config_cd(.src_clk(config_clk),.dst_clk(cd_clock),.src_data({want_cd,paused,movie_96k,attenuation}),.dst_data(cfg_cd));
  wire select_cd,mute,cd_ready,config_error,cd_locked;
- media_audio_clocks clocks(.refclk(refclk),.reset(reset),.movie_clock(movie_clock),.select_cd(select_cd),.enable(1'b1),
+ media_audio_clocks clocks(.refclk(refclk),.reset(ref_reset_sync[2]),.movie_clock(movie_clock),.select_cd(select_cd),.enable(1'b1),
   .cd_clock(cd_clock),.cd_locked(cd_locked),.output_clock(output_mclk));
  // Ready comes from edges of the actual selected clock, with a matching mode
  // echo; neither a requested mode nor PLL lock alone acknowledges a handoff.

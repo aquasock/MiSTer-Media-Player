@@ -183,7 +183,7 @@ foreach chain {req_sync ack_sync} {
         if {$count != 1} {error "Missing session synchronizer: $pattern"}
     }
 }
-foreach chain {select_sync lock_sync mute_movie_sync wr_reset_sync rd_reset_sync ref_reset_sync movie_reset_sync out_reset_sync} {
+foreach chain {select_sync lock_sync mute_movie_sync wr_reset_sync rd_reset_sync ref_reset_sync movie_reset_sync out_reset_sync cd_gate_sync movie_gate_sync} {
     for {set stage 0} {$stage < 3} {incr stage} {
         set pattern [format {*media_native_audio:*|%s[%d]} $chain $stage]
         set count [get_collection_size [get_registers $pattern]]
