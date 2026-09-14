@@ -1,4 +1,8 @@
-# Sparse-timestamp duration correction — build qualification pending
+# Sparse-timestamp duration correction — revised build qualification pending
+
+Initial `9076405` builds compile but fail setup in scaler/decimal formatter
+paths. They are not recommended. The revision uses the existing sequential
+divider for decimal digits; pixels and time-field contents are unchanged.
 
 The next candidate resolves `Groove.mpg` using MPEG picture-order information
 between timestamp anchors. The exact file's bounded-window RTL replay now

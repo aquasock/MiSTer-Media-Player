@@ -56,6 +56,7 @@ task multiply;
   multiply_resume<=next_state;state<=36;
  end
 endtask
+reg [23:0] time_digits=0;
 wire known=snapshot[70];
 wire [34:0] duration=snapshot[69:35],position=snapshot[34:0];
 
@@ -78,9 +79,9 @@ function [7:0] time_glyph;
   if(index==2 || index==5) time_glyph=":";
   else if(field!=0 && !known) time_glyph="-";
   else case(index)
-   0:time_glyph=48+hours/10;1:time_glyph=48+hours%10;
-   3:time_glyph=48+minutes/10;4:time_glyph=48+minutes%10;
-   6:time_glyph=48+seconds/10;default:time_glyph=48+seconds%10;
+   0:time_glyph={4'h3,time_digits[23:20]};1:time_glyph={4'h3,time_digits[19:16]};
+   3:time_glyph={4'h3,time_digits[15:12]};4:time_glyph={4'h3,time_digits[11:8]};
+   6:time_glyph={4'h3,time_digits[7:4]};default:time_glyph={4'h3,time_digits[3:0]};
   endcase
  end
 endfunction
@@ -118,7 +119,19 @@ always @(posedge clk) begin
   41:divide({12'd0,time_rounded},35'd360000,2);
   2:divide(quotient>359999?48'd359999:quotient,35'd3600,3);
   3:begin hours<=quotient[6:0];divide({13'd0,remainder},35'd60,4);end
-  4:begin minutes<=quotient[6:0];seconds<=remainder[6:0];ch<=0;state<=5;end
+  4:begin minutes<=quotient[6:0];seconds<=remainder[6:0];ch<=0;state<=60;end
+  // Convert decimal digits once per field on the existing sequential unit.
+  // This avoids inferred combinational /10 and %10 networks in glyph writes.
+  60:divide({41'd0,hours},35'd10,61);
+  61:begin
+   time_digits[23:20]<=quotient[3:0];time_digits[19:16]<=remainder[3:0];
+   divide({41'd0,minutes},35'd10,62);
+  end
+  62:begin
+   time_digits[15:12]<=quotient[3:0];time_digits[11:8]<=remainder[3:0];
+   divide({41'd0,seconds},35'd10,63);
+  end
+  63:begin time_digits[7:4]<=quotient[3:0];time_digits[3:0]<=remainder[3:0];state<=5;end
   5:begin
    text_we<=1;text_addr<={field,ch};
    if(ch>=length) text_data<=0;

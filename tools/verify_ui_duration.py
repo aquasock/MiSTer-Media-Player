@@ -85,8 +85,13 @@ for media_index,media in enumerate(a.media):
  # ffprobe best_effort_timestamp reconstructs timestamps omitted in PES.
  frames=json.loads(subprocess.check_output(['ffprobe','-v','quiet','-select_streams','v:0','-show_frames','-show_entries','frame=best_effort_timestamp:stream=r_frame_rate','-of','json',str(tail_file)]))
  rate=Fraction(frames['streams'][0]['r_frame_rate'])
- last=max(int(x['best_effort_timestamp']) for x in frames['frames'])
- endq=((last-first)%(1<<33))*4+int(Fraction(360000,1)/rate)
+ # ffprobe can leave the final reference frame untimestamped. Its decoded
+ # display order still provides an independent frame count after the last
+ # available timestamp, without relying on the RTL's temporal-reference math.
+ timed=[(i,int(x['best_effort_timestamp'])) for i,x in enumerate(frames['frames']) if 'best_effort_timestamp' in x]
+ assert timed, f'{media}: independent timestamp anchor unavailable'
+ last_index,last=timed[-1]
+ endq=((last-first)%(1<<33))*4+(len(frames['frames'])-last_index)*int(Fraction(360000,1)/rate)
  result=run(name+'_tail',tail,first,1)
  assert abs(result['end']-endq)<=4, f'{media}: RTL {result["end"]}, independent endpoint {endq}'
  (o/(name+'_comparison.json')).write_text(json.dumps({'file':str(media.resolve()),'head_bytes':len(head),'tail_bytes':len(tail),'origin':first,'frame_rate':str(rate),'expected_end_q':endq,'actual_end_q':result['end'],'difference_q':result['end']-endq},indent=2)+'\n')

@@ -5,13 +5,14 @@ renderer and duration preflight now implement this design in RTL; hardware
 candidate `b00920a` seed 52 passes four-corner timing and resource qualification;
 user hardware validation is pending. See `TEST_INSTRUCTIONS.md`. The [interactive preview](ui/overlay-preview.html)
 remains a design aid; deterministic RTL renderings are produced by the tests.
+The [font character sheet](ui/font-sheet.html) shows the actual ROM glyphs.
 
 ## Implemented interface and bounds
 
 `media_ui_state` produces a coherent 91-bit presentation snapshot in the
 20 MHz core system domain. `player_ui_config` transfers it to HDMI with the
 existing coalescing request/acknowledge mailbox. `media_ui_scene` assembles an
-inactive scene there, using a sequential divider and one serialized multiplier for all
+inactive scene there, using a sequential divider (including decimal digit conversion) and one serialized multiplier for all
 layout and progress arithmetic. Both advance only every fourth HDMI clock;
 timing exceptions apply exclusively between registers sharing that enable.
 Mailbox inputs, provider writes, pixel logic and compositor-facing outputs
