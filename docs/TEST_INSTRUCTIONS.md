@@ -26,7 +26,17 @@ reader timeout/malformed-response quarantine, independent reader-error CDC and
 seek retirement, raster/refresh, UI/subtitle pixel and cue tests pass. The audio
 oracle checks 48384 sample pairs within one PCM unit of FFmpeg, exact pause/seek
 sample sequences and 30 picture timestamps with no underrun/timestamp warning.
-Evidence is under results/gate2-*. Build timing/resources remain pending.
+Evidence is under results/gate2-*. All 100ab07 seeds pass four timing corners,
+183 CDC stage checks, the zero-profiler audit and all 17 reporting-removal checks.
+Setup slack for seeds 52/61/87 is +0.072/+0.188/+0.344 ns; hold is
++0.116/+0.115/+0.106 ns. Preferred seed 87 uses 37,326 actual ALMs, 527 M10Ks
+and 75 DSPs, leaving 4,584 ALMs and 26 M10Ks free. Estimated ALMs are 31,820.
+Resources are essentially flat against gate-one seed 52 (37,267 actual/31,787
+estimated ALMs); source cleanup does not guarantee additional fitted savings.
+
+Preferred gate-two RBF: `results/hardware-test-100ab07/seed87/MediaPlayer_20260914.rbf`.
+SHA-256: `297690c42da92880077be53601e23a7a7fc8c6d4d90fc50105577f0c7f288dba`.
+Hardware acceptance is pending. Audio test remains for gate three.
 
 # Diagnostic removal gate one
 
