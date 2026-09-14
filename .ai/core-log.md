@@ -1,3 +1,32 @@
+## 87 COMMIT Unreleased 0ad4b1b 2026-09-14T12:36:07-07:00
+
+#### Coming From:
+
+Unreleased 100ab07
+
+#### Purpose:
+
+Qualify and package gate-two builds for the user's four-file hardware test.
+
+#### Outcome:
+
+All 100ab07 seeds complete in 15.1-15.6 minutes and pass four timing corners, 183 CDC stage checks, scene-enable checks, zero-profiler audit and all 17 reporting-removal patterns. Seeds 52/61/87 have setup +0.072/+0.188/+0.344 ns, hold +0.116/+0.115/+0.106 ns, actual ALMs 37325/37366/37326 and estimated ALMs 31844/31900/31820. All retain 527 M10Ks, 75 DSPs and three PLLs. Preferred seed 87 leaves 4584 ALMs and 26 M10Ks, with resources essentially flat versus gate-one seed 52: +59 placed and +33 estimated ALMs despite verified reporting-register removal. No further savings should be claimed from this gate. Hash-verified candidates are under results/hardware-test-100ab07; preferred seed87/MediaPlayer_20260914.rbf SHA-256 is 297690c42da92880077be53601e23a7a7fc8c6d4d90fc50105577f0c7f288dba. Audio test remains for gate three. No additional builds, timing fixes or deployment were performed; gate-two hardware acceptance is pending.
+
+#### Next Steps:
+
+Have the user test Fellow, Groove, Jiggler and Star Wars with playback, pause/seek, subtitles, OSD/filters, file replacement and EOF at both output rates; await authorization before gate three. Retain gate-one seed 52 and accepted b05b76f seed 87 as rollback.
+
+#### Files Modified:
+
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 86 COMMIT Unreleased 100ab07 2026-09-14T12:09:09-07:00
 
 #### Coming From:
@@ -1369,35 +1398,6 @@ All three source 3ab6615 builds failed fitter LAB capacity and produced no RBF. 
 #### Next Steps:
 
 Plan another bounded resource reduction to create packing margin before repeating the three-seed build, preserving seek behavior and existing regression coverage. The prior a229a01 seed 87 remains the timing-qualified hardware rollback; there is no new direct-seek binary to test.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 47 COMMIT Unreleased 3ab6615 2026-09-14T02:54:33-07:00
-
-#### Coming From:
-
-Unreleased 3ab6615
-
-#### Purpose:
-
-Build and qualify the reduced direct-seek source using the standard three placement seeds.
-
-#### Outcome:
-
-The user authorized proceeding with builds after the reduction tests passed. GitHub and local master were verified synchronized, then clean exports of source 3ab6615 started at 2026-09-14T02:54:05-07:00 for seeds 52, 61 and 87, with six workers each, under results/build-3ab6615-20260914-025405. Only seed and worker settings differ from committed source. The batch runs compile followed by focused timing; result packaging requires all four timing corners and the 165-register CDC audit. No replacement RBF exists yet and the MiSTer has not been changed.
-
-#### Next Steps:
-
-Inspect synthesis and fitting resource usage, finish the three builds and timing audits, then package the best completed candidate with exact source, seed, hash and qualification status. Preserve failed artifacts and the a229a01 seed 87 rollback. Hardware testing remains with the user; do not deploy automatically.
 
 #### Files Modified:
 
