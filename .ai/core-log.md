@@ -1,4 +1,4 @@
-## 59 COMMIT Unreleased ??? 2026-09-14T04:48:02-07:00
+## 59 COMMIT Unreleased 3ff27c8 2026-09-14T04:48:02-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Move IDCT intermediate storage into banked M10K memory while preserving transfor
 
 #### Outcome:
 
-The user approved the first proposed IDCT storage optimization. Start with the intermediate arrays only in all three IDCT instances, budgeting eight 8-by-24 banks per instance and 24 additional M10Ks overall. Keep coefficients and all arithmetic unchanged. Prefetch the next column synchronously, including the pass transition, so the existing multiplier issue and sample cycles remain unchanged. Do not reset the RAM contents; every complete first pass overwrites all entries before consumption, and reset cancels the transform. No RTL change or build has yet been performed.
+Source 3ff27c8 moves the intermediate array of all three IDCT instances into eight synchronous 8-by-24 M10K row banks per instance, leaving coefficients and arithmetic unchanged. Column-ahead prefetch preserves all external output cycles against dc1dfc2 in a differential test covering signed impulses, dense extremes, 512 random sparse blocks, 133 reset offsets, simultaneous input controls and overlap errors. The test compares 164020 cycles and observes 783 completed blocks and 52128 samples including aborted transforms. The mixed I/P/B pixel oracle passes 423936 comparisons with zero mismatches within its allowed numerical tolerance and passes paused seeks with display ownership. Exact Pee Strike direct restart through shared DDR passes at cycle 40027997 with elapsed_q 3663660, matching the baseline recovery point. Evidence is under results/idct-storage. Tested source was committed and pushed before clean seeds 52, 61 and 87 started under results/build-3ff27c8-20260914-045213 with six workers each. No new RBF or measured resource saving is available yet; hardware-accepted dc1dfc2 seed 52 is retained.
 
 #### Next Steps:
 
-Implement banked intermediate storage and differential tests against dc1dfc2 covering sparse and dense blocks, signed extremes, repeated blocks and reset interruption. Require identical output values and cycles, run the mixed-picture pixel oracle with paused seeks and display ownership plus exact-file A/V replay, commit and push tested source, then compile seeds 52, 61 and 87. Confirm M10K inference, actual placed ALMs and all timing corners before packaging the best candidate for hardware acceptance.
+Finish all three builds and verify 24 intermediate banks infer M10K. Compare actual placed ALMs and total RAM blocks with dc1dfc2, require all timing corners and the 153-register CDC audit, then package the preferred passing candidate for hardware playback and seek validation. Do not deploy automatically.
 
 #### Files Modified:
 
