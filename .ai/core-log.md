@@ -1,3 +1,32 @@
+## 53 COMMIT Unreleased bcddb20 2026-09-14T03:41:24-07:00
+
+#### Coming From:
+
+Unreleased bcddb20
+
+#### Purpose:
+
+Record hardware acceptance of the direct-seek seed 61 candidate.
+
+#### Outcome:
+
+The user reports that the core works well and seeking is rock solid and decently fast with the delivered bcddb20 seed 61 candidate. Passed records this reported playback/seek acceptance, not an independently enumerated matrix of files, keys or EOF cases. Its local build-info now records that scope. The separate maximum-packing experiment remains independent and is not accepted by this feedback. The user also asked what lies behind the black seek display: media_seeking holds the framebuffer reader/cache in reset, which forces RGB black while raster timing continues. Probe passes scan container/video headers without codec reconstruction; after selecting a restart point, the decoder reconstructs the short lead-in and reuses released frame banks. There is no intact live picture under an overlay; removing reset/blanking alone would expose invalid or changing data and can interfere with the display-bank release that fixed seeking. No playback source or hardware state was changed.
+
+#### Next Steps:
+
+Answer the seek-blanking question and finish the separately authorized single-seed packing experiment, comparing placed ALMs and timing against this accepted baseline. Any request to retain the last image or show seek previews requires a separate design preserving safe frame-bank ownership.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 52 COMMIT Unreleased bcddb20 2026-09-14T03:38:42-07:00
 
 #### Coming From:
@@ -1275,44 +1304,6 @@ Complete the three color builds, require all four operating-corner timing classe
 - tools/test_media_color_control.sv
 - tools/test_picture_color.sv
 - tools/verify_color_matrix.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 13 COMMIT Unreleased 62baf08 2026-09-13T13:05:36-07:00
-
-#### Coming From:
-
-Unreleased a0f153a
-
-#### Purpose:
-
-Provide manual 4:3 and 16:9 aspect selection and repair the observed decoder and scaler setup paths.
-
-#### Outcome:
-
-Committed and pushed 62baf08 with exactly two user-selected aspect choices, 4:3 and 16:9; removed sequence-aspect synchronization and its obsolete exception. The actual core mailbox and platform rectangle test passes six switches across 1080p and 5:4 outputs. B-frame coordinate snapshots split launch-address arithmetic without changing request latency. The final scaler fraction step occupies an existing delay stage and registered blanking preserves transition cycles. Extracted production VHDL matches a0f153a for 250000 randomized cycles at FRAC 4, 6 and 8 across every consumed fraction stage and resolution-blanking transition; the complete scaler also analyzes successfully in GHDL. The mixed I/P/B oracle checks 423936 samples with zero tolerance violations and maximum delta two, matching a0f153a cycle counts, request counts and prefetch activity. The old bench referenced a removed arbiter diagnostic and had a one-cycle stale depth-four total; both were corrected against the baseline. OSD/raster/CDC/cadence/telemetry and mounted-reader/session regressions pass. Timed MPG audio checks 24192 stereo pairs with maximum error one, 152679 video bytes and 15 timestamps without underrun. Clean seeds 52, 61 and 87 are running under results/build-62baf08-20260913-131350; timing and hardware acceptance remain pending.
-
-#### Next Steps:
-
-Complete all three clean builds and the fitted 84-register CDC audit, inspect every setup/hold/recovery/removal/pulse-width operating corner, and deliver clearly labeled hardware candidates. Verify manual aspect changes and continued OSD/filter operation during playback on hardware. Do not describe a seed as timing-qualified before all corners pass.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- docs/TEST_INSTRUCTIONS.md
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- sys/ascal.vhd
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/verify_decoder_timing.py
-- tools/verify_manual_aspect.py
-- tools/verify_scaler_timing.py
 
 #### Status:
 
