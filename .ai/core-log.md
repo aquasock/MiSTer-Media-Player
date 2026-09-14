@@ -1,3 +1,32 @@
+## 102 COMMIT Unreleased ??? 2026-09-14T15:14:08-07:00
+
+#### Coming From:
+
+Unreleased 36587f6
+
+#### Purpose:
+
+Implement complete native FLAC framing with hardware CRC admission and stereo reconstruction.
+
+#### Outcome:
+
+The user authorizes the next FLAC stage. Implement native metadata/header parsing, byte-to-bit delivery to the existing subframe engine, header/frame CRCs, sample/frame numbering and provisional-frame commit handshakes. Add hardware stereo reconstruction and validate complete files against original PCM through a modeled frame store, including stalls, bad CRCs, truncation and cancellation. Keep memory transport and native HDMI integration separate from claiming complete player functionality.
+
+#### Next Steps:
+
+Prove complete-file reconstruction and rejection behavior, then connect bounded DDR frame ownership and native output controls. Preserve the shared PCM boundary for later 44.1 kHz WAV, existing movie behavior and the accepted b639ccc baseline.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 101 COMMIT Unreleased 36587f6 2026-09-14T15:01:56-07:00
 
 #### Coming From:
@@ -1408,36 +1437,6 @@ Audit all four timing corners, 159 expected CDC synchronizer registers and actua
 - tools/test_media_ui_state.sv
 - tools/verify_player_overlay.py
 - tools/verify_ui_duration.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 62 COMMIT Unreleased ea05269 2026-09-14T05:41:58-07:00
-
-#### Coming From:
-
-Unreleased 3ff27c8
-
-#### Purpose:
-
-Design one playback overlay for progress and timing fields with a shared rendering framework for future subtitles.
-
-#### Outcome:
-
-The user requested bundling wishlist items 1, 2 and 7 into one UI layer while explicitly excluding subtitle implementation from the first build. Historical af7f570 audio_ui.c and media_player_helper.c supply the reference: Elapsed left, Total center, Remaining right in HH:MM:SS at y422 above the x32/y438/656-by-14 bar, muted blue-gray track and pale fill/text from the final video-overlay palette. The old font lacks lowercase despite mixed-case labels, so the preview adds readable lowercase in the same pixel style. Design commit ea05269 adds docs/UI_OVERLAY_PLAN.md and an interactive local HTML preview covering aspect, output size, pause/seek, unknown duration and a future subtitle-region guide. Its JavaScript executes across three output sizes and three picture aspects with a mocked DOM/canvas; this is not browser pixel validation. The proposed compositor sits after HDMI scaling/filters/shadow mask and before the existing MiSTer menu, with small text/glyph storage, frame-atomic scene publication, independent controls/subtitle visibility and no decoder-bank ownership or playback backpressure. The user selected a bounded timestamp probe with unknown total/remaining when unavailable; byte-ratio duration estimation is excluded. The plan covers head/tail probes, reordered PTS, endpoint qualification, large-file offsets, response retirement and session invalidation. Initial implementation budgets are 2000 additional actual ALMs and 12 M10Ks, not measured costs. No RTL, duration probe, subtitle parser, HDMI mode change or RBF was implemented; hardware-accepted runtime baseline remains 3ff27c8 seed 52. This commit completes design artifacts only.
-
-#### Next Steps:
-
-Use the documented design as the implementation boundary for the shared overlay, progress/time fields and duration probe, retaining existing controls and standard HDMI timing/frequency requirements. Before compilation require renderer, asynchronous scene-publication, duration-probe/late-response and existing decoder/seek regressions, then the standard three-seed timing/resource audit. Subtitle loading, decoding and cue selection remain deferred. No builds are running.
-
-#### Files Modified:
-
-- docs/UI_OVERLAY_PLAN.md
-- docs/ui/overlay-preview.html
 
 #### Status:
 
