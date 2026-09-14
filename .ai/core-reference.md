@@ -44,6 +44,18 @@ rules:
 ## 2. Active source catalog
 
 ```yaml
+- source_id: FLAC
+  priority: P0
+  authority: IETF
+  document: "RFC 9639 — Free Lossless Audio Codec (FLAC)"
+  consulted_baseline: "December 2024 Standards Track RFC"
+  consulted_url: "https://www.rfc-editor.org/rfc/rfc9639.html"
+  use_for:
+    - "Sections 7–9: subset limits, native metadata, frame/subframe syntax and CRCs"
+    - "Appendix A: integer widths, prediction, residual and stereo reconstruction"
+  applicability: "Authorized standalone 44100 Hz, 16-bit stereo FLAC implementation"
+  conformance_boundary: "CD target is a project profile; full FLAC supports other rates, depths and channel counts"
+
 - source_id: H262
   priority: P0
   authority: ITU-T / ISO/IEC
@@ -130,6 +142,7 @@ The 2021 H.222.0 edition is the controlled text consulted for the records below.
 
 | Question | Consult first | Fast records |
 |---|---|---|
+| FLAC decoding and integer reconstruction | RFC 9639 sections 7–9 and Appendix A | FLAC source catalog |
 | Native 23.976/24/25/29.97/30 cadence | H.262 sequence header | H262-027 |
 | Native interlaced frame structure and field output | H.262 picture coding extension and output process | H262-028 through H262-035 |
 | Program Stream pack boundaries and clean termination | H.222.0 2.5.3 | H222-001 through H222-003 |

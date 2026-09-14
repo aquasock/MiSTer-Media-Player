@@ -1,3 +1,32 @@
+## 99 COMMIT Unreleased ??? 2026-09-14T14:31:40-07:00
+
+#### Coming From:
+
+Unreleased ba9e0d8
+
+#### Purpose:
+
+Begin authorized FLAC feasibility and simulation implementation.
+
+#### Outcome:
+
+The user authorizes the FLAC plan and simulator-first work. Begin output-interface and DDR ownership audits, a deterministic native FLAC corpus with exact WAV reference samples, and a serial reconstruction arithmetic prototype with simulation and isolated Quartus resource evidence. Add RFC 9639 to the controlled references. Current Main configures HDMI audio for 48/96 kHz through the HPS I2C peripheral; ask the user whether to use high-quality conversion or extend native-output investigation while progressing independent decoder work. The accepted production baseline remains b639ccc MEDIUM seed 52.
+
+#### Next Steps:
+
+Resolve the output choice without assuming approval, prove sample arithmetic including side-channel width and order-32 LPC, generate ordinary encoder and edge-case inputs, measure primitive resources and document DDR ownership. Continue toward standalone decoding and integrated hardware gates after feasibility checks; no deployment is automatic.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 98 COMMIT Unreleased ba9e0d8 2026-09-14T14:28:21-07:00
 
 #### Coming From:
@@ -1394,39 +1423,6 @@ Have the user validate seed 52 playback at both existing refresh rates, OSD/aspe
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 59 COMMIT Unreleased 3ff27c8 2026-09-14T04:48:02-07:00
-
-#### Coming From:
-
-Unreleased dc1dfc2
-
-#### Purpose:
-
-Move IDCT intermediate storage into banked M10K memory while preserving transform arithmetic and cycle behavior.
-
-#### Outcome:
-
-Source 3ff27c8 moves the intermediate array of all three IDCT instances into eight synchronous 8-by-24 M10K row banks per instance, leaving coefficients and arithmetic unchanged. Column-ahead prefetch preserves all external output cycles against dc1dfc2 in a differential test covering signed impulses, dense extremes, 512 random sparse blocks, 133 reset offsets, simultaneous input controls and overlap errors. The test compares 164020 cycles and observes 783 completed blocks and 52128 samples including aborted transforms. The mixed I/P/B pixel oracle passes 423936 comparisons with zero mismatches within its allowed numerical tolerance and passes paused seeks with display ownership. Exact Pee Strike direct restart through shared DDR passes at cycle 40027997 with elapsed_q 3663660, matching the baseline recovery point. Evidence is under results/idct-storage. Tested source was committed and pushed before clean seeds 52, 61 and 87 started under results/build-3ff27c8-20260914-045213 with six workers each. No new RBF or measured resource saving is available yet; hardware-accepted dc1dfc2 seed 52 is retained.
-
-#### Next Steps:
-
-Finish all three builds and verify 24 intermediate banks infer M10K. Compare actual placed ALMs and total RAM blocks with dc1dfc2, require all timing corners and the 153-register CDC audit, then package the preferred passing candidate for hardware playback and seek validation. Do not deploy automatically.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_idct.sv
-- tools/test_idct_storage.sv
-- tools/verify_idct_storage.py
-- CHANGELOG.md
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
