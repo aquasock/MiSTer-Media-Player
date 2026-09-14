@@ -1,3 +1,32 @@
+## 34 COMMIT Unreleased aad072a 2026-09-14T00:05:22-07:00
+
+#### Coming From:
+
+Unreleased aad072a
+
+#### Purpose:
+
+Record the repeated seek freeze on timing-qualified seed 88.
+
+#### Outcome:
+
+The user reports that seed 88 froze in the same way after seeking. Fresh screenshots at 00:03:48 and 00:04:30 on September 14 show pixel-identical nonblack movie frames, confirming no visible frame change across 42 seconds. Neither screenshot contains decodable telemetry, so the previous seed-87 error 0x0004 cannot be assigned to this occurrence. Evidence and comparison.json are under results/telemetry-20260914-000348 and results/telemetry-20260914-000430. Passing all timing corners has not resolved the observed freeze; root cause remains undetermined. The core and loaded file were left untouched. Seed 88 remains timing qualified but fails hardware playback-control acceptance.
+
+#### Next Steps:
+
+Extend the exact-file reproduction to the combined MPG/audio buffering path and add bounded playback-control state and decoder error subcode visibility if required to distinguish seek, pause, starvation and fatal decoder states.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 33 COMMIT Unreleased aad072a 2026-09-13T23:54:38-07:00
 
 #### Coming From:
@@ -1343,35 +1372,6 @@ None.
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 993 COMMIT Unreleased 8b6ed49 2026-09-13T04:12:53-07:00
-
-#### Coming From:
-
-Unreleased 2f413b4
-
-#### Purpose:
-
-Fix the same parse_hold-not-cleared-on-error bug found again, this time in the P-side wide-motion probe, after entry 992's B-side fix let the file progress further.
-
-#### Outcome:
-
-Deployed entry 992's build (seed99, +0.434ns margin) and asked the user to reload. Real progress: `sent` advanced from ~143590 to 171634 bytes before stalling again with the same `credit=0` real-backpressure symptom, confirming entry 992's fix genuinely works - it just wasn't the last blocker in this file. Fresh telemetry showed `stall_diag_b_parse_hold=False` now (fixed) but `stall_diag_p_hold_raw`/`stall_diag_p_hold_effective=True` - a different sub-module, `mpeg2_h262_p_diagnostic_controller_rearm.sv`'s `wide_parse_hold`, one of `stream_hold`'s four OR-terms. Ruled out the other three: `four_mb_parse_hold` and `legacy_parse_hold` are both hardwired to `1'b0` (dead code), and `raster_hold_active` has its own ~0.28-second timeout safety net already built in (`raster_hold_timeout<=24'hffffff`), so it could not still be stuck after the diagnostic's 3-second arm delay. Comparing `mpeg2_h262_p_wide_motion_syntax_probe_part3.svh`'s eight `probe_error<=1` sites against entry 992's exact bug pattern found the identical defect: six sites correctly pair `probe_error<=1` with `parse_hold<=0` (matching every `parser_error` site in the B-core probe), but two sites (both `probe_error_detail=30`, in the slice-continuation-classification branch) do not. Source `8b6ed49` adds the same one-line unconditional statement entry 992 used, outside the `if(stream_valid)` gate for the identical reason (no further bytes ever arrive once `stream_hold` has blocked `stream_ready`): whenever `probe_error` is set, clear `parse_hold`. `quartus_map` on seed99 is clean, 0 errors, same warning count. No new Icarus reproduction attempted (same reasoning as entry 992 - this module's own sequencing preconditions aren't fully understood by a narrow isolated harness); rests on real hardware evidence plus the already-verified code pattern.
-
-#### Next Steps:
-
-Sync to all three seed build directories, run the full timing build, deploy the best-passing seed, and ask the user to reload the file. Given the pattern established across entries 986/990/992/993 (each fix uncovers real forward progress into a new, distinct stuck point rather than fully unblocking playback), pull fresh telemetry immediately on any further stall rather than assuming completion or the same cause; if `stall_diag_valid` shows all of `parser_ready`/`p_hold_effective`/`b_parse_hold`/`b_persistence_wait` clear, the stall has moved to a mechanism outside this stall-diagnostic bundle entirely (widen the diagnostic's coverage, or check `mpeg2_new_stream_ready`'s own `mpeg2_download_rearm_reset` term and both top-level holds again fresh) rather than re-checking the same four bits. If the file reaches a point where video actually displays, that is the first real milestone this stall-hunting chain has been working toward - confirm playback continues past the point of a full picture, not just single-frame progress.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
