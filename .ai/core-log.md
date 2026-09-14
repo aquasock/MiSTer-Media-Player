@@ -1,4 +1,4 @@
-## 40 COMMIT Unreleased ??? 2026-09-14T01:08:20-07:00
+## 40 COMMIT Unreleased a229a01 2026-09-14T01:08:20-07:00
 
 #### Coming From:
 
@@ -10,20 +10,23 @@ Release stale display-bank ownership during seeking after outstanding DDR reads 
 
 #### Outcome:
 
-The user approved implementing the proposed ownership fix after the captured B-frame reconstruction timeout and focused arbiter reproduction. The change will add an explicit seek-only display-bank release, preserve reader response ownership until draining completes, and leave normal playback and pause bank protection intact. Runtime compilation remains on hold under the user's no-more-builds instruction.
+Source a229a01 adds an optional explicit display-bank release to the DDR arbiter and enables it only for media_seeking in the production core. The retained bank guard clears after outstanding reads drain and DDR is not busy; a same-cycle accepted display request takes precedence. Descriptor ownership, reconstruction state and compressed streams are preserved, and ordinary pause does not release protection. A twin-arbiter transaction regression reproduces the old blocked-write behavior and verifies the fix across all five frame regions, queued display bursts, prediction/stream responses, DDR busy, acceptance priority and re-acquisition. Reconstruction now includes periodic display requests with seek gating: the release-disabled control fails prediction liveness, while the fix completes normal playback, both retained seeks with paused-bank checks and EOF seeking, with 423936 checked pixel samples and zero oracle mismatches in each passing case. Existing DDR routing and mounted-reader/session-restart regressions pass. The exact MPG replay also accepts the display-ownership model and compiles with shared-DDR mode; no additional full movie run is claimed for this source. The pixel runner now requires an explicit completed-oracle marker so a diagnostic watchdog exit cannot be misreported as success. Evidence is under results/seek-display-release. Source is committed and pushed, but no Quartus build or new RBF was produced under the user's instruction. Hardware confirmation and final timing/resource qualification remain pending.
 
 #### Next Steps:
 
-Implement the narrowly scoped arbiter/top-level change, prove the old failure and corrected drain/release behavior with pending bursts and simultaneous requests, extend reconstruction replay to exercise display ownership, and run relevant regressions. Commit and push source and evidence without starting Quartus builds.
+Keep new builds on hold until the user requests them. When a fixed RBF is available, repeat the captured Pee Strike seek near 18.45 seconds, then repeated forward/backward and paused seeks, resume and EOF behavior; preserve first-fault telemetry if any freeze remains.
 
 #### Files Modified:
 
-- MediaPlayer_top_06.svh
-- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
-- tools/test_seek_display_ownership.sv
-- tools/replay_mpg_seek.py
-- docs/TEST_INSTRUCTIONS.md
 - CHANGELOG.md
+- MediaPlayer_top_06.svh
+- docs/TEST_INSTRUCTIONS.md
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- tools/replay_mpg_seek.py
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_mixed_raster_pixels.sv
+- tools/test_seek_display_ownership.sv
+- tools/verify_decoder_timing.py
 
 #### Status:
 
