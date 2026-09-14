@@ -1,3 +1,32 @@
+## 75 COMMIT Unreleased 0d13908 2026-09-14T09:25:00-07:00
+
+#### Coming From:
+
+Unreleased ffafc79
+
+#### Purpose:
+
+Remove audio-track selection from planned player scope at the user's request.
+
+#### Outcome:
+
+The user explicitly declines audio-track selection after its purpose is explained. The UI plan now excludes a soundtrack selector and resource reservations for track switching, retaining the other six original features. Subtitle playback remains deferred. This documentation-only change does not alter RTL, running builds or hardware. The preceding read-only shared-IDCT investigation remains under results/shared-idct-audit/findings.md; no sharing implementation is authorized by this scope decision.
+
+#### Next Steps:
+
+Complete the existing lowered-overlay build qualification and retain the revised feature scope for future planning.
+
+#### Files Modified:
+
+- docs/UI_OVERLAY_PLAN.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 74 COMMIT Unreleased ffafc79 2026-09-14T09:09:57-07:00
 
 #### Coming From:
@@ -1282,35 +1311,6 @@ The user reports making fellow freeze. The fresh screenshot and checksum-valid s
 #### Next Steps:
 
 Use both captures to guide combined MPG/audio reproduction and add decoder error subcode plus first-fault visibility; do not attribute the failure to audio underrun alone.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 35 COMMIT Unreleased aad072a 2026-09-14T00:13:44-07:00
-
-#### Coming From:
-
-Unreleased aad072a
-
-#### Purpose:
-
-Record decoded telemetry from the repeated freeze on the latest RBF.
-
-#### Outcome:
-
-The user reports both tested RBFs freeze alike and reran the latest candidate until telemetry appeared. The fresh screenshot and checksum-valid schema-10 decode are under results/telemetry-20260914-001304. Error flags are 0x3004: aggregate decoder probe error 0x0004, MP2 output underrun 0x1000 and MP2 output timestamp error 0x2000. Transport error and MP2 decoding error remain zero; EOF is false. The latched snapshot shows 104 associated pictures, 37 reference pictures, final B-picture temporal reference nine, 224 processed audio frames, 157321 played audio sample pairs, 4204428 transport bytes and 1027 requests/completions in generation two. Profiler session_cycles and accepted_bytes are both two following the seek reset; these are not whole-file counts or evidence of two-byte total progress. The same aggregate decoder error recurs across the reported seed tests, but this snapshot cannot order the video and audio faults or identify the decoder subcode. The prior seed-87 snapshot had the decoder error without either audio flag. The loaded state was preserved and no playback changes were made.
-
-#### Next Steps:
-
-Use the repeated decoder failure as the primary reproduction target, include combined MPG/audio flow and host stalls, and capture error subcodes and first-fault ordering rather than infer causality from the latched summary.
 
 #### Files Modified:
 
