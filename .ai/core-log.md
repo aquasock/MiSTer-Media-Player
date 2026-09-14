@@ -1,3 +1,32 @@
+## 35 COMMIT Unreleased aad072a 2026-09-14T00:13:44-07:00
+
+#### Coming From:
+
+Unreleased aad072a
+
+#### Purpose:
+
+Record decoded telemetry from the repeated freeze on the latest RBF.
+
+#### Outcome:
+
+The user reports both tested RBFs freeze alike and reran the latest candidate until telemetry appeared. The fresh screenshot and checksum-valid schema-10 decode are under results/telemetry-20260914-001304. Error flags are 0x3004: aggregate decoder probe error 0x0004, MP2 output underrun 0x1000 and MP2 output timestamp error 0x2000. Transport error and MP2 decoding error remain zero; EOF is false. The latched snapshot shows 104 associated pictures, 37 reference pictures, final B-picture temporal reference nine, 224 processed audio frames, 157321 played audio sample pairs, 4204428 transport bytes and 1027 requests/completions in generation two. Profiler session_cycles and accepted_bytes are both two following the seek reset; these are not whole-file counts or evidence of two-byte total progress. The same aggregate decoder error recurs across the reported seed tests, but this snapshot cannot order the video and audio faults or identify the decoder subcode. The prior seed-87 snapshot had the decoder error without either audio flag. The loaded state was preserved and no playback changes were made.
+
+#### Next Steps:
+
+Use the repeated decoder failure as the primary reproduction target, include combined MPG/audio flow and host stalls, and capture error subcodes and first-fault ordering rather than infer causality from the latched summary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 34 COMMIT Unreleased aad072a 2026-09-14T00:05:22-07:00
 
 #### Coming From:
@@ -1337,37 +1366,6 @@ Commit the reviewed candidate as a new master revision, build independent tracke
 - tools/test_program_stream_ingress.sv
 - tools/verify_program_stream_ingress.py
 - tools/build.sh
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 994 STATUS Unreleased 8b6ed49 2026-09-13T05:05:48-07:00
-
-#### Coming From:
-
-Unreleased 8b6ed49
-
-#### Purpose:
-
-Record a session-ending status checkpoint: where the wide-motion RTL investigation stands, and a new, separate finding about stock Main compatibility that changed direction mid-session. No source changes in this entry.
-
-#### Outcome:
-
-Entry 993's build (seed99, +0.267ns margin) let the file advance from ~143590 to 171634 bytes before stalling again, same real-backpressure `credit=0` symptom. Fresh telemetry showed the fix had zero effect on this particular stall (`stall_diag_p_hold_raw`/`stall_diag_p_hold_effective` still latched, identical byte offset both before and after entry 993's build) - meaning entry 993's fix, while a real and independently-verified bug (same probe_error/parse_hold-pairing defect as entry 992, confirmed by direct code comparison), was not the cause of *this specific* occurrence. Traced further: this module's row-management logic (`mpeg2_h262_p_wide_motion_syntax_probe_part2.svh`) mirrors the B-core probe's row_retired/outstanding_rows pattern exactly, and `row_retired` (`p_row_persistence_complete`, ultimately `mpeg2_h262_reference_pipeline_probe_rearm.sv`'s `row_persisted`) appears to have no engagement path for "wide" mode specifically - that module's engine-select logic (`b_select`/`mixed_select`) has no awareness of `wide_mode` by name. Investigated whether wide-mode output reaches the shared `p_forward_vector_valid`/`p_residual_sample_valid` ports the engine-select watches (it does, via `wide_mode`-branched assigns) and definitively ruled out `p_implicit_reconstruct_request` as the exclusion cause for wide mode too (`p_forward_vector_valid` and `p_residual_sample_valid` are the literal same signal, `wide_sideband_valid`, when `wide_mode=1`, so `!p_forward_vector_valid` cannot be true at the exact moment the marker-pulse condition is checked - proven by direct signal-equality, not inferred). No confirmed root cause yet for why wide-mode rows never get persistence credit; two hypotheses have now been ruled out by code-level proof (this is the second dead end from pure code-tracing this session, after the earlier B-side implicit-reconstruct lead), so further progress needs either a proper Icarus reproduction of the engine-select logic in isolation, or live hardware signal capture, not more inference from reading.
-
-Mid-investigation, the user asked whether the modified Main/helper could be the actual cause instead of RTL, given the project's stated goal of eventually removing them entirely. This led to a significant, evidence-backed detour: confirmed `user_io_file_tx_data_step`/`media_burst_*` (the whole non-blocking bulk-transfer mechanism `plain_video_poll()` relies on) is custom code this project wrote in `host/main_mister/0001-mediaplayer-arm-loader.patch`, not a stock MiSTer primitive - grepping pristine `user_io.cpp` at the pinned commit finds zero occurrences. Verified the demux is not a source of corruption: extracted the same real file bytes' video elementary stream two independent ways (our RTL demux run under Icarus, and `ffmpeg` as a trusted reference) and diffed them byte-for-byte identical (`cmp` exit 0) across the whole region covering the stall point; `ffprobe` confirms the file is completely standard MPEG-2 Main Profile @ Main Level, 720x480 - the "wide motion" content is genuine, not corruption-induced. Built and tested genuinely stock, unpatched Main (cloned fresh from the pinned commit, zero of the four patches applied) with a short 8MB truncated test file, loaded via the standard F4 menu (MediaPlayer.sv's CONF_STR already declares this generically, no custom C++ required for basic routing) - and found a new, different, more severe hang: Main spins at ~50% CPU in userspace (`R` state, `wchan=0`, confirmed via `/proc/<pid>/io` showing zero rchar/wchar growth across repeated checks) with no forward progress at all, far earlier than where the custom-Main build got stuck. Ruled out several hypotheses for this by direct evidence: `ioctl_file_ext` is exposed by `hps_io.sv` but never read anywhere in `MediaPlayer.sv` (extension mismatch impossible); the `MEDIA_BURST` additions to this project's local `sys/hps_io.sv` copy (commit a4f2769) are purely additive - a new opt-in parameter defaulting to 0, a new command gated behind it - and do not touch the base FIO_FILE_TX_DAT/ioctl_download protocol at all; `mpeg2_stream_fifo`'s `burst_ready` settle-timer only needs ~63 cycles (microseconds) to clear, far too fast to explain a multi-minute hang on its own. No live debugging tools are available on-device (no strace, no way to get a stack trace), and no confirmed root cause was reached before the user asked to stop for this session. Notably, neither the old ARM-helper architecture nor this session's patch 0004 ever exercised the plain/non-burst transfer path successfully before - both always used the burst-aware mechanism - so this exact combination (stock Main + this FPGA core, no burst negotiation at all) may never have been tested in this project's history until now.
-
-#### Next Steps:
-
-Device state: the user deleted both the custom `MiSTer_MediaPlayer` binary and the ARM helper from `/media/fat/`, then rebooted; only stock `/media/fat/MiSTer` remains, running with the seed99 RBF (entries 992/993's fixes). The stock-Main hang was last observed live and may still be running in that state - check on resume. This is a decisive change of direction: the user wants to commit to stock Main going forward (matching the project's stated eventual goal of removing the custom Main/helper entirely) rather than continue developing patch 0004. That means the wide-motion RTL investigation, while still open, is now secondary to first getting the plain file-load protocol working with genuinely stock Main - there is no point fixing the wide-motion persistence gap if the file cannot even begin transferring under the architecture the user now wants to use. When resuming: get live diagnostic visibility into what `ioctl_download`/`session_start`/`mpeg2_burst_ready` actually do under a plain, non-burst stock Main transfer (the user was mid-way through choosing how to gather this evidence, favoring a purely diagnostic use of the custom Main build to get the data, with the fix itself implemented in RTL only) - do not add custom Main C++ back as the shipped solution regardless of what the diagnostic step uses to gather data.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
