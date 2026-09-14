@@ -15,7 +15,7 @@ wire cancel,flush,start,quiesce,decoder_reset;
 wire [31:0] generation;
 media_keyboard_control keyboard(
  .clk(clk_sys),.reset(reset),.new_file(new_file),.enabled(1'b1),.osd_open(1'b0),
- .key(key),.elapsed_q(elapsed_sys),.seek_done(done_sys),.paused(paused_sys),
+ .key(key),.elapsed_q(elapsed_sys),.seek_done(done_sys),.restart_complete(start),.paused(paused_sys),
  .seek_active(seeking_sys),.seek_target_q(target_sys),.restart(restart));
 video_config_cdc #(.WIDTH(37)) command_cdc(
  .src_clk(clk_sys),.dst_clk(clk_mpeg2),.src_data({paused_sys,seeking_sys,target_sys}),.dst_data(command));
@@ -62,6 +62,13 @@ initial begin
   reader_idle=0;ddr_idle=0;
   key_event(9'h174,1);key_event(9'h174,0);
   repeat(40) @(negedge clk_sys);
+  if(decoder_reset||quiesce||flush||starts!=i+1) $fatal(1,"forward seek restarted session");
+  wait(done_sys);wait(!seeking_sys);wait(!done_sys);
+  repeat(20) @(negedge clk_sys);
+  if(elapsed_sys!=expected||!paused) $fatal(1,"forward target/pause lost");
+  expected=elapsed_sys<3600000?0:elapsed_sys-3600000;
+  key_event(9'h16b,1);key_event(9'h16b,0);
+  repeat(2000) @(negedge clk_sys);
   if(decoder_reset||!quiesce||!flush) $fatal(1,"DDR was reset before retirement");
   ddr_idle=1;wait(decoder_reset);
   repeat(40) @(negedge clk_sys);
@@ -69,11 +76,11 @@ initial begin
   reader_idle=1;
   wait(starts==i+2);wait(done_sys);wait(!seeking_sys);wait(!done_sys);
   repeat(20) @(negedge clk_sys);
-  if(elapsed_sys!=expected||!paused) $fatal(1,"restart target/pause lost");
+  if(elapsed_sys<expected||elapsed_sys-expected>14400||!paused) $fatal(1,"restart target/pause lost");
  end
  new_file=1;@(negedge clk_sys);new_file=0;wait(starts==5);
  if(paused_sys||seeking_sys) $fatal(1,"new file retained controls");
- $display("PASS: three async keyboard seeks with in-flight host/DDR retirement, command settling, acknowledged completion and paused state");$finish;
+ $display("PASS: three retained forward and three restart backward async keyboard seeks with in-flight host/DDR retirement, command settling, acknowledged completion and paused state");$finish;
 end
 initial begin #10000000;$fatal(1,"timeout");end
 endmodule

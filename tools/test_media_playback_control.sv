@@ -40,7 +40,7 @@ task cold;
  end
 endtask
 reg [32:0] saved;
-integer rate,seconds,period;
+integer rate,seconds,period,repeat_seek;
 initial begin
  cold();repeat(8) @(negedge clk);paused=1;
  @(negedge clk);saved=stc;
@@ -81,6 +81,16 @@ initial begin
  repeat(3) @(negedge clk);display_pts=33'd3584;swap_reset_count=4;
  repeat(2) @(negedge clk);
  if(elapsed_q!=14400) $fatal(1,"timestamp wrap %d",elapsed_q);
+ // Repeated seeks in one decoder session must replace the prior landing PTS.
+ display_pts_valid=0;seek_active=0;paused=1;frame_rate_code=3;cold();
+ for(repeat_seek=1;repeat_seek<=3;repeat_seek=repeat_seek+1) begin
+  seek_target_q=repeat_seek*144000;seek_active=1;swap_window=0;auto_frames=1;
+  #1;if(seek_elapsed_90k!=seek_target_q/4) $fatal(1,"stale target on retained seek");
+  wait(dut.reached);@(negedge clk);auto_frames=0;swap_reset_count=0;swap_window=1;
+  wait(seek_done);repeat(3) @(negedge clk);
+  if(elapsed_q!=seek_target_q||seek_elapsed_90k!=seek_target_q/4) $fatal(1,"repeated seek target");
+  seek_active=0;swap_window=0;repeat(20) @(negedge clk);
+ end
  $display("PASS: pause clock/window, 15 rate/seek combinations, target rounding, paused seek, vblank release, EOF, fatal and PTS wrap");$finish;
 end
 initial begin #100000000;$fatal(1,"timeout");end

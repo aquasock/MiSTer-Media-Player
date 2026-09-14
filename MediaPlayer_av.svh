@@ -41,13 +41,14 @@ wire signed [15:0] mp2_pcm_l,mp2_pcm_r;
 wire [32:0] mp2_pcm_pts;
 wire mp2_pcm_pts_valid;
 wire [31:0] mp2_frames_decoded;
-mp2_decoder mp2_decoder (
+mp2_decoder #(.ENABLE_SEEK_SKIP(1)) mp2_decoder (
     .clk(clk_mpeg2),.reset(reset_mpeg2),.input_data(av_audio_q[7:0]),.input_valid(av_audio_q_valid),
     .input_ready(av_audio_q_ready),.input_end(av_ingress_end&&av_audio_empty),
     .input_pts(av_audio_q[40:8]),.input_pts_valid(av_audio_q[41]),
     .pcm_valid(mp2_pcm_valid),.pcm_ready(mp2_pcm_ready),.pcm_left(mp2_pcm_l),.pcm_right(mp2_pcm_r),
     .pcm_pts(mp2_pcm_pts),.pcm_pts_valid(mp2_pcm_pts_valid),.error(mp2_error),
-    .frames_decoded(mp2_frames_decoded),.idle(mp2_idle)
+    .frames_decoded(mp2_frames_decoded),.idle(mp2_idle),
+    .seek(media_seeking),.seek_target(media_seek_pts)
 );
 wire mp2_fifo_full,mp2_fifo_empty,mp2_fifo_rd;
 wire [66:0] mp2_fifo_data;

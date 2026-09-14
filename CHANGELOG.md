@@ -11,8 +11,12 @@ This project is still in active pre-release development. Published milestone rel
 - Space toggles play/pause; Left/Right seek backward/forward by 10 seconds,
   Ctrl by 30 seconds, and Ctrl+Alt by 5 minutes. Menu navigation is excluded.
 - Transactional reconstruction seeks retain the requested paused state and
-  clamp at the start/end of media. This implementation reconstructs from the
-  beginning, so long seeks can take time; no custom Main or seek index is needed.
+  clamp at the start/end of media. Forward seeks retain decoder state and
+  reconstruct only the skipped interval; backward seeks restart at the beginning.
+  MP2 audio before the destination bypasses synthesis with a full frame of
+  decoded preroll to restore filter history. Long seeks can still take time.
+- Backward seek completion waits for the restarted reader, preventing a stale
+  completion from the old decoder session during storage retirement.
 
 - Compact 25-word telemetry schema 10 retains playback errors, basic cadence, audio and transport health while removing detailed performance history from default synthesis; compile-time detailed schema 9 remains available.
 - Screenshot decoding supports compact and legacy profiles, marks omitted diagnostics unavailable, and reports the correct final checksum word for each schema.

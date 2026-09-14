@@ -1,7 +1,7 @@
 // MPEG-1 Layer II, 48 kHz, 112..384 kb/s stereo/dual/joint stereo.
 // One bounded frame buffer; no HPS software or soft CPU. CRC-protected frames
 // are explicitly rejected until CRC checking is implemented.
-module mp2_decoder (
+module mp2_decoder #(parameter ENABLE_SEEK_SKIP=0) (
     input wire clk, reset,
     input wire [7:0] input_data,
     input wire input_valid,
@@ -16,7 +16,9 @@ module mp2_decoder (
     output reg pcm_pts_valid,
     output reg error,
     output reg [31:0] frames_decoded,
-    output wire idle
+    output wire idle,
+    input wire seek,
+    input wire [32:0] seek_target
 );
 localparam COLLECT=0, HEADER=1, BEGIN_FRAME=2, GET_WAIT=3, GET_BIT=4,
     ALLOC=5, ALLOC_DONE=6, SCFSI=7, SCFSI_DONE=8, SCALE=9, SCALE_DONE=10,
@@ -55,6 +57,14 @@ reg [32:0] pending_pts;
 reg pending_pts_valid;
 reg [32:0] frame_pts;
 reg frame_pts_valid;
+// A decoded Layer II frame supplies 36 synthesis slots. The history contains
+// only 16 slots, so decoding a full frame before the destination completely
+// replaces stale history. Keep at least 24 ms of preroll; discard only frames
+// ending at least another full frame before the requested destination.
+reg [32:0] seek_distance;
+always @(posedge clk) seek_distance<=seek_target-frame_pts;
+wire discard_frame=ENABLE_SEEK_SKIP && seek && frame_pts_valid &&
+    !seek_distance[32] && seek_distance>=33'd4320;
 reg [30:0] scale_rom [0:1151];
 reg [30:0] scale_q;
 reg signed [16:0] centered;
@@ -164,7 +174,7 @@ always @(posedge clk) begin
         BEGIN_FRAME: begin
             zero_addr<=0; bit_pos<=32; sb<=0; channel<=0; part<=0; granule<=0;
             pcm_pts<=frame_pts; pcm_pts_valid<=frame_pts_valid;
-            state<=ALLOC;
+            state<=discard_frame?FINISH:ALLOC;
         end
         GET_WAIT: state<=GET_BIT;
         GET_BIT: begin

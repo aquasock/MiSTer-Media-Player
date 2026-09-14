@@ -395,13 +395,14 @@ module tb_h262_live_raster_soak #(
     reg playback_test_complete=0;
     generate if(PLAYBACK_CONTROL_MODE) begin: playback_test
         reg seeking=1,paused=1;
+        reg [34:0] target=PLAYBACK_CONTROL_MODE==2?35'd108000000:35'd144000;
         wire done,rebase,fast;
         wire [34:0] elapsed;
         wire [32:0] seek_elapsed;
         reg [3:0] saved_bank;
         media_playback_control control(
             .clk(clk),.reset(reset),.paused(paused),.seek_active(seeking),
-            .seek_target_q(PLAYBACK_CONTROL_MODE==2?35'd108000000:35'd144000),.frame_rate_code(4'd3),
+            .seek_target_q(target),.frame_rate_code(4'd3),
             .swap_reset_count(framebuffer_swap_reset_count),
             .first_picture_complete(picture_count!=0),.swap_window(swap_window_pulse),
             .drained(PLAYBACK_CONTROL_MODE==2 && sequence_end_seen &&
@@ -422,8 +423,21 @@ module tb_h262_live_raster_soak #(
                 if({display_scratch,display_scratch_bank,display_frame_bank}!=saved_bank)
                     $fatal(1,"queued I/P/B changed display while paused");
             end
+            if(PLAYBACK_CONTROL_MODE==1) begin
+                // Continue from frame ten to frame eighteen without resetting
+                // the decoder, reference banks or queued compressed stream.
+                target=259200;seeking=1;wait(done);@(negedge clk);
+                if(elapsed!=259200||seek_elapsed!=64800)
+                    $fatal(1,"retained reconstruction seek missed frame eighteen");
+                seeking=0;saved_bank={display_scratch,display_scratch_bank,display_frame_bank};
+                repeat(20000) begin
+                    @(negedge clk);
+                    if({display_scratch,display_scratch_bank,display_frame_bank}!=saved_bank)
+                        $fatal(1,"second paused seek changed bank");
+                end
+            end
             paused=0;playback_test_complete=1;
-            $display("PLAYBACK RECONSTRUCTION PASS: seek to frame ten and retain display through queued decode");
+            $display("PLAYBACK RECONSTRUCTION PASS: seek landing and retained-session second seek/EOF with paused display");
         end
     end else begin
         assign controlled_window=swap_window_pulse;

@@ -4,7 +4,7 @@ module media_keyboard_control(
  input wire clk,reset,new_file,enabled,osd_open,
  input wire [10:0] key,
  input wire [34:0] elapsed_q,
- input wire seek_done,
+ input wire seek_done,restart_complete,
  output reg paused=0,seek_active=0,
  output reg [34:0] seek_target_q=0,
  output reg restart=0
@@ -12,6 +12,7 @@ module media_keyboard_control(
 reg key_toggle=0;
 reg space_down=0,left_down=0,right_down=0;
 reg [1:0] ctrl_down=0,alt_down=0;
+reg wait_restart=0;
 wire ctrl=|ctrl_down;
 wire alt=|alt_down;
 wire [34:0] jump_q=ctrl ? (alt ? 35'd108000000 : 35'd10800000) : 35'd3600000;
@@ -20,11 +21,14 @@ always @(posedge clk) begin
  restart<=0;
  key_toggle<=key[10];
  if(reset) begin
-  paused<=0;seek_active<=0;seek_target_q<=0;
+  paused<=0;seek_active<=0;seek_target_q<=0;wait_restart<=0;
   space_down<=0;left_down<=0;right_down<=0;ctrl_down<=0;alt_down<=0;
  end else begin
-  if(seek_done) seek_active<=0;
-  if(new_file) begin paused<=0;seek_active<=0;seek_target_q<=0;end
+  if(restart_complete) wait_restart<=0;
+  // While retiring a backward restart, the old elapsed time already exceeds
+  // the new target. Its completion must not acknowledge the new session.
+  if(seek_done&&!wait_restart) seek_active<=0;
+  if(new_file) begin paused<=0;seek_active<=0;seek_target_q<=0;wait_restart<=0;end
   if(key_toggle!=key[10]) begin
    case(key[8:0])
     9'h014:ctrl_down[0]<=key[9];
@@ -41,7 +45,10 @@ always @(posedge clk) begin
         !osd_open&&!new_file&&!seek_active&&!seek_done) begin
       if(key[8:0]==9'h16b) seek_target_q<=elapsed_q<jump_q?35'd0:elapsed_q-jump_q;
       else seek_target_q<=forward_q[35]?{35{1'b1}}:forward_q[34:0];
-      seek_active<=1;restart<=1;
+      // Forward reconstruction keeps the decoder references and queued stream.
+      // Only backward seeks need the byte-zero restart/retirement handshake.
+      seek_active<=1;restart<=key[8:0]==9'h16b;
+      wait_restart<=key[8:0]==9'h16b;
      end
     end
    endcase

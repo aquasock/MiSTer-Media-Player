@@ -59,13 +59,25 @@ wire ready=pcm_wr-pcm_rd_index<4096;
 reg pcm_end_written=0,origin_sent=0;
 reg [32:0] origin_value;
 wire pcm_pop,under,terr,finished;
-reg playback_pause=0;
+reg playback_pause=0,playback_seek=0;
+reg [32:0] playback_target=0;
+integer skipped_frames=0;
+always @(posedge clk) if(!reset && decoder.state==decoder.BEGIN_FRAME && decoder.discard_frame) skipped_frames<=skipped_frames+1;
 wire signed [15:0] output_l,output_r;
 wire [31:0] played;
 wire [66:0] pcm_q=pcm_mem[pcm_rd_index%4096];
-mp2_pcm_output #(.ENABLE_PLAYBACK_CONTROL(1)) sink(aclk,reset,playback_pause,1'b0,33'd0,origin_sent,origin_value,pcm_q,pcm_wr==pcm_rd_index,
+mp2_pcm_output #(.ENABLE_PLAYBACK_CONTROL(1)) sink(aclk,reset,playback_pause,playback_seek,playback_target,origin_sent,origin_value,pcm_q,pcm_wr==pcm_rd_index,
     pcm_pop,output_l,output_r,under,terr,finished,played);
 initial begin
+ if($test$plusargs("seek")) begin
+  wait(played>=4800);@(negedge aclk);
+  playback_target=origin_value+9000+54000;playback_seek=1;
+  // Independent video metadata consumption must reach the destination while
+  // the actual demux, bounded audio queues, decoder and PCM sink run together.
+  wait(bpv && bp>=playback_target);
+  wait(!sink.sample_distance[35] && pcm_wr>pcm_rd_index);
+  @(negedge aclk);playback_seek=0;
+ end
  if($test$plusargs("pause")) begin
   wait(played>=4800);@(negedge aclk);playback_pause=1;
   repeat(2457600) @(negedge aclk);
@@ -73,7 +85,7 @@ initial begin
  end
 end
 always @(posedge aclk) if(!reset&&pcm_pop) begin
-    if(!pcm_q[66]) $fwrite(afd,"%d %d\n",$signed(pcm_q[31:16]),$signed(pcm_q[15:0]));
+    if(!pcm_q[66]&&!sink.skipping) $fwrite(afd,"%d %d\n",$signed(pcm_q[31:16]),$signed(pcm_q[15:0]));
     pcm_rd_index<=pcm_rd_index+1;
 end
 always @(posedge clk) if(!reset) begin
@@ -83,7 +95,7 @@ always @(posedge clk) if(!reset) begin
         pcm_mem[pcm_wr%4096]<={1'b1,66'd0};pcm_wr<=pcm_wr+1;pcm_end_written<=1;
     end
 end
-mp2_decoder decoder(clk,reset,aq[7:0],aqv,aqr,ve&&ae,aq[40:8],aq[41],pv,ready,pl,pr,pp,ppv,pe,frames,pi);
+mp2_decoder #(.ENABLE_SEEK_SKIP(1)) decoder(clk,reset,aq[7:0],aqv,aqr,ve&&ae,aq[40:8],aq[41],pv,ready,pl,pr,pp,ppv,pe,frames,pi,playback_seek,playback_target);
 wire [42:0] vq;wire vqv,vqr,memrd,memwr;wire [28:0] addr;wire [63:0] din;
 reg [63:0] mem[0:1048575],dq;reg dqv=0;
 wire mb=rng[4:3]==0;
@@ -122,8 +134,10 @@ initial begin
  vfd=$fopen({$sformatf("%0s",outpath),".m2v"},"wb");afd=$fopen({$sformatf("%0s",outpath),".pcm.txt"},"w");pfd=$fopen({$sformatf("%0s",outpath),".pts.txt"},"w");
  repeat(5) @(negedge clk);reset=0;
  @(negedge sys_clk);source_start=1;@(negedge sys_clk);source_start=0;
- wait(ve&&ae&&pi&&ee&&finished);repeat(20) @(negedge clk);
- if(under||terr||played!=frames*1152) $fatal(1,"playback errors underrun=%d timestamp=%d played=%0d frames=%0d",under,terr,played,frames);
+ wait(ve&&ae&&pi&&ee&&finished);repeat(2000) @(negedge clk);
+ if(under||terr||(!$test$plusargs("seek") && played!=frames*1152)) $fatal(1,"playback errors underrun=%d timestamp=%d played=%0d frames=%0d",under,terr,played,frames);
+ if($test$plusargs("seek") && (skipped_frames==0 || playback_seek)) $fatal(1,"seek did not bypass frames or complete");
+ $display("AUDIO SEEK skipped_frames=%0d played=%0d",skipped_frames,played);
  $fclose(vfd);$fclose(afd);$fclose(pfd);
  $display("MPG TIMED AUDIO PLAYBACK PASS samples=%0d frames=%0d video_bytes=%0d cycles=%0d",n,frames,voffset,cycles);$finish;
 end

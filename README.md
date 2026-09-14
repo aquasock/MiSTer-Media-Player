@@ -4,7 +4,7 @@ A progressive MPEG-2/MP2 player core for stock MiSTer Main. Audio decoding
 runs in FPGA logic; no ARM helper or modified Main is required. The accepted
 audio/video baseline is `0b6eb0e` seed 87, with native progressive output,
 manual refresh/aspect controls and compact telemetry accepted on hardware.
-Keyboard play/pause and seeking are implemented but await hardware validation.
+Keyboard play/pause is hardware tested. Faster seeking is implemented and awaits hardware validation.
 
 - Raw `.m2v` and MPEG Program Stream `.mpg` through the normal file menu.
 - Progressive 4:2:0 I/P/B video through 720x480, within the baseline decoder's
@@ -56,10 +56,13 @@ the displayed frame and queued samples while silencing movie audio. Seeking
 while paused leaves the destination paused. Additional seek commands are
 ignored while a seek is in progress; Space still controls the final pause state.
 
-This initial seeking implementation reconstructs silently from the beginning
-to a valid destination frame. The screen is blank during reconstruction and
-the OSD remains usable. **Long seeks can take substantial time** until a
-random-access index is added. Jumps clamp at the start/end of media.
+Forward seeking continues from the current decoder position, reconstructing
+only the skipped interval. Backward seeking restarts from the beginning to
+restore reference frames safely. Audio frames well before the destination
+are bypassed, with decoded preroll to restore audio filter history. The screen
+is blank during reconstruction and the OSD remains usable. **Backward seeks
+and large forward jumps can still take substantial time**; there is no random-access
+index yet. Jumps clamp at the start/end of media.
 See the [hardware test procedure](docs/TEST_INSTRUCTIONS.md) for validation.
 
 ## Decoder and output scope

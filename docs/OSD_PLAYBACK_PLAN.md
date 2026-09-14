@@ -71,14 +71,19 @@ time and presentation admission while retaining compressed/PCM queues and
 the current display bank. A common audio-domain hold stops the video time tick
 and PCM time progression; clocks and OSD service remain active.
 
-The first seeking implementation always restarts at byte zero and reconstructs
-forward silently at decoder throughput. This supplies sequence and open-GOP
-reference context without arbitrary byte offsets or a new index. The display
+Forward seeks retain the current decoder session and reconstruct only the
+skipped interval. Backward seeks restart at byte zero to restore sequence and
+open-GOP reference context without arbitrary byte offsets or a new index. The display
 remains blank during reconstruction. Timestamped display time or exact rational
 source-frame periods select the destination; PCM is discarded up to the shared
 destination timestamp, then ordinary timed output resumes. Seek completion
 waits for a real vertical blank and preserves the requested paused state.
-Long-seek latency is the tradeoff; random-access indexing is a future optimization.
+MP2 frames ending at least a full frame before the target bypass decoding and
+synthesis. At least one decoded frame before the target restores the finite
+synthesis history; sample discard still selects the exact audio destination.
+Backward and long forward seeks retain reconstruction latency; random-access
+indexing is a future optimization. A backward command ignores completion from
+the old session until storage retirement and the new reader start complete.
 
 The keyboard tracks press/release state even while OSD is open, excludes menu
 commands and suppresses typematic repeats. In-flight seeks are serialized.

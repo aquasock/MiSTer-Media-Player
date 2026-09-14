@@ -1,21 +1,27 @@
 `timescale 1ns/1ps
 module test_media_keyboard_control;
 reg clk=0;always #5 clk=~clk;
-reg reset=1,new_file=0,enabled=1,osd_open=0,seek_done=0;
+reg reset=1,new_file=0,enabled=1,osd_open=0,seek_done=0,restart_complete=0;
 reg [10:0] key=0;
 reg [34:0] elapsed_q=35'd36000000;
 wire paused,seek_active,restart;
+integer restarts=0;
+always @(posedge clk) if(restart) restarts<=restarts+1;
 wire [34:0] seek_target_q;
 media_keyboard_control dut(.*);
 task event_key(input [8:0] code,input down);
  begin @(negedge clk);key={!key[10],down,code};repeat(3) @(negedge clk);end
 endtask
 task finish_seek;
- begin seek_done=1;repeat(3) @(negedge clk);seek_done=0;repeat(3) @(negedge clk);end
+ begin restart_complete=1;repeat(3) @(negedge clk);restart_complete=0;
+ seek_done=1;repeat(3) @(negedge clk);seek_done=0;repeat(3) @(negedge clk);end
 endtask
 task check_jump(input [8:0] code,input [34:0] expected);
- begin event_key(code,1);if(!seek_active||seek_target_q!=expected) $fatal(1,"jump %h got %d expected %d",code,seek_target_q,expected);
- event_key(code,0);finish_seek();end
+ integer before_restarts;
+ begin before_restarts=restarts;event_key(code,1);if(!seek_active||seek_target_q!=expected) $fatal(1,"jump %h got %d expected %d",code,seek_target_q,expected);
+ event_key(code,0);
+ if(restarts-before_restarts!=(code==9'h16b ? 1 : 0)) $fatal(1,"wrong restart direction");
+ finish_seek();end
 endtask
 initial begin
  repeat(3) @(negedge clk);reset=0;

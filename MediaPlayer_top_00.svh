@@ -138,7 +138,8 @@ always @(posedge clk_sys) media_osd_sync<={media_osd_sync[1:0],OSD_STATUS};
 media_keyboard_control media_keyboard_control(
  .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.enabled(media_file_size!=0),
  .osd_open(media_osd_sync[2]),.key(ps2_key),.elapsed_q(media_elapsed_sys),
- .seek_done(media_seek_done_sys),.paused(media_paused_sys),.seek_active(media_seek_sys),
+ .seek_done(media_seek_done_sys),.restart_complete(media_reader_start),
+ .paused(media_paused_sys),.seek_active(media_seek_sys),
  .seek_target_q(media_target_sys),.restart(media_seek_restart));
 video_config_cdc #(.WIDTH(37)) playback_control_config(
  .src_clk(clk_sys),.dst_clk(clk_mpeg2),

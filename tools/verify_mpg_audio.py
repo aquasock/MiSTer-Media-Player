@@ -12,8 +12,8 @@ def run(*args):
     return subprocess.check_output([str(x) for x in args],cwd=ROOT,stderr=subprocess.STDOUT,text=True)
 with tempfile.TemporaryDirectory(prefix='mpg-audio-') as td:
     td=Path(td);src=td/'test.mpg';out=td/'rtl';sim=td/'sim'
-    run('ffmpeg','-v','error','-f','lavfi','-i','testsrc2=size=720x480:rate=30000/1001:duration=0.5',
-        '-f','lavfi','-i','aevalsrc=0.23*sin(2*PI*997*t)|0.19*sin(2*PI*1553*t):s=48000:d=0.5',
+    run('ffmpeg','-v','error','-f','lavfi','-i','testsrc2=size=720x480:rate=30000/1001:duration=1.0',
+        '-f','lavfi','-i','aevalsrc=0.23*sin(2*PI*997*t)|0.19*sin(2*PI*1553*t):s=48000:d=1.0',
         '-map','0:v','-map','1:a','-c:v','mpeg2video','-threads','1','-g','24','-bf','2','-q:v','6',
         '-c:a','mp2','-b:a','192k','-f','mpeg','-y',src)
     rtl=['rtl/audio/'+x+'.sv' for x in ('mp2_decoder','mp2_synthesis','av_stream_fifo','mp2_pcm_output')]
@@ -43,8 +43,22 @@ with tempfile.TemporaryDirectory(prefix='mpg-audio-') as td:
     assert np.array_equal(paused_pcm,x), 'pause changed decoded/consumed PCM sequence'
     assert Path(str(paused_out)+'.m2v').read_bytes()==video
     print(paused_log)
+    seek_out=td/'seek'
+    seek_log=run(sim/'Vtest_mpg_audio_playback','+input='+str(src),
+        '+output='+str(seek_out),'+seek')
+    seek_pcm=np.loadtxt(str(seek_out)+'.pcm.txt')
+    audio_packets=json.loads(run('ffprobe','-v','error','-select_streams','a:0',
+        '-show_entries','packet=pts','-of','json',src))['packets']
+    # Audio stream time_base is 1/90000 for the generated MPEG program stream.
+    import math
+    target_sample=math.ceil((int(packets[0]['pts'])+54000-int(audio_packets[0]['pts']))*48000/90000)
+    wanted=np.concatenate((x[:4800],x[target_sample:]))
+    assert np.array_equal(seek_pcm,wanted), f'seek PCM differs: actual {seek_pcm.shape}, expected {wanted.shape}'
+    print(seek_log,flush=True)
+    seek_video=Path(str(seek_out)+'.m2v').read_bytes()
+    assert seek_video==video, f'seek video differs: {len(seek_video)} vs {len(video)}'
     result={'played_sample_pairs':len(x),'max_sample_error':float(np.max(abs(x-y))),
-        'pause_100ms_pcm_exact':True,'video_bytes':len(video),'picture_pts_checked':len(pts),'underrun':False,'timestamp_error':False,
+        'pause_100ms_pcm_exact':True,'seek_600ms_pcm_exact':True,'seek_target_sample':target_sample,'video_bytes':len(video),'picture_pts_checked':len(pts),'underrun':False,'timestamp_error':False,
         'scope':'Mounted-file reader with periodic 2 ms host stalls + ideal bounded ingress/PCM FIFOs + timed sink; no full video decoder or vendor CDC simulation'}
     print(json.dumps(result,indent=2))
     if len(sys.argv)>1:Path(sys.argv[1]).write_text(json.dumps(result,indent=2)+'\n')

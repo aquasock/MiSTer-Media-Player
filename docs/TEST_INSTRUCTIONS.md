@@ -31,15 +31,20 @@ Pause should freeze the displayed movie frame and silence movie audio, while
 the raster and OSD keep running. Resume should continue the retained samples
 and frames without a catch-up burst. Leave Audio test Off during movie checks.
 
-Seeking flushes the prior session, reconstructs silently from the beginning,
-and resumes at the first frame at or after the requested time. PTS supply
+Forward seeking retains the decoder session and reconstructs only the skipped
+interval. Backward seeking flushes the session and reconstructs from the
+beginning. Both resume at the first frame at or after the requested time. PTS supply
 displayed-media time when available; unannotated pictures use the supported
 source frame rate, independent of the selected output refresh. The seek target
 is based on the displayed frame, not file-read position. Backward jumps clamp
 at zero; forward jumps beyond EOF finish on the last frame. Seeking while
 paused leaves the destination paused. Scanout is blank during reconstruction
-and the OSD remains usable. Long seeks can take substantial time: this initial
-implementation has no random-access index or bitrate-based offset shortcut.
+and the OSD remains usable. Audio frames ending at least 24 ms before the
+destination bypass synthesis; at least one complete decoded audio frame
+restores filter history before output resumes. Backward seeks and large forward
+jumps can still take substantial time; there is no random-access index. Compare
+a 10-second forward jump near the beginning and late in the same movie: its
+reconstruction work should depend on the interval, not the absolute position.
 
 1. Play both a numbered M2V and an MPG with audible audio. Pause for 10 seconds,
    open/close the OSD and adjust filters, then resume. Check frame retention,
@@ -55,6 +60,7 @@ implementation has no random-access index or bitrate-based offset shortcut.
 5. Repeat with 25 fps at 50 Hz and 29.97 fps at 59.94 Hz. Test OSD arrow navigation
    and held keys to ensure they do not accidentally repeat playback commands.
 
+Absence of telemetry while seeking does not prove error-free operation.
 Cadence telemetry clears during deliberate pause/seek and measures the subsequent
 continuous playback segment. Audio sample telemetry counts played samples,
 excluding discarded seek preroll. Report the source/seed, format, source frame
@@ -93,7 +99,7 @@ counters still wrap at 256; their derived FPS is unreliable on longer clips.
 
 The first audio profile is 48 kHz stereo MPEG-1 Layer II, unprotected,
 112–384 kb/s (192 and 320 kb/s are the main content targets). Other codecs,
-sampling rates, mono, CRC-protected audio, interlace and seeking are outside
+sampling rates, mono, CRC-protected audio and interlace are outside
 this candidate's acceptance claim. Native 480p output comes later.
 
 

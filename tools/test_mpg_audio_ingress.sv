@@ -10,7 +10,7 @@ wire [41:0] aq;wire aqv,aqr,ae;
 av_stream_fifo audio_fifo(clk,reset,{apv,ap,ab},av,ar,aq,aqv,aqr,ae);
 wire pv,pe,pi;wire signed [15:0] pl,pr;wire [32:0] pp;wire ppv;wire [31:0] frames;
 wire ready=rng[0]||rng[1];
-mp2_decoder decoder(clk,reset,aq[7:0],aqv,aqr,ve&&ae,aq[40:8],aq[41],pv,ready,pl,pr,pp,ppv,pe,frames,pi);
+mp2_decoder decoder(clk,reset,aq[7:0],aqv,aqr,ve&&ae,aq[40:8],aq[41],pv,ready,pl,pr,pp,ppv,pe,frames,pi,1'b0,33'd0);
 wire [42:0] vq;wire vqv,vqr,memrd,memwr;wire [28:0] addr;wire [63:0] din;
 reg [63:0] mem[0:1048575],dq;reg dqv=0;
 wire mb=rng[4:3]==0;
