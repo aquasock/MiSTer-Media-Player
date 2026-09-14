@@ -1,3 +1,32 @@
+## 78 COMMIT Unreleased ??? 2026-09-14T09:56:47-07:00
+
+#### Coming From:
+
+Unreleased c4b40c4
+
+#### Purpose:
+
+Implement manually loaded SRT subtitles through stock Main and the existing shared overlay.
+
+#### Outcome:
+
+The user authorizes feature three. Add a second mounted-file menu slot for SRT, bounded streaming cue parsing and selection on the existing presentation timeline, and a backpressured cue transfer into the retained HDMI overlay provider. Preserve normal video file access with explicit drive-response ownership. Clear subtitle association on a new movie and hide stale cues during seeking, then rescan at the actual landing time. Support ordinary plain-text SRT line endings and basic text with complete printable ASCII glyphs; document parser and display limits. No subtitle database is preallocated. Test transport isolation, parsing, pause/seek and file-change behavior, CDC transfer and rendered pixels before clean three-seed qualification.
+
+#### Next Steps:
+
+Implement and run directed regressions, measure resource use and timing, and package a qualified hardware candidate without automatic deployment.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 77 COMMIT Unreleased c4b40c4 2026-09-14T09:51:43-07:00
 
 #### Coming From:
@@ -1262,40 +1291,6 @@ Propose retiring display-bank protection during seek only after outstanding disp
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 38 COMMIT Unreleased 6eb49e1 2026-09-14T01:01:15-07:00
-
-#### Coming From:
-
-Unreleased 6eb49e1
-
-#### Purpose:
-
-Hand off the best completed seek diagnostic RBF and record cancellation of additional builds.
-
-#### Outcome:
-
-The user requested no more builds and to test the best completed RBF. The extra seed 53/62/88 batch under results/build-6eb49e1-20260914-005934 was stopped after verifying its process identity. Original seed 61 remains compiling. Seed 52 is the best completed diagnostic candidate under results/hardware-test-6eb49e1/seed52/MediaPlayer_20260914.rbf, hash verified as 9cabb95b1f045dae7a074f3c918ef8dbbc03b293a5842ca088ef776debfa6047. Its setup slack is -0.264 ns; hold, recovery, removal, pulse width and all 147 CDC checks pass. It uses 40900 ALMs, 55848 registers, 480 RAM blocks, 69 DSPs and three PLLs. Seed 87 misses setup by 1.205 ns. Neither is timing qualified or hardware accepted. Tools-only commits 11d7bac and e02f2a5 correct replay clock ratios, require post-seek audio/video progress, decode full PCM occupancy and add optional production shared-DDR arbitration. The original three combined MPG/audio replays completed the exact Pee Strike 2.2-to-12.2-second seek with audio/video resumption and no reported errors, including audio bypass disabled and varied host stalls/seek phase. A shared-DDR comparison is still running after correcting a behavioral memory-index width limitation before playback; this harness issue is not a hardware freeze reproduction. Hardware source remains 6eb49e1 and the freeze cause remains unresolved.
-
-#### Next Steps:
-
-Let the user test seed 52 with Seek audio bypass On, preserve the first-fault screenshot if it freezes, then reload and compare Off. Do not start more builds. Check the already-running original seed 61 and shared-DDR replay when results are needed.
-
-#### Files Modified:
-
-- tools/replay_mpg_seek.py
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/mpg_replay_control.svh
-- tools/streams/mpg_replay_ingress.svh
-- tools/verify_seek_diagnostics.py
-- docs/TEST_INSTRUCTIONS.md
 
 #### Status:
 
