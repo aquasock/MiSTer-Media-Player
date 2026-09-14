@@ -141,13 +141,13 @@ wire media_eof_video_drained=media_seek_drained && mpeg2_new_b_presentation_comp
  !mpeg2_new_pred_rd && !mpeg2_new_ddr_wr_we;
 media_eof_control eof_control(
  .clk_sys(clk_sys),.clk_mpeg2(clk_mpeg2),.reset_sys(RESET),.reset_decoder(reset_mpeg2),
- .new_file(media_external_new_file),.loaded(media_file_size!=0),
+ .new_file(media_external_new_file),.loaded(media_file_size!=0 && !media_music_hint),
  .sys_paused(media_paused_sys),.sys_seeking(media_seek_sys),
  .preflight(media_duration_busy),.generation(media_generation),
  .input_eof(media_eof_seen && mpeg2_ingress_end),.video_drained(media_eof_video_drained),
  .audio_finished(!av_is_ps || mp2_finished_sync[2]),.paused(media_paused),.seeking(media_seeking),
  .fatal(mpeg2_new_transport_fatal_error),.tick_90k(mpeg2_new_stc_tick_90k),
- .frame_rate_code(mpeg2_new_frame_rate_code),.close_file(media_eof_close));
+ .frame_rate_code(mpeg2_new_frame_rate_code),.close_file(media_video_eof_close));
 
 media_playback_control #(.ENABLE_MOVIE_ORIGIN(1)) media_playback_control(
  .clk(clk_mpeg2),.reset(reset_mpeg2),.paused(media_paused),.seek_active(media_seeking),

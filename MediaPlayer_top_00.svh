@@ -65,7 +65,7 @@ assign VIDEO_ARY = ar ? 13'd9 : 13'd3;
 // Status bits 3:1 remain reserved after removal of Audio test.
 localparam CONF_STR = {
 	"MediaPlayer;;",
-	"S0,M2VMPG,Open MPEG-2 Video;",
+	"S0,M2VMPGFL*,Open video or FLAC;",
 	"S1,SRT,Load subtitles;",
 	"O[120],Subtitles,On,Off;",
 	"-;",
@@ -112,7 +112,41 @@ wire [3:0] media_error;
 reg media_mount_d=0,media_user_reset_d=0;
 reg [63:0] media_file_size=0;
 wire media_user_reset=status[0] | buttons[1];
-wire media_eof_close;
+wire media_eof_close,media_video_eof_close;
+wire media_music_hint,media_music_hint_mpeg;
+reg media_music_mode=0;
+wire media_movie_ddr_idle,media_music_idle;
+wire media_music_input_ready,media_music_metadata;
+wire [35:0] media_music_total,media_music_total_sys;
+wire [3:0] media_music_decode_error;
+wire [37:0] media_music_status_sys;
+wire [34:0] media_music_elapsed,media_music_duration;
+wire [28:0] music_mem_addr,movie_mem_addr;
+wire [63:0] music_mem_data,movie_mem_data;
+wire [7:0] music_mem_be,movie_mem_be,movie_mem_burst;
+wire music_mem_read,music_mem_write,movie_mem_read,movie_mem_write;
+wire music_play_request=media_music_hint && media_file_size!=0;
+assign PLAYER_MUSIC=music_play_request;
+assign PLAYER_MUSIC_PAUSED=media_paused_sys;
+assign PLAYER_PCM_RESET=reset_mpeg2 || !media_music_mode;
+assign media_ddr_idle=media_music_mode?media_music_idle:media_movie_ddr_idle;
+assign media_eof_close=media_video_eof_close || (music_play_request && !media_fifo_reset &&
+ (media_music_status_sys[37] || media_music_status_sys[36] || media_music_error_sys));
+wire media_music_error_sys;
+video_config_cdc #(.WIDTH(1)) music_hint_cdc(.src_clk(clk_sys),.dst_clk(clk_mpeg2),.src_data(media_music_hint),.dst_data(media_music_hint_mpeg));
+video_config_cdc #(.WIDTH(1)) music_error_cdc(.src_clk(clk_mpeg2),.dst_clk(clk_sys),.src_data(|media_music_decode_error),.dst_data(media_music_error_sys));
+video_config_cdc #(.WIDTH(36)) music_total_cdc(.src_clk(clk_mpeg2),.dst_clk(clk_sys),.src_data(media_music_total),.dst_data(media_music_total_sys));
+video_config_cdc #(.WIDTH(38)) music_position_cdc(.src_clk(CLK_AUDIO_CD),.dst_clk(clk_sys),
+ .src_data({PLAYER_MUSIC_FINISHED,PLAYER_MUSIC_ERROR,PLAYER_MUSIC_POSITION}),.dst_data(media_music_status_sys));
+media_music_time music_time(.clk(clk_sys),.reset(RESET||media_new_file),
+ .position(media_music_status_sys[35:0]),.total(media_music_total_sys),.elapsed_q(media_music_elapsed),.total_q(media_music_duration));
+// The bus mode changes only while both previous clients have drained and
+// the session is holding decoder reset. It stays fixed for all live requests.
+always @(posedge clk_mpeg2)begin
+ if(reset_mpeg2_base)media_music_mode<=0;
+ else if(media_decoder_reset && media_music_idle && media_movie_ddr_idle)media_music_mode<=media_music_hint_mpeg;
+end
+
 wire media_external_new_file=(media_img_mounted[0] && !media_mount_d) ||
                             (media_user_reset && !media_user_reset_d);
 wire media_new_file=media_external_new_file || media_eof_close;
@@ -162,9 +196,9 @@ media_seek_search media_seek_search(
 (* preserve, altera_attribute="-name AUTO_SHIFT_REGISTER_RECOGNITION OFF; -name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] media_osd_sync=0;
 always @(posedge clk_sys) media_osd_sync<={media_osd_sync[1:0],OSD_STATUS};
-media_keyboard_control #(.RESTART_BOTH_DIRECTIONS(1)) media_keyboard_control(
+media_keyboard_control #(.RESTART_BOTH_DIRECTIONS(1),.ENABLE_SEEK_GATE(1)) media_keyboard_control(
  .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.enabled(media_file_size!=0 && !media_duration_busy),
- .osd_open(media_osd_sync[2]),.key(ps2_key),.elapsed_q(media_elapsed_sys),
+ .seek_enabled(!media_music_hint),.osd_open(media_osd_sync[2]),.key(ps2_key),.elapsed_q(media_elapsed_sys),
  .seek_done(media_seek_done_sys && !media_search_busy),.restart_complete(media_reader_start && !media_probe_sys),
  .paused(media_paused_sys),.seek_active(media_seek_sys),
  .seek_target_q(media_target_sys),.restart(media_seek_restart));
@@ -185,20 +219,20 @@ wire media_duration_busy,media_duration_start,media_duration_cancel,media_durati
 wire media_duration_valid;
 wire [34:0] media_duration_q;
 wire [63:0] media_duration_size,media_duration_offset;
-media_duration_probe media_duration_probe(
+media_duration_probe #(.ENABLE_FLAC(1)) media_duration_probe(
  .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.file_size(media_file_size),
  .reader_idle(media_reader_idle),.reader_error(media_error),
  .stream_data(media_stream_data),.stream_valid(media_stream_valid),.stream_ready(media_duration_ready),
  .busy(media_duration_busy),.reader_start(media_duration_start),.reader_cancel(media_duration_cancel),
  .read_size(media_duration_size),.read_offset(media_duration_offset),
- .duration_valid(media_duration_valid),.duration_q(media_duration_q),.origin());
+ .duration_valid(media_duration_valid),.duration_q(media_duration_q),.origin(),.music_file(media_music_hint));
 assign PLAYER_UI_CLOCK=clk_sys;
 media_ui_state player_ui_state(
  .clk(clk_sys),.reset(RESET),.new_file(media_new_file),
  .loaded(media_file_size!=0 && !media_duration_busy && !media_fifo_reset),
  .paused(media_paused_sys),.seeking(media_seek_sys),
- .elapsed_q(media_elapsed_sys),.target_q(media_target_sys),
- .duration_q(media_duration_q),.duration_valid(media_duration_valid),.scene_state(PLAYER_UI_STATE));
+ .elapsed_q(media_music_hint?media_music_elapsed:media_elapsed_sys),.target_q(media_target_sys),
+ .duration_q(media_music_hint?media_music_duration:media_duration_q),.duration_valid(media_music_hint?(media_music_total_sys!=0):media_duration_valid),.scene_state(PLAYER_UI_STATE));
 media_session_control #(.ENABLE_START_READY(1)) media_session_control (
  .clk_sys(clk_sys),.clk_mpeg2(clk_mpeg2),.reset(RESET),.restart(media_restart),
  .reader_idle(media_reader_idle),.ddr_idle(media_ddr_idle),
@@ -355,7 +389,7 @@ end
 reg playback_started = 0;
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2_base || media_new_file_mpeg) playback_started <= 0;
-    else if (mpeg2_new_framebuffer_swap_reset_count != 0) playback_started <= 1;
+    else if (mpeg2_new_framebuffer_swap_reset_count != 0 || (media_music_mode && music_started)) playback_started <= 1;
 end
 video_config_cdc #(.WIDTH(1)) playback_osd_config (
  .src_clk(clk_mpeg2), .dst_clk(clk_sys),
@@ -379,7 +413,7 @@ always @(posedge clk_mpeg2) begin
     if(reset_mpeg2) media_eof_seen<=0;
     else if(media_prefill_mpeg && media_eof_at_head) media_eof_seen<=1;
 end
-assign mpeg2_stream_rd=!reset_mpeg2 && media_prefill_mpeg && (media_eof_at_head || media_data_read);
+assign mpeg2_stream_rd=!reset_mpeg2 && media_prefill_mpeg && (media_eof_at_head || (media_music_mode ? (!mpeg2_stream_empty && media_music_input_ready) : media_data_read));
 
 // Phase 1V: the decoder owns syntax/persistence backpressure, while the top
 // level additionally pauses between a persisted B and completion of its proven
@@ -395,7 +429,7 @@ assign mpeg2_new_stream_ready =
 	!mpeg2_new_p_destination_ownership_hold;
 
 // EOF is an ordered FIFO token, never a gap between host sector requests.
-wire mpeg2_new_system_input_end = media_eof_seen && !reset_mpeg2;
+wire mpeg2_new_system_input_end = media_eof_seen && !reset_mpeg2 && !media_music_mode;
 
 wire [7:0] mpeg2_ingress_data;
 wire mpeg2_ingress_valid, mpeg2_ingress_ready, mpeg2_ingress_end;
@@ -418,7 +452,7 @@ mpeg2_h262_stream_transport_gate mpeg2_h262_stream_transport_gate
 (
 	.clk              (clk_mpeg2),
 	.reset            (reset_mpeg2),
-	.fifo_empty       (mpeg2_stream_empty || media_eof_at_head || reset_mpeg2 || !media_prefill_mpeg),
+	.fifo_empty       (media_music_mode || mpeg2_stream_empty || media_eof_at_head || reset_mpeg2 || !media_prefill_mpeg),
 	.decoder_ready    (mpeg2_new_system_input_ready),
 	.fatal_error      (mpeg2_new_transport_fatal_error),
 	.fifo_read        (media_data_read),
@@ -526,6 +560,25 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 // as an implicit audio transport.  Prefer on-chip FIFO/RAM when practical.
 // The DDR service and Phase 1S/1T clients run in the decoder clock domain.
 assign DDRAM_CLK = clk_mpeg2;
+assign DDRAM_ADDR=media_music_mode?music_mem_addr:movie_mem_addr;
+assign DDRAM_DIN=media_music_mode?music_mem_data:movie_mem_data;
+assign DDRAM_BE=media_music_mode?music_mem_be:movie_mem_be;
+assign DDRAM_BURSTCNT=media_music_mode?8'd1:movie_mem_burst;
+assign DDRAM_RD=media_music_mode?music_mem_read:movie_mem_read;
+assign DDRAM_WE=media_music_mode?music_mem_write:movie_mem_write;
+reg music_started=0;
+always @(posedge clk_mpeg2)begin
+ if(reset_mpeg2)music_started<=0;
+ else if(media_music_mode&&!media_quiesce)music_started<=1;
+end
+flac_ddr_decoder music_decoder(.clk(clk_mpeg2),.reset(reset_mpeg2),.cancel(media_quiesce),
+ .start(media_music_mode&&!media_quiesce&&!music_started),.start_ready(),.quiescent(media_music_idle),
+ .input_data(media_fifo_data[7:0]),.input_valid(media_music_mode&&media_prefill_mpeg&&!mpeg2_stream_empty&&!media_eof_at_head),
+ .input_end(media_eof_seen),.input_ready(media_music_input_ready),.metadata_valid(media_music_metadata),.total_samples(media_music_total),
+ .pcm_valid(PLAYER_PCM_VALID),.pcm_ready(PLAYER_PCM_READY),.pcm_eof(PLAYER_PCM_DATA[32]),
+ .pcm_left(PLAYER_PCM_DATA[31:16]),.pcm_right(PLAYER_PCM_DATA[15:0]),.error(media_music_decode_error),
+ .mem_addr(music_mem_addr),.mem_data(music_mem_data),.mem_be(music_mem_be),.mem_read(music_mem_read),.mem_write(music_mem_write),
+ .mem_busy(DDRAM_BUSY||!media_music_mode),.mem_q(DDRAM_DOUT),.mem_q_valid(DDRAM_DOUT_READY&&media_music_mode));
 
 ///////////////////////   VIDEO TIMING   /////////////////////////
 

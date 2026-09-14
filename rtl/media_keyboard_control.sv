@@ -1,10 +1,10 @@
 // One command per physical key press. Track releases even while OSD is open,
 // so menu navigation and typematic repeats cannot leak into playback.
-module media_keyboard_control #(parameter RESTART_BOTH_DIRECTIONS=0)(
+module media_keyboard_control #(parameter RESTART_BOTH_DIRECTIONS=0,parameter ENABLE_SEEK_GATE=0)(
  input wire clk,reset,new_file,enabled,osd_open,
  input wire [10:0] key,
  input wire [34:0] elapsed_q,
- input wire seek_done,restart_complete,
+ input wire seek_done,restart_complete,seek_enabled,
  output reg paused=0,seek_active=0,
  output reg [34:0] seek_target_q=0,
  output reg restart=0
@@ -42,7 +42,7 @@ always @(posedge clk) begin
     9'h16b,9'h174:begin
      if(key[8:0]==9'h16b) left_down<=key[9];else right_down<=key[9];
      if(key[9]&&!(key[8:0]==9'h16b ? left_down:right_down)&&enabled&&
-        !osd_open&&!new_file&&!seek_active&&!seek_done) begin
+        !osd_open&&!new_file&&!seek_active&&!seek_done&&(!ENABLE_SEEK_GATE||seek_enabled)) begin
       if(key[8:0]==9'h16b) seek_target_q<=elapsed_q<jump_q?35'd0:elapsed_q-jump_q;
       else seek_target_q<=forward_q[35]?{35{1'b1}}:forward_q[34:0];
       // Legacy integrations may retain forward reconstruction. Production

@@ -11,13 +11,18 @@ module media_pcm_i2s(
  output reg i2s_bclk,i2s_lrclk,i2s_data,
  output wire[35:0] position,
  output reg finished,
- output wire error
+ output wire error,
+ output wire signed[15:0] pcm_output_left,pcm_output_right,
+ output wire idle
 );
  reg[8:0] phase;
  reg paused_latched;
  reg[15:0] left,right;
  wire signed[15:0] audio_left,audio_right;
  wire sink_finished;
+ reg quiet=0;
+ assign idle=(reset||cancel)||(quiet&&paused);
+ assign pcm_output_left=audio_left;assign pcm_output_right=audio_right;
  media_pcm_sink sink(.clk(clk),.reset(reset),.cancel(cancel),.start(start),.start_position(start_position),
   .paused(paused_latched),.sample_tick(phase==0),.input_valid(input_valid),.input_eof(input_eof),
   .input_left(input_left),.input_right(input_right),.input_ready(input_ready),
@@ -25,9 +30,10 @@ module media_pcm_i2s(
  always @(posedge clk)begin
   if(reset||cancel||start)begin
    phase<=0;paused_latched<=paused;left<=0;right<=0;
-   i2s_bclk<=0;i2s_lrclk<=1;i2s_data<=0;finished<=0;
+   i2s_bclk<=0;i2s_lrclk<=1;i2s_data<=0;finished<=0;quiet<=0;
   end else begin
    phase<=phase+1'b1;
+   if(!paused)quiet<=0;else if(phase==16&&paused_latched)quiet<=1;
    // Fetch at phase 0; capture the sink's updated samples one full clock later.
    if(phase==1)begin left<=audio_left;right<=audio_right;end
    if(phase==511)paused_latched<=paused;

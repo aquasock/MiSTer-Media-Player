@@ -59,7 +59,7 @@ mpeg2_h262_ddram_arbiter #(.ENABLE_QUIESCE(1),.ENABLE_DISPLAY_RELEASE(1)) mpeg2_
 (
     .clk             (clk_mpeg2),
     .reset           (reset_mpeg2),
-    .quiesce(media_quiesce),.idle(media_ddr_idle),
+    .quiesce(media_quiesce||media_music_mode),.idle(media_movie_ddr_idle),
     .release_display_bank(media_seeking),
     .writer_burstcnt (mpeg2_new_ddr_wr_burstcnt),
     .writer_addr     (mpeg2_new_ddr_wr_addr),
@@ -81,12 +81,12 @@ mpeg2_h262_ddram_arbiter #(.ENABLE_QUIESCE(1),.ENABLE_DISPLAY_RELEASE(1)) mpeg2_
     .stream_addr(av_mem_addr),.stream_din(av_mem_data),
     .stream_rd(av_mem_read),.stream_we(av_mem_write),.stream_busy(av_mem_busy),
     .stream_dout_ready(av_mem_q_valid),
-    .ddram_busy      (DDRAM_BUSY),
-    .ddram_dout_ready(DDRAM_DOUT_READY),
-    .ddram_burstcnt  (DDRAM_BURSTCNT),
-    .ddram_addr      (DDRAM_ADDR),
-    .ddram_rd        (DDRAM_RD),
-    .ddram_din       (DDRAM_DIN),
-    .ddram_be        (DDRAM_BE),
-    .ddram_we        (DDRAM_WE)
+    .ddram_busy      (DDRAM_BUSY||media_music_mode),
+    .ddram_dout_ready(DDRAM_DOUT_READY&&!media_music_mode),
+    .ddram_burstcnt  (movie_mem_burst),
+    .ddram_addr      (movie_mem_addr),
+    .ddram_rd        (movie_mem_read),
+    .ddram_din       (movie_mem_data),
+    .ddram_be        (movie_mem_be),
+    .ddram_we        (movie_mem_write)
 );

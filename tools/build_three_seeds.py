@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """Build clean archived source for seeds 52/61/87; usage: build_three_seeds.py [commit]."""
 from pathlib import Path
+import argparse
 import subprocess, os, re, tarfile, io, time, json, threading, concurrent.futures, hashlib, sys
 root=Path(__file__).resolve().parents[1]
-sha=subprocess.check_output(['git','rev-parse',sys.argv[1] if len(sys.argv)>1 else 'HEAD'],cwd=root,text=True).strip()
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('commit',nargs='?',default='HEAD')
+parser.add_argument('--seeds',type=int,nargs='+',default=[52,61,87])
+args=parser.parse_args()
+sha=subprocess.check_output(['git','rev-parse',args.commit],cwd=root,text=True).strip()
 base=root/'results'/('build-'+sha[:7]+'-'+time.strftime('%Y%m%d-%H%M%S'))
 base.mkdir(parents=True)
 source=subprocess.check_output(['git','archive',sha],cwd=root)
@@ -30,5 +35,5 @@ def build(seed):
  rbf=dest/'output_files/MediaPlayer.rbf'
  save(seed,stage='complete' if rc==0 else 'timing_audit_failed',timing_exit=rc,total_seconds=round(time.time()-started,1),rbf_sha256=hashlib.sha256(rbf.read_bytes()).hexdigest() if rbf.exists() else None)
 print('Build evidence: '+str(base),flush=True)
-with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:list(pool.map(build,[52,61,87]))
+with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:list(pool.map(build,args.seeds))
 print('BATCH FINISHED '+str(base),flush=True)

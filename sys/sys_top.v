@@ -1184,16 +1184,16 @@ reg  [31:0] adj_data;
 	wire cfg_ready = 1;
 `endif
 
-assign HDMI_I2C_SCL = hdmi_scl_en ? 1'b0 : 1'bZ;
-assign HDMI_I2C_SDA = hdmi_sda_en ? 1'b0 : 1'bZ;
+assign HDMI_I2C_SCL = native_scl_low ? 1'b0 : 1'bZ;
+assign HDMI_I2C_SDA = native_sda_low ? 1'b0 : 1'bZ;
 
 wire hdmi_scl_en, hdmi_sda_en;
 cyclonev_hps_interface_peripheral_i2c hdmi_i2c
 (
 	.out_clk(hdmi_scl_en),
-	.scl(HDMI_I2C_SCL),
+	.scl(native_hps_scl),
 	.out_data(hdmi_sda_en),
-	.sda(HDMI_I2C_SDA)
+	.sda(native_hps_sda)
 );
 
 `ifndef MISTER_DEBUG_NOHDMI
@@ -1632,14 +1632,29 @@ end
 assign SDCD_SPDIF = (mcp_en & ~spdif) ? 1'b0 : 1'bZ;
 
 `ifndef MISTER_DUAL_SDRAM
-	wire analog_l, analog_r;
+
 
 	assign AUDIO_SPDIF = av_dis ? 1'bZ : (SW[0] | mcp_en) ? HDMI_LRCLK : spdif;
 	assign AUDIO_R     = av_dis ? 1'bZ : (SW[0] | mcp_en) ? HDMI_I2S   : analog_r;
 	assign AUDIO_L     = av_dis ? 1'bZ : (SW[0] | mcp_en) ? HDMI_SCLK  : analog_l;
 `endif
 
-assign HDMI_MCLK = clk_audio;
+wire native_scl_low,native_sda_low,native_hps_scl,native_hps_sda;
+wire music_request,music_paused,music_pcm_reset,music_pcm_valid,music_pcm_ready;
+wire [32:0] music_pcm_data;
+wire music_clock,music_finished,music_error;
+wire [35:0] music_position;
+wire analog_l,analog_r;
+wire movie_bclk,movie_lrclk,movie_i2s,movie_spdif,movie_analog_l,movie_analog_r;
+media_native_audio native_audio(.refclk(FPGA_CLK3_50),.config_clk(clk_sys),.wr_clk(ram_clk),.reset(reset),.movie_clock(clk_audio),
+ .want_cd(music_request),.paused(music_paused),.movie_96k(audio_96k),.attenuation(vol_att),
+ .pcm_reset(music_pcm_reset),.pcm_valid(music_pcm_valid),.pcm_data(music_pcm_data),.pcm_ready(music_pcm_ready),
+ .cd_clock(music_clock),.position(music_position),.finished(music_finished),.error(music_error),
+ .movie_bclk(movie_bclk),.movie_lrclk(movie_lrclk),.movie_data(movie_i2s),.movie_spdif(movie_spdif),.movie_dac_l(movie_analog_l),.movie_dac_r(movie_analog_r),
+ .output_mclk(HDMI_MCLK),.output_bclk(HDMI_SCLK),.output_lrclk(HDMI_LRCLK),.output_data(HDMI_I2S),.output_spdif(spdif),
+ .output_dac_l(analog_l),.output_dac_r(analog_r),
+ .pad_scl(HDMI_I2C_SCL),.pad_sda(HDMI_I2C_SDA),.hps_scl_low(hdmi_scl_en),.hps_sda_low(hdmi_sda_en),
+ .hps_scl_in(native_hps_scl),.hps_sda_in(native_hps_sda),.drive_scl_low(native_scl_low),.drive_sda_low(native_sda_low));
 wire clk_audio;
 
 pll_audio pll_audio
@@ -1681,14 +1696,14 @@ audio_out audio_out
 	.alsa_r(16'd0),
 `endif
 
-	.i2s_bclk(HDMI_SCLK),
-	.i2s_lrclk(HDMI_LRCLK),
-	.i2s_data(HDMI_I2S),
+	.i2s_bclk(movie_bclk),
+	.i2s_lrclk(movie_lrclk),
+	.i2s_data(movie_i2s),
 `ifndef MISTER_DUAL_SDRAM
-	.dac_l(analog_l),
-	.dac_r(analog_r),
+	.dac_l(movie_analog_l),
+	.dac_r(movie_analog_r),
 `endif
-	.spdif(spdif)
+	.spdif(movie_spdif)
 );
 
 
@@ -1897,7 +1912,10 @@ emu emu
 	.LED_POWER(led_power),
 	.LED_DISK(led_disk),
 
-	.CLK_AUDIO(clk_audio),
+	.PLAYER_MUSIC(music_request),.PLAYER_MUSIC_PAUSED(music_paused),
+ .PLAYER_PCM_RESET(music_pcm_reset),.PLAYER_PCM_VALID(music_pcm_valid),.PLAYER_PCM_DATA(music_pcm_data),.PLAYER_PCM_READY(music_pcm_ready),
+ .CLK_AUDIO_CD(music_clock),.PLAYER_MUSIC_POSITION(music_position),.PLAYER_MUSIC_FINISHED(music_finished),.PLAYER_MUSIC_ERROR(music_error),
+ .CLK_AUDIO(clk_audio),
 	.AUDIO_L(audio_l),
 	.AUDIO_R(audio_r),
 	.AUDIO_S(audio_s),

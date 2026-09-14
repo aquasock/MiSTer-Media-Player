@@ -30,7 +30,7 @@
 // altera message_off 10762
 // altera message_off 10240
 
-module spdif
+module spdif #(parameter SAMPLE_RATE=48000)
 (
     input           clk_i,
     input           rst_i,
@@ -176,7 +176,7 @@ begin
         channel_status_bit_r = 1'b1;
     else if (subframe_count_q[8:1] == 8'd15) // frame 15 => 0 = no indication, 1 = original media
         channel_status_bit_r = 1'b1;
-    else if (subframe_count_q[8:1] == 8'd25) // frame 24 to 27 => sample frequency, 0100 = 48kHz, 0000 = 44kHz (l2r)
+    else if (subframe_count_q[8:1] == 8'd25 && SAMPLE_RATE!=44100) // frame 24 to 27 => sample frequency, 0100 = 48kHz, 0000 = 44kHz (l2r)
         channel_status_bit_r = 1'b1;
     else
         channel_status_bit_r = 1'b0; // everything else defaults to 0        

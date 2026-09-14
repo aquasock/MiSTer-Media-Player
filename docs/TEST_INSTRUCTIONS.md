@@ -1,5 +1,32 @@
 # Shared IDCT candidate
 
+## Native FLAC first hardware gate
+
+The new candidate adds standalone native **44.1 kHz, 16-bit stereo FLAC** to
+**Open video or FLAC**. Keep accepted b639ccc seed 52 available for rollback.
+Hardware acceptance of native HDMI and real stock Main I2C behavior is pending.
+
+1. Open a CD-quality FLAC made from an original WAV. Check continuous playback,
+   correct pitch/speed, left/right identity, silence and elapsed/total times.
+   Compare its playing length with the original. If an HDMI receiver displays
+   the input audio rate, verify **44.1 kHz**.
+2. Press Space repeatedly; check silent pause, frozen elapsed time and clean
+   continuation. Check volume and mute. Music filters are a later gate; movie
+   audio filters remain supported. Arrow keys intentionally do not seek FLAC yet.
+3. Let a short FLAC finish naturally. Its final audio must play before startup
+   returns. Open another FLAC while playing and while paused; old audio and
+   state must be discarded. Unknown STREAMINFO total should remain dashes.
+4. Alternate MPG → FLAC → MPG repeatedly. Open the OSD and change HDMI/video
+   settings during music, checking that native playback resumes after Main
+   reconfigures the transmitter. Test HDMI reconnect if practical.
+5. Repeat Fellow, Groove, Jiggler and Star Wars at 50/59.94 Hz, including movie
+   pause, every seek combination, filters, subtitles and EOF. Movie audio must
+   retain its previous rate and behavior.
+
+A corrupt/unsupported FLAC currently returns to startup. Future 44.1 kHz WAV
+can share the PCM path, but WAV parsing is not implemented in this candidate.
+
+
 Replace three production IDCT engines with one shared service while preserving
 uncontended output cycles, transform arithmetic and reset/seek cancellation.
 Independent coefficient staging handles overlapping requests. See

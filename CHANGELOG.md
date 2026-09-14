@@ -8,6 +8,12 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- First standalone native 44.1 kHz/16-bit stereo FLAC hardware candidate:
+  content-based mounted-file selection, CRC-admitted DDR frames, exact PCM
+  clock crossing, native HDMI/I2S/SPDIF and analog outputs, volume, Space pause,
+  source-sample times and drained EOF. Preserve movie decoding and filtering;
+  FLAC seeking and additional music processing remain later gates.
+
 - Return to startup after physical EOF and drained audio/video, with a final-frame
   hold, pause/seek protection and generation-safe replacement-file handling. Clear
   subtitles, duration and controls without retaining a resume position.

@@ -149,7 +149,7 @@ if {$engine_names ne [list $expected_engine] || $index_names ne $expected_indice
 puts $shared_idct_audit "Shared IDCT audit: PASS"
 close $shared_idct_audit
 set cdc_audit [open "$output_dir/configuration_cdc_audit.rpt" w]
-foreach instance {eof_generation_config eof_complete_config subtitle_command_config subtitle_ack_config player_ui_config seek_file_config seek_file_echo_config seek_probe_config playback_control_config playback_position_config playback_audio_config playback_hide_reset_config refresh_request_config refresh_applied_config color_mode_config display_color_config media_prefill_config media_fatal_config reader_error_config aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
+foreach instance {music_hint_cdc music_error_cdc music_total_cdc music_position_cdc config_ref config_cd clock_ack movie_idle_cdc cd_idle_cdc ready_cdc eof_generation_config eof_complete_config subtitle_command_config subtitle_ack_config player_ui_config seek_file_config seek_file_echo_config seek_probe_config playback_control_config playback_position_config playback_audio_config playback_hide_reset_config refresh_request_config refresh_applied_config color_mode_config display_color_config media_prefill_config media_fatal_config reader_error_config aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
     if {[string first "|" $instance] < 0} {
         set prefix "*video_config_cdc:$instance"
     } else {
@@ -178,6 +178,14 @@ foreach chain {req_sync ack_sync} {
         set count [get_collection_size [get_registers $pattern]]
         puts $cdc_audit "$pattern: $count registers"
         if {$count != 1} {error "Missing session synchronizer: $pattern"}
+    }
+}
+foreach chain {select_sync lock_sync mute_movie_sync wr_reset_sync rd_reset_sync} {
+    for {set stage 0} {$stage < 3} {incr stage} {
+        set pattern [format {*media_native_audio:*|%s[%d]} $chain $stage]
+        set count [get_collection_size [get_registers $pattern]]
+        puts $cdc_audit "$pattern: $count registers"
+        if {$count != 1} {error "Missing native audio synchronizer: $pattern"}
     }
 }
 close $cdc_audit

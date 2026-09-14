@@ -3,6 +3,7 @@
 // Physical HPS busy/timeout behavior still requires board validation.
 module media_hdmi_audio_control #(
  parameter integer QUIET_CYCLES=500000,
+ parameter integer DRAIN_CYCLES=1,
  parameter integer BUS_FREE_CYCLES=250,
  parameter integer QUARTER_CYCLES=125,
  parameter integer STRETCH_LIMIT=250000,
@@ -16,7 +17,7 @@ module media_hdmi_audio_control #(
  wire hps_changed,config_ready,config_done,config_error,config_request;
  wire[1:0] config_mode;
  wire local_request,local_done,local_grant,local_scl_low,local_sda_low;
- media_audio_rate_control #(.QUIET_CYCLES(QUIET_CYCLES)) control(
+ media_audio_rate_control #(.QUIET_CYCLES(QUIET_CYCLES),.DRAIN_CYCLES(DRAIN_CYCLES)) control(
   .clk(clk),.reset(reset),.want_cd(want_cd),.movie_96k(movie_96k),.clients_idle(clients_idle),
   .clock_ready(clock_ready),.clock_applied_cd(clock_applied_cd),.hps_changed(hps_changed),
   .config_ready(config_ready),.config_done(config_done),.config_error(config_error),

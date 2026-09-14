@@ -3,6 +3,7 @@ module test_media_duration_reader;
 reg clk=0;always #5 clk=~clk;
 reg reset=1,new_file=0;
 reg [63:0] file_size=0;
+wire music_file;
 wire busy,probe_start,probe_cancel,probe_ready,duration_valid;
 wire [34:0] duration;
 wire [63:0] probe_size,probe_offset;
@@ -13,11 +14,11 @@ wire [31:0] lba;wire [5:0] blocks;wire rd;
 reg ack=0,bwr=0;reg [12:0] addr=0;reg [15:0] data=0;
 reg play_start=0,play_cancel=1;
 wire playback_byte=stream_valid&&!busy&&!play_cancel;
-media_duration_probe #(.HEAD_BYTES(512),.TAIL_BYTES(512),.TIMEOUT_CYCLES(20000)) probe(
+media_duration_probe #(.ENABLE_FLAC(1),.HEAD_BYTES(512),.TAIL_BYTES(512),.TIMEOUT_CYCLES(20000)) probe(
  .clk(clk),.reset(reset),.new_file(new_file),.file_size(file_size),.reader_idle(idle),.reader_error(error),
  .stream_data(stream),.stream_valid(stream_valid),.stream_ready(probe_ready),.busy(busy),
  .reader_start(probe_start),.reader_cancel(probe_cancel),.read_size(probe_size),.read_offset(probe_offset),
- .duration_valid(duration_valid),.duration_q(duration),.origin());
+ .music_file(music_file),.duration_valid(duration_valid),.duration_q(duration),.origin());
 media_file_reader #(.TIMEOUT_CYCLES(5000)) reader(
  .clk(clk),.reset(reset),.start(busy?probe_start:play_start),.cancel(busy?probe_cancel:play_cancel),.suspend(1'b0),
  .file_size(busy?probe_size:file_size),.start_offset(busy?probe_offset:64'd0),
@@ -27,6 +28,7 @@ media_file_reader #(.TIMEOUT_CYCLES(5000)) reader(
 reg [7:0] fixture[0:511];
 integer fixture_length=352;
 string path;
+reg flac_file=0;integer before_flac;
 reg host_enable=1,malformed=0,corrupt_head=0,different_tail=0;
 reg [63:0] host_base,host_size;
 integer host_words,j,request_count=0,play_bytes=0;
@@ -36,6 +38,8 @@ function [7:0] file_byte(input [63:0] offset,input [63:0] size);
  begin
   index=offset>=size-512?offset-(size-512):offset;
   file_byte=index<fixture_length?fixture[index]:8'hff;
+  if(flac_file && offset<4)case(offset)
+   0:file_byte=8'h66;1:file_byte=8'h4c;2:file_byte=8'h61;3:file_byte=8'h43;endcase
   if(corrupt_head && offset<size-512 && index==18) file_byte=file_byte&8'hfe;
   if(different_tail && offset>=size-512 && index>=3 && index<fixture_length &&
      fixture[index]==8'he0 && fixture[index-1]==1 && fixture[index-2]==0 && fixture[index-3]==0)
@@ -98,6 +102,10 @@ initial begin
  corrupt_head=1;mount(1024);done(0);corrupt_head=0;
  different_tail=1;mount(1024);done(0);different_tail=0;
  mount(1024);done(1);
+ before_flac=request_count;flac_file=1;mount(10000000);done(0);
+ if(!music_file||request_count!=before_flac+1)$fatal(1,"FLAC detection must drain head without tail probe");
+ flac_file=0;mount(1024);done(1);
+ if(music_file)$fatal(1,"FLAC mode survived movie replacement");
  $display("DURATION_READER_PASS requests=%0d playback_bytes=%0d",request_count,play_bytes);$finish;
 end
 initial begin #10000000;$fatal(1,"test timeout state=%0d reader=%0d",probe.state,reader.state);end

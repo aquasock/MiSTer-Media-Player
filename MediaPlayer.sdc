@@ -146,3 +146,14 @@ foreach player_scene_name {snapshot w h scale revision state resume_state field 
 }
 set_multicycle_path -setup -end 4 -from $player_scene_ce_regs -to $player_scene_ce_regs
 set_multicycle_path -hold -end 3 -from $player_scene_ce_regs -to $player_scene_ce_regs
+
+# Native audio CDCs: only the first synchronizer stages cross clocks. The
+# subsequent stages and serializer datapaths retain ordinary timing checks.
+set_false_path -to [get_keepers {*media_native_audio:*|select_sync[0]}]
+set_false_path -to [get_keepers {*media_native_audio:*|lock_sync[0]}]
+set_false_path -to [get_keepers {*media_native_audio:*|mute_movie_sync[0]}]
+# Async reset assertions clear the FIFO and per-domain release synchronizers.
+foreach chain {wr_reset_sync rd_reset_sync} {
+    set target [format {*media_native_audio:*|%s[*]} $chain]
+    set_false_path -from [get_keepers {*|media_music_mode *|media_session_control:*|decoder_reset *|reset_mpeg2_sync[2] *|reset}] -to [get_keepers $target]
+}

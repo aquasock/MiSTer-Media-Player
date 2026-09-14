@@ -5,6 +5,7 @@ module test_media_pcm_i2s;
  integer sent=0,received=0,frames=0,read_frame=0,bits=0,cycles=0;
  wire input_valid=1,input_eof=sent==1024;
  wire signed[15:0] input_left=16'(sent*127+1234),input_right=16'(-sent*191-5678);
+ wire signed[15:0] pcm_output_left,pcm_output_right;wire idle;
  wire input_ready,i2s_bclk,i2s_lrclk,i2s_data,finished,error;wire[35:0] position;
  media_pcm_i2s dut(.*,.start_position(36'd0));
  reg[15:0] expected_left[0:2047],expected_right[0:2047];

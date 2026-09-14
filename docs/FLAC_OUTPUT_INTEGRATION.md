@@ -139,3 +139,45 @@ clock counters. The remaining PCM CDC queue, mounted-file/session routing,
 production output/filter selection and integrated placement are not included.
 Virtual-I/O fits do not establish whole-core timing closure. The accepted
 b639ccc seed 52 remains the hardware rollback.
+
+## Production candidate wiring
+
+The production mounted-file preflight recognizes `fLaC` at byte zero, cancels
+and drains its head read, then starts playback from byte zero. Stock Main uses
+three-character extension patterns, so the common file picker uses
+`M2VMPGFL*`; decoder selection relies on content, not that wildcard.
+Movie and FLAC DDR clients are mutually exclusive. The route changes only
+while the session controller holds decoder reset and both clients report
+quiescent. Cancelled requests and responses retain their old route until drained.
+
+A 256-token vendor dual-clock FIFO connects the decoder's 60 MHz domain to
+native 22.5792 MHz PCM/I2S. The selected output clock acknowledges actual edges
+and settled mode through a mailbox. Movie I2S drains two muted frames; CD
+acknowledges a silent sample boundary. The controller waits a minimum 2048
+reference-clock cycles before accepting a drain acknowledgement. HPS writes
+pause CD consumption until native HDMI settings are reapplied and verified.
+The native SPDIF encoder advertises 44.1 kHz. EOF waits beyond the final I2S
+bit for the SPDIF tail before returning the core to startup.
+
+This first candidate includes Space pause, source-sample elapsed/total times,
+volume, clean EOF and replacement. FLAC arrow-key seeking is disabled until
+its separate seek gate. Music uses the native exact PCM path with volume;
+movie IIR/DC/filter/mix processing remains on its unchanged 48/96 kHz platform
+path. Additional music filtering is not part of this candidate. STREAMINFO
+with zero total samples displays unknown total/remaining. Corrupt or unsupported
+music stops and returns to startup; no diagnostic overlay is added.
+
+Run the integration checks with:
+
+```sh
+python3 tools/verify_flac_integration.py --output results/flac/production-integration
+python3 tools/verify_ui_duration.py --output results/flac/movie-duration-regression
+python3 tools/verify_playback_controls.py --output results/flac/playback-regression.json
+python3 tools/verify_direct_seek.py --output results/flac/movie-seek-regression
+```
+
+The integration test uses the vendor FIFO model and independent 60/20/50 MHz
+and native/movie audio clocks, with a functional PLL/selector model. It checks
+1024 exact I2S words and SPDIF sample captures, pause, a simulated Main register
+write during playback, source position, final-sample drain and movie-rate
+restoration. It does not qualify physical HPS I2C or HDMI interoperability.

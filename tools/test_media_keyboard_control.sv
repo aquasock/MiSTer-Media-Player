@@ -4,11 +4,12 @@ reg clk=0;always #5 clk=~clk;
 reg reset=1,new_file=0,enabled=1,osd_open=0,seek_done=0,restart_complete=0;
 reg [10:0] key=0;
 reg [34:0] elapsed_q=35'd36000000;
+reg seek_enabled=1;
 wire paused,seek_active,restart;
 integer restarts=0;
 always @(posedge clk) if(restart) restarts<=restarts+1;
 wire [34:0] seek_target_q;
-media_keyboard_control dut(.*);
+media_keyboard_control #(.ENABLE_SEEK_GATE(1)) dut(.*);
 task event_key(input [8:0] code,input down);
  begin @(negedge clk);key={!key[10],down,code};repeat(3) @(negedge clk);end
 endtask
@@ -47,6 +48,10 @@ initial begin
  event_key(9'h16b,1);if(seek_target_q!=39600000) $fatal(1,"busy seek accepted");
  event_key(9'h16b,0);finish_seek();
  new_file=1;@(negedge clk);new_file=0;if(paused) $fatal(1,"new file retained pause");
+ seek_enabled=0;event_key(9'h174,1);event_key(9'h174,0);
+ if(seek_active||restart)$fatal(1,"music seek gate");
+ event_key(9'h029,1);event_key(9'h029,0);if(!paused)$fatal(1,"music pause blocked");
+ new_file=1;@(negedge clk);new_file=0;
  enabled=0;event_key(9'h029,1);event_key(9'h174,1);
  if(paused||seek_active) $fatal(1,"empty player accepted control");
  $display("PASS: keyboard modifiers, direction, bounds, typematic, OSD, busy and pause retention");$finish;
