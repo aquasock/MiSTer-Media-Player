@@ -1,3 +1,32 @@
+## 44 COMMIT Unreleased ??? 2026-09-14T01:57:50-07:00
+
+#### Coming From:
+
+Unreleased a229a01
+
+#### Purpose:
+
+Implement a playback-built seek index for fast backward MPG seeking in the next build.
+
+#### Outcome:
+
+The user reports no freeze so far with fixed seed 87 and authorizes indexed seeking, accepting approximate initial GOP landing. The implementation will associate video sequence headers and first I-picture timestamps with absolute Program Stream pack and sequence byte positions, retain a bounded inferred-RAM index across decoder restarts, and restart at a preceding indexed point. A compacting table will retain coverage of long files as it fills. The existing reader offset and DDR-drain handshake will be reused, with explicit lookup completion before releasing the restarted session and original movie timestamp origin preserved for audio and video. Startup video before the selected sequence header will be discarded. Unindexed targets and elementary streams retain the existing reconstruction fallback. No custom Main or offline index is required.
+
+#### Next Steps:
+
+Implement and test index collection, compaction, lookup, nonzero reader restart, timestamp continuity, paused and repeated seeking, new-file invalidation and actual MPG reconstruction. Commit validated source and build the next hardware candidate; report timing, resource usage and remaining limitations before hardware acceptance.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 43 COMMIT Unreleased a229a01 2026-09-14T01:47:05-07:00
 
 #### Coming From:
@@ -1285,35 +1314,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 004 COMMIT Unreleased f8bebcd 2026-09-13T10:35:05-07:00
-
-#### Coming From:
-
-Unreleased f8bebcd
-
-#### Purpose:
-
-Record the completed progressive-sync repair batch, remaining timing defects and the user's preliminary playback observation.
-
-#### Outcome:
-
-All three f8bebcd builds compiled and produced RBFs, but none passed timing. Seed 52 completed in 1431 seconds with setup -2.173 ns, hold -0.104 ns, decoder setup -0.061 ns and 40480 ALMs; seed 61 completed in 1834 seconds with setup -2.284 ns, hold +0.202 ns, decoder setup +0.442 ns and 40578 ALMs; seed 87 completed in 1669 seconds with setup -2.343 ns, hold +0.202 ns, decoder setup -0.476 ns and 40862 ALMs. All used 472 RAM blocks and 69 DSP blocks, and all passed recovery, removal and pulse-width checks. Same-clock video margins were +12.517, +11.337 and +11.794 ns respectively. Seed 52's detailed reports reveal that Quartus inferred RAM shift registers from newly added request and VS synchronization chains, causing first-stage register constraints to match nothing; its worst path is aspect_config request into an inferred shift RAM. Remaining direct platform configuration crossings include LFB_EN and HDMI_PR, while lowlat into ASCAL i_mode causes the hold failure. Thus the prior synchronization changes are incomplete in synthesized hardware despite passing RTL simulations. The user reports that audio and video look and sound good, but the tested seed and explicit disappearance of lingering-frame flicker have not been confirmed. Two screenshot commands over responsive FTP produced no capture within their polling windows, so current telemetry and the prior audio timestamp flag remain unverified. Detailed reports, RBF hashes, regression evidence and the preliminary user observation are stored under /home/vash/builds/f8bebcd-20260913-100007. No source changes or replacement builds were started while the user tests. Built records successful compilation only; Passed remains unchecked pending hardware acceptance.
-
-#### Next Steps:
-
-Let the user finish the current test and confirm the seed and flicker behavior, then obtain fresh telemetry when screenshot commands respond. Preserve actual flip-flop synchronization stages through synthesis, verify that constraints match their intended endpoints, and finish remaining configuration crossings before another timing batch; retain 1750154 seed 87 as the timing-passed and hardware-accepted rollback reference.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
