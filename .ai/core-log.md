@@ -1,4 +1,4 @@
-## 80 COMMIT Unreleased ??? 2026-09-14T10:42:12-07:00
+## 80 COMMIT Unreleased b5a17cf 2026-09-14T10:42:12-07:00
 
 #### Coming From:
 
@@ -10,15 +10,23 @@ Rearrange the hardware-accepted subtitle overlay around the progress bar.
 
 #### Outcome:
 
-The user reports everything works perfectly after the ec56250 seed 87 handoff, accepting the subtitle baseline. They request three clocks below the progress bar, Paused/Seeking on the bar and subtitles two lines lower. Implement reference positions clocks y=469, status y=455 within the unchanged [452,466) track and subtitle lines y=417/431 (28 pixels below their prior positions). Keep status legible over the fill with dark text on a light inset. Update preview and existing pixel oracles, qualify normal/unknown progress and subtitle visibility, then compile three seeds. No subtitle parser, transport or playback behavior changes are intended.
+The user reports everything works perfectly after the ec56250 seed 87 handoff, accepting the subtitle baseline. Source b5a17cf implements their requested layout: reference clocks y=469 below the unchanged [452,466) progress track, Paused/Seeking y=455 on the bar, and subtitle lines y=417/431, two 14-pixel lines below the previous positions. Text palette one provides dark status lettering on a light inset; rectangle palette one retains the existing subtitle backdrop alpha blend. Twelve player-frame cases and five subtitle-frame cases pass with zero pixel mismatches at 480p, 720p and 1080p, including status over empty/full/unknown progress, controls hiding and stale cue epochs. Parser, two-drive transport, pause/seek controller, retained-provider and 518 divider checks also pass. Preview, subtitle notes, test instructions and changelog are updated. Source is pushed and clean seeds 52, 61 and 87 are starting under /tmp/subtitle-layout-build.log. Subtitle parsing and playback behavior are unchanged; no new core was deployed.
 
 #### Next Steps:
 
-Verify layout, contrast and bottom margins at 480p, 720p and 1080p, commit and start clean timing qualification while retaining ec56250 seed 87 as the accepted rollback.
+Audit completed timing and resources, package the preferred qualified RBF, then have the user confirm bottom margins, status contrast and subtitle positioning. Retain accepted ec56250 seed 87 as rollback.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- docs/SUBTITLES.md
+- docs/TEST_INSTRUCTIONS.md
+- docs/UI_OVERLAY_PLAN.md
+- docs/ui/overlay-preview.html
+- rtl/media_overlay_compositor.sv
+- rtl/media_ui_scene.sv
+- tools/verify_player_overlay.py
+- tools/verify_subtitles.py
 
 #### Status:
 
