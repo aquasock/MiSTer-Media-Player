@@ -1,3 +1,32 @@
+## 37 COMMIT Unreleased ??? 2026-09-14T00:24:33-07:00
+
+#### Coming From:
+
+Unreleased aad072a
+
+#### Purpose:
+
+Diagnose the hardware seek freeze with persistent first-fault telemetry and combined program-stream replay.
+
+#### Outcome:
+
+The user approved adding a bounded seek diagnostic snapshot that remains active during seeking, extending exact-file simulation to combined demux, audio buffering and video reconstruction, and comparing audio frame bypass enabled and disabled. The existing captures establish an aggregate decoder error on both movies but do not establish its source or fault order. No root cause is assumed.
+
+#### Next Steps:
+
+Implement and verify first-fault retention, decoder subcodes, seek state, timestamps and queue observations; replay the exact opening with seek phase and storage stalls varied and audio bypass compared. Commit the source and build diagnostic candidates for user hardware testing without deploying them.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 36 COMMIT Unreleased aad072a 2026-09-14T00:15:26-07:00
 
 #### Coming From:
@@ -1336,33 +1365,3 @@ None.
 - [x] Passed
 
 ---
-
-## 996 COMMIT Unreleased 9233f07 2026-09-13T06:25:18-07:00
-
-#### Coming From:
-
-Unreleased 9233f07
-
-#### Purpose:
-
-Record the clean three-seed progressive MPG ingress build batch and its delivered hardware candidates.
-
-#### Outcome:
-
-Source 9233f07 was pushed and built in three independent tracked-source exports using Quartus Lite 17.0.2 Build 602 with seeds 11, 33 and 52, with no input differences beyond the intended fitter seeds. Seed 11 completed compilation and focused timing in 1177 seconds with setup +0.288 ns, hold +0.257 ns, recovery +4.168 ns, removal +0.649 ns, pulse width +1.122 ns, decoder same-clock setup +0.437 ns and video same-clock setup +7.883 ns; its 4276012-byte RBF SHA-256 is f25ed4dea6d0e3e6a10d562cfb6dfb7c3d1c3ce4c3d10c2f1f09a72a9c623e6d. Seed 52 completed compilation and focused timing in 1223 seconds despite routing-congestion warnings, with setup +0.510 ns, hold +0.224 ns, recovery +4.280 ns, removal +0.494 ns, pulse width +1.122 ns, decoder setup +1.122 ns and video setup +7.076 ns; its 4205152-byte RBF SHA-256 is b3cf7bca197820e295a309ad86f446b55c8398dfa822f428dad0ae17aec739a5. Seed 33 remained in congested routing and was terminated at the user's explicit request after 1388 seconds; the process group and supervisor were confirmed exited, so it is canceled rather than timing-qualified. Seed 11 uses 36344 ALMs, 52992 registers, 410 RAM blocks and 65 DSP blocks. Reports, checksums and both named RBFs are retained under /home/vash/builds/9233f07-20260913-055946. The user could not copy the supplied FFmpeg command, so an executable script was saved at /home/vash/Downloads/make-mpg-test.sh; a one-second encode verified its progressive 720x480 30000/1001 video and 48 kHz stereo 192 kb/s MP2 output. The script generates a 30-second test_progressive_mpg.mpg on the GIT drive. Changelog text was reconciled without changing the built runtime source.
-
-#### Next Steps:
-
-The user should load either passing candidate with stock Main and Audio test Off, repeat the accepted raw control, then require silent MPG video playback, terminal-picture completion and repeated raw/MPG reloads. Seed 52 has the larger measured setup margin, while seed 11 was already offered as a valid candidate. Capture any failure against the exact file and source rather than attributing it to the old DVD architecture. Only after this ingress stage is hardware-accepted should FPGA MP2 decode and A/V synchronization begin, followed by progressive 720x480 output.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
