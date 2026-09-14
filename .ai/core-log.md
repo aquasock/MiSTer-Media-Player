@@ -1,4 +1,4 @@
-## 102 COMMIT Unreleased ??? 2026-09-14T15:14:08-07:00
+## 102 COMMIT Unreleased 7c197c9 2026-09-14T15:14:08-07:00
 
 #### Coming From:
 
@@ -10,15 +10,21 @@ Implement complete native FLAC framing with hardware CRC admission and stereo re
 
 #### Outcome:
 
-The user authorizes the next FLAC stage. Implement native metadata/header parsing, byte-to-bit delivery to the existing subframe engine, header/frame CRCs, sample/frame numbering and provisional-frame commit handshakes. Add hardware stereo reconstruction and validate complete files against original PCM through a modeled frame store, including stalls, bad CRCs, truncation and cancellation. Keep memory transport and native HDMI integration separate from claiming complete player functionality.
+Commit 7c197c9 adds native FLAC metadata/frame parsing, canonical coded numbering, header CRC-8, frame CRC-16, padding and length validation, plus exact independent/left-side/right-side/mid-side stereo reconstruction. Samples remain provisional until an explicit whole-frame commit; store faults suppress handshakes on the same cycle. Complete-file RTL tests pass 73 cases: all 55 corpus files plus eight constructed stereo/numbering streams and ten fault cases. The 63 valid streams compare 3890965 stereo sample pairs directly with original PCM, with stalls and reset/replay in each; damaged frames are not admitted. The isolated framing/subframe/MAC fit uses 1746 placed ALMs, 1753 estimated ALMs, 859 registers, two M10Ks and one DSP, including prior decoder resources. The separate stereo unit and memory/output integration are excluded from this figure. RTL lint and test compilation pass; evidence is results/flac/stream and results/flac/stream-fit. No production files.qip integration, full-core build or playable FLAC RBF is claimed; b639ccc seed 52 remains accepted. STREAMINFO MD5 is not checked.
 
 #### Next Steps:
 
-Prove complete-file reconstruction and rejection behavior, then connect bounded DDR frame ownership and native output controls. Preserve the shared PCM boundary for later 44.1 kHz WAV, existing movie behavior and the accepted b639ccc baseline.
+Implement bounded DDR provisional/committed frame ownership and connect admitted samples to the shared PCM sink. Complete native 44.1 kHz clock and HDMI control integration before hardware handoff. Preserve existing movie behavior and the common PCM boundary for future WAV without implementing WAV parsing in this cycle.
 
 #### Files Modified:
 
-None.
+- docs/FLAC_FEASIBILITY.md
+- docs/FLAC_FRAME_CONTRACT.md
+- rtl/audio/flac/flac_stereo.sv
+- rtl/audio/flac/flac_stream_decoder.sv
+- tools/synth_flac_predict.py
+- tools/test_flac_stream.sv
+- tools/verify_flac_stream.py
 
 #### Status:
 
