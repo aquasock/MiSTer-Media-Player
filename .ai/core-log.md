@@ -1,4 +1,4 @@
-## 46 COMMIT Unreleased ??? 2026-09-14T02:49:40-07:00
+## 46 COMMIT Unreleased 3ab6615 2026-09-14T02:49:40-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Reduce duplicate direct-seek registers and search arithmetic after placement exc
 
 #### Outcome:
 
-The user requested stopping the two remaining builds and starting the reduction. By the time the stop was attempted, seeds 52 and 61 had also exited with fitter capacity failures; no Quartus processes remain. Seed 87 required 4198 LABs against 4191 available. No new RBF was produced. The approved reduction will reuse candidate output storage in the point observer and simplify search arithmetic while retaining full offsets, timestamps and tagged restart handshakes.
+Source 3ab6615 removes 115 duplicate register bits by using seek-point output fields as candidate storage until found validates them, then freezing the result. Search midpoint calculation uses one widened sum instead of subtraction plus addition; the timestamp-distance borrow also supplies the before-target comparison. Offset and timestamp widths, PTS association, probe limits and tagged restart handshakes are retained. The new observer regression passes timestamp association, late PTS rejection, stalled input, stable publication, reset and addresses above 4 GiB. Existing VBR, timestamp-wrap, bounded fallback, open-GOP filtering and asynchronous paused forward/backward restart tests pass. All four actual Pee Strike prefix probes exactly match the prior implementation, including landing addresses, byte counts and probe counts; the 300-second case is bounded-prefix EOF fallback, not full-movie playback. Evidence is under results/direct-seek/reduction. The user requested stopping seeds 52 and 61, but both had already exited with fitter capacity failures before the stop attempt; no Quartus jobs remain. Seed 87 had required 4198 LABs against 4191 available. No new RBF was produced, and no new builds or deployment were started. Physical resource savings and timing are not measured by these simulations.
 
 #### Next Steps:
 
-Implement the reduction, check observer candidate stability and invalidation, rerun direct-seek control and actual-file probes, then commit and push. Hold new Quartus builds; fitted resource savings and hardware acceptance remain unverified.
+Keep Quartus builds on hold until requested, then compile the reduced source and audit resource fit, timing and all 165 CDC registers before packaging a candidate for hardware acceptance. The previous a229a01 seed 87 remains the available timing-qualified rollback.
 
 #### Files Modified:
 
