@@ -1,3 +1,32 @@
+## 68 COMMIT Unreleased b00920a 2026-09-14T07:53:13-07:00
+
+#### Coming From:
+
+Unreleased aa8d067
+
+#### Purpose:
+
+Record the first successful hardware playback and time-field test of the shared overlay.
+
+#### Outcome:
+
+The user is testing the supplied overlay core and reports that Star Wars - EPISODE IV - A New Hope - Despecialized - LOWER.mpg from the GIT HDD works perfectly and the time fields update properly. This records a successful file-specific hardware test of the supplied b00920a seed 52 candidate. The user has not yet reported completion of the remaining pause/seek, unknown-duration, file-switch and HDMI-mode checks; overall candidate acceptance remains pending. No source or binary changes were made.
+
+#### Next Steps:
+
+Continue the current hardware test, especially pause/resume and seeking with time-field updates, automatic hiding, OSD/filter coexistence and switching files without retaining the previous duration.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 67 COMMIT Unreleased aa8d067 2026-09-14T07:41:06-07:00
 
 #### Coming From:
@@ -1287,36 +1316,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 28 COMMIT Unreleased 62f4741 2026-09-13T17:17:06-07:00
-
-#### Coming From:
-
-Unreleased 58f74d7
-
-#### Purpose:
-
-Document the required HDMI refresh override and align setup guidance with current playback features.
-
-#### Outcome:
-
-Committed and pushed 62f4741 documenting [MediaPlayer] vsync_adjust=1 even when the global setting is zero. Official MiSTer video documentation confirms mode one follows core refresh while zero uses configured output timing and can introduce repeat/drop cadence conversion. README now describes accepted compact baseline 0b6eb0e seed 87, fully manual aspect and refresh, color matrix selection, keyboard controls pending hardware validation and reconstruction-seek latency. The hardware instructions include the override and no longer claim pause/seek are unexposed. Whitespace review passes; documentation-only changes require no FPGA build and do not modify the running 17743f8 batch.
-
-#### Next Steps:
-
-Use the documented per-core refresh override and finish the current build handoff for hardware playback-control testing.
-
-#### Files Modified:
-
-- README.md
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
