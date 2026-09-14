@@ -138,3 +138,50 @@ Reproduce with:
 python3 tools/verify_media_pcm_sink.py --output results/flac/pcm-sink
 python3 tools/verify_hdmi_i2c_owner.py --output results/flac/i2c-owner
 ```
+
+## Streamed subframe decoder
+
+`rtl/audio/flac/flac_subframe.sv` now parses subframe bits and reconstructs
+coded 16/17-bit channel samples. It implements constant/verbatim coding,
+fixed prediction orders 0–4, LPC orders 1–32, wasted bits, both Rice parameter
+widths, partition validation, zero-width escaped partitions, signed residual
+reconstruction and output range checks. It uses the existing prediction MAC,
+with synchronous coefficient and history M10Ks and no full-frame on-chip array.
+
+The initial synthetic suite passes 83 cases and 77498 provisional transfers,
+including malformed type/wasted/shift/truncated streams. The first-frame
+corpus run passes 193 cases and 1059248 provisional transfers across all
+55 reference/FFmpeg files. The offline oracle parses framing and CRCs,
+reconstructs stereo and checks it against original PCM before providing coded
+channel expectations to RTL. Tests compare output sample order and exact
+consumed bit count under input/output stalls. Outer headers, stereo joining,
+frame CRC commit and DDR output are still software/model responsibilities;
+these results do not yet constitute a complete FPGA FLAC decoder.
+
+An isolated Quartus subframe fit, **including** its prediction MAC, uses
+1160 placed ALMs, 1154 estimated ALMs, 396 registers, two M10Ks and one DSP.
+The two inferred M10Ks hold 32x16 coefficients and 32x17 sample history.
+Do not add the earlier standalone MAC figure again. As with that probe,
+virtual ports make this area evidence rather than whole-core timing closure.
+
+Reproduce with:
+
+```sh
+python3 tools/verify_flac_subframe.py --output results/flac/subframe
+python3 tools/verify_flac_subframe.py --output results/flac/subframe-corpus --corpus results/flac/corpus --verilator
+python3 tools/verify_flac_subframe.py --output results/flac/subframe-full-corpus --corpus results/flac/corpus --frames-per-file 0 --verilator
+python3 tools/synth_flac_predict.py --output results/flac/subframe-fit --top flac_subframe
+```
+
+The full-corpus mode also compares final short blocks and complete decoded
+lengths with original PCM. Reset/replay injection restarts selected subframes
+midstream to detect stale predictor/history state. Malformed syntax is rejected;
+CRC admission and a system-level work watchdog remain outer-frame concerns.
+
+Full-corpus result: 3173 cases pass, with 7964966 provisional transfers
+(including replayed prefixes) and 3160 reset/replays. All frames of all 55
+files, their exact original PCM lengths and their final short subframes are
+checked. The RTL receives real subframe bits; headers, CRC validation and
+stereo recombination are still checked by the offline oracle. No production
+file support is implied. Strict Verilator RTL lint passes with intentional
+unconnected status-port warnings excluded.
