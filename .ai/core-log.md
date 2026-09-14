@@ -1,3 +1,36 @@
+## 46 COMMIT Unreleased ??? 2026-09-14T02:49:40-07:00
+
+#### Coming From:
+
+Unreleased 2fac1cb
+
+#### Purpose:
+
+Reduce duplicate direct-seek registers and search arithmetic after placement exceeded device capacity.
+
+#### Outcome:
+
+The user requested stopping the two remaining builds and starting the reduction. By the time the stop was attempted, seeds 52 and 61 had also exited with fitter capacity failures; no Quartus processes remain. Seed 87 required 4198 LABs against 4191 available. No new RBF was produced. The approved reduction will reuse candidate output storage in the point observer and simplify search arithmetic while retaining full offsets, timestamps and tagged restart handshakes.
+
+#### Next Steps:
+
+Implement the reduction, check observer candidate stability and invalidation, rerun direct-seek control and actual-file probes, then commit and push. Hold new Quartus builds; fitted resource savings and hardware acceptance remain unverified.
+
+#### Files Modified:
+
+- rtl/media_seek_point.sv
+- rtl/media_seek_search.sv
+- tools/test_media_seek_point.sv
+- tools/verify_direct_seek.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+
 ## 45 COMMIT Unreleased 2fac1cb 2026-09-14T02:31:21-07:00
 
 #### Coming From:
@@ -1300,45 +1333,6 @@ Finish all three clean builds, require the fitted 54-register audit and standard
 
 - MediaPlayer.sdc
 - tools/phase1p_timing.tcl
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 006 COMMIT Unreleased 9c6ccbb 2026-09-13T11:04:15-07:00
-
-#### Coming From:
-
-Unreleased f8bebcd
-
-#### Purpose:
-
-Suppress the loading message during playback and repair synthesized video-configuration clock crossings.
-
-#### Outcome:
-
-Implemented playback-controlled suppression of Main message-mode OSD on HDMI and analog paths, preserving ordinary menu and info windows. The first scheduled display-frame swap latches playback state; reset or a new download clears it, and an acknowledged mailbox carries the state into the system clock before the OSD configuration mailboxes. Explicit OSD startup state makes the every-other-frame enable behavior reproducible in simulation. Configuration and VS synchronizers now disable shift-register RAM inference and preserve their registers. System aspect configuration is transferred as a held bundle, ASCAL receives separate input/output-clock mode snapshots, and HDMI framebuffer enable is synchronized. Focused timing extraction now requires all three stages of every configuration and VS synchronization chain to exist as registers. Full-raster compiled OSD simulation passes seven visibility cases and sync alignment, including zero loading-message pixels during playback and retained menu/info pixels. Raster reset, 345600-pixel cache scanout, mailbox, geometry, all five cadence rates, B-picture ordering and telemetry regressions pass. Timed MPG regression passes 24192 stereo sample pairs with maximum FFmpeg difference one sample unit, 152679 matching video bytes and 15 correct picture timestamps; its FIFO is ideal and full video reconstruction and physical CDC are outside that test. The user explicitly excluded the earlier inaudible audio underrun from this cycle; audio behavior is unchanged. Source 9c6ccbb was committed and pushed before launching three independent clean Quartus exports under results/build-9c6ccbb-20260913-111811/. Only fitter seed and worker count differ from committed project settings; seeds are 52, 61 and 87 with six workers each. New synthesis and timing results remain pending.
-
-#### Next Steps:
-
-Implement the reviewed changes, run focused OSD, mailbox, raster, cadence and playback regressions, commit and push the source, then run clean seeds 52, 61 and 87 with standard and focused timing reports. Deliver a timing-passing candidate for loading-overlay, flicker, audio and repeated-load hardware tests. Retain 1750154 seed 87 as the timing-passed and hardware-accepted rollback. Do not change audio behavior in this cycle.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- rtl/video_config_cdc.sv
-- sys/ascal.vhd
-- sys/emu_ports.vh
-- sys/osd.v
-- sys/sys_top.v
-- tools/phase1p_timing.tcl
-- tools/test_osd_playback.sv
-- tools/verify_video_sync.py
 
 #### Status:
 
