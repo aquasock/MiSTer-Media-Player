@@ -1,4 +1,4 @@
-## 56 COMMIT Unreleased ??? 2026-09-14T04:11:41-07:00
+## 56 COMMIT Unreleased dc1dfc2 2026-09-14T04:11:41-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Restore the P and B parser row-buffer block-memory conversion to recover logic c
 
 #### Outcome:
 
-The user approved restoring the historical 047f5b2 row-buffer conversion. Its seven RTL-file patch applies cleanly to current source 1349c82. Each 512-byte row buffer will use synchronous M10K reads with current/next-byte prefetch and shadow head/tail registers for the two-byte rollover, preserving bit-parser timing and the current progressive decoder, seeking and audio paths. This boundary does not change menu-ROM storage or packing effort. Historical area savings are not assumed for the current design.
+Source dc1dfc2 restores the seven-file historical 047f5b2 conversion to current progressive RTL. Both 512-byte row arrays use synchronous M10K reads, one-byte-ahead prefetch and shadow head/tail bytes so the two-byte rollover needs no extra RAM write port or combinational read. Five supported differential parser/transport cases pass against baseline 1349c82 with identical RESULT lines and reported cycle counts: P/B intra, B residual streaming, eight P and eight B window refills, and abort recovery. A new strict runner rejects failed baselines and isolates legacy generator output; two historical dense-stream fixture/test pairings were found to fail unchanged baseline count assertions and are explicitly excluded rather than counting matching failures as success. Current full I/P/B reconstruction with display ownership and repeated paused seeks passes 423936 pixel comparisons with zero mismatches; actual Pee Strike direct restart at the ten-second target resumes audio and video with shared DDR and no reported errors. These models use ideal bounded queues and do not prove vendor RAM inference or physical timing. Evidence is under results/row-buffer. The source was committed and pushed before clean seeds 52, 61 and 87 started at 2026-09-14T04:17:03-07:00 with six workers each under results/build-dc1dfc2-20260914-041703. Packing remains MEDIUM and menu-ROM storage is unchanged. The result checker requires 153 CDC registers and separately reports actual placed ALMs. No RBF is ready yet, no current savings are claimed and the MiSTer was not changed.
 
 #### Next Steps:
 
-Port the conversion, add a reproducible differential parser runner comparing current baseline against modified RTL with strict failure checks, run current reconstruction and seek regressions, then commit and push. Build clean seeds 52, 61 and 87, confirm two row RAMs are inferred, measure actual placed ALMs and RAM usage, audit all timing corners and 153 CDC registers, and deliver the best candidate without automatic deployment.
+Finish the three builds, confirm both row arrays infer M10K, compare actual placed ALMs and RAM usage with bcddb20 while noting the included audio-menu removal, and audit every timing corner plus 153 CDC registers. Package the best candidate for user validation of playback and repeated forward/backward seeks, keeping the hardware-accepted bcddb20 seed 61 as rollback.
 
 #### Files Modified:
 
