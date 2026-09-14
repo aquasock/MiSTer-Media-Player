@@ -294,8 +294,68 @@ def parse_words(words: list[int]) -> dict[str, Any]:
     }
 
 
+def decode_seek(path: Path | str):
+    im = Image.open(path).convert('RGB')
+    if im.width < 364 or im.height < 336:
+        return None
+    words = []
+    for row in range(14):
+        bits = []
+        for col in range(43):
+            total = sum(sum(im.getpixel((192+col*4+x, 280+row*4+y)))
+                        for x in (1, 2) for y in (1, 2))
+            bits.append(int(total >= 128*12))
+        word = int(''.join(map(str, bits[10:42])), 2)
+        if row == 0 and (bits[:4] != [1, 0, 1, 0] or word != 0x4D4D5331):
+            return None
+        if bits[:4] != [1, 0, 1, 0] or int(''.join(map(str, bits[4:10])), 2) != row:
+            raise ValueError(f'seek telemetry row {row} framing error')
+        if bits[42] != word.bit_count() % 2:
+            raise ValueError(f'seek telemetry row {row} parity error')
+        words.append(word)
+    checksum = 0
+    for word in words[:-1]:
+        checksum ^= word
+    if words[1] != 0x010EEA60 or checksum != words[-1]:
+        raise ValueError('seek telemetry format/checksum error')
+    code = words[3]
+    state = (words[2] >> 16) & 4095
+    names = ('pcm_full', 'destination_hold', 'presentation_hold', 'frame_waiting',
+             'reader_idle', 'reader_cancel', 'decoder_reset', 'seek_done',
+             'seeking', 'paused', 'program_stream', 'audio_bypass_disabled')
+    elapsed = words[4] | ((words[6] & 7) << 32)
+    target = words[5] | (((words[6] >> 3) & 7) << 32)
+    return dict(schema_version=1, reason={1:'error_after_seek_entry', 2:'error_at_seek_entry',
+        3:'seek_progress_timeout'}[words[2] >> 28], error_flags=words[2] & 65535,
+        state={name:bool(state & (1 << i)) for i, name in enumerate(names)},
+        syntax_source=code & 31, probe_source=(code >> 5) & 15,
+        p_probe_source=(code >> 9) & 15, publication_detail=(code >> 13) & 7,
+        p_wide_detail=(code >> 16) & 31, prediction_source=(code >> 21) & 7,
+        prediction_detail=(code >> 24) & 31,
+        elapsed_q=elapsed, target_q=target, elapsed_seconds=elapsed/360000,
+        target_seconds=target/360000, display_pts=words[7] | (((words[6] >> 6) & 1) << 32),
+        frame_rate_code=(words[6] >> 7) & 15, temporal_reference=(words[6] >> 11) & 1023,
+        picture_type=(words[6] >> 21) & 7, display_pts_valid=bool(words[6] & (1 << 24)),
+        video_ram_words=words[8] >> 11, audio_ram_bytes=words[8] & 2047,
+        pcm_write_domain_used=words[9] & 8191, ingress_reservoir_min=(words[9] >> 13) & 65535,
+        scheduler=words[10], cycles_since_seek=words[11], seek_count=words[12] >> 16,
+        entry_errors=words[12] & 65535, checksum=words[-1], words=words)
+
+
 def decode(path: Path | str) -> dict[str, Any]:
-    return parse_words(decode_words(path))
+    try:
+        seek = decode_seek(path)
+    except ValueError as exc:
+        raise TelemetryDecodeError(str(exc)) from exc
+    try:
+        result = parse_words(decode_words(path))
+    except TelemetryDecodeError:
+        if seek is None:
+            raise
+        result = {"telemetry_profile": "seek_only", "error_flags": seek["error_flags"]}
+    if seek is not None:
+        result["seek_diagnostics"] = seek
+    return result
 
 
 def validate(
@@ -305,6 +365,11 @@ def validate(
     require_fps: float | None = None,
 ) -> list[str]:
     failures: list[str] = []
+    if "seek_diagnostics" in result:
+        seek = result["seek_diagnostics"]
+        failures.append(f"seek diagnostic: {seek['reason']}, errors 0x{seek['error_flags']:04x}")
+    if result.get("telemetry_profile") == "seek_only":
+        return failures
     if result["error_flags"]:
         failures.append(f"hardware error flags 0x{result['error_flags']:04x}")
     if expected_pictures is not None:
@@ -356,7 +421,7 @@ def main() -> int:
     )
     result["validation_failures"] = failures
 
-    if args.json:
+    if args.json or result.get("telemetry_profile") == "seek_only":
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
         print(

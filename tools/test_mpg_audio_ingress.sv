@@ -7,7 +7,7 @@ reg [7:0] bytes[0:16777215];integer size,fd,vfd,afd,pfd,idx=0,cycles=0,n=0;
 reg [1023:0] path,outpath;reg [31:0] rng=32'h795137ba;
 mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1)) ingress(clk,reset,ib,iv,ir,ie,vb,vv,vr,ve,vp,vpv,ab,av,ar,ap,apv,ps,de);
 wire [41:0] aq;wire aqv,aqr,ae;
-av_stream_fifo audio_fifo(clk,reset,{apv,ap,ab},av,ar,aq,aqv,aqr,ae);
+av_stream_fifo audio_fifo(clk,reset,{apv,ap,ab},av,ar,aq,aqv,aqr,ae,);
 wire pv,pe,pi;wire signed [15:0] pl,pr;wire [32:0] pp;wire ppv;wire [31:0] frames;
 wire ready=rng[0]||rng[1];
 mp2_decoder decoder(clk,reset,aq[7:0],aqv,aqr,ve&&ae,aq[40:8],aq[41],pv,ready,pl,pr,pp,ppv,pe,frames,pi,1'b0,33'd0);
@@ -16,7 +16,7 @@ reg [63:0] mem[0:1048575],dq;reg dqv=0;
 wire mb=rng[4:3]==0;
 reg eof_written=0;
 wire vin_ready;assign vr=vin_ready;
-mpeg2_av_ddr_fifo vfifo(clk,reset,{ve,vpv,vp,vb},vv||(ve&&!eof_written),vin_ready,vq,vqv,vqr,addr,din,memrd,memwr,mb,dq,dqv);
+mpeg2_av_ddr_fifo vfifo(clk,reset,{ve,vpv,vp,vb},vv||(ve&&!eof_written),vin_ready,vq,vqv,vqr,addr,din,memrd,memwr,mb,dq,dqv,);
 always @(posedge clk) begin
  dqv<=0;
  if(reset) eof_written<=0;

@@ -12,7 +12,7 @@ reg [63:0] responses[0:1023];reg [1:0] owners[0:1023];
 integer tail=0,head=0,sent=0,got=0,cycle=0,latency=0,j,extra=0;
 reg [31:0] rng=32'h573ac9ef;
 reg was_stalled=0;reg [42:0] held;
-mpeg2_av_ddr_fifo #(.ADDRESS_BITS(5),.BASE(0)) fifo(clk,reset,idata,iv,ir,odata,ov,ordy,addr,din,rd,we,busy,dq,qvalid);
+mpeg2_av_ddr_fifo #(.ADDRESS_BITS(5),.BASE(0)) fifo(clk,reset,idata,iv,ir,odata,ov,ordy,addr,din,rd,we,busy,dq,qvalid,);
 mpeg2_h262_ddram_arbiter arb(
  .clk(clk),.reset(reset),.writer_burstcnt(8'd1),.writer_addr(29'd0),.writer_rd(1'b0),
  .writer_din(64'd0),.writer_be(8'hff),.writer_we(1'b0),.writer_busy(),

@@ -1,3 +1,53 @@
+# Seek freeze diagnostic candidate
+
+This build adds observation and an audio-bypass comparison, not a claimed freeze fix.
+Use the same file, refresh setting and seek key for both runs:
+
+1. Set **Seek audio bypass** to **On**, reload `01 - Pee Strike.mpg`, and
+   press Right once a few seconds into playback. Repeat with `fellow.mpg`.
+2. If it freezes, leave the file loaded for a screenshot. A new black/white
+   diagnostic block at x192/y280 records the first observed fault after a seek.
+3. Set **Seek audio bypass** to **Off**, reload the same file and repeat.
+   This disables only compressed MP2 frame bypass; forward decoder retention,
+   PCM draining, target calculation and video reconstruction remain enabled.
+   Set the option before reloading and do not change it during a seek.
+
+The new snapshot survives pause, later seeks and decoder restart. Reset or a
+new file clears it. Error-at-entry means flags were already present when the
+observer first saw the seek; it does not establish causality. After entry the
+first nonzero error or two seconds without decoder/presentation progress during
+seeking captures the record. Audio error flags arrive through their existing
+synchronizers, so this is decoder-domain observation order, not exact ordering
+between clock domains. A timeout is diagnostic evidence, not proof of deadlock.
+
+Decode an unscaled MiSTer screenshot with:
+
+```sh
+python3 tools/streams/decode_hardware_cadence.py screenshot.png --json
+```
+
+`seek_diagnostics` contains detailed decoder subcodes, errors, seek state,
+current/target quarter-90-kHz timestamps, displayed PTS and picture metadata,
+unread video DDR words, compressed-audio RAM bytes, PCM write-domain occupancy,
+ingress reservoir minimum, scheduler flags and seek count. RAM counts exclude
+pipeline/prefetch registers; the ingress field is a historical minimum, not live
+occupancy. The cycle counter saturates after about 71.6 seconds. The snapshot
+can decode even while the older cadence snapshot is absent.
+
+The exact-file replay accepts an MPG prefix up to 16 MiB, with unchanged bytes:
+
+```sh
+python3 tools/replay_mpg_seek.py opening.mpg results/replay
+python3 tools/replay_mpg_seek.py opening.mpg results/replay --reuse --no-audio-bypass
+python3 tools/replay_mpg_seek.py opening.mpg results/replay --reuse --seek-delay 137 --host-stall 200000
+```
+
+It runs the actual mounted reader, PS demux, MP2 decoder/output, bounded queues,
+video reconstruction and PTS scheduling. Vendor FIFO CDC and contention between
+compressed-video DDR and reconstruction DDR remain outside this behavioral
+model. A prefix may end mid-packet; only explicitly completed pre-EOF seek
+boundaries count as success. `--no-skip` provides an ordinary-playback comparison.
+
 # Keyboard playback controls
 
 Use a timing-qualified RBF from the playback-controls build. Hardware validation

@@ -18,12 +18,14 @@ module mpeg2_av_ddr_fifo #(
     output wire mem_read,mem_write,
     input wire mem_busy,
     input wire [63:0] mem_q,
-    input wire mem_q_valid
+    input wire mem_q_valid,
+    output wire [ADDRESS_BITS:0] ram_level
 );
 reg [ADDRESS_BITS-1:0] head,tail;
 reg [ADDRESS_BITS:0] count;
 reg [42:0] pending_data;
 reg pending_valid,read_pending;
+assign ram_level=count;
 wire room=count < (1<<ADDRESS_BITS);
 wire want_read=count!=0 && !read_pending && (!output_valid||output_ready);
 assign mem_read=want_read;

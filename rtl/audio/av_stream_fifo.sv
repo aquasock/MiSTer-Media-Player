@@ -7,7 +7,8 @@ module av_stream_fifo #(parameter WIDTH=42, ADDRESS_BITS=10)(
     output reg [WIDTH-1:0] output_data,
     output reg output_valid,
     input wire output_ready,
-    output wire empty
+    output wire empty,
+    output wire [ADDRESS_BITS:0] ram_level
 );
 reg [WIDTH-1:0] mem [0:(1<<ADDRESS_BITS)-1];
 reg [ADDRESS_BITS-1:0] head,tail;
@@ -15,6 +16,7 @@ reg [ADDRESS_BITS:0] count;
 assign input_ready=count<(1<<ADDRESS_BITS);
 wire push=input_ready&&input_valid;
 wire pop=count!=0&&(!output_valid||output_ready);
+assign ram_level=count;
 assign empty=count==0&&!output_valid;
 always @(posedge clk) begin
     if(push) mem[tail]<=input_data;

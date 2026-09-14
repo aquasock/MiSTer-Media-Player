@@ -5,6 +5,12 @@ wire av_video_q_valid,av_video_q_ready,av_video_fifo_ready;
 wire [28:0] av_mem_addr;
 wire [63:0] av_mem_data;
 wire av_mem_read,av_mem_write,av_mem_busy,av_mem_q_valid;
+wire [20:0] av_video_ram_level;
+wire [10:0] av_audio_ram_level;
+wire [11:0] mp2_pcm_wr_used;
+wire media_audio_skip_disabled;
+video_config_cdc #(.WIDTH(1)) seek_audio_config(
+ .src_clk(clk_sys),.dst_clk(clk_mpeg2),.src_data(status[7]),.dst_data(media_audio_skip_disabled));
 reg av_eof_queued;
 always @(posedge clk_mpeg2) begin
     if(reset_mpeg2) av_eof_queued<=0;
@@ -22,7 +28,7 @@ mpeg2_av_ddr_fifo av_video_fifo (
     .input_valid(av_is_ps&&(av_video_valid||(av_ingress_end&&!av_eof_queued))),.input_ready(av_video_fifo_ready),
     .output_data(av_video_q),.output_valid(av_video_q_valid),.output_ready(av_video_q_ready),
     .mem_addr(av_mem_addr),.mem_data(av_mem_data),.mem_read(av_mem_read),.mem_write(av_mem_write),
-    .mem_busy(av_mem_busy),.mem_q(DDRAM_DOUT),.mem_q_valid(av_mem_q_valid)
+    .mem_busy(av_mem_busy),.mem_q(DDRAM_DOUT),.mem_q_valid(av_mem_q_valid),.ram_level(av_video_ram_level)
 );
 mpeg2_pes_metadata_expand av_video_expand (
     .clk(clk_mpeg2),.reset(reset_mpeg2),.input_data(av_video_q),.input_valid(av_video_q_valid),
@@ -34,7 +40,7 @@ wire av_audio_q_valid,av_audio_q_ready,av_audio_empty;
 av_stream_fifo av_audio_fifo (
     .clk(clk_mpeg2),.reset(reset_mpeg2),.input_data({av_audio_pts_valid,av_audio_pts,av_audio_byte}),
     .input_valid(av_audio_valid),.input_ready(av_audio_ready),.output_data(av_audio_q),
-    .output_valid(av_audio_q_valid),.output_ready(av_audio_q_ready),.empty(av_audio_empty)
+    .output_valid(av_audio_q_valid),.output_ready(av_audio_q_ready),.empty(av_audio_empty),.ram_level(av_audio_ram_level)
 );
 wire mp2_pcm_valid,mp2_pcm_ready,mp2_error,mp2_idle;
 wire signed [15:0] mp2_pcm_l,mp2_pcm_r;
@@ -48,7 +54,7 @@ mp2_decoder #(.ENABLE_SEEK_SKIP(1)) mp2_decoder (
     .pcm_valid(mp2_pcm_valid),.pcm_ready(mp2_pcm_ready),.pcm_left(mp2_pcm_l),.pcm_right(mp2_pcm_r),
     .pcm_pts(mp2_pcm_pts),.pcm_pts_valid(mp2_pcm_pts_valid),.error(mp2_error),
     .frames_decoded(mp2_frames_decoded),.idle(mp2_idle),
-    .seek(media_seeking),.seek_target(media_seek_pts)
+    .seek(media_seeking && !media_audio_skip_disabled),.seek_target(media_seek_pts)
 );
 wire mp2_fifo_full,mp2_fifo_empty,mp2_fifo_rd;
 wire [66:0] mp2_fifo_data;
@@ -62,7 +68,7 @@ end
 mp2_pcm_fifo mp2_pcm_fifo (
     .reset(reset_mpeg2),.wr_clk(clk_mpeg2),.rd_clk(CLK_AUDIO),
     .wr_data({mp2_eof,mp2_pcm_pts_valid,mp2_pcm_pts,mp2_pcm_l,mp2_pcm_r}),
-    .wr_en((mp2_pcm_valid||mp2_eof)&&!mp2_fifo_full),.wr_full(mp2_fifo_full),
+    .wr_en((mp2_pcm_valid||mp2_eof)&&!mp2_fifo_full),.wr_full(mp2_fifo_full),.wr_used(mp2_pcm_wr_used),
     .rd_data(mp2_fifo_data),.rd_en(mp2_fifo_rd),.rd_empty(mp2_fifo_empty)
 );
 // Origin is common to the video scheduler and PCM sink. A 100 ms preroll

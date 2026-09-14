@@ -90,3 +90,5 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_picture_
 
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_keyboard_control.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_playback_control.sv
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_seek_diagnostics.sv

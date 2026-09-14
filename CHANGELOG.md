@@ -8,6 +8,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Persistent first-observed seek fault snapshot with decoder subcodes, state,
+  timestamps and queue observations, independent of seek/pause profiler resets.
+- Diagnostic OSD audio-bypass comparison and exact-MPG combined replay harness.
+  Hardware seek freeze remains unresolved pending diagnostic evidence.
+
 - Space toggles play/pause; Left/Right seek backward/forward by 10 seconds,
   Ctrl by 30 seconds, and Ctrl+Alt by 5 minutes. Menu navigation is excluded.
 - Transactional reconstruction seeks retain the requested paused state and

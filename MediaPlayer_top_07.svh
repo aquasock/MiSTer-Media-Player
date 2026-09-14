@@ -3,9 +3,9 @@ assign CE_PIXEL  = 1'b1;
 assign VGA_DE = fb_video_de;
 assign VGA_HS = fb_video_hs;
 assign VGA_VS = fb_video_vs;
-assign VGA_R = cadence_video_r;
-assign VGA_G = cadence_video_g;
-assign VGA_B = cadence_video_b;
+assign VGA_R = seek_overlay ? {8{seek_overlay_bit}} : cadence_video_r;
+assign VGA_G = seek_overlay ? {8{seek_overlay_bit}} : cadence_video_g;
+assign VGA_B = seek_overlay ? {8{seek_overlay_bit}} : cadence_video_b;
 
 // Entry 245: development-only hardware cadence snapshot. Every input is an
 // already registered top-level boundary. The profiler has no control output,
@@ -109,6 +109,41 @@ mpeg2_h262_hardware_cadence_profiler #(
     .video_b                   (cadence_video_b),
     .snapshot_ready            (cadence_snapshot_ready)
 );
+
+// Separate seek observer: no reset from media_seeking or decoder retirement.
+wire seek_snapshot_valid,seek_snapshot_video_valid;
+wire [447:0] seek_snapshot,seek_snapshot_video;
+media_seek_diagnostics seek_diagnostics(
+ .clk(clk_mpeg2),.clear(reset_mpeg2_base || media_new_file_mpeg),
+ .seeking(media_seeking),.paused(media_paused),
+ .progress(mpeg2_new_decode_stream_valid || media_rebase ||
+           mpeg2_new_framebuffer_swap_reset_count==3'd4),
+ .state_flags({media_audio_skip_disabled,av_is_ps,media_paused,media_seeking,
+   media_seek_done,reset_mpeg2,media_telemetry[229:228],
+   mpeg2_new_frame_waiting,mpeg2_new_b_presentation_hold,
+   mpeg2_new_p_destination_ownership_hold,mp2_fifo_full}),
+ .errors(mpeg2_new_cadence_error_flags),
+ .subcodes({3'd0,mpeg2_new_pred_error_detail,mpeg2_new_pred_error_source,
+   mpeg2_new_p_wide_probe_error_detail,mpeg2_new_publication_error_detail,
+   mpeg2_new_p_probe_error_source,mpeg2_new_phase1_probe_error_source,
+   mpeg2_new_syntax_error_source}),
+ .scheduler(mpeg2_new_b_scheduler_debug_state),
+ .elapsed_q(media_elapsed_q),.target_q(media_target_q),
+ .display_pts(mpeg2_new_display_pts),
+ .picture({mpeg2_new_display_pts_valid,mpeg2_new_picture_coding_type,
+   mpeg2_new_temporal_reference,mpeg2_new_frame_rate_code}),
+ .video_level(av_video_ram_level),.audio_level(av_audio_ram_level),
+ .pcm_level({mp2_fifo_full,mp2_pcm_wr_used}),.reservoir_min(media_telemetry[207:192]),
+ .valid(seek_snapshot_valid),.snapshot(seek_snapshot));
+video_config_cdc #(.WIDTH(449)) seek_diagnostic_config(
+ .src_clk(clk_mpeg2),.dst_clk(clk_video),
+ .src_data({seek_snapshot_valid,seek_snapshot}),
+ .dst_data({seek_snapshot_video_valid,seek_snapshot_video}));
+wire seek_overlay,seek_overlay_bit;
+media_seek_overlay seek_overlay_renderer(
+ .clk(clk_video),.reset(reset_video),.valid(seek_snapshot_video_valid),
+ .snapshot(seek_snapshot_video),.h(telemetry_h),.v(telemetry_v),.de(fb_video_de),
+ .enable(seek_overlay),.pixel(seek_overlay_bit));
 
 wire mpeg2_new_phase1s_all_i_user_success =
     mpeg2_new_first_picture_420_parsed &&

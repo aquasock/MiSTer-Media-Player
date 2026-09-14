@@ -51,7 +51,7 @@ initial forever begin
 end
 mpeg2_program_stream_ingress #(.ENABLE_AUDIO(1)) ingress(clk,reset,ib,iv,ir,ie,vb,vv,vr,ve,vp,vpv,ab,av,ar,ap,apv,ps,de);
 wire [41:0] aq;wire aqv,aqr,ae;
-av_stream_fifo audio_fifo(clk,reset,{apv,ap,ab},av,ar,aq,aqv,aqr,ae);
+av_stream_fifo audio_fifo(clk,reset,{apv,ap,ab},av,ar,aq,aqv,aqr,ae,);
 wire pv,pe,pi;wire signed [15:0] pl,pr;wire [32:0] pp;wire ppv;wire [31:0] frames;
 reg [66:0] pcm_mem[0:4095];
 integer pcm_wr=0,pcm_rd_index=0;
@@ -101,7 +101,7 @@ reg [63:0] mem[0:1048575],dq;reg dqv=0;
 wire mb=rng[4:3]==0;
 reg eof_written=0;
 wire vin_ready;assign vr=vin_ready;
-mpeg2_av_ddr_fifo vfifo(clk,reset,{ve,vpv,vp,vb},vv||(ve&&!eof_written),vin_ready,vq,vqv,vqr,addr,din,memrd,memwr,mb,dq,dqv);
+mpeg2_av_ddr_fifo vfifo(clk,reset,{ve,vpv,vp,vb},vv||(ve&&!eof_written),vin_ready,vq,vqv,vqr,addr,din,memrd,memwr,mb,dq,dqv,);
 always @(posedge clk) begin
  dqv<=0;
  if(reset) eof_written<=0;

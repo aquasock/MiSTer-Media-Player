@@ -82,6 +82,7 @@ localparam CONF_STR = {
 	"-;",
 	"O[121],Aspect ratio,4:3,16:9;",
 	"O[6],Refresh rate,59.94 Hz,50 Hz;",
+	"O[7],Seek audio bypass,On,Off;",
 	"O[5:4],Color matrix,Auto,BT.601,BT.709;",
 	"O[3:1],Audio test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
 	"-;",
