@@ -1,7 +1,8 @@
 # FLAC feasibility and simulation evidence
 
 Baseline is hardware-accepted b639ccc MEDIUM seed 52. The user requires native
-44.1 kHz FLAC, stock Main, and preservation of both 48/96 kHz platform modes.
+44.1 kHz FLAC and existing 48 kHz MP2 movie input, using stock Main. The
+inherited 96 kHz output option is not 96 kHz media decoding and is not removed.
 No resampler is planned. Production RTL/file lists have not been changed by
 these isolated probes; no new playable FLAC RBF is available yet.
 
@@ -109,3 +110,31 @@ fresh movie session starts. Reset/cancel must not reassign an outstanding
 read response. CRC-validated frame banks become visible to PCM output only
 after commit; a bank cannot be reused while audio still owns it. These
 ownership rules are not implemented or simulated by the arithmetic probe.
+
+## Shared PCM and bus-ownership prototypes
+
+`media_pcm_sink` is a format-independent PCM consumer for FLAC and later
+44.1 kHz PCM WAV. Its simulation passes 202 exact sample transfers with
+startup prefill, pause, EOF interval accounting, empty-file completion,
+starvation, restart at a sample offset and cancellation. It consumes only
+serializer fetch ticks and needs no FLAC fields. Its clock, CDC FIFO, format
+parser and native serializer integration remain separate work. See
+[PCM_PLAYBACK_CONTRACT.md](PCM_PLAYBACK_CONTRACT.md).
+
+`hdmi_i2c_owner` prototypes exclusive pin ownership. It observes START/STOP,
+requires bus-free time before granting, routes slave ACK/stretching to HPS
+normally, and isolates HPS drivers while local control holds the bus. HPS
+sees SCL low while isolated. Simulated active and repeated-START transfers,
+ACK, clock stretching, local ownership, STOP release and reset pass.
+This is not a transaction writer, register shadow/replay controller, or model
+of the Cyclone V HPS controller. Its real bus-busy and timeout behavior is an
+explicit integration gate. Release/cancellation of a local transaction must
+complete STOP before returning ownership; resetting mid-transaction requires
+bus recovery at the integration layer. Neither prototype is in files.qip.
+
+Reproduce with:
+
+```sh
+python3 tools/verify_media_pcm_sink.py --output results/flac/pcm-sink
+python3 tools/verify_hdmi_i2c_owner.py --output results/flac/i2c-owner
+```

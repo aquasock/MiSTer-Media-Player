@@ -17,8 +17,10 @@ Retain Space pause and existing 10-second, 30-second and five-minute seeks
 in both directions. Reuse the progress bar and three time fields. File
 replacement forgets the previous session; EOF drains the last sample and
 returns to startup. Video playback remains fully supported in the same RBF.
-WAV support, music playlists, cover art, track selection, high-resolution
-and multichannel audio are separate future scope.
+Native 44.1 kHz, 16-bit stereo PCM WAV is planned later. Reserve the same
+PCM playback boundary for it; do not implement RIFF parsing in this cycle.
+Music playlists, cover art, track selection, high-resolution and multichannel
+audio are separate future scope.
 
 ## Format and implementation approach
 
@@ -65,8 +67,10 @@ I2S/SPDIF declarations, HDMI transmitter configuration, clock crossings and
 clean return to movie playback must agree under stock Main. Do not promise
 bit-perfect HDMI merely because decoded PCM is exact.
 
-The user requires native 44.1 kHz and explicitly retains both 48 and 96 kHz
-platform modes. Sample-rate conversion is excluded. Preserve the existing
+The input targets are native 44.1 kHz FLAC and the existing 48 kHz MP2 movies.
+There is no 96 kHz media decoder: the inherited 96 kHz setting is a platform
+output option, which this work does not remove. Sample-rate conversion of
+44.1 kHz music is excluded. Preserve the existing
 24.576 MHz clock and investigate a separate 22.5792 MHz PLL with integer
 sample division, controlled output switching and FIFO/reset handshakes.
 The system time clock and movie timing must remain on their existing clock.
@@ -82,7 +86,11 @@ Keep the separate subtitle slot for movies. Reuse the file reader and byte
 offset requests, but make FLAC metadata/probes and movie ingress mutually
 exclusive with acknowledged session ownership.
 
-Use a music session controller and explicit PCM-source selection. Generalize
+Use a music session controller and explicit PCM-source selection.
+Both FLAC and later WAV feed a codec-independent stream of signed 16-bit
+stereo samples followed by an EOF token. Position is measured in source
+samples. Decoder-specific metadata, compression and byte seeking stay outside
+this interface; see [the PCM contract](PCM_PLAYBACK_CONTRACT.md). Generalize
 only the shared output FIFO/control interface that is necessary; preserve
 movie PTS handling. FLAC elapsed time follows consumed source samples at
 44,100 Hz, not decoded-ahead samples or video refresh. Total comes from
