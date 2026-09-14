@@ -1,4 +1,34 @@
-## 26 COMMIT Unreleased ??? 2026-09-13T17:02:36-07:00
+## 27 COMMIT Unreleased ??? 2026-09-13T17:10:11-07:00
+
+#### Coming From:
+
+Unreleased 17743f8
+
+#### Purpose:
+
+Require successful seek-controller completion in the full I/P/B EOF reconstruction regression.
+
+#### Outcome:
+
+The full mixed-pixel bench now supports a seek beyond the file end as well as the existing frame-ten seek. Both modes verify the expected landing time and retained paused display bank; control-mode drain observation is extended so the bench cannot finish before the pause/seek checks complete. An explicit completion assertion prevents the pixel oracle alone from being mistaken for control acceptance. The extended EOF mode lands on frame 23 of the 24-picture stream with zero pixel mismatches, no decoder/presentation errors and clean control completion. These are test-only changes and do not change the 17743f8 RBF being built.
+
+#### Next Steps:
+
+Commit the extended regression and retain its evidence with the current build, then deliver timing-qualified hardware candidates.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/verify_decoder_timing.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 26 COMMIT Unreleased 17743f8 2026-09-13T17:02:36-07:00
 
 #### Coming From:
 
@@ -10,11 +40,11 @@ Retain the frame-rounded seek destination through the audio acknowledgement hand
 
 #### Outcome:
 
-Review found that media_playback_control reverted seek_elapsed_90k to the unrounded request after seek_active fell, allowing the audio mailbox to rebase to a different time than the displayed frame. A new regression fails on 6b22b6e after the first fractional-rate seek. Latching the actual destination at completion until the next decoder reset fixes the handoff and passes all focused playback regressions. This is a correction within the authorized playback-controls implementation; the superseded build batch was stopped before qualification.
+Committed and pushed 17743f8 to latch the frame-rounded destination until the next decoder reset. The added assertion fails on 6b22b6e and passes on the corrected controller, including all five source rates and all three seek intervals. All focused keyboard, asynchronous restart, PCM pause/seek, timestamp wrap and legacy sink checks pass. The canceled 6b22b6e process group was confirmed stopped, and replacement clean seeds 52/61/87 are running under results/build-17743f8-20260913-170250. All three pass synthesis; seed 87 reports 52905 synthesized registers with unchanged 3754315 memory bits, 69 DSPs and three PLLs. Fitted utilization and timing remain pending. Seven-minute 25/29.97 fps counter clips were generated with the committed make_cadence_motion_tests.py --seconds 420 under results/playback-control-tests; all four raw/MPG files pass full decode and frame-count checks. No playback-controls RBF is hardware accepted.
 
 #### Next Steps:
 
-Commit the corrected controller and regression, then run clean seeds 52/61/87 with complete timing and CDC audits.
+Finish all seeded builds and timing/CDC audits, retain the seven-minute counter media for hardware checks, and extend the reconstruction regression to require explicit end-of-file seek completion.
 
 #### Files Modified:
 
@@ -1328,36 +1358,6 @@ Reload the real `.mpg` via F4 and check whether video now actually plays through
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 986 COMMIT Unreleased e6e5a4c 2026-09-13T00:34:53-07:00
-
-#### Coming From:
-
-Unreleased 3713581
-
-#### Purpose:
-
-Fix the presentation-scheduler deadlock entry 985's hardware telemetry pinned down exactly.
-
-#### Outcome:
-
-Pulled `tools/decode-hardware-telemetry.py --json` on entry 985's stuck screenshot and got the scheduler's full internal register snapshot: `reorder_active=1, run_closed=1, decode_inflight=0, promotion_pending=1, queued_run_active=0`. Tracing `presentation_hold`'s expression against those exact values, plus `deferred_queued_b_start` (not exported to telemetry but inferable from `promotion_pending`'s own clear guard requiring it false), found a genuine circular wait in `mpeg2_h262_b_presentation_scheduler`: `deferred_queued_b_start` asserts `presentation_hold` directly and unconditionally - a separate OR-term, not gated on `promotion_pending` at all - which blocks all further decoder input at the top level (`mpeg2_new_stream_ready`), including the remaining compressed bytes of the very overlap-reference picture whose completion (a `frame_waiting` pulse) is the only thing that can ever clear `deferred_queued_b_start`. Once an early B-picture header defers while its overlap reference (an I/P admitted right after the run closed) is still decoding, nothing can ever resolve it - the exact scenario the hardware hit, and almost certainly the same underlying decoder defect the original freeze investigation from much earlier in this session (on the old helper architecture) never got to the bottom of. Built a standalone Icarus testbench (`tools/test_b_presentation_scheduler_deadlock.sv`) instantiating the real scheduler module and reproduced the exact deadlock before writing any fix: admit and complete two B pictures, admit a P header that closes the run and opens an overlap decode, admit a third B header before ever supplying the overlap reference's `frame_waiting`, then run 320 cadence cycles confirming `presentation_hold` never clears. Fixed by detecting this specific combination at the point the closed run's own future frame is ready to retire, and aborting - matching the module's own stated design philosophy ("any decode or ownership failure aborts the transaction without retaining compressed-stream backpressure") instead of latching `promotion_pending` and hanging forever. The properly-promoted (`queued_run_active`) path and the plain non-deferred path are untouched. The same test now verifies the abort fires and `presentation_hold` actually clears afterward. `quartus_map` on seed99 remains clean, 0 errors, same warning count as before.
-
-#### Next Steps:
-
-Run the full three-seed timing build, deploy, and reload the real `.mpg` via F4. This fix only addresses the specific deadlock the telemetry proved; if playback still stalls, pull fresh telemetry again rather than assuming it is the same root cause, since this scheduler's state space is large and this may not be the only unrecoverable combination in it.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/test_b_presentation_scheduler_deadlock.sv
 
 #### Status:
 
