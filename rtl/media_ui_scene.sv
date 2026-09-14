@@ -142,13 +142,13 @@ always @(posedge clk) begin
   7:begin
    tw<=(text_span+12'd3)>>2;th<=scale==9?12'd16:scale==6?12'd11:12'd7;
    tx<=quotient[11:0]-(text_span>>3);
-   multiply({36'd0,h},field==3?12'd417:field==4?(aux_length1!=0?12'd389:12'd403):field==5?12'd403:12'd436,47);
+   multiply({36'd0,h},field==3?12'd455:field==4?(aux_length1!=0?12'd417:12'd431):field==5?12'd431:12'd469,47);
   end
   47:divide(product,35'd480,8);
   8:begin ty<=quotient[11:0];state<=9;end
   9:begin
    object_we<=1;object_addr<={1'b0,field};
-   object_data<={length!=0,(field>=4),2'd3,4'd0,(tx+tw),(ty+th),ty,tx};
+   object_data<={length!=0,(field>=4),(field==3?2'd1:2'd3),4'd0,(tx+tw),(ty+th),ty,tx};
    if(field==4)subtitle_rect0<={length!=0,1'b1,2'd1,4'd0,(ty+th+12'd2),(tx+tw+12'd2),(ty-12'd2),(tx-12'd2)};
    if(field==5)subtitle_rect1<={length!=0,1'b1,2'd1,4'd0,(ty+th+12'd2),(tx+tw+12'd2),(ty-12'd2),(tx-12'd2)};
    if(field>=3) begin field<=field+1'b1;ch<=0;state<=10;end

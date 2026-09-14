@@ -173,12 +173,17 @@ always @(posedge clk) begin
 end
 reg [26:0] video_pipe[0:6];
 reg [1:0] color6,color7;
+reg inverse_text6=0,inverse_text7=0;
+wire glyph_hit=hit5 && column5<5 && bits5[4-column5];
 reg [26:0] video6,video7;
 always @(posedge clk) begin
  video_pipe[0]<={hs,vs,de,rgb};
  for(integer v=1;v<7;v=v+1) video_pipe[v]<=video_pipe[v-1];
  video6<=video_pipe[6];
- color6<=hit5 && column5<5 && bits5[4-column5] ? tc5 : rc5;
+ // Text palette 1 is an opaque dark glyph on a light inset. Rect palette 1
+ // retains alpha blending, so subtitle backdrops keep their existing behavior.
+ inverse_text6<=hit5 && tc5==1;
+ color6<=hit5 && tc5==1 ? (glyph_hit?2'd1:2'd3) : (glyph_hit?tc5:rc5);
 end
 // Exact fixed-palette alpha 160/255, evaluated by byte ROMs. Red and green
 // share a dual-read table; no multipliers or divide-by-255 pixel path remains.
@@ -193,12 +198,12 @@ always @(posedge clk) begin
  dark_r7<=blend_rg[{1'b0,video6[23:16]}];
  dark_g7<=blend_rg[{1'b1,video6[15:8]}];
  dark_b7<=blend_b[video6[7:0]];
- video7<=video6;color7<=color6;
+ video7<=video6;color7<=color6;inverse_text7<=inverse_text6;
 end
 always @(posedge clk) begin
  {hs_out,vs_out,de_out}<=video7[26:24];
  case(color7)
-  1:rgb_out<={dark_r7,dark_g7,dark_b7};
+  1:rgb_out<=inverse_text7?24'h181b20:{dark_r7,dark_g7,dark_b7};
   2:rgb_out<=24'h687d89;
   3:rgb_out<=24'heef2f4;
   default:rgb_out<=video7[23:0];

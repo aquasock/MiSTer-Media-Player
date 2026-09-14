@@ -39,15 +39,18 @@ function render(){
  const objects=[];
  if(el('hud').checked){
   const fields=[[time(pos),32,218],[(known?time(total):'--:--:--'),250,220],[(known?time(total-pos):'--:--:--'),470,218]];
-  for(const [s,x,width] of fields)objects.push({kind:'text',s,x:(x+width/2)/720*w-textWidth(s,k)/2,y:436*k,k,color:3});
+  for(const [s,x,width] of fields)objects.push({kind:'text',s,x:(x+width/2)/720*w-textWidth(s,k)/2,y:469*k,k,color:3});
   objects.push({kind:'rect',x:32/720*w,y:452*k,width:656/720*w,height:14*k,color:2});
   if(known)objects.push({kind:'rect',x:34/720*w,y:455*k,width:652/720*w*pos/total,height:8*k,color:3});
   else for(let x=34;x<686;x+=12)objects.push({kind:'rect',x:x/720*w,y:455*k,width:6/720*w,height:8*k,color:1});
   let status=performance.now()<seekUntil?seekLabel:paused?'Paused':'';
-  if(status)objects.push({kind:'text',s:status,x:w/2-textWidth(status,k)/2,y:417*k,k,color:3});
+  if(status){
+   objects.push({kind:'rect',x:w/2-textWidth(status,k)/2,y:455*k,width:textWidth(status,k),height:7*k,color:3});
+   objects.push({kind:'text',s:status,x:w/2-textWidth(status,k)/2,y:455*k,k,color:1});
+  }
  }
  for(const o of objects){if(o.kind==='text')text(o.s,o.x,o.y,o.k,colors[o.color]);else{ctx.fillStyle=colors[o.color];ctx.fillRect(o.x,o.y,o.width,o.height)}}
- if(el('guide').checked){ctx.strokeStyle='#d4c08c';ctx.setLineDash([6*k,4*k]);ctx.strokeRect(32/720*w,387*k,656/720*w,25*k);ctx.setLineDash([]);ctx.font=`${Math.round(11*k)}px monospace`;ctx.fillStyle='#e4d5ae';ctx.fillText('Subtitle lines — layout guide only',w/2,382*k)}
+ if(el('guide').checked){ctx.strokeStyle='#d4c08c';ctx.setLineDash([6*k,4*k]);ctx.strokeRect(32/720*w,415*k,656/720*w,25*k);ctx.setLineDash([]);ctx.font=`${Math.round(11*k)}px monospace`;ctx.fillStyle='#e4d5ae';ctx.fillText('Subtitle lines — layout guide only',w/2,410*k)}
  if(el('menu').checked){ctx.fillStyle='#10131a';ctx.fillRect(w*.29,h*.25,w*.42,h*.36);ctx.strokeStyle='#899caa';ctx.strokeRect(w*.29,h*.25,w*.42,h*.36);ctx.fillStyle='#eef2f4';ctx.font=`${Math.round(13*k)}px monospace`;ctx.fillText('MiSTer menu remains above player UI',w/2,h*.43)}
 }
 function seek(delta){el('position').value=Math.max(0,Math.min(+el('position').max,+el('position').value+delta));seekLabel='Seeking';seekUntil=performance.now()+1000;el('hud').checked=true;render();setTimeout(render,1050)}

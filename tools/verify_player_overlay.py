@@ -25,17 +25,21 @@ def oracle(w,h,known,shown,paused,seeking,pos=1340400000,total=2629890000,patter
  else:
   for x in range(x0,x1):
    if x&8:im[y0:y1,x]=((background[y0:y1,x].astype(np.uint16)*95+np.array(colors[1],dtype=np.uint16)*160)//255).astype(np.uint8)
- for label,center,y in zip(labels,[141,360,579,360],[436,436,436,417]):
+ for field,(label,center,y) in enumerate(zip(labels,[141,360,579,360],[469,469,469,455])):
   x0=w*center//720-len(label)*6*scale//8;y0=h*y//480
+  if field==3 and label:im[y0:y0+(7*scale+3)//4,x0:x0+(len(label)*6*scale+3)//4]=colors[3]
   for dy in range((7*scale+3)//4):
    gy=dy*4//scale
    for dx in range((len(label)*6*scale+3)//4):
     gx=dx*4//scale;char=gx//6;column=gx%6
-    if gy<7 and char<len(label) and column<5 and (glyphs.get(label[char],[0]*7)[gy]>>(4-column))&1:im[y0+dy,x0+dx]=colors[3]
+    if gy<7 and char<len(label) and column<5 and (glyphs.get(label[char],[0]*7)[gy]>>(4-column))&1:im[y0+dy,x0+dx]=colors[1 if field==3 else 3]
  return im
 cases=[(720,480,1,1,0,0),(1280,720,1,1,1,0),(1920,1080,1,1,0,1),(720,480,0,1,0,0),(720,480,1,0,0,0)]
 cases=[(*c,1340400000,2629890000) for c in cases]+[(720,480,1,1,0,0,0,36000000),(720,480,1,1,0,0,40000000,36000000)]
 cases=[(*c,0) for c in cases]+[(720,480,0,1,0,0,1340400000,2629890000,1),(720,480,1,0,0,0,1340400000,2629890000,1)]
+cases += [(720,480,0,1,1,0,1340400000,2629890000,1),
+          (720,480,1,1,0,1,0,36000000,1),
+          (720,480,1,1,1,0,40000000,36000000,1)]
 for w,h,known,shown,paused,seeking,pos,total,pattern in cases:
  name=f'{w}x{h}-k{known}-v{shown}-p{paused}-s{seeking}-q{pos}-r{pattern}';path=o/(name+'.ppm')
  r=subprocess.run([str(o/'obj/Vtest_media_player_overlay'),f'+OUT={path}',f'+W={w}',f'+H={h}',f'+KNOWN={known}',f'+SHOWN={shown}',f'+PAUSED={paused}',f'+SEEK={seeking}',f'+POSITION={pos}',f'+TOTAL={total}',f'+PATTERN={pattern}'],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT);(o/(name+'.log')).write_text(r.stdout);r.check_returncode()

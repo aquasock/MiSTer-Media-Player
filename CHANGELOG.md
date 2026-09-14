@@ -14,6 +14,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Place time fields below the progress bar, Paused/Seeking on the bar with
+  contrasting lettering, and subtitles two lines lower following hardware
+  acceptance of manual SRT playback.
+
 - Move Paused/Seeking down one text line and place subtitles directly above it.
   Complete the existing font ROM's printable ASCII character set.
 

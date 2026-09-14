@@ -1,3 +1,12 @@
+# Next layout: clocks below the progress bar
+
+The subtitle baseline ec56250 was accepted on hardware. The next revision moves
+all three time fields below the progress bar, Paused/Seeking onto the bar, and
+subtitles two lines lower. Status has dark text on a light inset. Check the
+bottom margin at 480p/720p/1080p, empty/full/unknown progress with status, and
+subtitles with the controls shown and hidden. Playback and SRT parsing are
+unchanged. New build timing qualification is pending; keep ec56250 seed 87.
+
 # Timing-qualified ec56250 seed 87: manually loaded SRT subtitles
 
 Open a movie, then choose **Load subtitles** and select its SRT. Subtitles
@@ -11,7 +20,7 @@ Run `python3 tools/make_subtitle_test.py` for a one-hour timing fixture that
 works alongside any movie. See [SRT coverage and limits](SUBTITLES.md).
 All three seeds pass all four corners, 171 CDC registers and scene-enable
 checks. Seed 87 has setup +0.338 ns and hold +0.110 ns; seeds 52/61 have setup
-+0.116/+0.136 ns and hold +0.115/+0.108 ns. Hardware acceptance is pending.
++0.116/+0.136 ns and hold +0.115/+0.108 ns. The user reports everything works perfectly and accepts this subtitle baseline.
 
 Preferred RBF: `results/hardware-test-ec56250/seed87/MediaPlayer_20260914.rbf`.
 SHA-256: `765fc4eea7ec7e5a4d2701a3ac470d0f6e4dacadfaef4acd5f771b517bb59752`.

@@ -5,7 +5,7 @@ The filenames need not match. **Subtitles: On/Off** hides or restores the loaded
 track. Loading a different movie or resetting clears the association; select
 its SRT again. There is no automatic discovery, playlist loader or custom Main.
 
-Subtitles appear one text line above Paused/Seeking and remain visible when
+Subtitles appear above the progress bar and remain visible when
 playback controls hide. Pausing retains the current cue. Seeking hides it and
 rescans the SRT from its beginning after landing; larger SRT files can therefore
 have a brief subtitle recovery delay. Movie playback does not wait for the
@@ -50,8 +50,9 @@ text with the current player epoch. Scene assembly and frame publication keep
 text changes atomic; old seek/file epochs cannot become visible. Subtitle and
 controls visibility groups are independent.
 
-On the 480p reference layout, Paused/Seeking is now y=417. The subtitle bottom
-line is y=403; a two-line cue begins at y=389. Clock fields remain y=436 and the
+On the 480p reference layout, Paused/Seeking sits at y=455 inside the progress
+bar with dark lettering on a light inset. The subtitle bottom line is y=431;
+a two-line cue begins at y=417. Clock fields are below the bar at y=469; the
 progress track remains [452,466). Coordinates scale with the HDMI output.
 The font has 94 visible printable ASCII glyphs plus space in its existing ROM.
 

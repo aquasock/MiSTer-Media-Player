@@ -356,3 +356,12 @@ cue lifecycle, atomic shared-overlay transfer and verification. This supersedes
 older notes deferring all subtitle loading. The user's accompanying layout
 change moves Paused/Seeking down one line to y=417 at 480p, with the bottom
 subtitle line at y=403 and an additional line at y=389. Bar/clocks stay put.
+
+## Post-acceptance layout revision
+
+The user accepts the ec56250 subtitle build and requests clocks below the bar,
+Paused/Seeking on the bar, and subtitles two lines lower. The new 480p reference
+layout is clocks y=469, status y=455, subtitle lines y=417/431 and the unchanged
+track [452,466). These positions supersede earlier layouts in this document.
+Status uses opaque dark text on a light inset so it remains readable over any
+progress fill. Subtitle backdrops retain their alpha blend.
