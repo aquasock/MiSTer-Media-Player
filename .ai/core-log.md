@@ -1,3 +1,32 @@
+## 43 COMMIT Unreleased a229a01 2026-09-14T01:47:05-07:00
+
+#### Coming From:
+
+Unreleased a229a01
+
+#### Purpose:
+
+Stop the final remaining build at the user's request.
+
+#### Outcome:
+
+Terminated the verified a229a01 build process group; no Quartus jobs remain. Seed 52 had progressed from fitting to timing analysis before cancellation, with compilation completed in 1638.2 seconds; its results are preserved but timing qualification is incomplete. Completed seeds 61 and 87 and their handoff artifacts remain intact. Seed 87 remains the recommended timing-qualified RBF at results/hardware-test-a229a01/seed87/MediaPlayer_20260914.rbf, with minimum setup slack +0.104 ns and all 147 CDC checks passing. The local batch status and handoff README record cancellation, superseding entry 42's instruction to finish seed 52. Hardware acceptance remains pending.
+
+#### Next Steps:
+
+Await the user's seed 87 hardware results. Do not start further builds unless requested.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 42 COMMIT Unreleased a229a01 2026-09-14T01:42:00-07:00
 
 #### Coming From:
@@ -1284,46 +1313,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 003 COMMIT Unreleased f8bebcd 2026-09-13T09:59:54-07:00
-
-#### Coming From:
-
-Unreleased f960c0e
-
-#### Purpose:
-
-Repair progressive frame-switch sync glitches and the configuration clock crossings exposed by the 27 MHz raster.
-
-#### Outcome:
-
-The previous native-480p batch completed seeds 52 and 87 but failed setup at -2.395 ns and -3.249 ns; the user canceled seed 61, whose stopped fitter was terminated to finish cancellation. Same-clock video setup remained +17.460 ns and +16.964 ns: the major failures were 20-to-27 MHz OSD configuration and cfg_done gating the HDMI adjuster's video clock, with additional aspect and VS crossings. Seed 52 also missed decoder setup by 0.208 ns, while seed 87 passed that path by 0.503 ns. The user reported generally good audio/video but lingering, flickering blended frames and unavailable OSD during playback, so f960c0e is not hardware accepted. The captured telemetry froze early on audio timestamp_error 0x2000 and is not an end-of-playback result; that separate flag is unresolved. Committed fixes keep HS/VS/DE free-running across frame-bank cache resets, transfer slow OSD/aspect settings through held acknowledged mailboxes, resynchronize system-clock VS edge detection, remove cfg_done gating of the actual HDMI-adjuster input clock, and align telemetry coordinates with framebuffer RGB/DE. The new reset regression fails on f960c0e and passes with the fix while checking all 345600 visible pixels with stalled DDR. The 20/27 MHz mailbox regression verifies atomic updates, source hold and final convergence; OSD elaboration, geometry, all five cadence rates, B-picture ordering and telemetry RTL also pass. Simulations use an ideal cache RAM and do not establish physical timing, full decoder reconstruction or HDMI scaler behavior. The accepted 1750154 seed-87 RBF remains the rollback reference.
-
-#### Next Steps:
-
-Run three clean Quartus seeds from the committed fixes, verify standard and focused timing and configuration synchronizer constraints, and compare resource use. Test HDMI for continuous frame changes, retained images, audio sync and OSD behavior; capture fresh telemetry to distinguish the remaining timestamp flag from this raster fix.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_07.svh
-- files.qip
-- rtl/mpeg2_luma_framebuffer.sv
-- sys/osd.v
-- sys/sys_top.v
-- tools/test_480p_scanout.sv
-- rtl/video_config_cdc.sv
-- tools/test_video_config_cdc.sv
-- tools/verify_video_sync.py
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
