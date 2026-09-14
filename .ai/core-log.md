@@ -1,3 +1,32 @@
+## 47 COMMIT Unreleased 3ab6615 2026-09-14T02:54:33-07:00
+
+#### Coming From:
+
+Unreleased 3ab6615
+
+#### Purpose:
+
+Build and qualify the reduced direct-seek source using the standard three placement seeds.
+
+#### Outcome:
+
+The user authorized proceeding with builds after the reduction tests passed. GitHub and local master were verified synchronized, then clean exports of source 3ab6615 started at 2026-09-14T02:54:05-07:00 for seeds 52, 61 and 87, with six workers each, under results/build-3ab6615-20260914-025405. Only seed and worker settings differ from committed source. The batch runs compile followed by focused timing; result packaging requires all four timing corners and the 165-register CDC audit. No replacement RBF exists yet and the MiSTer has not been changed.
+
+#### Next Steps:
+
+Inspect synthesis and fitting resource usage, finish the three builds and timing audits, then package the best completed candidate with exact source, seed, hash and qualification status. Preserve failed artifacts and the a229a01 seed 87 rollback. Hardware testing remains with the user; do not deploy automatically.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 46 COMMIT Unreleased 3ab6615 2026-09-14T02:49:40-07:00
 
 #### Coming From:
@@ -1307,36 +1336,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 007 COMMIT Unreleased 0710e81 2026-09-13T11:24:43-07:00
-
-#### Coming From:
-
-Unreleased 9c6ccbb
-
-#### Purpose:
-
-Correct top-level synchronizer constraint matching before fitting the loading-overlay repair.
-
-#### Outcome:
-
-All three 9c6ccbb clean exports completed synthesis successfully in approximately 150 seconds, but inspection found the existing hierarchy-separator prefix excluded top-level VS registers and the new top-level mailboxes from timing exceptions. The three fitting jobs and their supervisor were terminated before completion; they produced no accepted build. A post-map TimeQuest audit reproduced rejection of the old platform_aspect_config pattern, then passed with the corrected patterns: all 54 required control registers were present, with eight request stage-zero endpoints, eight acknowledgement stage-zero endpoints, each VS stage-zero endpoint and 267 held/destination data bits matched. Source 0710e81 changes only constraint and audit patterns; the 9c6ccbb RTL regressions remain applicable. The correction was committed and pushed before restarting clean seeds 52, 61 and 87 with six workers each under results/build-0710e81-20260913-112410/. The prior batch and its cancellation record remain under results/build-9c6ccbb-20260913-111811/. No replacement RBF has been delivered or installed.
-
-#### Next Steps:
-
-Finish all three clean builds, require the fitted 54-register audit and standard and focused timing reports, then deliver a timing-passing candidate for user validation of loading-overlay suppression, video, audio and repeated loads. Preserve the hardware-accepted 1750154 seed-87 rollback reference and keep the earlier inaudible audio underrun outside this cycle as directed.
-
-#### Files Modified:
-
-- MediaPlayer.sdc
-- tools/phase1p_timing.tcl
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
