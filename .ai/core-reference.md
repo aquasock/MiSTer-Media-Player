@@ -44,6 +44,16 @@ rules:
 ## 2. Active source catalog
 
 ```yaml
+- source_id: ADV7513-AUDIO
+  priority: P0
+  authority: Analog Devices
+  document: "ADV7513 Programming Guide, Revision B, March 2012"
+  consulted_url: "https://www.analog.com/media/en/technical-documentation/user-guides/adv7513_programming_guide.pdf"
+  use_for:
+    - "Sections 4.4.2–4.4.3: automatic CTS, N and I2S channel-status registers"
+  applicability: "Native CD audio transmitter configuration; hardware behavior remains to be verified"
+  conformance_boundary: "Device programming guide does not replace the normative HDMI specification"
+
 - source_id: FLAC
   priority: P0
   authority: IETF

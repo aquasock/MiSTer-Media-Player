@@ -1,4 +1,4 @@
-## 99 COMMIT Unreleased ??? 2026-09-14T14:31:40-07:00
+## 99 COMMIT Unreleased 6d564e9 2026-09-14T14:31:40-07:00
 
 #### Coming From:
 
@@ -10,15 +10,22 @@ Begin authorized FLAC feasibility and simulation implementation.
 
 #### Outcome:
 
-The user authorizes the FLAC plan and simulator-first work. Begin output-interface and DDR ownership audits, a deterministic native FLAC corpus with exact WAV reference samples, and a serial reconstruction arithmetic prototype with simulation and isolated Quartus resource evidence. Add RFC 9639 to the controlled references. Current Main configures HDMI audio for 48/96 kHz through the HPS I2C peripheral; ask the user whether to use high-quality conversion or extend native-output investigation while progressing independent decoder work. The accepted production baseline remains b639ccc MEDIUM seed 52.
+The user authorizes implementation and then explicitly selects native 44.1 kHz FLAC while preserving 48 and 96 kHz platform modes; conversion is excluded. Commit 6d564e9 adds a standalone serial FLAC prediction primitive and reproducible simulation/corpus/Quartus probes, with no production integration. Python integer comparisons pass 4097 vectors including orders 0–32, 17-bit side-channel history, residual/range checks and backpressure, plus 33 reset cancellation points; Verilator lint passes. Isolated virtual-pin prediction fitting uses 150 placed ALMs, 192 estimated ALMs, 106 registers, one DSP and zero M10Ks; this is not full decoder area or production timing. A deterministic 55-file corpus reproduces all original PCM through independent source comparisons; two damaged cases are rejected. Local FFmpeg emits no samples for the large-block noise file, while reference flac 1.5.0 decodes it exactly; the manifest records this secondary-reference limitation. A separate dual-PLL probe fits with two PLLs and 18 registers; fitter frequencies are 24.576 and 22.579199 MHz. The proposed native path retains the movie clock and adds one CD PLL, but current whole-core PLL placement and HDMI operation are unproven. ADV7513 documentation confirms automatic CTS and the channel-status rate field; the remaining native-output gate is an FPGA/HPS I2C owner or proxy that preserves Main traffic and restores/reapplies audio configuration correctly. Proposed frame storage reuses 1 MiB of the inactive compressed-video FIFO's reserved DDR range, subject to explicit drain/ownership testing. RFC 9639 and ADV7513 references are catalogued. Evidence is results/flac and docs/FLAC_FEASIBILITY.md. No playable FLAC RBF exists yet; accepted b639ccc seed 52 remains current.
 
 #### Next Steps:
 
-Resolve the output choice without assuming approval, prove sample arithmetic including side-channel width and order-32 LPC, generate ordinary encoder and edge-case inputs, measure primitive resources and document DDR ownership. Continue toward standalone decoding and integrated hardware gates after feasibility checks; no deployment is automatic.
+Implement and simulate the serialized HDMI audio-control path, validating HPS contention, ACK/NACK, reads, resets and reconnects before platform integration. Continue the FLAC bitstream/parser, memory ownership and full-file PCM comparison work using the corpus. Preserve native 44.1 kHz plus existing 48/96 kHz; no resampler and no removal of 96 kHz. Whole-core builds and hardware validation follow meaningful integration gates rather than treating isolated fits as a completed player.
 
 #### Files Modified:
 
-None.
+- docs/FLAC_PLAN.md
+- docs/FLAC_FEASIBILITY.md
+- rtl/audio/flac/flac_predict_mac.sv
+- tools/make_flac_tests.py
+- tools/synth_flac_clock.py
+- tools/synth_flac_predict.py
+- tools/test_flac_predict.sv
+- tools/verify_flac_predict.py
 
 #### Status:
 
