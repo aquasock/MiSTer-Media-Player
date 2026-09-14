@@ -1,3 +1,32 @@
+## 95 COMMIT Unreleased b639ccc 2026-09-14T14:03:21-07:00
+
+#### Coming From:
+
+Unreleased b639ccc
+
+#### Purpose:
+
+Record the standalone CD-quality FLAC music playback target.
+
+#### Outcome:
+
+The user clarifies that FLAC restores the music-player side for the user's own standalone files, not movie audio, and sets the acceptance target: a CD-ripped WAV converted to FLAC should play perfectly. The initial profile is 44100 Hz, 16-bit stereo PCM, reconstructed sample-for-sample with the original WAV before optional output filters or volume processing, with correct playback rate and no dropped/repeated samples or buffer underruns. Ordinary compatible FLAC encoder compression settings must work without a special encoding recipe; a fixed-predictor-only demonstration is insufficient. Validate lossless decoding, channel reconstruction and continuous playback against original WAV samples, plus pause/seek/EOF behavior. High-resolution and multichannel FLAC are outside this initial target. The xavieran/fLaCPGA reference was inspected at a724a18b6205b192bd42977186b669d467b0aa9b: its integrated frame path is restricted to mono and hardcoded 4096-sample blocks, with LPC code separate from the subframe path. It is an architectural reference, not a complete compatible decoder or measured Cyclone V resource estimate. No FLAC RTL is implemented by this scope update; shared-IDCT builds remain independent and the accepted video baseline stays 7eb5088 MEDIUM seed 61.
+
+#### Next Steps:
+
+Use this CD-quality profile for the FLAC design and test corpus, covering ordinary compression settings, metadata, channel coding, block sizes and final short blocks within the target. Measure a standalone decoder implementation before claiming it fits alongside the video player; preserve current video functionality and existing shared-IDCT build work.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 94 COMMIT Unreleased b639ccc 2026-09-14T13:49:03-07:00
 
 #### Coming From:
@@ -1398,39 +1427,6 @@ Finish the three builds, confirm both row arrays infer M10K, compare actual plac
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
 - tools/verify_row_buffer_equivalence.py
-- CHANGELOG.md
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 55 COMMIT Unreleased 1349c82 2026-09-14T04:07:41-07:00
-
-#### Coming From:
-
-Unreleased bcddb20
-
-#### Purpose:
-
-Remove the diagnostic seek-audio menu switch while retaining normal compressed-audio bypass.
-
-#### Outcome:
-
-The user authorized removing the Seek audio bypass menu entry during a read-only historical RAM optimization audit. Source 1349c82 removes the option and its one-bit CDC mailbox, connects MP2 seeking directly to media_seeking and removes the obsolete mailbox from the timing audit, reducing required synchronizer checks from 159 to 153. The existing bypass algorithm and full-frame synthesis preroll are preserved; saved status bit seven no longer affects behavior. MP2 quantizer and joint-stereo tests pass exact resumed PCM comparisons across two reset sessions, normal and wrapped timestamps, and one-byte, 582-byte and false-header 1604-byte startup prefixes. Evidence is under results/menu-removal. No builds or hardware changes were made. Separately, Git history confirms that progressive restoration 9233f07 lost the 047f5b2 parser row-buffer BRAM conversion and 6e44472 configuration-ROM BRAM enable. Current P and B row_bytes arrays are each 512 by 8 with combinational reads, and CONF_STR_BRAM defaults to zero. Historical entry 420 records 7082 fewer estimated ALMs and two additional RAM blocks for the row-buffer conversion, followed by hardware acceptance in entry 422; those historical savings are not a current-build prediction. Large residual plans and shared residual storage already use M10K. The attempted 19-to-20-bit coefficient padding in 5fb7d5d saved nothing because synthesis removed the unused bit and was reverted by 3e89189. No RAM conversion is authorized or implemented in this menu-removal boundary.
-
-#### Next Steps:
-
-Menu removal is ready for the next build; adapt future build summaries to 153 CDC checks. Recommend porting the historical row-buffer conversion with differential parser and current seeking tests, followed by the smaller configuration-ROM change, as the next resource-recovery work.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_av.svh
-- tools/phase1p_timing.tcl
 - CHANGELOG.md
 - docs/TEST_INSTRUCTIONS.md
 
