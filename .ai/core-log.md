@@ -1,4 +1,4 @@
-## 27 COMMIT Unreleased ??? 2026-09-13T17:10:11-07:00
+## 27 COMMIT Unreleased 58f74d7 2026-09-13T17:10:11-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Require successful seek-controller completion in the full I/P/B EOF reconstructi
 
 #### Outcome:
 
-The full mixed-pixel bench now supports a seek beyond the file end as well as the existing frame-ten seek. Both modes verify the expected landing time and retained paused display bank; control-mode drain observation is extended so the bench cannot finish before the pause/seek checks complete. An explicit completion assertion prevents the pixel oracle alone from being mistaken for control acceptance. The extended EOF mode lands on frame 23 of the 24-picture stream with zero pixel mismatches, no decoder/presentation errors and clean control completion. These are test-only changes and do not change the 17743f8 RBF being built.
+Committed and pushed 58f74d7: the full mixed-pixel bench now supports a seek beyond the file end as well as the existing frame-ten seek. Both modes verify the expected landing time and retained paused display bank; control-mode drain observation is extended so the bench cannot finish before the pause/seek checks complete. An explicit completion assertion prevents the pixel oracle alone from being mistaken for control acceptance. The extended EOF mode lands on frame 23 of the 24-picture stream with zero pixel mismatches, no decoder/presentation errors and clean control completion. These are test-only changes and do not change the 17743f8 RBF being built.
 
 #### Next Steps:
 
-Commit the extended regression and retain its evidence with the current build, then deliver timing-qualified hardware candidates.
+Finish the 17743f8 build batch and deliver timing-qualified hardware candidates with the extended regression evidence; the test-only commit requires no separate FPGA build.
 
 #### Files Modified:
 
