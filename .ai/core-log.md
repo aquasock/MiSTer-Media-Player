@@ -1,4 +1,4 @@
-## 94 COMMIT Unreleased ??? 2026-09-14T13:49:03-07:00
+## 94 COMMIT Unreleased b639ccc 2026-09-14T13:49:03-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Correct shared-IDCT Quartus syntax compatibility and restart the authorized thre
 
 #### Outcome:
 
-The user explicitly authorizes building again, superseding the previous stop. Add an explicit generate/endgenerate region and separately declared genvar for the shared coefficient-bank loop rejected by Quartus 17. Preserve arithmetic, request arbitration and memory behavior. Run the existing shared-IDCT differential test and isolated Quartus analysis/elaboration before restarting clean MEDIUM seeds 52/61/87. Keep accepted 7eb5088 seed 61 and the failed original batch unchanged.
+The user explicitly authorizes building again, superseding the previous stop. Source b639ccc adds an explicit generate/endgenerate region and separately declared genvar around the shared coefficient banks; no arithmetic, arbitration or memory behavior changes. The existing differential suite again passes 79008 exact samples. Isolated full-design Quartus 17 analysis/elaboration succeeds with zero errors in 41 seconds after supplying the normal generated build_id.v header; evidence is under results/shared-idct-quartus-preflight and /tmp/shared-idct-quartus-preflight.log. Source is committed and pushed; clean MEDIUM seeds 52/61/87 restart under /tmp/shared-idct-build-restart.log. Full compilation, timing and hardware acceptance remain pending. The accepted 7eb5088 MEDIUM seed 61 and failed 54d64d2 batch are preserved.
 
 #### Next Steps:
 
-Commit the compatibility correction, restart the three builds and inspect for early errors; then qualify timing, resource savings, one-engine/eight-intermediate/three-staging RAM structure and all existing CDC/removal checks before hardware handoff.
+Monitor the b639ccc batch and audit all corners, placed/estimated ALMs, RAM/DSP savings, one shared IDCT engine with eight intermediate and three staging M10Ks, and existing 183-stage CDC/removal checks. Package the preferred RBF for four-file hardware acceptance at both refresh settings. Retain 7eb5088 MEDIUM seed 61 as rollback; do not launch extra timing-fix batches without direction.
 
 #### Files Modified:
 
