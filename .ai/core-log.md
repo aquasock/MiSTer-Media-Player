@@ -1,3 +1,32 @@
+## 103 COMMIT Unreleased ??? 2026-09-14T15:29:03-07:00
+
+#### Coming From:
+
+Unreleased 7c197c9
+
+#### Purpose:
+
+Connect CRC-admitted FLAC frames to bounded DDR ownership and develop native output integration.
+
+#### Outcome:
+
+The user authorizes continuing the FLAC path. Implement two provisional/committed DDR frame banks with backpressure, stereo reading, shared PCM tokens, EOF drain and cancellation that preserves in-flight bus transactions. Test complete files against original PCM through delayed memory responses and output stalls, including faults and cancellation. Develop the native 44.1 kHz clock and HDMI control path against the existing stock Main interface, keeping the movie clock and future WAV PCM boundary intact. Only build a playable candidate once memory and output transitions are proved and connected; do not claim isolated simulation as hardware support.
+
+#### Next Steps:
+
+Measure the connected decoder/store cost and prove native output configuration and clean movie/music transitions before hardware handoff. Preserve the accepted b639ccc seed 52 rollback and existing 48 kHz MP2 playback.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 102 COMMIT Unreleased 7c197c9 2026-09-14T15:14:08-07:00
 
 #### Coming From:
@@ -1390,59 +1419,6 @@ Audit corrected builds across all corners, the 159 CDC registers and real four-c
 - tools/test_media_ui_divider.sv
 - tools/test_media_ui_lifetime.sv
 - tools/verify_player_overlay.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 63 COMMIT Unreleased 5373dae 2026-09-14T06:07:40-07:00
-
-#### Coming From:
-
-Unreleased ea05269
-
-#### Purpose:
-
-Implement the approved shared playback overlay and bounded timestamp duration probe for hardware validation.
-
-#### Outcome:
-
-Source 5373dae implements the shared post-filter, pre-menu HDMI compositor with eight bounded text objects, four rectangles, synchronous glyph/text RAM, five-stage aligned RGB and sync delay, frame-boundary publication and stale session/seek epoch rejection. A retained synthetic-provider interface reserves future text functionality without subtitle loading or cue selection. The controls reproduce the historical progress bar and Elapsed, Total and Remaining fields, pause/seek feedback, independent ten-second wall-clock hiding and explicit unknown duration. A bounded 64 KiB head and 4 MiB tail preflight reuses the existing mounted reader RAM, validates PES timestamps, retains the maximum presentation PTS plus the frame period, and quarantines outstanding responses on cancellation or timeout. Reader integration testing caught and fixed a FINISH-state validity gate; the complete encoded sample now matches the independently calculated endpoint. Full-frame pixel oracles pass at 480p, 720p and 1080p, including unknown/hidden controls and progress endpoints. Scene lifetime, retained-provider, epoch, wall-clock, reordered/wrapped timestamp, large-file reader, remount, malformed response and timeout recovery tests pass. Existing transport/session, decoder pixel and real-file direct-seek regressions pass. Evidence is under results/ui-overlay. Resource and timing qualification remain pending; standard clean seeds 52, 61 and 87 are now compiling. No deployment occurred.
-
-#### Next Steps:
-
-Audit all four timing corners, 159 expected CDC synchronizer registers and actual placed ALMs versus the accepted 35774-ALM baseline; compare M10Ks with 508 baseline and the planned 2000-ALM/12-M10K incremental budgets. Correct any new synthesis or timing failures, package the best qualified RBF and have the user validate startup preflight, fields, pause/seek, menu/filter priority, file changes and EOF. Keep accepted 3ff27c8 seed 52 as rollback.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer_top_00.svh
-- README.md
-- docs/TEST_INSTRUCTIONS.md
-- docs/UI_OVERLAY_PLAN.md
-- files.qip
-- rtl/media_duration_probe.sv
-- rtl/media_duration_window.sv
-- rtl/media_overlay_compositor.sv
-- rtl/media_overlay_font.hex
-- rtl/media_player_overlay.sv
-- rtl/media_ui_divider.sv
-- rtl/media_ui_scene.sv
-- rtl/media_ui_state.sv
-- rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
-- sys/emu_ports.vh
-- sys/sys_top.v
-- tools/phase1p_timing.tcl
-- tools/test_media_duration_reader.sv
-- tools/test_media_duration_window.sv
-- tools/test_media_player_overlay.sv
-- tools/test_media_ui_lifetime.sv
-- tools/test_media_ui_state.sv
-- tools/verify_player_overlay.py
-- tools/verify_ui_duration.py
 
 #### Status:
 
