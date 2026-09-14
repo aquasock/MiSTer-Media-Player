@@ -1,4 +1,4 @@
-## 96 COMMIT Unreleased ??? 2026-09-14T14:12:56-07:00
+## 96 COMMIT Unreleased db4bc3f 2026-09-14T14:12:56-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Correct shared-IDCT physical-register auditing and qualify the existing three fi
 
 #### Outcome:
 
-The user authorizes investigation of the b639ccc audit failure. Seed 61 register enumeration shows the six original transform_index bits plus six Quartus ~DUPLICATE copies in the same shared engine; raw physical register counting incorrectly requires six. Plan to normalize only recognized duplicate suffixes, require all six logical index bits and exactly the shared engine hierarchy, retain physical-name evidence and physical RAM checks, then rerun timing against existing fitted databases without recompilation or RBF changes.
+Audit-only commit db4bc3f corrects the false failure: Quartus replicated transform_index bits with ~DUPLICATE suffixes inside the sole shared engine. All three fitted b639ccc designs have six logical bits, with 11/12/10 physical registers for seeds 52/61/87. The revised check requires exactly the expected engine hierarchy and six logical indices, records physical names and rejects missing bits, additional engines and unknown suffixes in mutation checks. Existing fitted databases were re-audited without RTL, constraint or RBF changes; hashes match the original compilation outputs. All seeds retain eight intermediate and three staging M10Ks, 183 CDC stages, scene enable and diagnostic-removal checks. Four-corner minima (setup/hold/recovery/removal/pulse width ns) are seed 52 +0.645/+0.081/+3.337/+0.214/+0.925, seed 61 +0.458/+0.048/+2.565/+0.182/+0.925, seed 87 -0.102/+0.105/+3.330/+0.235/+0.925. Thus 52/61 pass and 87 fails cold-corner setup. Preferred seed 52 uses 35908 placed ALMs, 512 M10Ks and 59 DSPs, saving 1136/13/16 versus accepted 7eb5088 MEDIUM seed 61 and leaving 6002/41/53 free. Packaged original b639ccc RBFs and build-info.json identify db4bc3f separately as timing_audit_revision. Evidence is results/build-b639ccc-20260914-135047; original failed timing logs and status are preserved. No full compilation of this audit-only commit was necessary; b639ccc compiled successfully and hardware acceptance remains pending.
 
 #### Next Steps:
 
-Validate rejection of missing bits and extra engines, rerun all three structural and four-corner timing audits, package the preferred candidate and record source versus audit revision explicitly. Hardware acceptance remains pending.
+Test results/hardware-test-b639ccc/seed52/MediaPlayer_20260914.rbf on Fellow, Groove, Jiggler and Star Wars at both refresh rates, covering opening, motion, audio, pause/seek, reset/file replacement, subtitles/filters and EOF. Preserve accepted 7eb5088 MEDIUM seed 61 as rollback; do not start extra timing-fix builds without direction.
 
 #### Files Modified:
 
