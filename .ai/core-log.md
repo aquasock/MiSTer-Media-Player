@@ -1,3 +1,33 @@
+## 98 COMMIT Unreleased ba9e0d8 2026-09-14T14:28:21-07:00
+
+#### Coming From:
+
+Unreleased b639ccc
+
+#### Purpose:
+
+Document the staged standalone CD-quality FLAC implementation plan.
+
+#### Outcome:
+
+Added docs/FLAC_PLAN.md and updated the shared-IDCT test instructions to reflect user acceptance. The plan preserves stock Main and standalone 44100 Hz, 16-bit stereo FLAC with exact decoded PCM, normal encoder settings, pause/seek, shared progress UI and drain-to-startup EOF. The current 24.576 MHz audio clock and 48/96 kHz platform output require an early native-44.1-kHz feasibility decision; a high-quality 160/147 converter is a separately disclosed alternative, not bit-perfect HDMI. Plan a serial predictor, CRC-validated frames, bounded M10K queues and DDR-backed channel storage after a memory ownership audit, with full CD-format block/order handling rather than a silently restricted 4096-only decoder. RFC 9639 was consulted as the normative FLAC source and is not yet in core-reference.md; add its controlled reference before RTL implementation. Four gates cover output/resource feasibility, standalone sample equivalence, integrated continuous playback and controls/UI with four-movie regressions. Proposed whole-feature budgets are 3500 ALMs, 28 M10Ks and 12 DSPs, not measured resource estimates. No FLAC RTL or new builds were started.
+
+#### Next Steps:
+
+Review the plan with the user and begin feasibility/output qualification when implementation is authorized. Retain accepted b639ccc MEDIUM seed 52, keep PCM fidelity distinct from output conversion, and measure fitted costs before full integration.
+
+#### Files Modified:
+
+- docs/FLAC_PLAN.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 97 COMMIT Unreleased b639ccc 2026-09-14T14:26:52-07:00
 
 #### Coming From:
@@ -1398,34 +1428,5 @@ Finish all three builds and verify 24 intermediate banks infer M10K. Compare act
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 58 COMMIT Unreleased dc1dfc2 2026-09-14T04:41:39-07:00
-
-#### Coming From:
-
-Unreleased dc1dfc2
-
-#### Purpose:
-
-Record hardware acceptance and investigate optimization techniques in the original upstream decoder.
-
-#### Outcome:
-
-The user reports everything works perfectly like before with the delivered dc1dfc2 seed 52 row-buffer candidate. Passed records that reported playback acceptance; detailed file/key/EOF coverage was not enumerated. Its build-info now records hardware acceptance. The user requested comparison with mrchrisster/MiSTer_MPEG2; upstream main was pinned to 11d1aa2d11649d0c4048d1b33fb1d2abc84771ef and inspected from a read-only clone. Active local files.qip selects mpeg2_new, while upstream idct.v is byte-identical to the dormant local mpeg2fpga IDCT. Useful adaptation candidates are upstream's RAM-backed transpose storage and shared streamed transform pipeline. Current three active IDCT instances total 4196 combinational ALUTs, 7971 registers and 24 DSP blocks with no block memory; this is total module cost, not forecast savings. Their eight parallel reads mean RAM banking or prefetch needs design work, and upstream's two-RAM count cannot be copied as a local budget. The current intra inverse quantizer also holds qfs/reconstructed arrays in registers and totals 1073 combinational ALUTs, 1776 registers and six DSP blocks; a RAM-backed or streamed adaptation is another candidate. A shared IDCT would require overlap/throughput and seek-ownership proof. Upstream VLC tables are combinational too, so no ready-made ROM saving was found. Different transform widths, rounding and output clipping prevent claiming a drop-in replacement; current audio, PTS and seek behavior must remain. Findings and source references are saved in results/upstream-optimization-audit/findings.md. No source optimization, build or deployment was performed.
-
-#### Next Steps:
-
-Present the bounded opportunities and select an approved optimization boundary before implementation. Prefer retaining current transform arithmetic while redesigning storage, or first converting the simpler inverse-quantizer buffers; require numerical equivalence, pixel-oracle and seek recovery tests, then measured RAM/ALM and timing qualification. Retain accepted dc1dfc2 seed 52 as baseline.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
