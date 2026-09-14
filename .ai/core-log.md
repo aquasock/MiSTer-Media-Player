@@ -1,3 +1,32 @@
+## 91 COMMIT Unreleased 7eb5088 2026-09-14T13:19:19-07:00
+
+#### Coming From:
+
+Unreleased 78c82f1
+
+#### Purpose:
+
+Run one isolated maximum-register-packing comparison of the accepted seed 61 core.
+
+#### Outcome:
+
+The user requests a dense packing run. Reuse the previous single-seed packing build helper against clean archived source 7eb5088, with seed 61, six workers and ALM_REGISTER_PACKING_EFFORT HIGH instead of MEDIUM. Keep source RTL and the tracked QSF unchanged. The accepted MEDIUM baseline uses 37044 actual ALMs, 31325 estimated ALMs, 44804 registers, 525 M10Ks and 75 DSPs with setup +0.334 ns and hold +0.074 ns. The prior bcddb20 HIGH experiment saved no ALMs, but the current design differs substantially; measure again without promising savings. Run compilation and all existing four-corner, CDC and diagnostic-removal audits. Evidence will use a distinct results/build-7eb5088-packing-high directory and /tmp/gate3-packing-high.log. This is an experimental build request, not acceptance of its eventual RBF.
+
+#### Next Steps:
+
+Compare final placed and estimated ALMs, RAM, DSP, registers and timing against accepted 7eb5088 MEDIUM seed 61. Package the experiment separately: do not run the normal packaging helper unmodified because its source/seed destination would overwrite the accepted RBF. Keep the accepted MEDIUM artifact and hardware acceptance intact. Report results before any additional build or default-setting change. The previous displayed timing table had a transcription error: fast -40 C recovery is +4.898 ns in the audit JSON, not +4.950 ns; the reported minimum recovery +3.668 ns is unchanged.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 90 COMMIT Unreleased 78c82f1 2026-09-14T13:10:02-07:00
 
 #### Coming From:
@@ -1387,35 +1416,6 @@ None.
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 51 COMMIT Unreleased bcddb20 2026-09-14T03:36:49-07:00
-
-#### Coming From:
-
-Unreleased bcddb20
-
-#### Purpose:
-
-Record completed direct-seek timing qualification and deliver the preferred seed 61 candidate.
-
-#### Outcome:
-
-All three bcddb20 builds compiled and passed the 159-register CDC audit. Seed 61 passes all four timing corners with minimum setup +0.205 ns, hold +0.066 ns, recovery +2.388 ns, removal +0.098 ns and pulse width +0.925 ns. It uses 41223 ALMs, 56345 registers, 482 RAM blocks, 69 DSP blocks and three PLLs. The preferred RBF is results/hardware-test-bcddb20/seed61/MediaPlayer_20260914.rbf, hash verified as 98a3957e92ffb71112a31d373082854673a45c97fb5c5169c2b48971e75a2f24. Seeds 52 and 87 fail setup at -0.377 and -0.327 ns respectively; their other timing categories pass, and their packaged files are explicitly unqualified. Batch durations were 1294, 1424 and 1254 seconds for seeds 52, 61 and 87. Per-corner evidence remains under results/build-bcddb20-20260914-031001; the handoff includes checksums, build-info files and testing instructions. Documentation commit d3f141e identifies the candidate and corrects the remaining stale reference to the removed seek-fault observer; runtime source remains bcddb20. The earlier 90 percent baseline was an ALMs-needed estimate: 0b6eb0e seed 87 physically placed 40431 ALMs, versus 41119 in bcddb20 seed 87, a 688-ALM increase across playback/seek development. Most of the apparent percentage jump came from changed dense-packing recovery estimates. No new build or deployment was started.
-
-#### Next Steps:
-
-Have the user load seed 61 and test short and long direct seeks in both directions, paused seeks and resume, first-time distant destinations, EOF, reload, OSD access and audio alignment. Hardware acceptance remains pending; retain a229a01 seed 87 as rollback.
-
-#### Files Modified:
-
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
