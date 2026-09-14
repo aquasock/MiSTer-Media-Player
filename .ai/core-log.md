@@ -1,3 +1,33 @@
+## 28 COMMIT Unreleased ??? 2026-09-13T17:17:06-07:00
+
+#### Coming From:
+
+Unreleased 58f74d7
+
+#### Purpose:
+
+Document the required HDMI refresh override and align setup guidance with current playback features.
+
+#### Outcome:
+
+The user asks how vsync_adjust interacts with the new refresh menu and specifically what happens at zero. Official MiSTer video documentation confirms that mode one follows core refresh while zero uses the configured output timing, potentially adding cadence conversion. Keep [MediaPlayer] vsync_adjust=1 even if the global setting is zero. README still describes an older baseline, metadata-controlled aspect and no seeking; update those statements to the accepted compact baseline and the current hardware-pending keyboard controls. This is documentation only and does not change the 17743f8 builds.
+
+#### Next Steps:
+
+Update README and hardware setup instructions with the per-core ini snippet, current manual aspect/refresh/color controls and clear seek latency/validation status, then finish the running builds.
+
+#### Files Modified:
+
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 27 COMMIT Unreleased 58f74d7 2026-09-13T17:10:11-07:00
 
 #### Coming From:
@@ -1329,35 +1359,6 @@ Sync this change to all three seed build directories and run the full three-seed
 #### Files Modified:
 
 - MediaPlayer.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 987 COMMIT Unreleased e6e5a4c 2026-09-13T00:54:32-07:00
-
-#### Coming From:
-
-Unreleased e6e5a4c
-
-#### Purpose:
-
-Build and deploy entry 986's presentation-scheduler deadlock fix for hardware testing.
-
-#### Outcome:
-
-Ran the three-seed timing build. seed26 failed setup timing this time; seed33 and seed99 both passed cleanly, seed33 with the better margin (+0.399ns worst case vs seed99's +0.320ns). Installed seed33's RBF (`.ai/current_results/MediaPlayer_stageB_schedfix_seed33.rbf`, SHA-256 `e98b442d884daa19893256313624534261a22db1bc17bb3b6969278c5b7c2c7d`) onto the test MiSTer via `tools/mister.sh install`, replacing the prior `MediaPlayer_stageB_legacyfix_seed26.rbf` file (confirmed by the installed checksum). Main is unchanged from entry 983 and was not reinstalled. Not yet tested.
-
-#### Next Steps:
-
-Reload the real `.mpg` via F4 and check whether video now actually plays through. If it stalls again, pull fresh telemetry (`tools/decode-hardware-telemetry.py --json`) immediately rather than assuming the same root cause - this scheduler's state space is large and entry 986's fix only addresses the one specific combination the previous snapshot proved.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
