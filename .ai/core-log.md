@@ -1,3 +1,32 @@
+## 48 COMMIT Unreleased 3ab6615 2026-09-14T03:06:59-07:00
+
+#### Coming From:
+
+Unreleased 3ab6615
+
+#### Purpose:
+
+Record the completed reduced-source placement results and remaining device-capacity shortfall.
+
+#### Outcome:
+
+All three source 3ab6615 builds failed fitter LAB capacity and produced no RBF. Seeds 52, 61 and 87 required 4196, 4209 and 4192 LABs respectively against 4191 available, leaving seed 87 one LAB over capacity. The partial fitter ALM estimates were 41561, 41708 and 41542; these are incomplete-fit figures, not successful placement or timing qualification. Seed 87 synthesis confirms the observer dropped from 429 to 314 registers and 77 to 74 combinational ALUTs, while search logic dropped from 487 to 417 ALUTs with 332 registers unchanged. Thus the two edited modules saved 115 registers and 73 combinational ALUTs. The previous seed 87 required 4198 LABs; the reduction helped packing but did not yield a legal fit. Timing and fitted CDC qualification could not run. Evidence and failure-summary.json are under results/build-3ab6615-20260914-025405. No further builds were launched and the MiSTer was not changed.
+
+#### Next Steps:
+
+Plan another bounded resource reduction to create packing margin before repeating the three-seed build, preserving seek behavior and existing regression coverage. The prior a229a01 seed 87 remains the timing-qualified hardware rollback; there is no new direct-seek binary to test.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 47 COMMIT Unreleased 3ab6615 2026-09-14T02:54:33-07:00
 
 #### Coming From:
@@ -1299,35 +1328,6 @@ At the user's explicit request, the timing-failing 0710e81 seed-87 RBF was provi
 #### Next Steps:
 
 Finish the three 07b8688 builds and their timing checks, including the fitted 60-register synchronizer audit and explicit operating-corner reports. Report the results and any passing candidate without further implementation changes; menu access during playback is deferred by the user's instruction.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 008 COMMIT Unreleased 0710e81 2026-09-13T11:44:14-07:00
-
-#### Coming From:
-
-Unreleased 0710e81
-
-#### Purpose:
-
-Record the completed timing-repair batch and identify the final shared subcarrier configuration crossing.
-
-#### Outcome:
-
-All three clean 0710e81 builds compiled and passed the fitted 54-register synchronizer audit. Seeds 52, 61 and 87 finished compilation and focused timing in 1052, 1176 and 1112 seconds, using 40441, 40540 and 40304 ALMs respectively; each used 472 RAM blocks and 69 DSP blocks. Setup remained -1.656, -1.702 and -1.525 ns, with the shared worst path from the system-clock subcarrier flag to video-clock subcarrier_out. All passed hold at +0.243, +0.241 and +0.238 ns, recovery at +3.790, +2.242 and +3.476 ns, removal at +0.418, +0.551 and +0.390 ns, and pulse width at +0.925 ns. Focused decoder setup was -0.237, +0.173 and +0.143 ns; HDMI setup was +0.013, +0.214 and +0.390 ns, while same-clock video setup was +16.635, +15.933 and +17.190 ns. Thus seeds 61 and 87 now fail only the remaining shared configuration crossing among the reported paths; seed 52 also has a smaller decoder setup violation. The old request, VS, LFB_EN, HDMI_PR and lowlat failures were removed. No new hardware candidate is timing-qualified. All reports, RBF hashes and regression evidence are retained under results/build-0710e81-20260913-112410/.
-
-#### Next Steps:
-
-Within the approved remaining-configuration-crossing repair scope, transfer subcarrier through the verified mailbox and extend the fitted audit to its six control stages. Verify the mailbox behavior, commit and push, then run clean seeds 52, 61 and 87 again. Require positive standard and focused timing before delivering the loading-overlay repair for hardware testing; audio remains unchanged.
 
 #### Files Modified:
 
