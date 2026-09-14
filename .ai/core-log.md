@@ -1,3 +1,32 @@
+## 100 COMMIT Unreleased ??? 2026-09-14T14:54:34-07:00
+
+#### Coming From:
+
+Unreleased 6d564e9
+
+#### Purpose:
+
+Establish a codec-independent native PCM playback boundary for FLAC and future WAV.
+
+#### Outcome:
+
+The user authorizes continuing and asks that later native 44100 Hz WAV support be accommodated without implementing WAV now. Correct the earlier wording: production movie input supports 48000 Hz MP2; the inherited 96 kHz platform output option is not 96 kHz media decoding. Preserve that platform option without claiming a supported 96 kHz input profile. Implement and simulate a format-independent PCM sink with source-sample position, tick-driven consumption, pause, EOF drain and cancellation, so FLAC and future PCM WAV can share output controls. Keep format parsing and file seeking outside the sink. Continue native HDMI work subject to bus ownership validation; no resampling.
+
+#### Next Steps:
+
+Verify exact emitted sample order, pause/resume, last-sample duration, starvation and reset/seek cancellation. Document the shared PCM contract and native-output integration requirements; preserve accepted b639ccc production behavior until the integrated path is ready.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 99 COMMIT Unreleased 6d564e9 2026-09-14T14:31:40-07:00
 
 #### Coming From:
@@ -1402,34 +1431,5 @@ Use 3ff27c8 seed 52 as the baseline for subsequent changes and retain dc1dfc2 se
 
 - [x] Built
 - [x] Passed
-
----
-
-## 60 COMMIT Unreleased 3ff27c8 2026-09-14T05:09:29-07:00
-
-#### Coming From:
-
-Unreleased 3ff27c8
-
-#### Purpose:
-
-Qualify and deliver the IDCT intermediate RAM conversion hardware candidate.
-
-#### Outcome:
-
-All three clean 3ff27c8 builds finish; seeds 52 and 87 pass all four timing corners, while seed 61 fails setup at -0.152 ns in the slow -40C corner. All pass the 153-register CDC audit. Seeds 52 and 87 have minimum setup/hold +0.133/+0.110 and +0.067/+0.074 ns. Actual placed ALMs are 35774, 35923 and 35876 for seeds 52, 61 and 87, versus estimates 29791, 29693 and 29634; all use 508 M10Ks, 69 DSPs and three PLLs. Each fitter report confirms 24 distinct physical intermediate M10K sites despite requested type AUTO in its RAM table. Preferred seed 52 saves 2016 actually placed ALMs versus accepted dc1dfc2 seed 52, reducing placement from 90.2 to 85.4 percent; estimated utilization drops from 76.2 to 71.1 percent. RAM rises by 24 blocks and leaves 45 free; registers total 43508. Synthesis IDCT instances remove 4608 registers and 1382 combinational ALUTs with unchanged arithmetic and output cycles. Full validation evidence is under results/idct-storage and results/build-3ff27c8-20260914-045213. Hash-verified handoffs are under results/hardware-test-3ff27c8, with seed 61 visibly marked timing-failed. Preferred seed52/MediaPlayer_20260914.rbf SHA-256 is 236c9817ccfd04b10e23ff0ee052f2c11e5a39d7fcfdb88e3e42b29e969406f1. Documentation commit 863e254 records the candidate. No hardware acceptance or deployment occurred. While builds ran, the user requested better film cadence and clarified that only standard HDMI timings and refresh frequencies are acceptable. Exact 24 and 23.976 fps need consideration separately; 50 and 59.94 Hz cannot evenly repeat either. Standard 1080p23.976/24 is an investigation candidate, subject to stock Main/scaler and display compatibility verification; no new refresh mode was implemented.
-
-#### Next Steps:
-
-Have the user validate seed 52 playback at both existing refresh rates, OSD/aspect/filters, repeated short and long seeks both directions, paused seeks, reload and EOF, retaining accepted dc1dfc2 seed 52 as rollback. For future film cadence work, verify complete standardized HDMI timing modes including blanking, sync and pixel clock through stock Main before proposing an implementation. No additional builds are running.
-
-#### Files Modified:
-
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
