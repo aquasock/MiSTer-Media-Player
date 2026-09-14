@@ -1,3 +1,32 @@
+## 93 COMMIT Unreleased 54d64d2 2026-09-14T13:45:57-07:00
+
+#### Coming From:
+
+Unreleased 54d64d2
+
+#### Purpose:
+
+Record the user's build stop and the already-terminated shared-IDCT batch.
+
+#### Outcome:
+
+The user explicitly says to stop the builds. Process inspection finds no running build runner or Quartus process: all three 54d64d2 seeds had already failed after about seven seconds with compile exit 3. The primary error is Quartus 17 syntax rejection at mpeg2_h262_shared_idct.sv line 56 near the module-level for generate loop, followed by cascading declarations. Simulation passes do not establish Quartus compatibility. No RBF was produced. No fixes, retries or further builds are performed after the stop instruction; accepted 7eb5088 MEDIUM seed 61 remains the hardware baseline.
+
+#### Next Steps:
+
+Await user direction before continuing implementation or restarting builds. Preserve failed logs under results/build-54d64d2-20260914-134450 and /tmp/shared-idct-build.log; inspect explicit generate/endgenerate syntax when work is resumed.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 92 COMMIT Unreleased 54d64d2 2026-09-14T13:22:12-07:00
 
 #### Coming From:
@@ -1409,35 +1438,6 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 53 COMMIT Unreleased bcddb20 2026-09-14T03:41:24-07:00
-
-#### Coming From:
-
-Unreleased bcddb20
-
-#### Purpose:
-
-Record hardware acceptance of the direct-seek seed 61 candidate.
-
-#### Outcome:
-
-The user reports that the core works well and seeking is rock solid and decently fast with the delivered bcddb20 seed 61 candidate. Passed records this reported playback/seek acceptance, not an independently enumerated matrix of files, keys or EOF cases. Its local build-info now records that scope. The separate maximum-packing experiment remains independent and is not accepted by this feedback. The user also asked what lies behind the black seek display: media_seeking holds the framebuffer reader/cache in reset, which forces RGB black while raster timing continues. Probe passes scan container/video headers without codec reconstruction; after selecting a restart point, the decoder reconstructs the short lead-in and reuses released frame banks. There is no intact live picture under an overlay; removing reset/blanking alone would expose invalid or changing data and can interfere with the display-bank release that fixed seeking. No playback source or hardware state was changed.
-
-#### Next Steps:
-
-Answer the seek-blanking question and finish the separately authorized single-seed packing experiment, comparing placed ALMs and timing against this accepted baseline. Any request to retain the last image or show seek previews requires a separate design preserving safe frame-bank ownership.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
