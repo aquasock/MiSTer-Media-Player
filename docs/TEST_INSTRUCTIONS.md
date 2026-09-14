@@ -2,7 +2,17 @@
 
 Use a timing-qualified RBF from the playback-controls build. Hardware validation
 of these controls is pending; source and simulation success alone are not acceptance.
-Use stock Main with the existing mounted-file menu. No ini change is required.
+Use stock Main with the existing mounted-file menu. For HDMI refresh matching,
+retain this per-core override even if the global setting is zero:
+
+```ini
+[MediaPlayer]
+vsync_adjust=1
+```
+
+The menu selects 50/59.94 Hz; this ini setting lets HDMI follow it. At zero,
+the configured HDMI timing may require repeat/drop conversion between rates.
+No additional ini change is needed specifically for keyboard playback controls.
 
 | Key | Action |
 | --- | --- |
@@ -91,7 +101,7 @@ this candidate's acceptance claim. Native 480p output comes later.
 
 For the mounted-file build, select MPG or M2V through **Open MPEG-2 Video**. During playback, open/close the MiSTer OSD repeatedly, enter the video and audio filter pages, change filters, and browse the file selector. Playback should continue while the menu is open. Check video continuity, audible continuity and A/V sync, then select another file, repeat the same file, use Reset, and play through EOF. The previous file must not leak into the next session.
 
-Pause and seek controls are not exposed yet. Record the exact RBF hash and actual Main binary/version: a `main=MiSTer_MediaPlayer` ini override exists on the previously inspected hardware configuration, so stock-Main identity must be verified during acceptance. This build needs no custom Main and does not alter MiSTer.ini.
+Keyboard pause/seek controls are described above; these mounted-reader checks remain applicable. Record the exact RBF hash and actual Main binary/version: a `main=MiSTer_MediaPlayer` ini override exists on the previously inspected hardware configuration, so stock-Main identity must be verified during acceptance. This build needs no custom Main and does not alter MiSTer.ini.
 
 Run `python3 tools/verify_media_file_reader.py` for host/session regressions and `python3 tools/verify_mpg_audio.py /tmp/mounted-playback.json` for byte/PTS/PCM comparison. Capture post-playback telemetry using the existing workflow; the decoder recognizes schema 9 at (8,280) as well as older captures. Transport status low four bits are error (0 none, 1 timeout, 2 malformed response, 3 size/offset range), bit 4 reader idle and bit 5 session cancellation. Maximum response wait is in 20 MHz system-clock cycles. Reservoir minimum includes normal tail drain and is not by itself an underrun indicator.
 

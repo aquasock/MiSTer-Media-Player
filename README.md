@@ -2,8 +2,9 @@
 
 A progressive MPEG-2/MP2 player core for stock MiSTer Main. Audio decoding
 runs in FPGA logic; no ARM helper or modified Main is required. The accepted
-audio/video baseline is `1750154` seed 87, accepted by the user and passing
-static timing. The native 480p candidate awaits build and hardware qualification.
+audio/video baseline is `0b6eb0e` seed 87, with native progressive output,
+manual refresh/aspect controls and compact telemetry accepted on hardware.
+Keyboard play/pause and seeking are implemented but await hardware validation.
 
 - Raw `.m2v` and MPEG Program Stream `.mpg` through the normal file menu.
 - Progressive 4:2:0 I/P/B video through 720x480, within the baseline decoder's
@@ -12,19 +13,61 @@ static timing. The native 480p candidate awaits build and hardware qualification
   unprotected frames. The conversion script uses 192 kb/s stereo.
 - PES timestamps, audio-clock-based presentation, and independent compressed
   video buffering. Missing individual video PTS retain encoded-cadence fallback.
-- Native 720x480 progressive raster at 60000/1001 Hz, with a 27 MHz pixel
-  clock and aspect-ratio menu (Original follows 4:3 or 16:9 sequence signalling). **Audio test Off selects
-  movie audio**; test-tone modes remain available.
+- Native 720x480 progressive raster with manual 59.94/50 Hz selection.
+- User-controlled 4:3 or 16:9 aspect ratio; video metadata never overrides it.
+- Frame-associated Auto/BT.601/BT.709 color matrix selection.
+- **Audio test Off selects movie audio**; test-tone modes remain available.
 
-This first audio candidate targets continuous FFmpeg-generated MPG files with
+The player targets continuous FFmpeg-generated MPG files with
 initial audio/video timestamps and nearby start times. It rejects unsupported
 MP2 headers, CRC-protected audio, and malformed frames; it does not implement
-mono, 44.1/32 kHz, MP3, AC3, seeking, or timestamp discontinuity recovery.
+mono, 44.1/32 kHz, MP3, AC3, or arbitrary timestamp discontinuity recovery.
 These are implementation limits, not MPEG standard limits.
 
+## HDMI setup
+
+Add this override to MiSTer.ini, including when the global setting is zero:
+
+```ini
+[MediaPlayer]
+vsync_adjust=1
+```
+
+The Refresh rate menu chooses the core's 50 or 59.94 Hz timing. Mode one lets
+HDMI follow that rate; leave it set to one when changing the menu. With zero,
+HDMI uses the configured output timing and may repeat/drop frames to convert
+between rates, reducing the benefit of the refresh switch.
+See [MiSTer's video configuration guide](https://mister-devel.github.io/MkDocs_MiSTer/basics/video/#vsync_adjust).
+
+Use 50 Hz for 25 fps video and 59.94 Hz for 29.97 fps video. This does not
+change the encoded playback speed or the audio sample rate.
+
+## Keyboard controls
+
+| Key | Action |
+| --- | --- |
+| Space | Play/pause |
+| Left / Right | Backward / forward 10 seconds |
+| Ctrl + Left / Right | Backward / forward 30 seconds |
+| Ctrl + Alt + Left / Right | Backward / forward 5 minutes |
+
+Controls operate with the OSD closed, once per physical press. Pause retains
+the displayed frame and queued samples while silencing movie audio. Seeking
+while paused leaves the destination paused. Additional seek commands are
+ignored while a seek is in progress; Space still controls the final pause state.
+
+This initial seeking implementation reconstructs silently from the beginning
+to a valid destination frame. The screen is blank during reconstruction and
+the OSD remains usable. **Long seeks can take substantial time** until a
+random-access index is added. Jumps clamp at the start/end of media.
+See the [hardware test procedure](docs/TEST_INSTRUCTIONS.md) for validation.
+
+## Decoder and output scope
+
 The decoder remains at 60 MHz. Smaller pictures are centered within the 720x480
-raster. There is no interlaced output, Bob or Weave support. Direct analog
-output is 480p/31 kHz; this is not a 15 kHz 240p or 480i mode.
+raster. There is no interlaced output, Bob or Weave support. The default direct analog
+output is 480p/31 kHz; this is not a 15 kHz 240p or 480i mode. The 50 Hz mode
+uses an internal 720x480-active scaler raster, not 576-line decoding.
 Interlace, Bob/Weave, DVD navigation and subtitles are outside this development
 scope. Historical v0.7–v0.9 releases describe the earlier DVD/ARM architecture.
 
