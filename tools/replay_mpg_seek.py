@@ -69,6 +69,8 @@ def main():
     ap.add_argument('--compile-only',action='store_true')
     ap.add_argument('--reuse',action='store_true')
     ap.add_argument('--shared-ddr',action='store_true')
+    ap.add_argument('--shared-idct',action='store_true')
+    ap.add_argument('--idct-intra',action='store_true')
     ap.add_argument('--display-ownership',action='store_true')
     ap.add_argument('--disable-display-release',action='store_true')
     ap.add_argument('--at-q',type=int,default=792792)
@@ -84,7 +86,9 @@ def main():
     rtl=re.findall(r'SYSTEMVERILOG_FILE (rtl/mpeg2_new/\S+)',(ROOT/'files.qip').read_text())
     rtl += ['rtl/audio/'+x+'.sv' for x in ('mp2_decoder','mp2_synthesis','mp2_pcm_output','av_stream_fifo')]
     rtl += ['rtl/media_seek_video_filter.sv','rtl/media_playback_control.sv','rtl/media_file_reader.sv','rtl/video_config_cdc.sv']
-    fingerprint=hashlib.sha256(str((args.display_ownership,args.disable_display_release)).encode()+bench.read_bytes()+b''.join((ROOT/p).read_bytes() for p in rtl)).hexdigest()
+    # P/B integration lives partly in included headers; cache identity must cover it.
+    headers=sorted((ROOT/'rtl/mpeg2_new').glob('*.svh'))
+    fingerprint=hashlib.sha256(str((args.display_ownership,args.disable_display_release,args.shared_idct,args.idct_intra)).encode()+bench.read_bytes()+b''.join((ROOT/p).read_bytes() for p in rtl)+b''.join(p.read_bytes() for p in headers)).hexdigest()
     manifest=dest/'obj/replay-build.json'
     if args.reuse:
         if not manifest.exists() or json.loads(manifest.read_text())['fingerprint']!=fingerprint:
@@ -94,6 +98,8 @@ def main():
             subprocess.run(['verilator','--binary','--timing','-j','8','-Wno-fatal',
                 '--top-module','tb_h262_live_raster_soak','--Mdir',str(dest/'obj'),
                 '-GPLAYBACK_CONTROL_MODE=1','-GSWAP_WINDOW_CYCLES=1001000',
+                '-GSHARED_IDCT_MODE='+str(int(args.shared_idct)),
+                '-GIDCT_INTRA_MODE='+str(int(args.idct_intra)),
                 '-GDISPLAY_OWNERSHIP_MODE='+str(int(args.display_ownership)),
                 '-GSEEK_DISPLAY_RELEASE='+str(int(not args.disable_display_release)),
                 '-GFREEZE_TRACE_CYCLES=0','-GMAX_SIM_CYCLES=1200000000',
@@ -122,7 +128,7 @@ def main():
         for line in f:
             if 'MPG_REPLAY_BOUNDARY_PASS' in line:passed=True
     result=dict(command=cmd,exit=rc,completed=passed,source_sha256=hashlib.sha256(data).hexdigest(),
-        scope='Combined PS/MP2/bounded queues/video reconstruction/PTS; ideal CDC; optional periodic display ownership model, not full raster bandwidth', shared_ddr=args.shared_ddr, display_ownership=args.display_ownership, display_release=not args.disable_display_release, binary_fingerprint=fingerprint)
+        scope='Combined PS/MP2/bounded queues/video reconstruction/PTS; ideal CDC; optional periodic display ownership model, not full raster bandwidth', shared_idct=args.shared_idct, idct_intra=args.idct_intra, shared_ddr=args.shared_ddr, display_ownership=args.display_ownership, display_release=not args.disable_display_release, binary_fingerprint=fingerprint)
     (dest/(label+'.json')).write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps(result),flush=True)
     if rc or not passed:raise SystemExit(1)

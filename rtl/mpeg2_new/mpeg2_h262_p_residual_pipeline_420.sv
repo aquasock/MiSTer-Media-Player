@@ -9,8 +9,10 @@
 // Entry 204 starts this transaction at every completed parser row; A2FE retires
 // an intermediate row and A2FF retains its established final-picture meaning.
 //============================================================================
-module mpeg2_h262_p_residual_probe
+module mpeg2_h262_p_residual_probe #(parameter EXTERNAL_IDCT=0)
 (
+    output wire [20:0] external_idct_request,
+    input wire [24:0] external_idct_response,
     input wire clk,
     input wire reset,
     input wire [7:0] stream_data,
@@ -100,8 +102,9 @@ reg replay_valid, first_valid_reg;
 reg [5:0] replay_index;
 reg signed [15:0] replay_value, first_value_reg;
 
-mpeg2_h262_p_non_intra_transform transform
+mpeg2_h262_p_non_intra_transform #(.EXTERNAL_IDCT(EXTERNAL_IDCT)) transform
 (
+    .external_idct_request(external_idct_request),.external_idct_response(external_idct_response),
     .clk(clk),
     .reset(reset),
     .qfs_block_index(2'd1),

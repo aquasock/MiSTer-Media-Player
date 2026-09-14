@@ -70,8 +70,12 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
+wire [41:0] shared_residual_idct_requests;
+wire [49:0] shared_residual_idct_responses;
+mpeg2_h262_two_picture_probe #(.EXTERNAL_IDCT(1)) mpeg2_h262_two_picture_probe
 (
+ .external_idct_requests(shared_residual_idct_requests),
+ .external_idct_responses(shared_residual_idct_responses),
 	.clk                         (clk_mpeg2),
 	.reset                       (reset_mpeg2),
 	.stream_data                 (mpeg2_stream_data),

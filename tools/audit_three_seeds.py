@@ -38,7 +38,19 @@ for seed in (52,61,87):
  detail=(root/'output_files/MediaPlayer.fit.rpt').read_text(errors='replace')
  resources['actual_placed_ALMs']=int(re.search(r'\[A\] ALMs used in final placement[^;]*;\s*([\d,]+)',detail).group(1).replace(',',''))
  rows=[r for r in detail.splitlines() if 'altsyncram:intermediate[' in r and 'row_data' in r and re.search(r'M10K_X\d+_Y\d+_N\d+',r)]
- if len(rows)!=24:raise RuntimeError(f'Seed {seed}: expected 24 existing IDCT intermediate M10Ks, found {len(rows)}')
+ shared_file=root/'phase1p_timing_reports/shared_idct_audit.rpt'
+ shared_idct=shared_file.exists()
+ expected_idct_rams=8 if shared_idct else 24
+ if len(rows)!=expected_idct_rams:raise RuntimeError(f'Seed {seed}: expected {expected_idct_rams} IDCT intermediate M10Ks, found {len(rows)}')
+ if shared_idct:
+  if shared_file.read_text().splitlines()!=['Shared IDCT index registers: 6','All IDCT index registers: 6']:raise RuntimeError('Shared IDCT engine audit failed')
+  staging_sites=set()
+  for row in detail.splitlines():
+   if 'mpeg2_h262_shared_idct:shared_idct' in row and 'coefficients' in row:
+    staging_sites.update(re.findall(r'M10K_X\d+_Y\d+_N\d+',row))
+  if len(staging_sites)!=3:raise RuntimeError(f'Expected three shared IDCT staging M10Ks, found {len(staging_sites)}')
+  resources['shared_IDCT_staging_M10Ks']=len(staging_sites)
+ resources['IDCT_intermediate_M10Ks']=len(rows)
  overlay_sites=set()
  for r in detail.splitlines():
   if 'player_overlay' in r:overlay_sites.update(re.findall(r'M10K_X\d+_Y\d+_N\d+',r))
@@ -60,7 +72,7 @@ for seed in (52,61,87):
  audio_absent=len(audio_lines)==14 and all(x.endswith(': 0 registers') for x in audio_lines[:11]) and all(re.search(r': [1-9][0-9]* registers$',x) for x in audio_lines[11:])
  passed=(not a.require_no_audio_test or audio_absent) and cdc and enable_ok and (not a.require_no_reporting or reporting_absent) and (not a.require_no_profiler or profiler_absent) and all(v>=0 for v in minima.values())
  item={'source':state['source'],'seed':seed,'corners':corners,'minimum_slack_ns':minima,
- 'audio_test_absent_and_pcm_retained':audio_absent,'reporting_absent':reporting_absent,'profiler_absent':profiler_absent,'scene_enable_audit_passed':enable_ok,'cdc_registers':len(lines),'cdc_audit_passed':cdc,'timing_passed':passed,'resource_budget_passed':budget,
+ 'shared_idct_audit_passed':shared_idct,'audio_test_absent_and_pcm_retained':audio_absent,'reporting_absent':reporting_absent,'profiler_absent':profiler_absent,'scene_enable_audit_passed':enable_ok,'cdc_registers':len(lines),'cdc_audit_passed':cdc,'timing_passed':passed,'resource_budget_passed':budget,
  'hardware_accepted':False,'rbf_sha256':info['rbf_sha256'],'resources':resources,
  'scope':a.scope}
  summary[str(seed)]=item

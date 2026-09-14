@@ -26,8 +26,10 @@
 // H262-021, H262-024 plus the established motion/address records used by
 // Commit 169.
 //============================================================================
-module mpeg2_h262_b_core_probe
+module mpeg2_h262_b_core_probe #(parameter EXTERNAL_IDCT=0)
 (
+    output wire [20:0] external_idct_request,
+    input wire [24:0] external_idct_response,
     input  wire clk,
     input  wire reset,
     input  wire [7:0] stream_data,

@@ -56,7 +56,8 @@ wire consume_bit=parse_active&&parser_consumes_bit&&!parser_at_end;
 
 reg t_start,t_we,t_end,t_intra; reg [5:0] t_widx; reg signed [12:0] t_wval; reg [4:0] t_qscale;
 wire t_done,t_first_valid,t_valid,t_error; wire signed [15:0] t_first_value,t_value; wire [1:0] t_unused_block; wire [5:0] t_index;
-mpeg2_h262_p_non_intra_transform b_transform(
+mpeg2_h262_p_non_intra_transform #(.EXTERNAL_IDCT(EXTERNAL_IDCT)) b_transform(
+    .external_idct_request(external_idct_request),.external_idct_response(external_idct_response),
     .clk(clk),.reset(reset),.qfs_block_index(2'd1),.qfs_block_start(t_start),.qfs_write_en(t_we),
     .qfs_write_index(t_widx),.qfs_write_value(t_wval),.qfs_block_end(t_end),
     .quantiser_scale_code(t_qscale),.q_scale_type(q_scale_type),.alternate_scan(alternate_scan),

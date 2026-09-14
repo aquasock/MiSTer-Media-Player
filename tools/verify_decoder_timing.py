@@ -12,6 +12,11 @@ parser.add_argument('--display-ownership',action='store_true')
 parser.add_argument('--disable-display-release',action='store_true')
 parser.add_argument('--seek-eof',action='store_true')
 parser.add_argument('--eof-control',action='store_true')
+parser.add_argument('--idct-trace',action='store_true')
+parser.add_argument('--shared-idct',action='store_true')
+parser.add_argument('--idct-intra',action='store_true')
+parser.add_argument('--refresh-50',action='store_true')
+parser.add_argument('--baseline-log',type=Path)
 args=parser.parse_args()
 root=Path(__file__).resolve().parents[1]
 out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
@@ -22,9 +27,13 @@ sources=re.findall(r'-name SYSTEMVERILOG_FILE (rtl/mpeg2_new/\S+)',(root/'files.
 obj=out/'obj';obj.mkdir(exist_ok=True)
 with (out/'compile.log').open('w') as log:
     subprocess.run(['verilator','--binary','--timing','-j','6','-Wno-fatal',
+        *(['+define+H262_IDCT_TRACE'] if args.idct_trace else []),
         '-Wno-PINMISSING','-Wno-WIDTH','-Wno-UNOPTFLAT','-Wno-CASEINCOMPLETE',
         '-Wno-BLKANDNBLK','+incdir+rtl/mpeg2_new','--top-module',
         'tb_h262_mixed_raster_pixels',
+        '-GREFRESH_50_MODE='+str(int(args.refresh_50)),
+        '-GIDCT_INTRA_MODE='+str(int(args.idct_intra)),
+        '-GSHARED_IDCT_MODE='+str(int(args.shared_idct)),
         '-GEOF_CONTROL_MODE='+str(int(args.eof_control)),
         '-GDISPLAY_OWNERSHIP_MODE='+str(int(args.display_ownership)),
         '-GSEEK_DISPLAY_RELEASE='+str(int(not args.disable_display_release)),
@@ -43,3 +52,10 @@ if 'MIXED_RASTER_PIXEL_PASS' not in text:raise RuntimeError('reconstruction did 
 if (args.playback_controls or args.seek_eof) and 'PLAYBACK RECONSTRUCTION PASS' not in text:raise RuntimeError('seek did not complete')
 if args.eof_control and 'EOF MIXED DRAIN PASS' not in text:raise RuntimeError('EOF drain did not complete')
 print('PASS mixed I/P/B raster pixel oracle; evidence '+str(out/'run.log'))
+
+if args.baseline_log:
+    baseline=args.baseline_log.read_text()
+    if 'MIXED_RASTER_PIXEL_PASS' not in baseline:raise RuntimeError('Comparison baseline did not pass')
+    pattern=r'^LIVE_RASTER_RESULT .*'
+    if re.findall(pattern,text,re.M)!=re.findall(pattern,baseline,re.M):raise RuntimeError('Shared service changed cycle count or reconstruction accounting')
+    print('PASS paired baseline reconstruction accounting and cycle count')

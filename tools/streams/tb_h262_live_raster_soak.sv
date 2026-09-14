@@ -15,6 +15,9 @@
 // same 3-I/22-P/47-B repeated-GOP transaction sequence as the 720x480 stream.
 module tb_h262_live_raster_soak #(
     parameter integer MIXED_PIXEL_MODE=0,
+    parameter integer SHARED_IDCT_MODE=0,
+    parameter integer IDCT_INTRA_MODE=0,
+    parameter integer REFRESH_50_MODE=0,
     parameter integer EOF_CONTROL_MODE=0,
     parameter integer DISPLAY_OWNERSHIP_MODE=0,
     parameter integer SEEK_DISPLAY_RELEASE=1,
@@ -332,13 +335,56 @@ module tb_h262_live_raster_soak #(
         .temporal_reference(temporal_reference),
         .sequence_end_seen(sequence_end_seen));
 
-    mpeg2_h262_two_picture_probe publication(
+    // Exercise intra transform demand too. Raster I pixels still come from
+    // this harness's initialized reference image; this models block ownership,
+    // not a substitute for the standalone bit-exact transform oracle.
+    wire [20:0] intra_idct_request;
+    wire [24:0] intra_idct_response;
+    reg intra_pipeline_done=0;
+    generate if(IDCT_INTRA_MODE) begin: intra_demand
+     mpeg2_h262_inverse_quant iq(.clk(clk),.reset(reset),
+      .block_start(publication.qfs_block_start),.coeff_write_en(publication.qfs_write_en),
+      .coeff_write_index(publication.qfs_write_index),.coeff_write_value(publication.qfs_write_value),
+      .block_end(publication.qfs_block_end),.intra_quant_matrix_default(1'b1),
+      .intra_dc_precision(intra_dc_precision),.quantiser_scale_code(publication.quantiser_scale_code),
+      .q_scale_type(frontend.q_scale_type),.alternate_scan(frontend.alternate_scan),
+      .coeff_out_block_start(intra_idct_request[20]),.coeff_out_valid(intra_idct_request[19]),
+      .coeff_out_index(intra_idct_request[18:13]),.coeff_out_value(intra_idct_request[12:1]),
+      .coeff_out_block_end(intra_idct_request[0]));
+     if(!SHARED_IDCT_MODE) begin: dedicated
+      mpeg2_h262_idct idct(.clk(clk),.reset(reset),
+       .coeff_block_start(intra_idct_request[20]),.coeff_valid(intra_idct_request[19]),
+       .coeff_index(intra_idct_request[18:13]),.coeff_value(intra_idct_request[12:1]),
+       .coeff_block_end(intra_idct_request[0]),.block_complete(intra_idct_response[24]),
+       .idct_error(intra_idct_response[23]),.sample_valid(intra_idct_response[22]),
+       .sample_index(intra_idct_response[21:16]),.sample_value(intra_idct_response[15:0]));
+     end
+     always @(posedge clk)begin
+      if(reset || publication.qfs_block_start)intra_pipeline_done<=0;
+      else if(intra_idct_response[22] && intra_idct_response[21:16]==63)intra_pipeline_done<=1;
+      if(!reset && (iq.iq_error || intra_idct_response[23]))$fatal(1,"intra transform error");
+     end
+    end else begin: no_intra_demand
+     assign intra_idct_request=0;
+     if(!SHARED_IDCT_MODE)assign intra_idct_response=0;
+    end endgenerate
+    wire [41:0] external_idct_requests;
+    wire [74:0] external_idct_responses;
+    generate if(SHARED_IDCT_MODE) begin: shared_transform_service
+     mpeg2_h262_shared_idct shared_idct(.clk(clk),.reset(reset),
+      .requests({external_idct_requests,intra_idct_request}),.responses(external_idct_responses));
+     assign intra_idct_response=external_idct_responses[24:0];
+    end else begin: dedicated_transform_service
+     assign external_idct_responses=0;
+    end endgenerate
+    mpeg2_h262_two_picture_probe #(.EXTERNAL_IDCT(SHARED_IDCT_MODE)) publication(
+        .external_idct_requests(external_idct_requests),.external_idct_responses(external_idct_responses[74:25]),
         .clk(clk),.reset(reset),.stream_data(stream_data),
         .stream_valid(stream_valid),.stream_ready(decoder_ready),
         .phase1_supported(phase1_supported),.vertical_size(vertical_size),
         .intra_dc_precision(intra_dc_precision),
         .intra_vlc_format(intra_vlc_format),
-        .pipeline_block_done(1'b1),.recon_block_complete(1'b1),
+        .pipeline_block_done(IDCT_INTRA_MODE?intra_pipeline_done:1'b1),.recon_block_complete(IDCT_INTRA_MODE?intra_pipeline_done:1'b1),
         .p_persistence_complete(pred_persisted),
         .p_row_persistence_complete(pred_row_persisted),
         .picture_420_complete(picture_complete),
@@ -485,7 +531,8 @@ module tb_h262_live_raster_soak #(
         assign seek_override=1'b0;
     end endgenerate
 
-    mpeg2_h262_b_presentation_scheduler scheduler(
+    mpeg2_h262_b_presentation_scheduler #(.ENABLE_REFRESH_SELECTION(REFRESH_50_MODE)) scheduler(
+        .refresh_50(REFRESH_50_MODE!=0),
         .clk(clk),.reset(reset),.swap_window_pulse(controlled_window),
         .frame_rate_code(4'h3),
         .timestamp_candidate_active(seek_override),
@@ -1635,10 +1682,11 @@ module tb_h262_live_raster_soak #(
                    profile_b_replay_coeff_writes!=26591||
                    profile_b_replay_coeff_wait!=0||
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
-                    (MEMORY_READ_LATENCY==1)&&!PLAYBACK_CONTROL_MODE&&!DISPLAY_OWNERSHIP_MODE&&(total_cycles!=1239996))||
-                   // Matched against a0f153a with the current Verilator bench.
+                    (MEMORY_READ_LATENCY==1)&&!PLAYBACK_CONTROL_MODE&&!DISPLAY_OWNERSHIP_MODE&&!IDCT_INTRA_MODE&&!REFRESH_50_MODE&&(total_cycles!=1239996))||
+                   // Legacy cycle budget uses stubbed intra completion and 59.94 Hz.
+                   // New intra/refresh variants require a paired baseline-log comparison.
                    ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
-                    (MEMORY_READ_LATENCY==1)&&!PLAYBACK_CONTROL_MODE&&!DISPLAY_OWNERSHIP_MODE&&(total_cycles!=1239997))||
+                    (MEMORY_READ_LATENCY==1)&&!PLAYBACK_CONTROL_MODE&&!DISPLAY_OWNERSHIP_MODE&&!IDCT_INTRA_MODE&&!REFRESH_50_MODE&&(total_cycles!=1239997))||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||

@@ -7,8 +7,10 @@
 // stream after B sideband completion until scratch persistence is complete, so
 // a following reference picture cannot outrun the shared P/B execution client.
 //============================================================================
-module mpeg2_h262_two_picture_probe
+module mpeg2_h262_two_picture_probe #(parameter EXTERNAL_IDCT=0)
 (
+    output wire [41:0] external_idct_requests,
+    input wire [49:0] external_idct_responses,
     input wire clk,input wire reset,input wire[7:0] stream_data,input wire stream_valid,output wire stream_ready,
     input wire phase1_supported,input wire[13:0] vertical_size,input wire[1:0] intra_dc_precision,input wire intra_vlc_format,
     input wire pipeline_block_done,input wire recon_block_complete,input wire p_persistence_complete,
@@ -193,7 +195,9 @@ end
 wire p_macroblock_type_seen_raw,p_forward_vector_valid_raw;wire signed[12:0] p_forward_vector_x_raw,p_forward_vector_y_raw;
 wire p_residual_required_raw,p_residual_success_raw,p_first_residual_sample_valid_raw,p_residual_sample_valid_raw;
 wire signed[15:0] p_first_residual_sample_value_raw,p_residual_sample_value_raw;wire[5:0] p_residual_sample_index_raw;
-mpeg2_h262_p_diagnostic_controller p_controller(
+mpeg2_h262_p_diagnostic_controller #(.EXTERNAL_IDCT(EXTERNAL_IDCT)) p_controller(
+ .external_idct_request(external_idct_requests[0+:21]),
+ .external_idct_response(external_idct_responses[0+:25]),
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_expected(p_picture_expected),
  .p_persistence_complete(p_persistence_complete),.p_row_persistence_complete(p_row_persistence_complete),
  .intra_dc_precision(intra_dc_precision),
@@ -210,7 +214,9 @@ mpeg2_h262_p_diagnostic_controller p_controller(
 wire b_candidate,b_seen,b_complete_now,b_parse_hold,b_replay_active,b_sideband_valid,b_first_valid,b_error;
 wire[5:0] b_sideband_index;wire signed[15:0] b_sideband_value,b_first_value;
 wire signed[8:0] b_motion_vector_x,b_motion_vector_y;
-mpeg2_h262_b_core_probe b_controller(
+mpeg2_h262_b_core_probe #(.EXTERNAL_IDCT(EXTERNAL_IDCT)) b_controller(
+ .external_idct_request(external_idct_requests[21+:21]),
+ .external_idct_response(external_idct_responses[25+:25]),
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.row_retired(p_row_persistence_complete),.b_candidate(b_candidate),.b_seen(b_seen),
  .b_complete_now(b_complete_now),.parse_hold(b_parse_hold),.replay_active(b_replay_active),.sideband_valid(b_sideband_valid),
  .sideband_index(b_sideband_index),.sideband_value(b_sideband_value),

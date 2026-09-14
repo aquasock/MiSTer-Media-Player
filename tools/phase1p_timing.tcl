@@ -109,6 +109,14 @@ foreach pattern {{*mp2_pcm_output:*|*} {*mp2_pcm_fifo:*|*} {*mp2_finished_sync*}
     if {$count == 0} {error "Gate three lost functional PCM state: $pattern"}
 }
 close $audio_audit
+# All three production clients must use one physical arithmetic engine.
+set shared_idct_audit [open "$output_dir/shared_idct_audit.rpt" w]
+set shared_index_regs [get_collection_size [get_registers -nowarn {*mpeg2_h262_shared_idct:shared_idct|mpeg2_h262_idct:engine|transform_index[*]}]]
+set all_index_regs [get_collection_size [get_registers -nowarn {*mpeg2_h262_idct:*|transform_index[*]}]]
+puts $shared_idct_audit "Shared IDCT index registers: $shared_index_regs"
+puts $shared_idct_audit "All IDCT index registers: $all_index_regs"
+close $shared_idct_audit
+if {$shared_index_regs != 6 || $all_index_regs != 6} {error "Expected exactly one shared IDCT engine"}
 set cdc_audit [open "$output_dir/configuration_cdc_audit.rpt" w]
 foreach instance {eof_generation_config eof_complete_config subtitle_command_config subtitle_ack_config player_ui_config seek_file_config seek_file_echo_config seek_probe_config playback_control_config playback_position_config playback_audio_config playback_hide_reset_config refresh_request_config refresh_applied_config color_mode_config display_color_config media_prefill_config media_fatal_config reader_error_config aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
     if {[string first "|" $instance] < 0} {

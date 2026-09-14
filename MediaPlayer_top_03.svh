@@ -47,22 +47,15 @@ mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 	.coeff_out_block_end         (mpeg2_new_iq_coeff_block_end)
 );
 
-mpeg2_h262_idct mpeg2_h262_idct
-(
-	.clk                         (clk_mpeg2),
-	.reset                       (reset_mpeg2),
-	.coeff_block_start           (mpeg2_new_iq_coeff_block_start),
-	.coeff_valid                 (mpeg2_new_iq_coeff_valid),
-	.coeff_index                 (mpeg2_new_iq_coeff_index),
-	.coeff_value                 (mpeg2_new_iq_coeff_value),
-	.coeff_block_end             (mpeg2_new_iq_coeff_block_end),
-	.block_complete              (mpeg2_new_idct_complete),
-	.idct_error                  (mpeg2_new_idct_error),
-	.sample_valid                (mpeg2_new_idct_sample_valid),
-	.sample_index                (mpeg2_new_idct_sample_index),
-	.sample_value                (mpeg2_new_idct_sample_value),
-	.first_luma_sample00         (),
-	.first_luma_sample77         ()
+wire [74:0] shared_idct_responses;
+assign shared_residual_idct_responses=shared_idct_responses[74:25];
+assign {mpeg2_new_idct_complete,mpeg2_new_idct_error,mpeg2_new_idct_sample_valid,
+ mpeg2_new_idct_sample_index,mpeg2_new_idct_sample_value}=shared_idct_responses[24:0];
+mpeg2_h262_shared_idct shared_idct(
+ .clk(clk_mpeg2),.reset(reset_mpeg2),
+ .requests({shared_residual_idct_requests,mpeg2_new_iq_coeff_block_start,
+  mpeg2_new_iq_coeff_valid,mpeg2_new_iq_coeff_index,mpeg2_new_iq_coeff_value,
+  mpeg2_new_iq_coeff_block_end}),.responses(shared_idct_responses)
 );
 
 mpeg2_h262_intra_recon mpeg2_h262_intra_recon

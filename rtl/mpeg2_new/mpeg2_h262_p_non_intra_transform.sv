@@ -26,8 +26,10 @@
 // issue/retire cadence.
 //============================================================================
 
-module mpeg2_h262_p_non_intra_transform
+module mpeg2_h262_p_non_intra_transform #(parameter EXTERNAL_IDCT=0)
 (
+    output wire [20:0] external_idct_request,
+    input wire [24:0] external_idct_response,
     input  wire        clk,
     input  wire        reset,
 
@@ -328,6 +330,13 @@ wire signed [15:0] idct_sample_value;
 wire signed [15:0] idct_first_sample00;
 wire signed [15:0] idct_first_sample77;
 
+assign external_idct_request={idct_coeff_block_start,idct_coeff_valid,
+ idct_coeff_index,idct_coeff_value,idct_coeff_block_end};
+generate if(EXTERNAL_IDCT) begin: shared_transform
+ assign {idct_block_complete,idct_error,idct_sample_valid,idct_sample_index,idct_sample_value}=external_idct_response;
+ assign idct_first_sample00=0;
+ assign idct_first_sample77=0;
+end else begin: local_transform
 mpeg2_h262_idct p_residual_idct
 (
     .clk                 (clk),
@@ -345,6 +354,7 @@ mpeg2_h262_idct p_residual_idct
     .first_luma_sample00 (idct_first_sample00),
     .first_luma_sample77 (idct_first_sample77)
 );
+end endgenerate
 
 reg [6:0] idct_sample_count;
 wire transform_busy = iq_active;

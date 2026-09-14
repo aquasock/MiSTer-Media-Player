@@ -402,4 +402,17 @@ always @(posedge clk) begin
     end
 end
 
+`ifdef H262_IDCT_TRACE
+// Simulation-only demand/latency evidence, excluded from production builds.
+integer trace_cycle=0,trace_begin=0;
+always @(posedge clk) begin
+ trace_cycle<=trace_cycle+1;
+ if(!reset && coeff_block_start) begin
+  trace_begin<=trace_cycle;
+  $display("IDCT_REQUEST %m cycle=%0d",trace_cycle);
+ end
+ if(!reset && sample_valid && sample_index==63)
+  $display("IDCT_FINISH %m cycle=%0d latency=%0d",trace_cycle,trace_cycle-trace_begin);
+end
+`endif
 endmodule

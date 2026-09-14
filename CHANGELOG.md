@@ -18,6 +18,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Share one unchanged IDCT arithmetic engine across intra/P/B clients, using
+  immediate uncontended capture and bounded per-client coefficient staging
+  for overlap, with reset cancellation and per-client completion/error routing.
+
 - Remove Audio test menu and hardware; connect movie PCM directly to outputs
   and reserve old status bits 1–3. Retain functional playback audio and filters.
 - Draw all three clocks in black on the progress bar, remove Paused/Seeking

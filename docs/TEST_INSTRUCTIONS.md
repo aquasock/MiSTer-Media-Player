@@ -1,3 +1,25 @@
+# Shared IDCT candidate
+
+Replace three production IDCT engines with one shared service while preserving
+uncontended output cycles, transform arithmetic and reset/seek cancellation.
+Independent coefficient staging handles overlapping requests. See
+[shared-IDCT design and validation](SHARED_IDCT.md) for evidence and limits.
+
+Test Fellow, Groove, Jiggler and Star Wars at 50/59.94 Hz: opening, dense motion,
+audio/video continuity, pause/resume, all seek sizes/directions and repeated
+seeks, reset/file replacement, subtitles/filters and EOF return to startup.
+Retain accepted 7eb5088 MEDIUM seed 61 as rollback. Differential transform,
+three-client timing, paired EOF/50 Hz seek and the real Pee Strike opening/seek
+replay pass. The latter confirms resumed audio/video without underrun or
+timestamp warning after the ten-second seek. Hardware acceptance and
+fitted resource/timing qualification of shared IDCT remain pending.
+
+The separate 7eb5088 HIGH-packing experiment completed: 36,245 placed ALMs
+(799 fewer), 31,461 estimated ALMs, 525 M10Ks and 75 DSPs. It fails setup at
+-0.021 ns; hold is +0.114 ns. Its RBF is kept separately under
+`results/hardware-test-7eb5088-packing-high/seed61` with a timing-failure marker.
+The normal MEDIUM setting and accepted RBF remain the baseline.
+
 # Diagnostic removal gate three and compact time bar
 
 **Hardware accepted:** the user reports all tests pass for the preferred

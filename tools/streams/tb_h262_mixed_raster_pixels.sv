@@ -1,6 +1,9 @@
 `timescale 1ns/1ps
 
 module tb_h262_mixed_raster_pixels #(
+    parameter integer SHARED_IDCT_MODE=0,
+    parameter integer IDCT_INTRA_MODE=0,
+    parameter integer REFRESH_50_MODE=0,
     parameter integer EOF_CONTROL_MODE=0,
     parameter integer MEMORY_READ_LATENCY=1,
     parameter integer PLAYBACK_CONTROL_MODE=0,
@@ -10,6 +13,9 @@ module tb_h262_mixed_raster_pixels #(
     parameter integer STALL_TRACE_CYCLES=0
 );
     tb_h262_live_raster_soak #(
+        .SHARED_IDCT_MODE(SHARED_IDCT_MODE),
+        .IDCT_INTRA_MODE(IDCT_INTRA_MODE),
+        .REFRESH_50_MODE(REFRESH_50_MODE),
         .MIXED_PIXEL_MODE(1),
         .EOF_CONTROL_MODE(EOF_CONTROL_MODE),
         .PLAYBACK_CONTROL_MODE(PLAYBACK_CONTROL_MODE),

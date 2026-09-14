@@ -6,8 +6,10 @@
 // streamed directly to the shared raster engine while the existing transform
 // pipeline handles sparse residual blocks. Legacy proof clients remain intact.
 //============================================================================
-module mpeg2_h262_p_diagnostic_controller
+module mpeg2_h262_p_diagnostic_controller #(parameter EXTERNAL_IDCT=0)
 (
+    output wire [20:0] external_idct_request,
+    input wire [24:0] external_idct_response,
  input wire clk,input wire reset,input wire [7:0] stream_data,input wire stream_valid,
  input wire p_picture_expected,input wire p_persistence_complete,
  input wire p_row_persistence_complete,
@@ -401,8 +403,9 @@ mpeg2_h262_p_wide_motion_syntax_probe wide_general_probe
  .probe_error_detail(wide_error_detail)
 );
 
-mpeg2_h262_p_residual_probe residual_probe
+mpeg2_h262_p_residual_probe #(.EXTERNAL_IDCT(EXTERNAL_IDCT)) residual_probe
 (
+    .external_idct_request(external_idct_request),.external_idct_response(external_idct_response),
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
  .p_picture_expected(p_picture_expected),
 
