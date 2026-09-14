@@ -1,5 +1,17 @@
 # Row-buffer RAM conversion candidate
 
+Source **dc1dfc2, seed 52** is the preferred candidate. All three seeds pass
+all four timing corners and all 153 CDC checks. Seed 52 has worst setup
++0.437 ns and hold +0.089 ns. Its RBF is
+`results/hardware-test-dc1dfc2/seed52/MediaPlayer_20260914.rbf`.
+SHA-256: `7eb9a5bebc66423885d5865a40dc55ab24f28d3ff6f4743f05c3ebd394358ce6`.
+Hardware acceptance is pending.
+
+Seed 52 uses 37,790 actually placed ALMs (90.2%), with Quartus estimating
+31,925 ALMs needed (76.2%). These are different metrics. Against accepted
+bcddb20 seed 61, actual placement drops by 3,355 ALMs. RAM rises from 482 to
+484 of 553 blocks; DSP usage stays at 69. Both row arrays are confirmed M10K.
+
 Current source restores the two 512-byte P/B parser row buffers to M10K RAM,
 using the prefetch and rollover handling from historical commit 047f5b2.
 The previously accepted bcddb20 seed 61 below remains the rollback; it does
@@ -20,8 +32,8 @@ ordering as well; parser equivalence alone does
 not model vendor RAM inference or physical timing. In Quartus confirm both
 row arrays infer RAM, compare actual placed ALMs separately from the ALMs-needed
 estimate, and require all timing corners plus the 153-register CDC audit.
-Expected memory cost is two M10K blocks; historical ALM savings are not a
-prediction of the current placement result.
+Measured memory cost is two additional M10K blocks. See the candidate figures
+above for the current placement result.
 
 On hardware repeat short/long forward and backward seeks, paused seeks/resume,
 new-file load and EOF, checking clean pictures and synchronized audio. The
