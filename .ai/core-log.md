@@ -1,3 +1,32 @@
+## 69 COMMIT Unreleased b00920a 2026-09-14T07:58:54-07:00
+
+#### Coming From:
+
+Unreleased b00920a
+
+#### Purpose:
+
+Record successful playback-control tests and explain Groove's unknown duration.
+
+#### Outcome:
+
+The user confirms pause/resume, forward/backward seeking and ten-second overlay hiding including while paused all work properly. Groove.mpg on the GIT HDD shows dashes for Total and Remaining. Exact 64 KiB head and 4 MiB tail replay through the current duration-window RTL reproduces the fallback: head origin 48754, healthy matching stream 224, no parser or syntax error, complete final packet boundary, but unqualified_tail remains set because a picture after the maximum observed presentation timestamp has no independently associated PTS. A later timestamped reordered picture does not exceed that maximum and cannot clear this conservative guard. This is expected behavior of the current probe, not evidence that the file cannot play; ffprobe obtains a duration using its broader stream analysis. Evidence is retained under results/ui-overlay/groove-duration. No RTL, RBF or media changes were made; overall acceptance remains pending while testing continues.
+
+#### Next Steps:
+
+Continue user hardware testing and retain the conservative unknown-duration behavior unless a separate improvement to timestamp association and endpoint qualification is requested.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 68 COMMIT Unreleased b00920a 2026-09-14T07:53:13-07:00
 
 #### Coming From:
@@ -1287,35 +1316,6 @@ Finish all three builds and timing/CDC audits, deliver a qualified RBF, and comp
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 29 COMMIT Unreleased 17743f8 2026-09-13T17:24:06-07:00
-
-#### Coming From:
-
-Unreleased 62f4741
-
-#### Purpose:
-
-Deliver timing-qualified keyboard pause and seek candidates from the completed three-seed build.
-
-#### Outcome:
-
-All three clean 17743f8 seeds compile and pass the expanded 135-register CDC audit. Seed 52 passes all timing categories at all four corners with minimum setup +0.065 ns, hold +0.116 ns, recovery +2.865 ns, removal +0.260 ns and pulse width +0.925 ns; it is the preferred candidate and uses 40233 ALMs, 54615 registers, 480 RAM blocks, 69 DSPs and three PLLs. Its RBF SHA-256 is be8e0a26c4b3df7d12eb35db4a83067457ae8111551ec9310201cc509fe07607. Seed 61 also passes, with setup +0.005 ns, hold +0.108 ns, recovery +2.611 ns, removal +0.217 ns and pulse width +0.925 ns, using 40530 ALMs and 54621 registers. Seed 87 uses 40413 ALMs and 54622 registers but fails setup at -0.481 ns from ASCAL vertical position to output VS; its other timing categories pass. Total compile plus timing durations are 1161, 1111 and 1169 seconds for seeds 52, 61 and 87. Relative to compact source 0b6eb0e, synthesis adds 906 combinational ALUTs and 534 registers with unchanged memory bits, DSPs and PLLs; larger fitted ALM differences include placement effects. Evidence is under results/build-17743f8-20260913-170250 and hash-verified RBFs plus explicit timing status and instructions are under results/hardware-test-17743f8. The extended EOF seek oracle lands on the last frame with zero pixel mismatches and explicitly completes its paused-display check. Seven-minute numbered raw/MPG clips are under results/playback-control-tests. No new core has been deployed or hardware accepted; 0b6eb0e seed 87 remains the accepted baseline.
-
-#### Next Steps:
-
-Have the user load the preferred seed 52 and verify Space pause/resume, all three Left/Right seek sizes, paused seeking, EOF clamps, repeated commands, OSD isolation, audio continuity and both output refresh rates using the documented vsync_adjust=1 override; record landing times and reconstruction latency.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
