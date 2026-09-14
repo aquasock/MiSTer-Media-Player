@@ -4,10 +4,12 @@ import argparse, os, subprocess, json, re, hashlib
 from pathlib import Path
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True)
 p.add_argument('--quartus',type=Path,default=Path('/home/vash/intelFPGA_lite/17.0/quartus/bin'))
-p.add_argument('--top',choices=['flac_predict_mac','flac_subframe'],default='flac_predict_mac')
+p.add_argument('--top',choices=['flac_predict_mac','flac_subframe','flac_stream_decoder'],default='flac_predict_mac')
 a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 root=Path(__file__).resolve().parents[1];source=root/f'rtl/audio/flac/{a.top}.sv'
-source_assignments='\n'.join(f'set_global_assignment -name SYSTEMVERILOG_FILE \"{path}\"' for path in sorted({source,root/'rtl/audio/flac/flac_predict_mac.sv'}))
+dependencies={source,root/'rtl/audio/flac/flac_predict_mac.sv'}
+if a.top=='flac_stream_decoder':dependencies.add(root/'rtl/audio/flac/flac_subframe.sv')
+source_assignments='\n'.join(f'set_global_assignment -name SYSTEMVERILOG_FILE \"{path}\"' for path in sorted(dependencies))
 (out/'predict.qpf').write_text('PROJECT_REVISION = "predict"\n')
 (out/'predict.qsf').write_text(f'''set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name DEVICE 5CSEBA6U23I7
@@ -25,6 +27,7 @@ with (out/'compile.log').open('w') as f:
  subprocess.run([str(a.quartus/'quartus_sh'),'--flow','compile','predict'],cwd=out,env=env,stdout=f,stderr=subprocess.STDOUT,check=True)
 fit=(out/'predict.fit.rpt').read_text(errors='replace');summary=(out/'predict.fit.summary').read_text()
 result={'scope':'isolated primitive, virtual I/O; not a whole-core resource/timing result','top':a.top,'source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),'mac_sha256':hashlib.sha256((root/'rtl/audio/flac/flac_predict_mac.sv').read_bytes()).hexdigest()}
+result['sources_sha256']={str(path.relative_to(root)):hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(dependencies)}
 for label,key in [('Logic utilization (in ALMs)','estimated_ALMs'),('Total registers','registers'),('Total RAM Blocks','M10Ks'),('Total DSP Blocks','DSPs')]:
  result[key]=int(re.search(re.escape(label)+r'\s*:\s*([\d,]+)',summary).group(1).replace(',',''))
 result['placed_ALMs']=int(re.search(r'\[A\] ALMs used in final placement[^;]*;\s*([\d,]+)',fit).group(1).replace(',',''))

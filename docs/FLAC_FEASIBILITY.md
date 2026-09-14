@@ -185,3 +185,46 @@ checked. The RTL receives real subframe bits; headers, CRC validation and
 stereo recombination are still checked by the offline oracle. No production
 file support is implied. Strict Verilator RTL lint passes with intentional
 unconnected status-port warnings excluded.
+
+## Complete native framing prototype
+
+`flac_stream_decoder` now performs native metadata and frame parsing around
+`flac_subframe`, including header CRC-8, frame CRC-16, canonical frame/sample
+numbers, contiguous positioning and total-length checks. Coded samples remain
+provisional until frame commit. `flac_stereo` reconstructs all four stereo
+assignments with signed overflow rejection. The ownership interface is defined
+in [FLAC_FRAME_CONTRACT.md](FLAC_FRAME_CONTRACT.md).
+
+The complete-file suite compares every admitted left/right sample directly
+with the original PCM from all 55 corpus files. It additionally constructs
+fixed/variable frames for each stereo mode with explicit/inherited 44.1 kHz
+rates, signed extremes and unknown totals. Stalls and midstream reset/replay
+exercise the byte, sample and frame ownership interfaces. Bad CRCs, bad
+numbering, unsupported profiles, truncated input and store faults are rejected.
+
+Reproduce with:
+
+```sh
+python3 tools/verify_flac_stream.py --output results/flac/stream --corpus results/flac/corpus
+python3 tools/synth_flac_predict.py --output results/flac/stream-fit --top flac_stream_decoder
+```
+
+The modeled frame store is testbench memory, not synthesized on-chip storage.
+No DDR adapter or native HDMI output is implied by these complete-file tests.
+The decoder does not check STREAMINFO MD5. Production movie RTL and the
+accepted b639ccc hardware candidate remain unchanged.
+
+The completed suite passes **73 cases**: 55 full corpus files, eight
+constructed stereo/numbering streams and ten fault cases. The 63 valid
+streams compare **3,890,965 stereo sample pairs** (7,781,930 individual
+samples), excluding replayed prefixes. Every valid stream exercises reset
+and replay. No bad first frame is committed after CRC or store failure;
+a damaged final frame preserves only the earlier valid prefix.
+
+The isolated framing/subframe/MAC fit uses **1,746 placed ALMs**, 1,753
+estimated ALMs, 859 registers, **two M10Ks and one DSP**. These figures include
+the previous subframe and MAC resources; do not add them again. The separate
+stereo combinational unit, DDR transport, PCM buffering, clock handoff and
+HDMI control are outside this fit. Virtual I/O fitting is area evidence, not
+integrated timing closure. RTL lint is clean with the intentional unconnected
+MAC status port excluded.
