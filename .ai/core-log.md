@@ -1,3 +1,32 @@
+## 83 COMMIT Unreleased e9f9bfb 2026-09-14T11:40:39-07:00
+
+#### Coming From:
+
+Unreleased 6688db2
+
+#### Purpose:
+
+Record hardware acceptance of the EOF core and plan safe production diagnostic removal.
+
+#### Outcome:
+
+The user reports the latest EOF core passes, accepting b05b76f seed 87's startup return, session clearing and layout as the new rollback baseline. Its package metadata is marked accepted. Source e9f9bfb adds a proposed removal plan only; no RTL is changed and no new builds start. The inventory identifies the cadence snapshot/overlay, 256-bit telemetry mailbox, reporting-only counters and CDC, profiler-only seconds clock and Audio test generator/transport/menu. Seek and EOF consume scheduler debug bits 26 and 0, so named functional outputs must replace them before debug cleanup. Decoder modules named probe/diagnostic, fatal checks, timeouts, byte positions, generations, FIFO flow control, PCM finished synchronization and the 90 kHz timebase must remain. Proposed implementation is two reviewable commits followed by one three-seed batch, with pixel/PCM/control/subtitle regressions and post-fit proof of removal. Simulation tooling remains; the unbuilt audio warning tolerance becomes unnecessary in production when its reporting consumer is removed. Baseline is 37410 actual ALMs, 527 M10Ks and 75 DSPs; savings must be measured rather than promised.
+
+#### Next Steps:
+
+Present the plan for implementation approval, then remove reporting hardware while preserving functional safety and qualify seeds 52, 61 and 87 against accepted b05b76f.
+
+#### Files Modified:
+
+- docs/DIAGNOSTIC_REMOVAL_PLAN.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 82 COMMIT Unreleased 6688db2 2026-09-14T11:22:33-07:00
 
 #### Coming From:
@@ -1315,35 +1344,6 @@ Finish the running A/V regressions and compile the next source candidate using t
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 43 COMMIT Unreleased a229a01 2026-09-14T01:47:05-07:00
-
-#### Coming From:
-
-Unreleased a229a01
-
-#### Purpose:
-
-Stop the final remaining build at the user's request.
-
-#### Outcome:
-
-Terminated the verified a229a01 build process group; no Quartus jobs remain. Seed 52 had progressed from fitting to timing analysis before cancellation, with compilation completed in 1638.2 seconds; its results are preserved but timing qualification is incomplete. Completed seeds 61 and 87 and their handoff artifacts remain intact. Seed 87 remains the recommended timing-qualified RBF at results/hardware-test-a229a01/seed87/MediaPlayer_20260914.rbf, with minimum setup slack +0.104 ns and all 147 CDC checks passing. The local batch status and handoff README record cancellation, superseding entry 42's instruction to finish seed 52. Hardware acceptance remains pending.
-
-#### Next Steps:
-
-Await the user's seed 87 hardware results. Do not start further builds unless requested.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
