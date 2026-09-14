@@ -19,6 +19,18 @@ assert d['audio_ram_bytes']==123 and d['pcm_write_domain_used']==4096
 assert d['ingress_reservoir_min']==42 and d['error_flags']==4
 assert d['entry_errors']==0 and d['reason']=='error_after_seek_entry'
 assert im.getpixel((364,280))==(18,52,86) and im.getpixel((192,336))==(18,52,86)
+# Vendor used-word counters need not encode zero when full; the full flag wins.
+full_words=d['words'].copy();full_words[9]|=4095;full_words[-1]=0
+for w in full_words[:-1]:full_words[-1]^=w
+full=im.copy()
+for row in (9,13):
+ word=full_words[row]
+ bits=[1,0,1,0]+[(row>>i)&1 for i in range(5,-1,-1)]+[(word>>i)&1 for i in range(31,-1,-1)]+[word.bit_count()&1]
+ for col,bit in enumerate(bits):
+  for y in range(280+row*4,284+row*4):
+   for x in range(192+col*4,196+col*4):full.putpixel((x,y),(255,255,255) if bit else (0,0,0))
+full.save('/tmp/seek-diagnostic-full.png')
+assert decode('/tmp/seek-diagnostic-full.png')['seek_diagnostics']['pcm_write_domain_used']==4096
 for y in (293,294):
  for x in (233,234):
   im.putpixel((x,y),(255,255,255) if sum(im.getpixel((x,y)))<384 else (0,0,0))

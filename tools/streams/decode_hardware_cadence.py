@@ -337,7 +337,7 @@ def decode_seek(path: Path | str):
         frame_rate_code=(words[6] >> 7) & 15, temporal_reference=(words[6] >> 11) & 1023,
         picture_type=(words[6] >> 21) & 7, display_pts_valid=bool(words[6] & (1 << 24)),
         video_ram_words=words[8] >> 11, audio_ram_bytes=words[8] & 2047,
-        pcm_write_domain_used=words[9] & 8191, ingress_reservoir_min=(words[9] >> 13) & 65535,
+        pcm_write_domain_used=4096 if words[9] & 4096 else words[9] & 4095, ingress_reservoir_min=(words[9] >> 13) & 65535,
         scheduler=words[10], cycles_since_seek=words[11], seek_count=words[12] >> 16,
         entry_errors=words[12] & 65535, checksum=words[-1], words=words)
 

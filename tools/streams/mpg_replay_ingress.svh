@@ -1,7 +1,7 @@
 // Real PS demux, codec queues, MP2 decoder/sink and video PTS scheduling.
 // Host and PCM CDC queues are bounded behavioral models, not vendor CDC proof.
 reg replay_sys_clk=0;always #25 replay_sys_clk=~replay_sys_clk;
-reg replay_audio_clk=0;always #12.20703125 replay_audio_clk=~replay_audio_clk;
+reg replay_audio_clk=0;always #20.345052083333 replay_audio_clk=~replay_audio_clk;
 reg replay_start=0,replay_ack=0,replay_wr=0;
 reg [12:0] replay_addr=0;reg [15:0] replay_data=0;
 wire [31:0] replay_lba;wire [5:0] replay_blocks;wire replay_rd;
@@ -113,12 +113,23 @@ mpeg2_h262_picture_timestamp replay_timestamp(.clk(clk),.reset(reset),.metadata_
  .candidate_scratch_bank(replay_candidate_bank),.candidate_frame_bank(replay_candidate_frame),
  .display_pts(replay_display_pts),.display_pts_valid(replay_display_valid),
  .candidate_pts(replay_candidate_pts),.candidate_pts_valid(replay_candidate_pts_valid));
-// Exact 90 kHz average at 60 MHz; audio-origin CDC modeled ideally here.
-reg [26:0] replay_tick_acc=0;wire replay_tick=replay_tick_acc>=59910000;
-always @(posedge clk)if(reset)replay_tick_acc<=0;
- else replay_tick_acc<=replay_tick?replay_tick_acc+90000-60000000:replay_tick_acc+90000;
+// Production audio-derived STC pulse and its decoder-domain synchronizer.
+wire replay_tick_audio;
+reg [2:0] replay_tick_sync=0;
+wire replay_tick=replay_tick_sync[2:1]==2'b01;
+mpeg2_h262_system_time_clock replay_stc(.clk(replay_audio_clk),.reset(reset),
+ .run(!replay_seek_audio),.load_valid(1'b0),.load_value(33'd0),.tick_90k(replay_tick_audio));
+always @(posedge clk) if(reset)replay_tick_sync<=0;
+ else replay_tick_sync<={replay_tick_sync[1:0],replay_tick_audio};
 mpeg2_h262_pts_presentation_timeline #(.ENABLE_PLAYBACK_CONTROL(1)) replay_timeline(
  .clk(clk),.reset(reset),.tick_90k(replay_tick),.hold_time(seek_override),
  .rebase(playback_test.rebase),.rebase_pts(replay_target),.metadata_valid(rmv),.metadata_pts(rmp-33'd9000),
  .candidate_valid(replay_candidate_pts_valid),.candidate_pts(replay_candidate_pts),
  .candidate_active(replay_timestamp_active),.candidate_due(replay_timestamp_due));
+
+reg [1:0] replay_audio_errors_q=0;
+always @(posedge clk)if(!reset)begin
+ replay_audio_errors_q<={replay_terr,replay_under};
+ if(replay_audio_errors_q!={replay_terr,replay_under})
+  $display("MPG_REPLAY_AUDIO_ERROR cycle=%0d seeking=%0d underrun=%0d timestamp=%0d video_ram=%0d audio_ram=%0d pcm=%0d target=%0d",total_cycles,seek_override,replay_under,replay_terr,rv_level,ra_level,replay_pcm_wr-replay_pcm_rd,replay_target);
+end

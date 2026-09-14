@@ -37,7 +37,7 @@ def generate(dest):
     # These legacy prints repeat every stalled cycle and can produce gigabytes.
     s = re.sub(r'\$display\("PIC_FIRST_SIDEBAND.*?;\s*\$fflush;', '', s, flags=re.S)
     def bounded_display(match):
-        return match.group(0) if any(tag in match.group(0) for tag in ('PROGRESS', 'SEEK BEGIN', 'SEEK END', 'MPG_REPLAY_BOUNDARY_PASS')) else 'begin end'
+        return match.group(0) if any(tag in match.group(0) for tag in ('PROGRESS', 'SEEK BEGIN', 'SEEK END', 'MPG_REPLAY')) else 'begin end'
     s = re.sub(r'\$display\(.*?\);', bounded_display, s, flags=re.S)
     path = dest/'tb_mpg_seek.sv'
     path.write_text(s)
@@ -56,16 +56,22 @@ def main():
     ap.add_argument('--no-skip',action='store_true')
     args=ap.parse_args();dest=args.output.resolve();dest.mkdir(parents=True,exist_ok=True)
     bench=generate(dest);binary=dest/'obj/Vtb_h262_live_raster_soak'
-    if not args.reuse:
-        rtl=re.findall(r'SYSTEMVERILOG_FILE (rtl/mpeg2_new/\S+)',(ROOT/'files.qip').read_text())
-        rtl += ['rtl/audio/'+x+'.sv' for x in ('mp2_decoder','mp2_synthesis','mp2_pcm_output','av_stream_fifo')]
-        rtl += ['rtl/media_playback_control.sv','rtl/media_file_reader.sv','rtl/video_config_cdc.sv']
+    rtl=re.findall(r'SYSTEMVERILOG_FILE (rtl/mpeg2_new/\S+)',(ROOT/'files.qip').read_text())
+    rtl += ['rtl/audio/'+x+'.sv' for x in ('mp2_decoder','mp2_synthesis','mp2_pcm_output','av_stream_fifo')]
+    rtl += ['rtl/media_playback_control.sv','rtl/media_file_reader.sv','rtl/video_config_cdc.sv']
+    fingerprint=hashlib.sha256(bench.read_bytes()+b''.join((ROOT/p).read_bytes() for p in rtl)).hexdigest()
+    manifest=dest/'obj/replay-build.json'
+    if args.reuse:
+        if not manifest.exists() or json.loads(manifest.read_text())['fingerprint']!=fingerprint:
+            raise ValueError('replay binary does not match current harness/RTL; compile without --reuse')
+    else:
         with (dest/'compile.log').open('w') as log:
             subprocess.run(['verilator','--binary','--timing','-j','8','-Wno-fatal',
                 '--top-module','tb_h262_live_raster_soak','--Mdir',str(dest/'obj'),
                 '-GPLAYBACK_CONTROL_MODE=1','-GSWAP_WINDOW_CYCLES=1001000',
                 '-GFREEZE_TRACE_CYCLES=0','-GMAX_SIM_CYCLES=1200000000',
                 '-DH262_SOAK_MAX_STREAM_BYTES=16777216',str(bench),*rtl],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,check=True)
+        manifest.write_text(json.dumps({'fingerprint':fingerprint})+'\n')
     if args.compile_only:return
     data=args.input.read_bytes()
     if not 0<len(data)<=16777216:raise ValueError('supply a bounded MPG prefix of at most 16 MiB')
