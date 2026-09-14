@@ -5,6 +5,7 @@ import argparse,json,re,hashlib,shutil,datetime
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('build',type=Path);p.add_argument('--cdc-registers',type=int,default=171)
 p.add_argument('--baseline-alms',type=int,default=35774);p.add_argument('--baseline-ram',type=int,default=508)
+p.add_argument('--scope',default='See the source-specific test instructions for feature scope and hardware acceptance.')
 a=p.parse_args();base=a.build.resolve();state=json.loads((base/'status.json').read_text());summary={}
 for seed in (52,61,87):
  root=base/f'seed{seed}';info=state['seeds'].get(str(seed),{})
@@ -47,7 +48,7 @@ for seed in (52,61,87):
  item={'source':state['source'],'seed':seed,'corners':corners,'minimum_slack_ns':minima,
  'scene_enable_audit_passed':enable_ok,'cdc_registers':len(lines),'cdc_audit_passed':cdc,'timing_passed':passed,'resource_budget_passed':budget,
  'hardware_accepted':False,'rbf_sha256':info['rbf_sha256'],'resources':resources,
- 'scope':'Shared post-filter player overlay and bounded duration preflight; future subtitle provider only, no subtitle playback or HDMI mode changes.'}
+ 'scope':a.scope}
  summary[str(seed)]=item
  out=base.parent/f'hardware-test-{state["source"][:7]}'/f'seed{seed}';out.mkdir(parents=True,exist_ok=True)
  date=datetime.datetime.fromtimestamp(info['started']).strftime('%Y%m%d');rbf=out/f'MediaPlayer_{date}.rbf'

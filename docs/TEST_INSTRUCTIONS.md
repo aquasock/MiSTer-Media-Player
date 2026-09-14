@@ -1,4 +1,4 @@
-# Next candidate: manually loaded SRT subtitles
+# Timing-qualified ec56250 seed 87: manually loaded SRT subtitles
 
 Open a movie, then choose **Load subtitles** and select its SRT. Subtitles
 appear above the relocated Paused/Seeking text, independently of controls
@@ -9,8 +9,21 @@ reads. Check 480p, 720p and 1080p, OSD access and filters.
 
 Run `python3 tools/make_subtitle_test.py` for a one-hour timing fixture that
 works alongside any movie. See [SRT coverage and limits](SUBTITLES.md).
-Compilation/timing and hardware acceptance are pending. Retain ffafc79 seed 87
-below as the previous timing-qualified candidate.
+All three seeds pass all four corners, 171 CDC registers and scene-enable
+checks. Seed 87 has setup +0.338 ns and hold +0.110 ns; seeds 52/61 have setup
++0.116/+0.136 ns and hold +0.115/+0.108 ns. Hardware acceptance is pending.
+
+Preferred RBF: `results/hardware-test-ec56250/seed87/MediaPlayer_20260914.rbf`.
+SHA-256: `765fc4eea7ec7e5a4d2701a3ac470d0f6e4dacadfaef4acd5f771b517bb59752`.
+Seed 87 uses 38,773 actual ALMs, 527/553 M10Ks and 75/112 DSPs, leaving 3,137
+ALMs and 26 M10Ks. Seed 52 also passes and uses 37,536 actual ALMs, leaving
+4,374; its lower physical usage reflects fitter packing, not less functionality.
+Estimated ALMs are 33,032/32,933/32,936 for seeds 52/61/87, compared with
+31,987 for ffafc79 seed 87. Thus the low placed total of seed 52 is not evidence
+that adding subtitles removed logic. All subtitle seeds add seven M10Ks and
+six DSPs. Fitter confirms four M10Ks for reader staging and two for line/cue
+storage; the overlay hierarchy rises from 15 to 16 M10Ks. Retain ffafc79 seed
+87 below as rollback.
 
 # Timing-qualified ffafc79 seed 87: lower progress strip and clocks without labels
 
