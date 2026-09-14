@@ -6,15 +6,15 @@ Unreleased a229a01
 
 #### Purpose:
 
-Implement a playback-built seek index for fast backward MPG seeking in the next build.
+Implement direct timestamp-guided file seeking in both directions for the next build.
 
 #### Outcome:
 
-The user reports no freeze so far with fixed seed 87 and authorizes indexed seeking, accepting approximate initial GOP landing. The implementation will associate video sequence headers and first I-picture timestamps with absolute Program Stream pack and sequence byte positions, retain a bounded inferred-RAM index across decoder restarts, and restart at a preceding indexed point. A compacting table will retain coverage of long files as it fills. The existing reader offset and DDR-drain handshake will be reused, with explicit lookup completion before releasing the restarted session and original movie timestamp origin preserved for audio and video. Startup video before the selected sequence header will be discarded. Unindexed targets and elementary streams retain the existing reconstruction fallback. No custom Main or offline index is required.
+The user reports no freeze so far with fixed seed 87 and authorizes approximate GOP landing. The revised user-approved plan supersedes the playback-only index proposal: probe arbitrary file positions without decoding audio or video, locate a Program Stream pack and sequence header with a timestamped I-picture, and refine the byte bounds toward the requested time. Forward and backward MPG seeks will share this bounded search and restart path, including previously unseen content. The existing offset reader and DDR-drain handshake will be reused, with configuration acknowledged before restarting clients, original movie timestamp origin retained, and video before the chosen sequence header discarded. Unsupported elementary streams and unusable timestamps retain reconstruction fallback. No custom Main or offline index is required.
 
 #### Next Steps:
 
-Implement and test index collection, compaction, lookup, nonzero reader restart, timestamp continuity, paused and repeated seeking, new-file invalidation and actual MPG reconstruction. Commit validated source and build the next hardware candidate; report timing, resource usage and remaining limitations before hardware acceptance.
+Implement and test bidirectional probing, bounded search and EOF fallback, nonzero reader restart, timestamp continuity, paused and repeated seeking, new-file invalidation and actual MPG reconstruction. Commit validated source and build the next hardware candidate; report timing, resources and limitations before hardware acceptance.
 
 #### Files Modified:
 
