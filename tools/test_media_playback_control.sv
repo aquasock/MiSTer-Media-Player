@@ -64,6 +64,7 @@ initial begin
    if(!seek_done||stc!=90000+elapsed_q/4) $fatal(1,"seek completion/rebase");
    seek_active=0;swap_window=0;repeat(3) @(negedge clk);
    saved=stc;repeat(30) @(negedge clk);
+   if(seek_elapsed_90k!=elapsed_q/4) $fatal(1,"landing timestamp was not retained after seek acknowledgement");
    if(stc!=saved||scheduler_window) $fatal(1,"paused seek resumed");
   end
  end
