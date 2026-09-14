@@ -1,4 +1,4 @@
-## 103 COMMIT Unreleased ??? 2026-09-14T15:29:03-07:00
+## 103 COMMIT Unreleased bfdafe2 2026-09-14T15:29:03-07:00
 
 #### Coming From:
 
@@ -10,15 +10,37 @@ Connect CRC-admitted FLAC frames to bounded DDR ownership and develop native out
 
 #### Outcome:
 
-The user authorizes continuing the FLAC path. Implement two provisional/committed DDR frame banks with backpressure, stereo reading, shared PCM tokens, EOF drain and cancellation that preserves in-flight bus transactions. Test complete files against original PCM through delayed memory responses and output stalls, including faults and cancellation. Develop the native 44.1 kHz clock and HDMI control path against the existing stock Main interface, keeping the movie clock and future WAV PCM boundary intact. Only build a playable candidate once memory and output transitions are proved and connected; do not claim isolated simulation as hardware support.
+Commit bfdafe2 connects the FLAC parser to two external provisional/committed DDR frame banks and exact stereo PCM tokens, using 1 MiB within the inactive video FIFO region. Cancellation retains held requests and drains old responses before reuse. All 55 complete corpus files pass through modeled DDR to original PCM; the 63-case suite also covers five cancellation phases, zero-latency reads, shared-sink EOF/position and CRC failure. Native I2S tests verify 1024 exact stereo samples, 512-clock cadence, pause and last-bit drain. Connected HDMI control tests prove exclusive register access, read-modify-write/readback of 44.1/48/inherited 96 kHz output settings, simulated Main overwrite/reapplication and fault recovery. A clock-stretch timeout now generates STOP after recovery rather than leaving ownership stuck. Native PLL and vendor selector fit after using Cyclone V PLL inputs 2/3. Isolated fits use 1953 placed ALMs, two M10Ks and one DSP for decoder/store/stereo; 225 ALMs for connected HDMI control; and 78 ALMs for PCM/I2S, totaling 2256 before production integration. The clock probe uses two PLLs including the existing movie PLL. Strict lint and five native component/connected tests pass. Evidence is results/flac/ddr, results/flac/native-audio and their documented isolated fit directories. No files.qip or production top-level changes, full-core build or playable FLAC RBF are claimed; accepted b639ccc seed 52 remains unchanged.
 
 #### Next Steps:
 
-Measure the connected decoder/store cost and prove native output configuration and clean movie/music transitions before hardware handoff. Preserve the accepted b639ccc seed 52 rollback and existing 48 kHz MP2 playback.
+Wire mounted-file content selection, shared DDR ownership and PCM CDC into production; connect real drain/clock acknowledgements and the native clock/output/filter path. Then build a hardware candidate to qualify actual HPS I2C busy behavior, native HDMI clock/rate and clean movie/music transitions. Preserve existing 48 kHz MP2 and inherited platform 96 kHz output; retain the format-independent PCM boundary for future 44.1 kHz WAV. Do not equate isolated fits or simulated HPS traffic with whole-core timing or hardware acceptance.
 
 #### Files Modified:
 
-None.
+- docs/FLAC_FEASIBILITY.md
+- docs/FLAC_OUTPUT_INTEGRATION.md
+- docs/FLAC_PLAN.md
+- rtl/audio/flac/flac_ddr_decoder.sv
+- rtl/audio/flac/flac_frame_store.sv
+- rtl/audio/media_pcm_i2s.sv
+- rtl/platform/hdmi_audio_config.sv
+- rtl/platform/hdmi_i2c_write_watch.sv
+- rtl/platform/i2c_register_master.sv
+- rtl/platform/media_audio_clocks.sv
+- rtl/platform/media_audio_rate_control.sv
+- rtl/platform/media_hdmi_audio_control.sv
+- tools/i2c_register_model.svh
+- tools/synth_flac_clock.py
+- tools/synth_flac_predict.py
+- tools/test_flac_ddr.sv
+- tools/test_hdmi_audio_config.sv
+- tools/test_hdmi_i2c_write_watch.sv
+- tools/test_media_audio_rate_control.sv
+- tools/test_media_hdmi_audio_control.sv
+- tools/test_media_pcm_i2s.sv
+- tools/verify_flac_ddr.py
+- tools/verify_native_audio.py
 
 #### Status:
 
