@@ -1,3 +1,32 @@
+## 39 COMMIT Unreleased 6eb49e1 2026-09-14T01:07:15-07:00
+
+#### Coming From:
+
+Unreleased 6eb49e1
+
+#### Purpose:
+
+Record the first detailed hardware seek fault and the display-bank ownership mechanism consistent with it.
+
+#### Outcome:
+
+The user confirms 01 - Pee Strike.mpg is frozen after one seek. The checksum-valid screenshot under results/telemetry-20260914-010332 contains both legacy and persistent seek telemetry. The first observed error is 0x0004, specifically the prediction/reconstruction aggregate bit, with prediction source three and detail nine: the B-picture raster engine timeout. The syntax/publication-chain probe source and P probe source are zero. Entry errors were zero; capture occurred 67432806 decoder cycles, approximately 1.124 seconds, after seek entry, while seeking remained active with audio bypass enabled. Elapsed time was 18.5185 seconds and target 28.4517667 seconds. Video RAM held 1048576 unread words, compressed audio and PCM queues were empty, and audio/transport error flags were clear. Inspection found that forward seek resets the display framebuffer while preserving the DDR arbiter, whose last accepted display-bank ownership remains valid until reset or another display read. A focused simulation of the unchanged arbiter reproduces indefinite scratch-writer blocking after display reads stop and drain, and releases writes when another display bank is accepted. This is a concrete mechanism consistent with the B timeout, not yet an end-to-end reproduction of this hardware occurrence; the snapshot does not expose writer wait or retained reader-bank state and seed 52 is not timing qualified. The shared-DDR combined replay also completed its 2.2-to-12.2-second seek without errors, but lacks display-reader ownership, explaining why that comparison does not test this mechanism. The capture, focused harness, simulation log and diagnosis are preserved together. No runtime source change or additional build was started.
+
+#### Next Steps:
+
+Propose retiring display-bank protection during seek only after outstanding display reads have drained, preserving normal and paused-frame protection. Validate actual seek/display ownership transitions with a regression before any future build; respect the user's instruction not to start more builds.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 38 COMMIT Unreleased 6eb49e1 2026-09-14T01:01:15-07:00
 
 #### Coming From:
@@ -1310,78 +1339,6 @@ Run clean builds with seeds 52, 61 and 87 from this committed source, using seed
 - rtl/mpeg2_new/mpeg2_h262_reference_response_handoff.sv
 - files.qip
 - tools/streams/tb_h262_reference_response_handoff.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 998 COMMIT Unreleased 9fd1829 2026-09-13T07:17:37-07:00
-
-#### Coming From:
-
-Unreleased 9233f07
-
-#### Purpose:
-
-Add FPGA MPEG-1 Layer II audio decoding and synchronized progressive MPG playback on the accepted seed-52 video baseline.
-
-#### Outcome:
-
-Implemented 48 kHz stereo/dual/joint-stereo MP2 at 112–384 kb/s with a bounded frame parser, serial requantization and polyphase synthesis, an independent compressed-video DDR ring, ordered PES metadata binding, PCM timestamp scheduling and schema-eight audio telemetry. Stock Main and the accepted progressive decoder/output raster remain; raw video bypasses the new DDR queue. CRC-protected frames, other rates/codecs, mono and timestamp-discontinuity recovery are not supported by this first audio profile. All 17 quantizers and all joint-stereo bounds pass FFmpeg comparison after increasing requantization coefficients from Q24 to Q30; eight quality fixtures pass two reset-separated, backpressured sessions with maximum PCM error 0–2 sample units, and six unsupported/truncated fixtures fail explicitly. A timed MPG test plays 24192 sample pairs from 21 frames without underrun or timestamp error, agrees with FFmpeg PCM within one unit, preserves 152679 video bytes and binds all 15 picture timestamps correctly. That harness models a bounded PCM FIFO and does not claim complete H.262 or vendor CDC simulation. DDR stress passes 5000 words with 8014 competing responses; legacy arbiter, raw/PS ingress, PCM baseline, PES split-prefix and telemetry checks pass. An early synthesis estimate fits at 38562 ALMs and 68 DSP elements before the final precision/telemetry changes, but full build/timing qualification is pending. Sources are installed from the isolated development export; no hardware acceptance is claimed.
-
-#### Next Steps:
-
-Push this source and run independent clean Quartus builds with seeds 52, 61 and 87, reviewing standard and focused timing before delivering RBFs. Provide the executable flash/beep and movie-content generator, then require audible synchronized MPG playback, exact audio completion counters, repeated raw/MPG loads and a longer-file synchronization test on hardware. Native progressive 720x480 output follows audio acceptance.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer_av.svh
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_06.svh
-- MediaPlayer_top_07.svh
-- README.md
-- docs/ARCHITECTURE.md
-- docs/BUILDING.md
-- docs/TEST_INSTRUCTIONS.md
-- files.qip
-- rtl/audio/av_stream_fifo.sv
-- rtl/audio/mp2_cos.hex
-- rtl/audio/mp2_decoder.sv
-- rtl/audio/mp2_pcm_fifo.sv
-- rtl/audio/mp2_pcm_output.sv
-- rtl/audio/mp2_scale.hex
-- rtl/audio/mp2_synthesis.sv
-- rtl/audio/mp2_window.hex
-- rtl/mpeg2_new/mpeg2_av_ddr_fifo.sv
-- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_new/mpeg2_pes_metadata_expand.sv
-- rtl/mpeg2_new/mpeg2_pes_picture_pts.sv
-- rtl/mpeg2_new/mpeg2_program_stream_ingress.sv
-- tools/generate_mp2_tables.py
-- tools/make_mpg_audio_test.sh
-- tools/mp2_fixtures.py
-- tools/mp2_model.py
-- tools/reference/LICENSE.pl_mpeg
-- tools/reference/README.md
-- tools/reference/pl_mpeg.h
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/tb_h262_ddram_arbiter.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/test_av_ddr_fifo.sv
-- tools/test_mp2_decoder.sv
-- tools/test_mp2_pcm_output.sv
-- tools/test_mp2_synthesis.sv
-- tools/test_mpg_audio_ingress.sv
-- tools/test_mpg_audio_playback.sv
-- tools/test_pes_picture_pts.sv
-- tools/verify_mp2.py
-- tools/verify_mpg_audio.py
 
 #### Status:
 
