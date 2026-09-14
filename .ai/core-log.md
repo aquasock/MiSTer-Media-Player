@@ -1,3 +1,32 @@
+## 92 COMMIT Unreleased ??? 2026-09-14T13:22:12-07:00
+
+#### Coming From:
+
+Unreleased 7eb5088
+
+#### Purpose:
+
+Reduce duplicated IDCT hardware with measured shared transform service.
+
+#### Outcome:
+
+The user authorizes the deferred IDCT logic reduction while the isolated HIGH-packing build continues. The accepted intermediate-buffer M10K conversion is already present and its savings must not be counted again. Begin with simulation-only transaction overlap and service measurements, then implement block-granular shared transform ownership with bounded coefficient staging if supported by evidence. Preserve arithmetic, rounding, per-client sample ordering, functional errors and reset/seek cancellation. Verify one-outstanding-block assumptions and exact per-client samples against independent existing engines, including concurrent arrivals and resets; verify mixed decoding and actual-file seek recovery before a hardware candidate. Accepted 7eb5088 MEDIUM seed 61 remains the baseline. The packing experiment is isolated and must not be interrupted or overwrite accepted artifacts.
+
+#### Next Steps:
+
+Measure client demand and ownership, select the supported sharing boundary, implement and run differential and playback regressions. Measure fitted area and timing only after correctness checks; obtain user input if evidence requires a material scope change. Keep all measurements simulation-only without restoring hardware telemetry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 91 COMMIT Unreleased 7eb5088 2026-09-14T13:19:19-07:00
 
 #### Coming From:
@@ -1388,35 +1417,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 52 COMMIT Unreleased bcddb20 2026-09-14T03:38:42-07:00
-
-#### Coming From:
-
-Unreleased bcddb20
-
-#### Purpose:
-
-Compare maximum ALM register packing effort against the timing-passing seed 61 build.
-
-#### Outcome:
-
-While testing the core, the user authorized exactly one additional build of passing seed 61 at maximum packing effort. A clean bcddb20 export started at 2026-09-14T03:38:00-07:00 under results/build-bcddb20-packing-high-20260914-033800. ALM_REGISTER_PACKING_EFFORT changes from MEDIUM to HIGH, the highest documented level; source, seed, six-worker count and all other effective QSF settings match the passing seed 61 baseline. The exact QSF comparison is asserted and saved as settings.diff alongside experiment.json and the single-seed runner. The runner compiles then runs the existing timing audit. Its result checker processes seed 61 only, requires 159 CDC registers and packages to a separate hardware-test-bcddb20-packing-high directory so the user's current candidate remains intact. Local master and GitHub were verified synchronized. No source settings or MiSTer state were changed, and no other seeds were launched.
-
-#### Next Steps:
-
-Finish this single build and compare actual placed ALMs separately from ALMs-needed and dense-packing estimates, plus registers, RAM, DSPs, all timing corners and the 159-register CDC audit. Report any savings and timing tradeoff; do not select the experiment over the existing candidate without evaluating both. Hardware feedback for the original bcddb20 seed 61 remains pending.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
 
 ---
 
