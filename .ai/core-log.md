@@ -1,3 +1,33 @@
+## 85 COMMIT Unreleased a406feb 2026-09-14T12:07:01-07:00
+
+#### Coming From:
+
+Unreleased 8e418b3
+
+#### Purpose:
+
+Qualify and package diagnostic-removal gate one for the user's four-file hardware test.
+
+#### Outcome:
+
+All 8e418b3 seeds compile and pass all four timing corners, 183 CDC checks, scene-enable checks and zero-profiler-register audits. Seed 52 is preferred with setup +0.397 ns and hold +0.114 ns; seeds 61/87 have setup +0.397/+0.197 ns and hold +0.099/+0.089 ns. Actual ALMs are 37267/37169/37350 and estimated ALMs 31787/31731/31708, with unchanged 527 M10Ks and 75 DSPs. Compared with accepted b05b76f seed 87, preferred gate-one seed 52 saves 964 estimated ALMs but only 143 placed ALMs because packing differs. The reporting mailbox survives this gate and all six stages remain audited; profiler hardware is absent. Hash-verified candidates and notes are under results/hardware-test-8e418b3; preferred seed52/MediaPlayer_20260914.rbf SHA-256 is 78501002b4e4d9669635ffa30e9f744e47103baf0e12740e09594f2a40c625a8. The user says not to pursue timing closure now; no fixes or extra builds were needed or started. They additionally authorize frozen MPEG2FPGA reference cleanup at gate two; the plan records checking unused wrappers and retaining required attribution. Gate-one hardware acceptance is pending; no core was deployed.
+
+#### Next Steps:
+
+Have the user test Fellow, Groove, Jiggler and Star Wars including no telemetry, black transparent status text, audio/video, controls, subtitles and EOF at both output rates. Proceed to reporting-source and frozen-reference cleanup only after gate-one acceptance; retain b05b76f seed 87 as rollback.
+
+#### Files Modified:
+
+- docs/DIAGNOSTIC_REMOVAL_PLAN.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 84 COMMIT Unreleased 8e418b3 2026-09-14T11:46:01-07:00
 
 #### Coming From:
@@ -1301,33 +1331,4 @@ Keep Quartus builds on hold until requested, then compile the reduced source and
 
 ---
 
-
-## 45 COMMIT Unreleased 2fac1cb 2026-09-14T02:31:21-07:00
-
-#### Coming From:
-
-Unreleased 2fac1cb
-
-#### Purpose:
-
-Build the direct-seek implementation after functional validation.
-
-#### Outcome:
-
-The clean source 2fac1cb seed 52/61/87 batch is running under results/build-2fac1cb-20260914-022936. Final two-header MP2 resynchronization passes exact PCM comparisons after one-byte, 582-byte and plausible-false-header 1604-byte prefixes in both reset sessions, alongside compressed-seek history tests. The actual Pee Strike shared-DDR replay resumes at 10.01 seconds with bypass On and 20.02 seconds with bypass Off, without decoder or audio errors; the Off run was repeated with final two-header verification. Normal opening playback also completes and advances both audio and video. Actual prefix searches use three to five probes for 5-, 10- and 20-second targets; the 10-second search consumes 1387169 bytes rather than decoding the opening interval. Directed tests cover VBR, offsets above 4 GiB, timestamp wrap, bounded fallback, EOF, new-file invalidation, asynchronous configuration and retirement, repeated paused forward/backward commands, and open-GOP/PTS byte filtering. These simulations use bounded ideal queues and periodic display ownership, not full vendor CDC or HDMI hardware models. All functional checks are complete; synthesis, fit and timing qualification are pending. The prior a229a01 seed 87 remains available, and the MiSTer has not been reloaded by the agent.
-
-#### Next Steps:
-
-Finish the authorized three-seed batch, audit all corners and 165 CDC registers, compare resources against a229a01, and package the best completed RBF for user hardware testing. Do not start extra placement batches or deploy automatically.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
 
