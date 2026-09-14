@@ -798,10 +798,6 @@ wire [7:0]  fb_video_b;
 wire        fb_video_de;
 wire        fb_video_hs;
 wire        fb_video_vs;
-wire [7:0]  cadence_video_r;
-wire [7:0]  cadence_video_g;
-wire [7:0]  cadence_video_b;
-wire        cadence_snapshot_ready;
 
 // ---------------------------------------------------------------------------
 // Entry 389: presentation time base.

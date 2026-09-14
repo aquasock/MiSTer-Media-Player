@@ -363,3 +363,10 @@ layout is clocks y=469, status y=455, subtitle lines y=417/431 and the unchanged
 track [452,466). These positions supersede earlier layouts in this document.
 Status uses opaque dark text on a light inset so it remains readable over any
 progress fill. Subtitle backdrops retain their alpha blend.
+
+## Gate-one status style
+
+The user removes the white Paused/Seeking inset. Status now uses opaque black
+glyphs with transparent gaps; the normal progress bar underneath is unchanged.
+Coordinates and subtitle backdrops are unchanged. The development telemetry
+profiler is removed independently of this player/subtitle overlay.

@@ -51,7 +51,7 @@ text changes atomic; old seek/file epochs cannot become visible. Subtitle and
 controls visibility groups are independent.
 
 On the 480p reference layout, Paused/Seeking sits at y=455 inside the progress
-bar with dark lettering on a light inset. The subtitle bottom line is y=431;
+bar with black lettering and no text background. The subtitle bottom line is y=431;
 a two-line cue begins at y=417. Clock fields are below the bar at y=469; the
 progress track remains [452,466). Coordinates scale with the HDMI output.
 The font has 94 visible printable ASCII glyphs plus space in its existing ROM.

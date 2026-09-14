@@ -1,6 +1,6 @@
 # Production diagnostic removal plan
 
-Status: proposed, not implemented. The user accepts b05b76f seed 87's EOF and
+Status: gate one authorized and implemented for qualification. The user accepts b05b76f seed 87's EOF and
 layout behavior. Preserve that RBF as the hardware rollback baseline:
 37,410 placed ALMs, 527/553 M10Ks, 75/112 DSPs, setup +0.358 ns, hold +0.099 ns.
 The later 6688db2 audio warning tolerance is simulation-tested only.
@@ -14,45 +14,64 @@ oracles and archived Git source available for engineering. No new diagnostic
 menu or alternate diagnostic RBF is needed. Do not delete modules by name:
 several modules named `probe` and `diagnostic` contain production decoding.
 
-## Changes, in two reviewable commits and one build batch
+## Three hardware acceptance gates
 
-1. Separate functional dependencies from reporting.
-   - Expose named scheduler `pending_frame_valid` and `reorder_active` outputs
-     for seek/EOF instead of consuming debug_state bits 26 and 0. Preserve their
-     exact logic; this is an interface cleanup, not a scheduler rewrite.
-   - Trace each status output to its consumers. Keep physical EOF, input and
-     PCM finished signals, generation tags, byte position, active FIFO levels,
-     parser validation, transport timeouts, backpressure and DDR ownership.
-   - In particular, retain `mp2_finished_sync` even when removing the adjacent
-     sample-count and warning synchronizers. Keep the 90 kHz clock used by
-     presentation/EOF while retiring the profiler-only one-second counter.
+The user supersedes the original two-commit/one-build plan with three separate
+build-and-test gates. Do not begin the next gate until they accept the current
+candidate on Fellow, Groove, Jiggler and Star Wars. Run simulations and three
+clean seeds at each gate, then provide the best timing-qualified RBF. Each
+accepted gate becomes the next rollback baseline.
 
-2. Remove reporting and standalone test hardware from the production graph.
-   - Remove the cadence profiler instance, compact/detailed snapshot registers,
-     snapshot-trigger timers, serializer, pixel coordinates and telemetry RGB
-     overlay. Route existing framebuffer RGB directly to core video outputs;
-     preserve sync/DE alignment and the separate player/subtitle overlay.
-   - Remove the 256-bit media telemetry mailbox, minimum-reservoir tracking,
-     reporting-only request/completion/max-wait counters, audio sample-count
-     crossing and other observation-only counters/flags. Retain live reader
-     timeout state, not its historical maximum statistic.
-   - Remove the Audio test menu, test tone source, test-only FIFOs/control
-     mailboxes/output adapter and output-selection mux. Route decoded MP2 PCM
-     directly to the existing MiSTer audio ports. Leave unused status bits
-     reserved to avoid renumbering saved aspect/color/refresh/subtitle settings.
-   - Remove dead legacy success/LED diagnostic expressions and unused details.
-     Disconnect observation-only leaf outputs so synthesis can prune their
-     logic; retain simulation visibility where useful. Verify actual pruning
-     in the mapped/fitted netlist rather than assuming disconnected ports save
-     resources. The 6688db2 timestamp-warning adjustment needs no dedicated
-     hardware build if its only consumer is removed in this work.
-   - Retain fatal decode/transport checks that gate reads or inhibit a clean EOF.
-     Do not turn malformed input into apparent successful completion. Reporting
-     can disappear without making those conditions stop protecting playback.
-   - Update files.qip, timing scripts, documentation and exact CDC audit counts
-     for removed instances; retain checks for every surviving synchronizer.
-     Remove only constraints whose endpoints were removed, not broad timing
-     exceptions or retained safety checks.
+### Gate one: remove the telemetry screen and profiler
+
+Remove the cadence profiler instance, frozen snapshots, trigger timers,
+serializer, telemetry coordinates and RGB overlay. Route framebuffer RGB
+directly to video outputs with unchanged sync/DE and no extra pipeline delay.
+Remove the profiler from files.qip and its obsolete snapshot CDC constraints.
+Keep the independent player/subtitle overlay. The user's accompanying UI
+request makes Paused/Seeking opaque black glyphs with transparent gaps, at the
+existing y=455 reference position, without the previous white text inset.
+
+Preserve existing functional scheduler debug bits 26/0 used by seek/EOF.
+Leave reporting-source RTL, the telemetry mailbox and Audio test for later
+gates. Synthesis may naturally prune unobserved reporting hardware now; do not
+add preservation attributes to force it to remain. The telemetry-only mailbox
+may disappear entirely; if it remains, all six control synchronizer stages
+must pass their existing checks. Every functional CDC remains mandatory.
+Require zero cadence-profiler registers in the fitted timing netlist.
+
+Hardware checks: no telemetry pattern at startup or EOF, clean picture/audio,
+pause/seek/EOF/file replacement, subtitles and black status glyphs over empty,
+filled and unknown progress at both output rates.
+
+### Gate two: remove reporting sources and legacy diagnostic wiring
+
+Replace the consumed scheduler debug bits with named functional outputs before
+removing debug buses. Preserve the exact pending-frame and reorder-active
+logic. Trace consumers before removing counters, error details and warnings.
+Remove the 256-bit reporting mailbox, minimum-reservoir tracking, historical
+request/completion/max-wait statistics, audio sample-count crossing and
+profiler-only seconds counter. Keep live timeout state, byte position,
+generation, FIFO flow control, 90 kHz presentation ticks and PCM finished CDC.
+Retire dead success/LED expressions; prune observation-only leaf ports while
+retaining simulation visibility where useful. Keep fatal decode/transport
+checks that gate reads or prevent malformed input being classified as clean
+EOF. Do not delete production decoder modules named probe or diagnostic.
+Update CDC counts/constraints only for endpoints actually removed.
+
+Hardware checks: repeat all four files, including long/backward seeks,
+replacement movies and clean EOF. Retain gate one's accepted RBF.
+
+### Gate three: remove Audio test hardware
+
+Remove its menu, tone source, test-only FIFOs/control mailboxes/output adapter
+and output mux; connect movie PCM directly to the existing MiSTer audio ports.
+Keep old status bits reserved so saved aspect/color/refresh/subtitle settings
+are not renumbered. Verify old Audio test settings cannot override movie PCM.
+
+Hardware checks: startup audio, continuity, pause/resume, seeking, filters and
+longer audio tails, plus the common four-file playback checks. Retain gate
+two's accepted RBF.
 
 ## Validation gates
 
@@ -64,9 +83,8 @@ so removal does not bypass cancellation, quarantine, reset or ownership rules.
 Use simulation-only observers for evidence; screen telemetry is no longer a
 verification mechanism. Verify old Audio test status bits cannot override PCM.
 
-Build clean seeds 52/61/87 once both commits pass tests. Audit all four timing
-corners, remaining CDC stages and fitted resources. Confirm the profiler,
-telemetry mailbox and audio test generator are absent from the hardware.
+Build clean seeds 52/61/87 at each gate after its tests pass. Audit all four timing
+corners, remaining CDC stages and fitted resources. Confirm each gate's removal targets are absent from the hardware.
 Report actual placed ALMs, estimated ALMs, M10Ks and DSPs separately against
 b05b76f; report measured savings, not a promised percentage. Some dead source
 logic is already optimized away, and placement varies between seeds.

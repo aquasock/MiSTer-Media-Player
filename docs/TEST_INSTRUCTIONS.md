@@ -1,3 +1,22 @@
+# Diagnostic removal gate one
+
+This candidate removes the on-screen telemetry profiler and its snapshot
+hardware. Audio test remains for gate three; reporting-source RTL remains for
+gate two. Paused and Seeking are now black glyphs with transparent gaps, at
+their existing position on the progress bar. There is no white text background.
+The normal progress fill can still be white underneath the text.
+
+Test Fellow, Groove, Jiggler and Star Wars. At each file's startup and EOF,
+confirm there is no telemetry pattern. Verify picture/audio continuity, OSD
+and filters, pause/resume, short/long forward and backward seeks, replacement
+movies and EOF return to startup. Check subtitles and status lettering over
+empty/full/unknown progress, at both 50 and 59.94 Hz. Keep hardware-accepted
+b05b76f seed 87 as rollback. Gate two waits for your acceptance of this gate.
+
+Simulation evidence is under results/gate1-subtitles, results/gate1-mixed and
+results/gate1-controls.json. Build timing/resources remain pending. See
+[the three-gate plan](DIAGNOSTIC_REMOVAL_PLAN.md).
+
 # Audio timestamp warning tolerance
 
 Fellow and Groove triggered only the audio timestamp warning at played sample

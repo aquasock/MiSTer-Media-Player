@@ -27,12 +27,11 @@ def oracle(w,h,known,shown,paused,seeking,pos=1340400000,total=2629890000,patter
    if x&8:im[y0:y1,x]=((background[y0:y1,x].astype(np.uint16)*95+np.array(colors[1],dtype=np.uint16)*160)//255).astype(np.uint8)
  for field,(label,center,y) in enumerate(zip(labels,[141,360,579,360],[469,469,469,455])):
   x0=w*center//720-len(label)*6*scale//8;y0=h*y//480
-  if field==3 and label:im[y0:y0+(7*scale+3)//4,x0:x0+(len(label)*6*scale+3)//4]=colors[3]
   for dy in range((7*scale+3)//4):
    gy=dy*4//scale
    for dx in range((len(label)*6*scale+3)//4):
     gx=dx*4//scale;char=gx//6;column=gx%6
-    if gy<7 and char<len(label) and column<5 and (glyphs.get(label[char],[0]*7)[gy]>>(4-column))&1:im[y0+dy,x0+dx]=colors[1 if field==3 else 3]
+    if gy<7 and char<len(label) and column<5 and (glyphs.get(label[char],[0]*7)[gy]>>(4-column))&1:im[y0+dy,x0+dx]=((0,0,0) if field==3 else colors[3])
  return im
 cases=[(720,480,1,1,0,0),(1280,720,1,1,1,0),(1920,1080,1,1,0,1),(720,480,0,1,0,0),(720,480,1,0,0,0)]
 cases=[(*c,1340400000,2629890000) for c in cases]+[(720,480,1,1,0,0,0,36000000),(720,480,1,1,0,0,40000000,36000000)]

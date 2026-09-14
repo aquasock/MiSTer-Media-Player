@@ -18,6 +18,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Diagnostic-removal gate one removes the cadence profiler and telemetry screen
+  from the production core, preserving functional seek/EOF checks and Audio test.
+- Draw Paused/Seeking as opaque black glyphs with transparent gaps instead of
+  dark text on a white inset; keep their progress-bar position unchanged.
+
 - Allow 1 ms of audio timestamp lateness in the diagnostic warning, avoiding
   startup warnings from the measured 167 us PES timestamp step in Fellow/Groove.
   Audio samples, cadence and underrun detection are unchanged.

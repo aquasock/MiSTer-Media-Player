@@ -65,12 +65,22 @@ update_timing_netlist
 # Reject a build whose mailbox/VS control chains vanished or became shift RAMs.
 # Check every stage of each required instance, not just a wildcard that could
 # accidentally match one surviving synchronizer elsewhere in the design.
+set profiler_regs [get_collection_size [get_registers -nowarn {*mpeg2_h262_hardware_cadence_profiler:*|*}]]
+set diagnostic_audit [open "$output_dir/diagnostic_removal_audit.rpt" w]
+puts $diagnostic_audit "Cadence profiler registers: $profiler_regs"
+close $diagnostic_audit
+if {$profiler_regs != 0} {error "Gate one still contains cadence profiler registers"}
 set cdc_audit [open "$output_dir/configuration_cdc_audit.rpt" w]
 foreach instance {eof_generation_config eof_complete_config subtitle_command_config subtitle_ack_config player_ui_config seek_file_config seek_file_echo_config seek_probe_config playback_control_config playback_position_config playback_audio_config playback_hide_reset_config refresh_request_config refresh_applied_config color_mode_config display_color_config media_prefill_config media_fatal_config media_telemetry_config aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
     if {[string first "|" $instance] < 0} {
         set prefix "*video_config_cdc:$instance"
     } else {
         set prefix "*osd:$instance"
+    }
+    # Gate one removes this mailbox's only reporting consumer. Synthesis may
+    # prune it naturally; if retained, require all six stages as before.
+    if {$instance eq "media_telemetry_config" && [get_collection_size [get_registers -nowarn "${prefix}|*"]] == 0} {
+        continue
     }
     foreach chain {req_sync ack_sync} {
         for {set stage 0} {$stage < 3} {incr stage} {
