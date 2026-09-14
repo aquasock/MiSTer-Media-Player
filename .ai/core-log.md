@@ -1,3 +1,32 @@
+## 45 COMMIT Unreleased 2fac1cb 2026-09-14T02:31:21-07:00
+
+#### Coming From:
+
+Unreleased 2fac1cb
+
+#### Purpose:
+
+Build the direct-seek implementation after functional validation.
+
+#### Outcome:
+
+The clean source 2fac1cb seed 52/61/87 batch is running under results/build-2fac1cb-20260914-022936. Final two-header MP2 resynchronization passes exact PCM comparisons after one-byte, 582-byte and plausible-false-header 1604-byte prefixes in both reset sessions, alongside compressed-seek history tests. The actual Pee Strike shared-DDR replay resumes at 10.01 seconds with bypass On and 20.02 seconds with bypass Off, without decoder or audio errors; the Off run was repeated with final two-header verification. Normal opening playback also completes and advances both audio and video. Actual prefix searches use three to five probes for 5-, 10- and 20-second targets; the 10-second search consumes 1387169 bytes rather than decoding the opening interval. Directed tests cover VBR, offsets above 4 GiB, timestamp wrap, bounded fallback, EOF, new-file invalidation, asynchronous configuration and retirement, repeated paused forward/backward commands, and open-GOP/PTS byte filtering. These simulations use bounded ideal queues and periodic display ownership, not full vendor CDC or HDMI hardware models. All functional checks are complete; synthesis, fit and timing qualification are pending. The prior a229a01 seed 87 remains available, and the MiSTer has not been reloaded by the agent.
+
+#### Next Steps:
+
+Finish the authorized three-seed batch, audit all corners and 165 CDC registers, compare resources against a229a01, and package the best completed RBF for user hardware testing. Do not start extra placement batches or deploy automatically.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 44 COMMIT Unreleased 2fac1cb 2026-09-14T01:57:50-07:00
 
 #### Coming From:
@@ -1315,35 +1344,6 @@ Implement the reviewed changes, run focused OSD, mailbox, raster, cadence and pl
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 005 COMMIT Unreleased f8bebcd 2026-09-13T10:54:04-07:00
-
-#### Coming From:
-
-Unreleased f8bebcd
-
-#### Purpose:
-
-Record user acceptance of seed 52 playback and the freshly captured early audio-underrun telemetry.
-
-#### Outcome:
-
-The user confirmed that everything played perfectly and identified seed 52, accepting visual and audible playback for this test of f8bebcd. A fresh uniquely named screenshot captured over FTP from 10.10.0.45 at 2026-09-13T10:52:38-07:00 decoded successfully as schema eight. Its one-shot snapshot froze approximately 0.207309 seconds into the session on error_flags 0x1000, identifying MP2 underrun, with four audio frames decoded and 4608 stereo sample pairs played; MP2 decode and timestamp errors were clear at capture. This is an early error snapshot, not end-of-playback telemetry: sequence_end_seen, presentation_complete, audio_finished and session_quiet were false at that early point and do not establish failure to finish the user's test. The snapshot recorded 74207 accepted bytes, three displayed pictures and a 100.1 ms display gap. The screenshot and decoded JSON are retained in results/telemetry-20260913-105236/. User acceptance does not resolve the underrun or the seed's setup -2.173 ns, hold -0.104 ns and decoder setup -0.061 ns timing failures. Passed records the user's hardware acceptance only. The user identified the current agent environment as the build PC and instructed ignoring keyboard LED commands; the user subsequently explicitly authorized pushing from this build PC.
-
-#### Next Steps:
-
-Prepare the next timing-repair proposal around preserving real synchronization flip-flops, checking matched timing endpoints and completing the remaining configuration clock crossings, with a separate investigation of the early MP2 underrun. Retain 1750154 seed 87 as the timing-passed and hardware-accepted rollback. Commit and push this checkpoint from the build PC under the user's explicit authorization.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
