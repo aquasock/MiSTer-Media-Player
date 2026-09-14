@@ -40,12 +40,14 @@ The exact-file replay accepts an MPG prefix up to 16 MiB, with unchanged bytes:
 python3 tools/replay_mpg_seek.py opening.mpg results/replay
 python3 tools/replay_mpg_seek.py opening.mpg results/replay --reuse --no-audio-bypass
 python3 tools/replay_mpg_seek.py opening.mpg results/replay --reuse --seek-delay 137 --host-stall 200000
+python3 tools/replay_mpg_seek.py opening.mpg results/replay-shared --shared-ddr --seek-delay 500000 --host-stall 200000
 ```
 
 It runs the actual mounted reader, PS demux, MP2 decoder/output, bounded queues,
-video reconstruction and PTS scheduling. Vendor FIFO CDC and contention between
-compressed-video DDR and reconstruction DDR remain outside this behavioral
-model. A prefix may end mid-packet; only explicitly completed pre-EOF seek
+video reconstruction and PTS scheduling. The optional `--shared-ddr` mode routes compressed-video traffic through the
+production reconstruction/prediction arbiter; default mode uses separate DDR
+service. Vendor FIFO CDC and physical display-reader traffic remain outside
+this behavioral model. A prefix may end mid-packet; only explicitly completed pre-EOF seek
 boundaries count as success. `--no-skip` provides an ordinary-playback comparison.
 
 # Keyboard playback controls

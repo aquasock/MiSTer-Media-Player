@@ -2,8 +2,9 @@
 """Exact MPG opening through reconstruction + demux/MP2/PTS; bounded ideal CDC.
 
 Usage: tools/replay_mpg_seek.py input.mpg results/replay [--compile-only]
-Reuses the live raster memory model; compressed video has separate ideal DDR
-service, so shared DDR arbitration and vendor CDC are not covered here.
+Reuses the live raster memory model. --shared-ddr routes compressed-video
+traffic through the production arbiter; vendor CDC and display-reader traffic
+are not modeled. Without this flag, compressed video has separate DDR service.
 """
 import argparse
 import hashlib
@@ -15,7 +16,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def generate(dest):
+def generate(dest, shared_ddr=False):
     s = (ROOT/'tools/streams/tb_h262_live_raster_soak.sv').read_text()
     a = s.index('    generate if(PLAYBACK_CONTROL_MODE) begin: playback_test')
     b = s.index('\n    mpeg2_h262_b_presentation_scheduler scheduler', a)
@@ -39,6 +40,23 @@ def generate(dest):
     def bounded_display(match):
         return match.group(0) if any(tag in match.group(0) for tag in ('PROGRESS', 'SEEK BEGIN', 'SEEK END', 'MPG_REPLAY')) else 'begin end'
     s = re.sub(r'\$display\(.*?\);', bounded_display, s, flags=re.S)
+    if shared_ddr:
+        s = s.replace('DDR_WORDS=327680;', 'DDR_WORDS=1572864;')
+        s = s.replace('reg [18:0] read_index_pipe', 'reg [20:0] read_index_pipe')
+        s = s.replace('.ddram_busy(1\'b0),.ddram_dout_ready(memory_dout_ready)',
+            '.stream_addr(raddr),.stream_din(rdin),.stream_rd(rrd),.stream_we(rwr),'
+            '.stream_busy(replay_stream_busy),.stream_dout_ready(rdqv),'
+            '.ddram_busy(1\'b0),.ddram_dout_ready(memory_dout_ready)')
+        s = s.replace('reg [63:0] rdq;reg rdqv=0;',
+            'wire [63:0] rdq=memory_dout;wire rdqv,replay_stream_busy;')
+        s = s.replace('reg [63:0] replay_vmem[0:1048575];', '')
+        s = s.replace('raddr,rdin,rrd,rwr,1\'b0,rdq,rdqv,rv_level)',
+            'raddr,rdin,rrd,rwr,replay_stream_busy,rdq,rdqv,rv_level)')
+        a = s.index('always @(posedge clk)begin\n rdqv<=0;')
+        b = s.index('wire [7:0] reb;', a)
+        s = s[:a] + 'always @(posedge clk)if(!reset&&rve&&rvready)replay_veof<=1;\n' + s[b:]
+        # Stream storage is not a reconstructed frame write for legacy counters.
+        s = s.replace('case(memory_addr[18:16])', 'if(memory_addr<DDR_BASE+327680)case(memory_addr[18:16])')
     path = dest/'tb_mpg_seek.sv'
     path.write_text(s)
     return path
@@ -49,13 +67,14 @@ def main():
     ap.add_argument('input',type=Path);ap.add_argument('output',type=Path)
     ap.add_argument('--compile-only',action='store_true')
     ap.add_argument('--reuse',action='store_true')
+    ap.add_argument('--shared-ddr',action='store_true')
     ap.add_argument('--at-q',type=int,default=792792)
     ap.add_argument('--seek-delay',type=int,default=0)
     ap.add_argument('--host-stall',type=int,default=40000)
     ap.add_argument('--no-audio-bypass',action='store_true')
     ap.add_argument('--no-skip',action='store_true')
     args=ap.parse_args();dest=args.output.resolve();dest.mkdir(parents=True,exist_ok=True)
-    bench=generate(dest);binary=dest/'obj/Vtb_h262_live_raster_soak'
+    bench=generate(dest,args.shared_ddr);binary=dest/'obj/Vtb_h262_live_raster_soak'
     rtl=re.findall(r'SYSTEMVERILOG_FILE (rtl/mpeg2_new/\S+)',(ROOT/'files.qip').read_text())
     rtl += ['rtl/audio/'+x+'.sv' for x in ('mp2_decoder','mp2_synthesis','mp2_pcm_output','av_stream_fifo')]
     rtl += ['rtl/media_playback_control.sv','rtl/media_file_reader.sv','rtl/video_config_cdc.sv']
@@ -78,7 +97,7 @@ def main():
     hexpath=dest/'source.hex'
     with hexpath.open('w') as f:
         for b in data:f.write(f'{b:02x}\n')
-    label=f"seek-{args.at_q}-{args.seek_delay}-stall{args.host_stall}-bypass{int(not args.no_audio_bypass)}-baseline{int(args.no_skip)}"
+    label=f"{'shared-' if args.shared_ddr else ''}seek-{args.at_q}-{args.seek_delay}-stall{args.host_stall}-bypass{int(not args.no_audio_bypass)}-baseline{int(args.no_skip)}"
     cmd=[str(binary),f'+HEX={hexpath}',f'+LEN={len(data)}','+GENERIC_STREAM','+PROGRESS=20000000',
          f'+AT_Q={args.at_q}',f'+SEEK_DELAY={args.seek_delay}',f'+HOST_STALL={args.host_stall}']
     if args.no_audio_bypass:cmd.append('+NO_AUDIO_BYPASS')
@@ -90,7 +109,7 @@ def main():
         for line in f:
             if 'MPG_REPLAY_BOUNDARY_PASS' in line:passed=True
     result=dict(command=cmd,exit=rc,completed=passed,source_sha256=hashlib.sha256(data).hexdigest(),
-        scope='Combined PS/MP2/bounded queues/video reconstruction/PTS, ideal CDC and separate compressed-video DDR service')
+        scope='Combined PS/MP2/bounded queues/video reconstruction/PTS, ideal CDC; no display DDR reader', shared_ddr=args.shared_ddr, binary_fingerprint=fingerprint)
     (dest/(label+'.json')).write_text(json.dumps(result,indent=2)+'\n')
     print(json.dumps(result),flush=True)
     if rc or not passed:raise SystemExit(1)

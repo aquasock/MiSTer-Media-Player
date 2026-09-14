@@ -98,6 +98,7 @@ mpeg2_h262_inband_metadata replay_metadata(.clk(clk),.reset(reset),.input_data(r
 always @(posedge clk)if(!reset)begin
  if(stream_valid)stream_index<=stream_index+1;
  if(rmv&&!replay_origin_valid)begin replay_origin<=rmp-9000;replay_origin_valid<=1;end
+ if(frontend.syntax_error)$fatal(1,"MPG_REPLAY_SYNTAX_ERROR source=%0d byte=%0d",frontend.syntax_error_source,stream_index);
  if(replay_source_error||rde||rpe)$fatal(1,"MPG_REPLAY_ERROR reader=%d demux=%d mp2=%d",replay_source_error,rde,rpe);
 end
 wire rbpv;wire [32:0] rbp;
