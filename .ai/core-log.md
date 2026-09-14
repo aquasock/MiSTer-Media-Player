@@ -1,3 +1,33 @@
+## 61 COMMIT Unreleased 3ff27c8 2026-09-14T05:13:13-07:00
+
+#### Coming From:
+
+Unreleased 3ff27c8
+
+#### Purpose:
+
+Record hardware acceptance of the IDCT intermediate RAM conversion as the new baseline.
+
+#### Outcome:
+
+The user reports everything works perfectly with the recommended 3ff27c8 seed 52 candidate. Passed records that user-reported hardware acceptance; detailed file and control coverage was not enumerated. The accepted RBF remains results/hardware-test-3ff27c8/seed52/MediaPlayer_20260914.rbf with verified SHA-256 236c9817ccfd04b10e23ff0ee052f2c11e5a39d7fcfdb88e3e42b29e969406f1. Its handoff metadata and README now record acceptance, and documentation commit e76bc84 updates the changelog and test instructions. This establishes the 35774 actual placed ALM, 508 M10K, 69 DSP seed 52 build as the current accepted baseline, with 45 M10Ks free. Runtime RTL is unchanged and no builds or deployment were performed. The requirement for standard HDMI timings and frequencies remains in force for future film-cadence work.
+
+#### Next Steps:
+
+Use 3ff27c8 seed 52 as the baseline for subsequent changes and retain dc1dfc2 seed 52 as the previous rollback. Investigate stock Main and scaler support for standard 23.976/24 Hz HDMI timing modes before proposing any film-cadence implementation; do not infer authorization for another implementation or build from this acceptance report.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 60 COMMIT Unreleased 3ff27c8 2026-09-14T05:09:29-07:00
 
 #### Coming From:
@@ -1261,35 +1291,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 21 COMMIT Unreleased 0b6eb0e 2026-09-13T15:55:39-07:00
-
-#### Coming From:
-
-Unreleased dd144a3
-
-#### Purpose:
-
-Record completed compact-telemetry builds, measured resource savings and the clarified whole-movie failure context.
-
-#### Outcome:
-
-All three clean source-0b6eb0e seeds compile and pass the unchanged 108-register CDC audit. Seed 87 passes every timing category at all four corners, with minimum setup +0.082 ns, hold +0.100 ns, recovery +3.007 ns, removal +0.199 ns and pulse width +0.925 ns. Its fitted use is 37548 ALMs, 54191 registers, 480 RAM blocks and 69 DSP blocks, leaving 4362 ALMs free; its RBF SHA-256 is 17e0b04eb91fe7d75538338f171da9c8cf8e6a8d57e1c395e6fd3ad8b3137507. Seed 52 uses 40372 ALMs and fails setup at -0.011 ns in the ASCAL vertical polyphase path; seed 61 uses 40247 ALMs and fails setup at -0.493 ns in ASCAL vertical filtering. Both other seeds pass hold, recovery, removal and pulse width. Compile plus timing durations are 1119, 1081 and 1162 seconds for seeds 52, 61 and 87. Compared with dd144a3, source synthesis saves 1803 combinational ALUTs and 3021 registers without changing memory bits, DSPs or PLLs; the profiler alone falls from 3290 to 1515 synthesized ALUTs and from 5449 to 2429 registers, while fitted seed-87 profiler use is 894 ALMs. The larger reduction between the preceding qualified seed 52 and this qualified seed 87 includes placement effects. Complete evidence, regression results and copied RBFs with explicit timing status are under results/build-0b6eb0e-20260913-153453 and results/hardware-test-0b6eb0e. Separately, the user clarifies the freeze occurred in fellow.mpg at fixed 50 Hz without a switch, and this was the first test that far into the file. FTP reports 4359360512 bytes at /media/fat/games/MediaPlayer/fellow.mpg, exactly matching the historical large-file case in af7f570. That old fix enabled 64-bit ARM-helper stat() for Total/Remaining labels and did not resolve the separately noted decoder hang. The current reader uses 64-bit size and position; the saved snapshot already read 110306058 bytes, exceeding the 64393216-byte low-32-bit size, so simple size truncation does not explain that captured progress. Actual filesystem type was not established by the FTP proc-file read, and the /media/fat name is not evidence of FAT32. No freeze cause or refresh regression has been established, and no compact RBF has been deployed or hardware-accepted.
-
-#### Next Steps:
-
-Offer source-0b6eb0e seed 87 for compact-telemetry hardware validation with the updated decoder, retaining the detailed dd144a3 candidate and saved freeze captures for diagnosis. Confirm normal playback, retained EOF/error/audio/transport fields and OSD controls before accepting telemetry cuts. Investigate fellow.mpg separately, using reproducible position and a 59.94 Hz comparison or fresh live-state diagnostics; do not present telemetry cuts as a freeze fix. Do not use timing-failed seeds 52 or 61 as qualified artifacts.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
