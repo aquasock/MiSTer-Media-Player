@@ -1,4 +1,4 @@
-## 104 COMMIT Unreleased ??? 2026-09-14T15:59:29-07:00
+## 104 COMMIT Unreleased b3e4f1d 2026-09-14T15:59:29-07:00
 
 #### Coming From:
 
@@ -10,15 +10,41 @@ Integrate standalone native FLAC playback into the production mounted-file and p
 
 #### Outcome:
 
-The user authorizes production integration and a first hardware candidate. Add content-based FLAC selection, mutually exclusive DDR ownership, PCM clock crossing, native clock/output and HDMI configuration handoffs, source-sample timestamps, pause and drained EOF. Preserve movie decoding and its existing filter/output behavior. The first music candidate uses the exact native PCM boundary with volume control; FLAC seeking and additional music output processing remain later gates. Verify regressions and integration before a clean seed 52 hardware build; report actual timing and area rather than isolated estimates.
+Commit b3e4f1d integrates content-based FLAC selection, mutually exclusive drained DDR ownership, a vendor PCM CDC FIFO, native 44.1 kHz clock/output and stock Main HDMI configuration handoffs, source-sample timestamps, Space pause, volume and drained EOF. The common picker uses FL* to accommodate stock Main's three-character extension patterns. Movie decoding and its existing filter/output path remain intact; FLAC seeking and additional music processing remain later gates. Native component tests and production integration pass, including 1024 exact stereo I2S/SPDIF samples, pause, simulated Main register overwrite/reapplication, final-sample drain and movie restoration. Movie audio, pause/seek, mounted-reader duration/FLAC detection and subtitle/overlay regressions pass. Preliminary timing review corrected output-clock exclusivity and native reset release. The vendor automatic switch wrapper starts on unavailable PLL input zero, so production now explicitly gates off, selects PLL input 2/3, then reenables through synchronized requests. The integration bench executes that sequencing RTL and rejects enabled selection changes or short clock pulses. Superseded 95af4d3 and fa041b0 runs were cancelled before hardware handoff. The user requests the usual three builds; clean b3e4f1d seeds 52/61/87 are running in results/build-b3e4f1d-20260914-163106. No new RBF, fitted area, timing acceptance or physical native-HDMI qualification is claimed yet.
 
 #### Next Steps:
 
-Complete production integration and simulations, then build and document a candidate for native-rate hardware and four-movie regression tests. Preserve b639ccc seed 52 as rollback; stock Main and future WAV compatibility remain mandatory.
+Finish the three builds, audit all timing corners and physical resources, and package the best candidate for native-rate hardware and four-movie regression tests. Preserve b639ccc seed 52 as rollback. Qualify real HPS I2C busy behavior and HDMI playback on the board; stock Main, no resampling and a shared boundary for future 44.1 kHz WAV remain mandatory.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer.sdc
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_06.svh
+- docs/FLAC_OUTPUT_INTEGRATION.md
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/audio/media_music_time.sv
+- rtl/audio/media_pcm_i2s.sv
+- rtl/media_duration_probe.sv
+- rtl/media_keyboard_control.sv
+- rtl/platform/media_audio_clocks.sv
+- rtl/platform/media_audio_rate_control.sv
+- rtl/platform/media_hdmi_audio_control.sv
+- rtl/platform/media_native_audio.sv
+- sys/emu_ports.vh
+- sys/spdif.v
+- sys/sys_top.v
+- tools/build_three_seeds.py
+- tools/phase1p_timing.tcl
+- tools/test_media_duration_reader.sv
+- tools/test_media_keyboard_control.sv
+- tools/test_media_music_time.sv
+- tools/test_media_native_audio.sv
+- tools/test_media_pcm_i2s.sv
+- tools/verify_flac_integration.py
 
 #### Status:
 
