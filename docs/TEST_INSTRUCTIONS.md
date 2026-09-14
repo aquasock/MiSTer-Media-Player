@@ -52,24 +52,31 @@ python3 tools/verify_decoder_timing.py --playback-controls --display-ownership -
 
 Repeat the captured Pee Strike seek near 18.45 seconds with the fixed RBF,
 then test repeated forward seeks from both moving and paused playback, backward
-seeks, resume, and seeking past EOF. Keep the file loaded if first-fault telemetry
-appears. The diagnostic audio bypass comparison remains available.
+seeks, resume, and seeking past EOF. The diagnostic audio bypass comparison
+remains available. The older a229a01 test RBF includes first-fault telemetry;
+current source removes that additional overlay to recover placement capacity.
 
-# Retained seek diagnostics and audio comparison
+# Seek audio comparison and historical diagnostics
 
-The fixed build retains the first-fault observer and audio-bypass comparison.
+Current source retains the audio-bypass comparison and compact playback-health
+telemetry. The additional persistent seek-fault observer, mailbox and renderer
+are removed from production hardware. Playback and seek controls are unchanged.
 Use the same file, refresh setting and seek key for both runs:
 
 1. Set **Seek audio bypass** to **On**, reload `01 - Pee Strike.mpg`, and
    press Right once a few seconds into playback. Repeat with `fellow.mpg`.
-2. If it freezes, leave the file loaded for a screenshot. A new black/white
-   diagnostic block at x192/y280 records the first observed fault after a seek.
+2. If it freezes, leave the file loaded and record the file, playback position
+   and key command. Current source does not generate the seek-fault block.
 3. Set **Seek audio bypass** to **Off**, reload the same file and repeat.
    This disables only compressed MP2 frame bypass; file-position searching,
    PCM draining, target calculation and video reconstruction remain enabled.
    Set the option before reloading and do not change it during a seek.
 
-The new snapshot survives pause, later seeks and decoder restart. Reset or a
+The following applies only to historical RBFs with the seek-fault observer
+(such as a229a01), and their saved screenshots. The standalone observer test
+and screenshot decoder remain available for those records.
+
+The historical snapshot survives pause, later seeks and decoder restart. Reset or a
 new file clears it. Error-at-entry means flags were already present when the
 observer first saw the seek; it does not establish causality. After entry the
 first nonzero error or two seconds without decoder/presentation progress during

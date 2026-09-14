@@ -21,8 +21,6 @@ This project is still in active pre-release development. Published milestone rel
   at direct restart, with movie timestamp origin retained across seeks.
 - Direct seek control, real-file probe, byte-filter and PCM recovery regressions.
 
-- Persistent first-observed seek fault snapshot with decoder subcodes, state,
-  timestamps and queue observations, independent of seek/pause profiler resets.
 - Diagnostic OSD audio-bypass comparison and exact-MPG combined replay harness.
   The captured display-bank ownership freeze is addressed by the fix above.
 
@@ -73,6 +71,10 @@ This project is still in active pre-release development. Published milestone rel
 - Align telemetry coordinates with the framebuffer RGB/DE pipeline.
 
 ### Changed
+
+- Remove the added persistent seek-fault snapshot, clock-domain mailbox and
+  screen renderer from production hardware to recover placement capacity.
+  Compact playback-health telemetry and historical screenshot decoding remain.
 
 - Pause preserves queued movie PCM, sample phase, the displayed frame and the
   shared media clock while keeping raster, OSD and filters responsive.
