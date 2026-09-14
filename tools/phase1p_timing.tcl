@@ -110,13 +110,44 @@ foreach pattern {{*mp2_pcm_output:*|*} {*mp2_pcm_fifo:*|*} {*mp2_finished_sync*}
 }
 close $audio_audit
 # All three production clients must use one physical arithmetic engine.
+# Quartus duplicates high-fanout index bits during fitting. Count logical bits
+# after stripping its observed duplicate suffix, and independently reject any
+# other IDCT hierarchy (including engines without a surviving index register).
 set shared_idct_audit [open "$output_dir/shared_idct_audit.rpt" w]
-set shared_index_regs [get_collection_size [get_registers -nowarn {*mpeg2_h262_shared_idct:shared_idct|mpeg2_h262_idct:engine|transform_index[*]}]]
-set all_index_regs [get_collection_size [get_registers -nowarn {*mpeg2_h262_idct:*|transform_index[*]}]]
-puts $shared_idct_audit "Shared IDCT index registers: $shared_index_regs"
-puts $shared_idct_audit "All IDCT index registers: $all_index_regs"
+set expected_engine {emu:emu|mpeg2_h262_shared_idct:shared_idct|mpeg2_h262_idct:engine}
+set engine_names [list]
+foreach_in_collection reg [get_registers -nowarn {*mpeg2_h262_idct:*|*}] {
+    set name [get_register_info $reg -name]
+    if {![regexp {^(.*mpeg2_h262_idct:[^|]+)\|} $name unused engine]} {
+        error "Unrecognized IDCT hierarchy: $name"
+    }
+    lappend engine_names $engine
+}
+set engine_names [lsort -unique $engine_names]
+set index_names [list]
+set physical_index_names [list]
+foreach_in_collection reg [get_registers -nowarn {*mpeg2_h262_idct:*|transform_index[*]}] {
+    set name [get_register_info $reg -name]
+    lappend physical_index_names $name
+    regsub {~DUPLICATE$} $name {} logical_name
+    lappend index_names $logical_name
+}
+set index_names [lsort -unique $index_names]
+set expected_indices [list]
+for {set bit 0} {$bit < 6} {incr bit} {
+    lappend expected_indices [format {%s|transform_index[%d]} $expected_engine $bit]
+}
+puts $shared_idct_audit "IDCT engine hierarchies: [llength $engine_names]"
+puts $shared_idct_audit "Logical IDCT index bits: [llength $index_names]"
+puts $shared_idct_audit "Physical IDCT index registers: [llength $physical_index_names]"
+foreach name $engine_names {puts $shared_idct_audit "Engine: $name"}
+foreach name [lsort $physical_index_names] {puts $shared_idct_audit "Register: $name"}
+if {$engine_names ne [list $expected_engine] || $index_names ne $expected_indices} {
+    close $shared_idct_audit
+    error "Expected exactly one shared IDCT engine with all six logical index bits"
+}
+puts $shared_idct_audit "Shared IDCT audit: PASS"
 close $shared_idct_audit
-if {$shared_index_regs != 6 || $all_index_regs != 6} {error "Expected exactly one shared IDCT engine"}
 set cdc_audit [open "$output_dir/configuration_cdc_audit.rpt" w]
 foreach instance {eof_generation_config eof_complete_config subtitle_command_config subtitle_ack_config player_ui_config seek_file_config seek_file_echo_config seek_probe_config playback_control_config playback_position_config playback_audio_config playback_hide_reset_config refresh_request_config refresh_applied_config color_mode_config display_color_config media_prefill_config media_fatal_config reader_error_config aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
     if {[string first "|" $instance] < 0} {

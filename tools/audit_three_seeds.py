@@ -43,7 +43,8 @@ for seed in (52,61,87):
  expected_idct_rams=8 if shared_idct else 24
  if len(rows)!=expected_idct_rams:raise RuntimeError(f'Seed {seed}: expected {expected_idct_rams} IDCT intermediate M10Ks, found {len(rows)}')
  if shared_idct:
-  if shared_file.read_text().splitlines()!=['Shared IDCT index registers: 6','All IDCT index registers: 6']:raise RuntimeError('Shared IDCT engine audit failed')
+  shared_lines=shared_file.read_text().splitlines()
+  if shared_lines[:2]!=['IDCT engine hierarchies: 1','Logical IDCT index bits: 6'] or shared_lines[-1:]!=['Shared IDCT audit: PASS']:raise RuntimeError('Shared IDCT engine audit failed')
   staging_sites=set()
   for row in detail.splitlines():
    if 'mpeg2_h262_shared_idct:shared_idct' in row and 'coefficients' in row:
@@ -73,7 +74,7 @@ for seed in (52,61,87):
  passed=(not a.require_no_audio_test or audio_absent) and cdc and enable_ok and (not a.require_no_reporting or reporting_absent) and (not a.require_no_profiler or profiler_absent) and all(v>=0 for v in minima.values())
  item={'source':state['source'],'seed':seed,'corners':corners,'minimum_slack_ns':minima,
  'shared_idct_audit_passed':shared_idct,'audio_test_absent_and_pcm_retained':audio_absent,'reporting_absent':reporting_absent,'profiler_absent':profiler_absent,'scene_enable_audit_passed':enable_ok,'cdc_registers':len(lines),'cdc_audit_passed':cdc,'timing_passed':passed,'resource_budget_passed':budget,
- 'hardware_accepted':False,'rbf_sha256':info['rbf_sha256'],'resources':resources,
+ 'timing_audit_revision':info.get('timing_audit_revision',state['source']),'hardware_accepted':False,'rbf_sha256':info['rbf_sha256'],'resources':resources,
  'scope':a.scope}
  summary[str(seed)]=item
  out=base.parent/f'hardware-test-{state["source"][:7]}'/f'seed{seed}';out.mkdir(parents=True,exist_ok=True)

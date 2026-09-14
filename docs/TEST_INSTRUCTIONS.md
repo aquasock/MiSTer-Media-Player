@@ -11,8 +11,29 @@ seeks, reset/file replacement, subtitles/filters and EOF return to startup.
 Retain accepted 7eb5088 MEDIUM seed 61 as rollback. Differential transform,
 three-client timing, paired EOF/50 Hz seek and the real Pee Strike opening/seek
 replay pass. The latter confirms resumed audio/video without underrun or
-timestamp warning after the ten-second seek. Hardware acceptance and
-fitted resource/timing qualification of shared IDCT remain pending.
+timestamp warning after the ten-second seek. Hardware acceptance remains pending.
+
+**Preferred candidate: b639ccc MEDIUM seed 52**, available at
+`results/hardware-test-b639ccc/seed52/MediaPlayer_20260914.rbf`.
+Four-corner minimum setup/hold slack is +0.645/+0.081 ns for seed 52,
++0.458/+0.048 ns for seed 61, and -0.102/+0.105 ns for seed 87.
+Seeds 52 and 61 pass; seed 87 fails setup. Recovery/removal/pulse-width,
+183 synchronizer stages, diagnostic-removal and scene-enable checks pass.
+
+Seed 52 uses 35,908 placed ALMs, 512 M10Ks and 59 DSP blocks: savings of
+1,136 ALMs, 13 M10Ks and 16 DSPs versus the accepted baseline. Free capacity
+is 6,002 ALMs, 41 M10Ks and 53 DSP blocks. Estimated ALMs are 29,843;
+use the placed figure when discussing current physical headroom.
+
+The original post-fit audit falsely rejected Quartus `~DUPLICATE` index
+registers. The corrected audit requires one shared engine hierarchy and all
+six logical index bits, and records every physical copy. It also verifies
+eight intermediate M10Ks and three coefficient-staging M10Ks. Missing bits,
+extra engines and unrecognized suffixes are rejected. Only timing extraction
+was rerun on the original fitted databases; RTL, constraints and RBFs were
+unchanged. Build metadata records the audit revision separately from b639ccc.
+The build evidence is `results/build-b639ccc-20260914-135047`; the original
+failed audit logs remain alongside `timing-rerun.log` in each seed directory.
 
 The separate 7eb5088 HIGH-packing experiment completed: 36,245 placed ALMs
 (799 fewer), 31,461 estimated ALMs, 525 M10Ks and 75 DSPs. It fails setup at
