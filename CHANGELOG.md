@@ -10,7 +10,9 @@ This project is still in active pre-release development. Published milestone rel
 
 - Store each IDCT's intermediate transform results in eight synchronous M10K
   row banks. Column-ahead prefetch preserves arithmetic, output order and cycle
-  timing while replacing register storage. Hardware qualification pending.
+  timing while replacing register storage. Hardware accepted with seed 52;
+  actual placed ALMs fall from 37,790 to 35,774, using 24 additional M10Ks
+  (508 of 553 total).
 
 ### Fixed
 

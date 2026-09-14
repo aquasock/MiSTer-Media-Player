@@ -1,8 +1,8 @@
-# IDCT intermediate RAM candidate: 3ff27c8 seed 52
+# Accepted IDCT intermediate RAM build: 3ff27c8 seed 52
 
 Preferred RBF: `results/hardware-test-3ff27c8/seed52/MediaPlayer_20260914.rbf`.
 SHA-256: `236c9817ccfd04b10e23ff0ee052f2c11e5a39d7fcfdb88e3e42b29e969406f1`.
-Hardware acceptance is pending.
+Seed 52 is hardware accepted: the user reports everything works perfectly.
 
 Seeds 52 and 87 pass all four timing corners and the 153-register CDC audit.
 Seed 52 has minimum setup +0.133 ns and hold +0.110 ns; seed 87 has +0.067
@@ -48,7 +48,7 @@ display ownership using the existing replay tool.
 Quartus qualification must confirm all 24 intermediate banks infer M10K,
 measure total RAM blocks and actual placed ALMs separately from estimated
 ALMs, and pass all four timing corners plus 153 CDC registers. Compilation confirms 24 additional M10Ks (508 total).
-No candidate from this change is hardware accepted yet.
+Seed 52 from this change is hardware accepted by user report.
 
 On hardware test clean playback at both refresh rates, repeated forward and
 backward short/long seeks, pause and paused seeks, reload and EOF. Watch for
