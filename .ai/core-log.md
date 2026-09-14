@@ -1,3 +1,34 @@
+## 73 COMMIT Unreleased ??? 2026-09-14T08:49:53-07:00
+
+#### Coming From:
+
+Unreleased 9076405
+
+#### Purpose:
+
+Document revised duration build qualification and reproduce the reported conversion cadence failure.
+
+#### Outcome:
+
+The completed 3d48cc5 seeds 61 and 87 pass timing and audits; seed 87 is preferred, while seed 52 fails setup. Prepare hardware handoff documentation without deployment. The user's full-start encoding recipe reproduces repeated and skipped pictures in Groove and fellow independently of thread count. Compare the original fps filter with output CFR synchronization using bounded sample encodes and retain logs; full movie files remain unchanged.
+
+#### Next Steps:
+
+Publish the preferred binary path, timing and resources, preserve a reproducible short encoding comparison and document the verified command correction and its limits.
+
+#### Files Modified:
+
+- docs/TEST_INSTRUCTIONS.md
+- docs/ENCODING_CADENCE.md
+- tools/reproduce_encode_cadence.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 72 COMMIT Unreleased 9076405 2026-09-14T08:31:24-07:00
 
 #### Coming From:
@@ -1275,35 +1306,6 @@ The user reports that seed 88 froze in the same way after seeking. Fresh screens
 #### Next Steps:
 
 Extend the exact-file reproduction to the combined MPG/audio buffering path and add bounded playback-control state and decoder error subcode visibility if required to distinguish seek, pause, starvation and fatal decoder states.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 33 COMMIT Unreleased aad072a 2026-09-13T23:54:38-07:00
-
-#### Coming From:
-
-Unreleased aad072a
-
-#### Purpose:
-
-Record timing-qualified seed 88 and the first exact-file seek replay comparison.
-
-#### Outcome:
-
-The additional aad072a placement batch completed. Seed 88 passes all four timing corners with setup +0.084 ns, hold +0.103 ns, recovery +3.150 ns, removal +0.231 ns and pulse width +0.925 ns, and passes the 135-register CDC audit. It uses 40462 ALMs, 54737 registers, 480 RAM blocks, 69 DSPs and three PLLs; its RBF SHA-256 is 983a08a8f3b90befc3ea66a4fd9e64393493f7effca1cb62db43716d3522d52e. Seeds 53 and 62 fail setup at -0.131 and -0.059 ns respectively, with other timing categories and CDC passing. Batch times are 1210 to 1221 seconds. Seed 88 is hash verified and marked preferred under results/hardware-test-aad072a, with the unresolved seed-87 decoder failure explicitly documented. An exact-file video-only simulation of Pee Strike completed ordinary playback to four seconds and a forward seek from about 2.2 to 12.2 seconds without the hardware decoder error. Evidence is under results/seek-repro-pee, including bounded-stream provenance, extracted diagnostic harness, logs and diagnosis.json. This is a decoder/reconstruction comparison, not full MPG/audio buffering or FPGA timing reproduction. The initial short-fixture watchdog stopped before the seek; final runs disabled that cutoff and required explicit boundary completion. A log-reading wrapper exceeded memory after baseline simulation completed, but its underlying log records successful completion. The root cause remains unresolved and seed 88 is not hardware accepted. No reset, reload or deployment was performed.
-
-#### Next Steps:
-
-Compare the same early Right-arrow seek on timing-qualified seed 88; if the failure persists, extend the exact-file reproduction to MPG/audio buffering and expose the decoder error subcode needed to isolate it.
 
 #### Files Modified:
 
