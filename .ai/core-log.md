@@ -1,3 +1,32 @@
+## 32 COMMIT Unreleased aad072a 2026-09-13T18:40:17-07:00
+
+#### Coming From:
+
+Unreleased aad072a
+
+#### Purpose:
+
+Record faster successful seeks and the early forward-seek decoder failure in Pee Strike.
+
+#### Outcome:
+
+The user requested the best first-batch RBF and received hash-verified aad072a seed 87 with its -0.010 ns setup miss explicitly disclosed. The user reports successful skips are faster, but one Right-arrow press a few seconds into 01 - Pee Strike.mpg froze playback. Captures under results/telemetry-20260913-183433 and results/telemetry-20260913-183457 contain the same schema-10 snapshot with error_flags 0x0004, which maps to the aggregate decoder probe error. MP2 decode, timestamp and underrun flags and transport error are zero. The latched record shows 69 associated pictures, 25 reference pictures, final B-picture temporal reference 22, 105519 audio samples and transport generation two; counters are snapshot values, not live progress. The user identified the exact non-lower MPG. The Git drive contains its MP4 and lower MPG, so a bounded 16 MiB prefix of the exact 887078912-byte MiSTer file was retrieved into results/seek-repro-pee. Its video is progressive 720x480 at 30000/1001. A diagnostic replay of the first 450 pictures is being prepared with a forward seek around 2.2 seconds and detailed decoder error reporting. No reset, reload or deployment was performed. Additional placement seeds 53/62/88 remain running, but timing qualification alone cannot establish that this decoder failure is fixed.
+
+#### Next Steps:
+
+Compare ordinary playback and an in-flight forward seek on the exact opening stream, isolate the aggregate decoder error source, and validate a correction before hardware acceptance; finish the existing placement reports separately.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 31 COMMIT Unreleased aad072a 2026-09-13T18:30:07-07:00
 
 #### Coming From:
@@ -1339,39 +1368,6 @@ Sync to all three seed build directories, run the full timing build (margins hav
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 991 COMMIT Unreleased 14af685 2026-09-13T03:08:33-07:00
-
-#### Coming From:
-
-Unreleased 03b033f
-
-#### Purpose:
-
-Get precise live evidence of what is actually blocking decode, instead of continuing to guess from code reading after entry 990's targeted fix retested unchanged.
-
-#### Outcome:
-
-Deployed entry 990's build (seed99, only passing seed this cycle at a razor-thin +0.001ns margin; seed26/33/40/7/52 all failed timing) and asked the user to reload. Same symptom: `sent` frozen near 143588 bytes, `credit=0` held for 670,000+ poll cycles - functionally identical to the pre-990 stall. Rather than assume the fix was ineffective, pulled fresh telemetry and compared its *live* counter fields (decoder_stall_cycles, presentation_stall_cycles, destination_stall_cycles, b_stall_cycles - these keep incrementing until the one-shot arms, unlike the frozen scheduler_flags/error_flags fields) against a second screenshot: `presentation_stall_cycles` totaled only ~2.8M cycles and `destination_stall_cycles` was exactly 0 across the whole ~30-second session, while `decoder_stall_cycles`/`b_stall_cycles` accounted for nearly all of it (~1.79-1.8 billion cycles, matching the corner telemetry's 30-second no-commit fallback arm). This proves neither hold this session fixed (entry 986's `b_presentation_hold`, entry 990's `p_destination_ownership_hold`) has been the dominant blocker - both fixes are real and correct, but something else, further upstream, has actually been stalling decode almost since the start. That points at `mpeg2_new_decoder_stream_ready` itself, the picture bookkeeper's own `stream_ready` output in `mpeg2_h262_two_picture_probe_p_chain.sv`, gated by its internal `parser_ready`/`p_hold_effective`/`b_parse_hold`/`b_persistence_wait` terms. Traced one candidate (`p_implicit_reconstruct_request` disqualifying the persistence-tracking engine select) by code reading alone and found it was a dead end - implicit-reconstruct macroblocks complete through a separate signal (`reconstructed_seen`), not `persisted_seen`. Rather than keep guessing, asked the user how to proceed; they chose building a live diagnostic. Source `14af685` bundles the four gating terms plus their own sub-signals (`b_picture_inflight`, `b_seen`, `b_persistence_verified`, `b_error`, `b_candidate`, `b_transport`, `p_error_raw` - 12 bits total) into a new `stall_probe_debug` output from the bookkeeper, and adds a small one-shot capture in `MediaPlayer.sv` (mirroring this project's established armed-once-per-session pattern, not a live/continuously-updating signal, to avoid the CDC/timing risk that got the earlier `mpeg2_h262_live_deadlock_probe` removed) that arms after ~3 seconds of sustained real stall and latches that bundle plus `stream_ready`, both top-level holds, and the active/display frame banks. Published as corner-telemetry snapshot word 58, replacing a hardwired zero confirmed unused in this build's `DEADLINE_DIAGNOSTICS=1` configuration (the python decoder's only reads of words 58-62 are gated at schema versions this build's `SNAPSHOT_FORMAT` never reaches). `tools/test_telemetry_visibility.sv` (the profiler's existing regression) and `tools/test_two_picture_probe_abandon.sv` (entry 990's regression) both still pass unchanged against the real modules. `quartus_map` on seed99 is clean, 0 errors, same warning count; logic cells rose modestly (88426->88692), consistent with one new counter/register/comparator, not a structural change.
-
-#### Next Steps:
-
-Sync to all seed build directories and run the full timing build - given entry 990's cycle already left only one of six seeds passing (seed99, +0.001ns), this addition's extra logic may push even that seed over the edge; if all six fail, that needs its own resolution before any further hardware test. Once a passing seed deploys, ask the user to reload the file, let it run past 3 seconds of stall, and pull fresh telemetry - `stall_diag_valid` true means word 58 has real content; decode `stall_diag_*` to see exactly which of parser_ready/p_hold_effective/b_parse_hold/b_persistence_wait (and their own sub-terms) is false, and fix that specific mechanism next instead of the two already-fixed holds.
-
-#### Files Modified:
-
-- MediaPlayer.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- tools/decode-hardware-telemetry.py
-- tools/test_telemetry_visibility.sv
 
 #### Status:
 
