@@ -6,6 +6,12 @@ This project is still in active pre-release development. Published milestone rel
 
 ## [Unreleased]
 
+### Changed
+
+- Store each IDCT's intermediate transform results in eight synchronous M10K
+  row banks. Column-ahead prefetch preserves arithmetic, output order and cycle
+  timing while replacing register storage. Hardware qualification pending.
+
 ### Fixed
 
 - Seeking now retires the stopped display reader's retained DDR bank protection

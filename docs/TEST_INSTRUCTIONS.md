@@ -1,11 +1,46 @@
-# Row-buffer RAM conversion candidate
+# IDCT intermediate RAM conversion
+
+The current change moves only the intermediate arrays of all three IDCT
+instances into eight 8-by-24 M10K banks each. Coefficient storage, signed
+arithmetic, rounding and multiplier sharing are unchanged. Synchronous reads
+prefetch the next column to preserve the existing transform and sample cycles.
+RAM is not cleared on reset: reset cancels the transform, and a full first
+pass overwrites every location before the next second pass reads it.
+
+Run the differential test against hardware-accepted dc1dfc2:
+
+```sh
+python3 tools/verify_idct_storage.py --baseline dc1dfc2 --output results/idct-storage/equivalence
+python3 tools/verify_decoder_timing.py --playback-controls --display-ownership --output results/idct-storage/reconstruction
+```
+
+The differential test compares every output on every cycle, including all
+64 positive/negative coefficient impulses, dense signed extremes, 512 seeded
+sparse random blocks, reset at 133 transform offsets, immediate restart,
+simultaneous input controls and invalid overlap. Require identical samples
+and handshakes plus the full mixed-picture pixel oracle and seek recovery.
+Also replay the captured Pee Strike direct restart through shared DDR and
+display ownership using the existing replay tool.
+
+Quartus qualification must confirm all 24 intermediate banks infer M10K,
+measure total RAM blocks and actual placed ALMs separately from estimated
+ALMs, and pass all four timing corners plus 153 CDC registers. The budget
+is 24 additional M10Ks (508 total), not a measured result until compilation.
+No candidate from this change is hardware accepted yet.
+
+On hardware test clean playback at both refresh rates, repeated forward and
+backward short/long seeks, pause and paused seeks, reload and EOF. Watch for
+block corruption or stale images after seeking. Accepted dc1dfc2 seed 52 below
+is the rollback and must remain available.
+
+# Accepted row-buffer RAM conversion
 
 Source **dc1dfc2, seed 52** is the preferred candidate. All three seeds pass
 all four timing corners and all 153 CDC checks. Seed 52 has worst setup
 +0.437 ns and hold +0.089 ns. Its RBF is
 `results/hardware-test-dc1dfc2/seed52/MediaPlayer_20260914.rbf`.
 SHA-256: `7eb9a5bebc66423885d5865a40dc55ab24f28d3ff6f4743f05c3ebd394358ce6`.
-Hardware acceptance is pending.
+The user reports playback works perfectly like the previous accepted core.
 
 Seed 52 uses 37,790 actually placed ALMs (90.2%), with Quartus estimating
 31,925 ALMs needed (76.2%). These are different metrics. Against accepted

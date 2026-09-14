@@ -12,6 +12,8 @@
 // the same time, so they now share one registered bank of eight 24x15 signed
 // multipliers and one 48-bit balanced adder tree instead of synthesizing two
 // parallel multiplier/adder banks.  No transform precision is reduced.
+// Intermediate storage now uses eight synchronous M10K row banks with
+// column-ahead prefetch, preserving both multiplier issue and output cycles.
 //============================================================================
 
 module mpeg2_h262_idct
@@ -36,7 +38,7 @@ module mpeg2_h262_idct
 );
 
 reg signed [11:0] coeff [0:63];
-reg signed [23:0] temp [0:63];
+wire signed [23:0] temp_column [0:7];
 integer i;
 
 reg       capture_active;
@@ -161,6 +163,28 @@ wire issue_active = pass1_active || pass2_active;
 wire issue_pass2 = pass2_active;
 wire [5:0] pass1_row_base = {transform_index[5:3], 3'b000};
 
+// Eight row banks provide one complete column per cycle. During pass 2,
+// prefetch the NEXT column while the multiplier bank consumes this one.
+// Outside pass 2, preload column zero: on the final pass-1 retirement the
+// only write is row 7, column 7, so this read has no write collision.
+wire [2:0] temp_read_column = pass2_active ?
+    (transform_index[2:0] + 3'd1) : 3'd0;
+wire signed [23:0] temp_write_value = round_q14_to_q10(shared_sum);
+
+genvar temp_row;
+generate for (temp_row = 0; temp_row < 8; temp_row = temp_row + 1) begin : intermediate
+    (* ramstyle = "M10K" *) reg signed [23:0] row_data [0:7];
+    reg signed [23:0] column_q;
+    // No bulk reset: a complete pass 1 overwrites all 64 locations before
+    // pass 2 can consume them. Reset cancels the pipeline and masks writes.
+    always @(posedge clk) begin
+        if (!reset && pipe_valid && !pipe_pass2 && pipe_index[5:3] == temp_row)
+            row_data[pipe_index[2:0]] <= temp_write_value;
+        column_q <= row_data[temp_read_column];
+    end
+    assign temp_column[temp_row] = column_q;
+end endgenerate
+
 reg signed [23:0] operand0;
 reg signed [23:0] operand1;
 reg signed [23:0] operand2;
@@ -181,14 +205,14 @@ reg signed [14:0] basis7;
 
 always @* begin
     if (issue_pass2) begin
-        operand0 = temp[{3'd0, transform_index[2:0]}];
-        operand1 = temp[{3'd1, transform_index[2:0]}];
-        operand2 = temp[{3'd2, transform_index[2:0]}];
-        operand3 = temp[{3'd3, transform_index[2:0]}];
-        operand4 = temp[{3'd4, transform_index[2:0]}];
-        operand5 = temp[{3'd5, transform_index[2:0]}];
-        operand6 = temp[{3'd6, transform_index[2:0]}];
-        operand7 = temp[{3'd7, transform_index[2:0]}];
+        operand0 = temp_column[0];
+        operand1 = temp_column[1];
+        operand2 = temp_column[2];
+        operand3 = temp_column[3];
+        operand4 = temp_column[4];
+        operand5 = temp_column[5];
+        operand6 = temp_column[6];
+        operand7 = temp_column[7];
 
         basis0 = basis_q14(transform_index[5:3], 3'd0);
         basis1 = basis_q14(transform_index[5:3], 3'd1);
@@ -290,7 +314,6 @@ always @(posedge clk) begin
 
         for (i = 0; i < 64; i = i + 1) begin
             coeff[i] <= 12'sd0;
-            temp[i]  <= 24'sd0;
         end
     end
     else begin
@@ -312,7 +335,6 @@ always @(posedge clk) begin
                     block_complete <= 1'b1;
             end
             else begin
-                temp[pipe_index] <= round_q14_to_q10(shared_sum);
                 if (pipe_index == 6'd63) begin
                     pass2_active    <= 1'b1;
                     transform_index <= 6'd0;
