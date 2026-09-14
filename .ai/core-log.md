@@ -1,4 +1,4 @@
-## 55 COMMIT Unreleased ??? 2026-09-14T04:07:41-07:00
+## 55 COMMIT Unreleased 1349c82 2026-09-14T04:07:41-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Remove the diagnostic seek-audio menu switch while retaining normal compressed-a
 
 #### Outcome:
 
-The user authorized removing the Seek audio bypass menu entry during a read-only historical RAM optimization audit. Remove the option and its one-bit CDC mailbox, connect MP2 seeking directly to media_seeking and remove the obsolete mailbox from the timing audit, reducing required synchronizer checks from 159 to 153. Preserve the existing bypass algorithm and full-frame synthesis preroll; saved status bit seven must no longer affect behavior. Separately, Git history confirms that progressive restoration 9233f07 lost the 047f5b2 parser row-buffer BRAM conversion and 6e44472 configuration-ROM BRAM enable. Current P and B row_bytes arrays are each 512 by 8 with combinational reads, and CONF_STR_BRAM defaults to zero. Historical entry 420 records 7082 fewer estimated ALMs and two additional RAM blocks for the row-buffer conversion, followed by hardware acceptance in entry 422; those historical savings are not a current-build prediction. Large residual plans and shared residual storage already use M10K. The attempted 19-to-20-bit coefficient padding in 5fb7d5d saved nothing because synthesis removed the unused bit and was reverted by 3e89189. No RAM conversion is authorized or implemented in this menu-removal boundary.
+The user authorized removing the Seek audio bypass menu entry during a read-only historical RAM optimization audit. Source 1349c82 removes the option and its one-bit CDC mailbox, connects MP2 seeking directly to media_seeking and removes the obsolete mailbox from the timing audit, reducing required synchronizer checks from 159 to 153. The existing bypass algorithm and full-frame synthesis preroll are preserved; saved status bit seven no longer affects behavior. MP2 quantizer and joint-stereo tests pass exact resumed PCM comparisons across two reset sessions, normal and wrapped timestamps, and one-byte, 582-byte and false-header 1604-byte startup prefixes. Evidence is under results/menu-removal. No builds or hardware changes were made. Separately, Git history confirms that progressive restoration 9233f07 lost the 047f5b2 parser row-buffer BRAM conversion and 6e44472 configuration-ROM BRAM enable. Current P and B row_bytes arrays are each 512 by 8 with combinational reads, and CONF_STR_BRAM defaults to zero. Historical entry 420 records 7082 fewer estimated ALMs and two additional RAM blocks for the row-buffer conversion, followed by hardware acceptance in entry 422; those historical savings are not a current-build prediction. Large residual plans and shared residual storage already use M10K. The attempted 19-to-20-bit coefficient padding in 5fb7d5d saved nothing because synthesis removed the unused bit and was reverted by 3e89189. No RAM conversion is authorized or implemented in this menu-removal boundary.
 
 #### Next Steps:
 
-Remove the diagnostic control, update documentation, verify the MP2 seek regression and reduced audit list, commit and push without launching builds. Recommend porting the historical row-buffer conversion with differential parser and current seeking tests, followed by the smaller configuration-ROM change, as the next resource-recovery work.
+Menu removal is ready for the next build; adapt future build summaries to 153 CDC checks. Recommend porting the historical row-buffer conversion with differential parser and current seeking tests, followed by the smaller configuration-ROM change, as the next resource-recovery work.
 
 #### Files Modified:
 
