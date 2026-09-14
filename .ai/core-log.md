@@ -1,3 +1,36 @@
+## 63 COMMIT Unreleased ??? 2026-09-14T06:07:40-07:00
+
+#### Coming From:
+
+Unreleased ea05269
+
+#### Purpose:
+
+Implement the approved shared playback overlay and bounded timestamp duration probe for hardware validation.
+
+#### Outcome:
+
+The user authorized continuing to the next build after the design and encoding discussion. Implement the approved UI_OVERLAY_PLAN using the accepted 3ff27c8 runtime baseline: post-scaler progress and Elapsed, Total and Remaining fields, pause and seek feedback, frame-atomic shared text and rectangle publication, and a bounded head/tail timestamp probe through the existing mounted-file reader. Unknown duration remains explicit. Subtitle loading, parsing and cue selection remain deferred, and existing stock Main, keyboard controls, HDMI modes and decoder behavior are retained. Target at most 2000 additional actual placed ALMs and 12 M10Ks, subject to measured fit.
+
+#### Next Steps:
+
+Implement and verify rendering, asynchronous publication, duration endpoint qualification and safe reader ownership retirement. Run existing reconstruction and exact-file seek regressions, commit and push tested source, then compile clean seeds 52, 61 and 87 and audit all timing corners and resource use. Package a timing-qualified candidate for user testing without deploying it.
+
+#### Files Modified:
+
+- docs/UI_OVERLAY_PLAN.md
+- MediaPlayer_top_00.svh
+- sys/sys_top.v
+- sys/emu_ports.vh
+- files.qip
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 62 COMMIT Unreleased ea05269 2026-09-14T05:41:58-07:00
 
 #### Coming From:
@@ -1263,35 +1296,6 @@ None.
 
 - [ ] Built
 - [x] Passed
-
----
-
-## 23 COMMIT Unreleased 6da4771 2026-09-13T16:01:34-07:00
-
-#### Coming From:
-
-Unreleased 0b6eb0e
-
-#### Purpose:
-
-Generate deterministic motion-focused media for visual refresh-rate qualification.
-
-#### Outcome:
-
-Implemented the reproducible motion-test generator and produced approximately 60-second progressive 720x480 clips at 25 and 30000/1001 fps, each in raw M2V and silent-audio MPG form. Sharp constant-speed bars, panning fences and frame IDs expose uneven frame holds while keeping source speed fixed during refresh switches. All four files pass complete FFmpeg decoding and ffprobe checks for exact rate, progressive geometry and expected frame count (1500 or 1798). Representative frames were visually inspected. Media, comparison instructions, previews and SHA-256 manifests are under results/cadence-motion-tests. Python syntax and git whitespace checks pass. No RTL changed or FPGA build was required; hardware comparison of these new clips remains pending.
-
-#### Next Steps:
-
-Have the user compare the same 25 fps clip at 50 and 59.94 Hz, then use the 29.97 fps clip as the reverse control; close the OSD and keep filters constant during each observation. Confirm actual output refresh with display signal information when available.
-
-#### Files Modified:
-
-- tools/make_cadence_motion_tests.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
 
 ---
 
