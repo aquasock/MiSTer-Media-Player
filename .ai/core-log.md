@@ -1,3 +1,32 @@
+## 86 COMMIT Unreleased ??? 2026-09-14T12:09:09-07:00
+
+#### Coming From:
+
+Unreleased a406feb
+
+#### Purpose:
+
+Implement gate-two reporting removal and frozen MPEG2FPGA repository cleanup.
+
+#### Outcome:
+
+The user explicitly authorizes proceeding to gate two after receiving gate-one seed 52; no separate detailed four-file test report was supplied. Replace seek/EOF use of scheduler debug bits with identical named functional outputs. Remove the telemetry mailbox, minimum-reservoir statistics, sample-count/warning clock crossings, profiler-only seconds reporting and dead LED-success logic. Disconnect observation-only leaf ports so synthesis removes their counters while retaining simulation observability; audit removal in the fitted netlist. Preserve live timeout quarantine, fatal checks, FIFO readiness, byte positions, generation tags, audio-finished CDC and the 90 kHz timebase. Remove the inactive frozen MPEG2FPGA copy and unused integration wrappers, update current documentation and preserve necessary attribution. Keep Audio test for gate three. Run relevant decoder, audio, control, reader, subtitle and EOF regressions and build three seeds; report timing without launching additional closure work per the user's standing preference.
+
+#### Next Steps:
+
+Implement and validate gate two, qualify seeds 52/61/87 and provide the preferred RBF for four-file testing; do not start gate three without user authorization.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 85 COMMIT Unreleased a406feb 2026-09-14T12:07:01-07:00
 
 #### Coming From:
@@ -1298,37 +1327,4 @@ None.
 - [ ] Passed
 
 ---
-
-## 46 COMMIT Unreleased 3ab6615 2026-09-14T02:49:40-07:00
-
-#### Coming From:
-
-Unreleased 2fac1cb
-
-#### Purpose:
-
-Reduce duplicate direct-seek registers and search arithmetic after placement exceeded device capacity.
-
-#### Outcome:
-
-Source 3ab6615 removes 115 duplicate register bits by using seek-point output fields as candidate storage until found validates them, then freezing the result. Search midpoint calculation uses one widened sum instead of subtraction plus addition; the timestamp-distance borrow also supplies the before-target comparison. Offset and timestamp widths, PTS association, probe limits and tagged restart handshakes are retained. The new observer regression passes timestamp association, late PTS rejection, stalled input, stable publication, reset and addresses above 4 GiB. Existing VBR, timestamp-wrap, bounded fallback, open-GOP filtering and asynchronous paused forward/backward restart tests pass. All four actual Pee Strike prefix probes exactly match the prior implementation, including landing addresses, byte counts and probe counts; the 300-second case is bounded-prefix EOF fallback, not full-movie playback. Evidence is under results/direct-seek/reduction. The user requested stopping seeds 52 and 61, but both had already exited with fitter capacity failures before the stop attempt; no Quartus jobs remain. Seed 87 had required 4198 LABs against 4191 available. No new RBF was produced, and no new builds or deployment were started. Physical resource savings and timing are not measured by these simulations.
-
-#### Next Steps:
-
-Keep Quartus builds on hold until requested, then compile the reduced source and audit resource fit, timing and all 165 CDC registers before packaging a candidate for hardware acceptance. The previous a229a01 seed 87 remains the available timing-qualified rollback.
-
-#### Files Modified:
-
-- rtl/media_seek_point.sv
-- rtl/media_seek_search.sv
-- tools/test_media_seek_point.sv
-- tools/verify_direct_seek.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
 
