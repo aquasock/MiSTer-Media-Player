@@ -1,3 +1,41 @@
+## 56 COMMIT Unreleased ??? 2026-09-14T04:11:41-07:00
+
+#### Coming From:
+
+Unreleased 1349c82
+
+#### Purpose:
+
+Restore the P and B parser row-buffer block-memory conversion to recover logic capacity.
+
+#### Outcome:
+
+The user approved restoring the historical 047f5b2 row-buffer conversion. Its seven RTL-file patch applies cleanly to current source 1349c82. Each 512-byte row buffer will use synchronous M10K reads with current/next-byte prefetch and shadow head/tail registers for the two-byte rollover, preserving bit-parser timing and the current progressive decoder, seeking and audio paths. This boundary does not change menu-ROM storage or packing effort. Historical area savings are not assumed for the current design.
+
+#### Next Steps:
+
+Port the conversion, add a reproducible differential parser runner comparing current baseline against modified RTL with strict failure checks, run current reconstruction and seek regressions, then commit and push. Build clean seeds 52, 61 and 87, confirm two row RAMs are inferred, measure actual placed ALMs and RAM usage, audit all timing corners and 153 CDC registers, and deliver the best candidate without automatic deployment.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- tools/verify_row_buffer_equivalence.py
+- CHANGELOG.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 55 COMMIT Unreleased 1349c82 2026-09-14T04:07:41-07:00
 
 #### Coming From:
@@ -1267,35 +1305,6 @@ Complete the three clean builds, record all four timing corners and resources, a
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 16 COMMIT Unreleased 24d3de0 2026-09-13T14:25:07-07:00
-
-#### Coming From:
-
-Unreleased 24d3de0
-
-#### Purpose:
-
-Record the user's successful hardware validation of the color-matrix build.
-
-#### Outcome:
-
-The user reports that all tests pass and that every change outlined in the supplied README was observed on hardware. This accepts the requested visual color-matrix checks following delivery of the recommended 24d3de0 seed 52 candidate, which already passes all four timing corners and the 96-register CDC audit. Seed 52 is associated with this acceptance from the handoff context; the running RBF hash was not independently captured. The user's observation is the hardware evidence, and no additional screen capture was taken. Local acceptance metadata is retained under results/hardware-test-24d3de0/seed52. Gamma and gamut conversion remain excluded.
-
-#### Next Steps:
-
-Retain 24d3de0 seed 52 as the accepted baseline and await the next requested development task; no additional build or release is required for this validation cycle.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
