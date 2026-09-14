@@ -1,4 +1,4 @@
-## 70 COMMIT Unreleased ??? 2026-09-14T08:02:17-07:00
+## 70 COMMIT Unreleased 9076405 2026-09-14T08:02:17-07:00
 
 #### Coming From:
 
@@ -10,20 +10,22 @@ Recover bounded duration for sparse-timestamp progressive program streams.
 
 #### Outcome:
 
-The user authorizes the next duration fix after Groove.mpg exposes conservative rejection of pictures without individual PTS. Clarification explicitly keeps loading fast and permits unknown duration when bounded evidence is insufficient; no full-file scan is authorized or required. Use picture temporal references and supported progressive frame periods to interpolate within timestamp-anchored groups, respect group resets and reordering, and retain conservative rejection of malformed, discontinuous or genuinely unanchored endpoints. Preserve the existing head/tail byte budgets, reader ownership and startup watchdog. Validate real Groove windows and additional playable files against independently decoded presentation timing, plus adversarial reorder, sparse timestamp, group transition, truncation and timestamp-wrap cases before clean build qualification.
+The user clarified that loading must remain fast and unknown duration is acceptable when bounded evidence is insufficient. The corrected observer uses progressive picture temporal references to reconstruct timestamps within anchored groups, unwrap reference-picture indices across modulo-1024 transitions and position B-pictures before their future reference. Late B-picture timestamps can backfill an earlier-coded reference endpoint, and anchored group endpoints carry into following unannotated groups. One serial multiplier computes offsets without DSPs. Conflicting anchors beyond one 90 kHz tick, unsupported/mixed rates, malformed endpoints and genuinely unanchored windows remain unknown. Existing byte budgets, reader ownership and watchdog are unchanged. All 32 synthetic cases, shared-reader remount/error/timeout and above-4-GiB tests, and Verilator lint pass. Exact bounded head/tail comparisons against independently decoded frames pass Groove, Star Wars LOWER, Pee Strike and fellow; Groove differs by three quarter-ticks, the other endpoints match exactly. Evidence is under results/ui-duration-sparse. No hardware deployment occurred.
 
 #### Next Steps:
 
-Implement and regress the duration observer correction, then build and audit clean seeds 52, 61 and 87 and package the best qualified RBF for user testing.
+Build clean seeds 52, 61 and 87, audit all four corners and 159 CDC registers plus scene enable, compare incremental resources with tested b00920a seed 52 and package the best qualified candidate.
 
 #### Files Modified:
 
+- CHANGELOG.md
+- docs/TEST_INSTRUCTIONS.md
+- docs/UI_OVERLAY_PLAN.md
+- files.qip
+- rtl/media_duration_timeline.sv
 - rtl/media_duration_window.sv
 - tools/test_media_duration_window.sv
 - tools/verify_ui_duration.py
-- docs/UI_OVERLAY_PLAN.md
-- docs/TEST_INSTRUCTIONS.md
-- CHANGELOG.md
 
 #### Status:
 
