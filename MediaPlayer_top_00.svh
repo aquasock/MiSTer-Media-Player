@@ -171,7 +171,7 @@ media_seek_search media_seek_search(
 reg [2:0] media_osd_sync=0;
 always @(posedge clk_sys) media_osd_sync<={media_osd_sync[1:0],OSD_STATUS};
 media_keyboard_control #(.RESTART_BOTH_DIRECTIONS(1)) media_keyboard_control(
- .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.enabled(media_file_size!=0),
+ .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.enabled(media_file_size!=0 && !media_duration_busy),
  .osd_open(media_osd_sync[2]),.key(ps2_key),.elapsed_q(media_elapsed_sys),
  .seek_done(media_seek_done_sys && !media_search_busy),.restart_complete(media_reader_start && !media_probe_sys),
  .paused(media_paused_sys),.seek_active(media_seek_sys),
@@ -187,23 +187,43 @@ always @(posedge clk_sys) begin
     if(RESET) media_file_size<=0;
     else if(media_img_mounted[0]) media_file_size<=media_img_size;
 end
+// Duration preflight owns the same reader until every accepted response drains.
+wire media_duration_busy,media_duration_start,media_duration_cancel,media_duration_ready;
+wire media_duration_valid;
+wire [34:0] media_duration_q;
+wire [63:0] media_duration_size,media_duration_offset;
+media_duration_probe media_duration_probe(
+ .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.file_size(media_file_size),
+ .reader_idle(media_reader_idle),.reader_error(media_error),
+ .stream_data(media_stream_data),.stream_valid(media_stream_valid),.stream_ready(media_duration_ready),
+ .busy(media_duration_busy),.reader_start(media_duration_start),.reader_cancel(media_duration_cancel),
+ .read_size(media_duration_size),.read_offset(media_duration_offset),
+ .duration_valid(media_duration_valid),.duration_q(media_duration_q),.origin());
+assign PLAYER_UI_CLOCK=clk_sys;
+media_ui_state player_ui_state(
+ .clk(clk_sys),.reset(RESET),.new_file(media_new_file),
+ .loaded(media_file_size!=0 && !media_duration_busy && !media_fifo_reset),
+ .paused(media_paused_sys),.seeking(media_seek_sys),
+ .elapsed_q(media_elapsed_sys),.target_q(media_target_sys),
+ .duration_q(media_duration_q),.duration_valid(media_duration_valid),.scene_state(PLAYER_UI_STATE));
 media_session_control #(.ENABLE_START_READY(1)) media_session_control (
  .clk_sys(clk_sys),.clk_mpeg2(clk_mpeg2),.reset(RESET),.restart(media_restart),
  .reader_idle(media_reader_idle),.ddr_idle(media_ddr_idle),
- .start_ready(media_search_echo==media_search_tag),
+ .start_ready(media_search_echo==media_search_tag && !media_duration_busy),
  .reader_cancel(media_reader_cancel),.fifo_reset(media_fifo_reset),
  .reader_start(media_reader_start),.quiesce(media_quiesce),
  .decoder_reset(media_decoder_reset),.generation(media_generation)
 );
 media_file_reader media_file_reader (
- .clk(clk_sys),.reset(RESET),.start(media_reader_start && media_file_size!=0),
- .cancel(media_reader_cancel || media_fatal_sys),.suspend(1'b0),
- .file_size(media_file_size),.start_offset({23'd0,media_start_offset}),
+ .clk(clk_sys),.reset(RESET),.start(media_duration_busy ? media_duration_start : (media_reader_start && media_file_size!=0)),
+ .cancel(media_duration_busy ? media_duration_cancel : (media_reader_cancel || media_fatal_sys)),.suspend(1'b0),
+ .file_size(media_duration_busy ? media_duration_size : media_file_size),
+ .start_offset(media_duration_busy ? media_duration_offset : {23'd0,media_start_offset}),
  .sd_lba(media_sd_lba[0]),.sd_blk_cnt(media_sd_blocks[0]),.sd_rd(media_sd_rd[0]),
  .sd_ack(media_sd_ack[0]),.sd_buff_wr(media_sd_wr),
  .sd_buff_addr(media_sd_addr),.sd_buff_dout(media_sd_data),
  .stream_data(media_stream_data),.stream_valid(media_stream_valid),
- .stream_ready(!mpeg2_stream_full && !media_fifo_reset),.idle(media_reader_idle),
+ .stream_ready(media_duration_busy ? media_duration_ready : (!mpeg2_stream_full && !media_fifo_reset)),.idle(media_reader_idle),
  .byte_position(media_byte_position),.requests(media_requests),
  .completions(media_completions),.max_wait(media_max_wait),.error(media_error)
 );
@@ -582,7 +602,7 @@ audio_pcm_output_adapter audio_pcm_output_adapter
 // Before the first slice is selected, bytes flow continuously for start-code/header
 // parsing.  During slice parsing the bitreader stalls this FIFO whenever its
 // current payload byte has not been fully consumed, including IQ/IDCT waits.
-assign mpeg2_stream_wr = media_stream_valid && !mpeg2_stream_full && !media_fifo_reset;
+assign mpeg2_stream_wr = !media_duration_busy && media_stream_valid && !mpeg2_stream_full && !media_fifo_reset;
 assign mpeg2_fifo_data=media_fifo_data[7:0];
 wire media_eof_at_head=!mpeg2_stream_empty && media_fifo_data[8];
 wire media_data_read;

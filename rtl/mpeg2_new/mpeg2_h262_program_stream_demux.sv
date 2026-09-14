@@ -26,7 +26,7 @@
 // ready/valid streams, each with its own directly-attached PTS, so nothing
 // downstream needs to parse an invented escape protocol back out again.
 //============================================================================
-module mpeg2_h262_program_stream_demux #(parameter ENABLE_FILE_POSITION=0)
+module mpeg2_h262_program_stream_demux #(parameter ENABLE_FILE_POSITION=0, parameter STRICT_TIMESTAMPS=0)
 (
     input  wire        clk,
     input  wire        reset,
@@ -50,7 +50,8 @@ module mpeg2_h262_program_stream_demux #(parameter ENABLE_FILE_POSITION=0)
     output reg         stream_end,
     output reg         demux_error,
     input wire [40:0] input_file_position,
-    output reg [40:0] video_file_position, video_pack_position
+    output reg [40:0] video_file_position, video_pack_position,
+    output wire packet_boundary
 );
 
 localparam [4:0]
@@ -97,6 +98,7 @@ assign in_ready = (!video_valid || video_ready) &&
                   (!audio_valid || audio_ready);
 
 wire accept = in_valid && in_ready;
+assign packet_boundary = state==S_SYNC && zero_run==0 && !video_valid;
 reg [40:0] pack_position;
 always @(posedge clk) begin
     if(reset) begin pack_position<=0; video_file_position<=0; video_pack_position<=0; end
@@ -319,6 +321,7 @@ always @(posedge clk) begin
                     payload_len    <= legacy_ts_payload_calc[15:0];
                     pts_is_legacy  <= 1'b1;
                     legacy_has_dts <= (in_data[7:4] == 4'h3);
+                    if (STRICT_TIMESTAMPS && !in_data[0]) demux_error <= 1;
                     pts_pending    <= 1'b1;
                     // This marker byte is already being shifted into
                     // pts_shift below, unlike the MPEG-2 path (which
@@ -375,6 +378,7 @@ always @(posedge clk) begin
                     payload_len    <= legacy_ts_payload_calc[15:0];
                     pts_is_legacy  <= 1'b1;
                     legacy_has_dts <= (in_data[7:4] == 4'h3);
+                    if (STRICT_TIMESTAMPS && !in_data[0]) demux_error <= 1;
                     pts_pending    <= 1'b1;
                     // This marker byte is already being shifted into
                     // pts_shift below, unlike the MPEG-2 path (which
@@ -429,6 +433,7 @@ always @(posedge clk) begin
                     payload_len    <= legacy_ts_payload_calc[15:0];
                     pts_is_legacy  <= 1'b1;
                     legacy_has_dts <= (in_data[7:4] == 4'h3);
+                    if (STRICT_TIMESTAMPS && !in_data[0]) demux_error <= 1;
                     pts_pending    <= 1'b1;
                     // This marker byte is already being shifted into
                     // pts_shift below, unlike the MPEG-2 path (which
@@ -494,6 +499,10 @@ always @(posedge clk) begin
         end
 
         S_PES_PTS: begin
+            if (STRICT_TIMESTAMPS && ((pts_byte_index==0 &&
+                (in_data[7:4] != (pts_dts_flags==3 ? 4'h3 : 4'h2) || !in_data[0])) ||
+                ((pts_byte_index==2 || pts_byte_index==4) && !in_data[0])))
+                demux_error <= 1;
             pts_shift      <= {pts_shift[31:0], in_data};
             pts_byte_index <= pts_byte_index + 3'd1;
             if (pts_byte_index == 3'd4) begin

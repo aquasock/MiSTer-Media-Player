@@ -95,3 +95,13 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_playback_control.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_seek_point.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_seek_search.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_seek_video_filter.sv
+
+# Shared player UI and bounded duration preflight
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_duration_window.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_duration_probe.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_ui_state.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_ui_divider.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_ui_scene.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_overlay_compositor.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_player_overlay.sv
+set_global_assignment -name HEX_FILE rtl/media_overlay_font.hex

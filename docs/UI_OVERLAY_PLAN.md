@@ -1,8 +1,72 @@
 # Unified playback overlay
 
-Design baseline: hardware-accepted `3ff27c8` seed 52. This document and the
-[interactive preview](ui/overlay-preview.html) describe the proposed runtime
-change. They do not add an overlay to the current RBF.
+Implementation baseline: hardware-accepted `3ff27c8` seed 52. The shared
+renderer and duration preflight now implement this design in RTL; hardware
+qualification is pending. The [interactive preview](ui/overlay-preview.html)
+remains a design aid; deterministic RTL renderings are produced by the tests.
+
+## Implemented interface and bounds
+
+`media_ui_state` produces a coherent 91-bit presentation snapshot in the
+20 MHz core system domain. `player_ui_config` transfers it to HDMI with the
+existing coalescing request/acknowledge mailbox. `media_ui_scene` assembles an
+inactive scene there, using a sequential divider and serialized progress
+multiplication. The compositor acknowledges publication only at the next VS
+rising edge. Session/seek epochs reject stale scenes without blocking playback.
+The actual pixel pipeline delays RGB, HS, VS and DE together by five registers.
+
+The scene holds eight text objects (64 eight-bit glyph IDs each) and four
+rectangles. Slots 0–3 carry controls; slots 4–7 are reserved for a retained
+auxiliary provider. Its text/object writes precede `aux_commit`; publication
+waits for a complete provider transaction. Epoch mismatch suppresses an old
+provider, and controls visibility never clears its retained content. Production
+ties this interface inactive, so synthesis may remove unused provider storage.
+Synthetic-provider tests exercise the interface without implementing subtitles.
+
+The palette and 5×7 glyphs follow the historical reference. Font scale uses
+quarter-pixel units (4, 6 and 9 at 480, 720 and 1080 lines), equally on both
+axes; object positions follow active-output proportions. Other output heights
+use the nearest lower supported scale tier. The unknown-duration hatch selects
+the dark alpha palette over the video in the one composition pass.
+
+Duration preflight reads at most 64 KiB from the head and 4 MiB from the tail.
+It first finds a pack prefix and then reuses a separate, strictly checked
+instance of the existing PES parser; it does not duplicate the reader RAM.
+The first head video PTS is the movie origin. The tail requires sequence/rate
+metadata, timestamped pictures, slice evidence and a complete packet boundary.
+It retains the maximum relative PTS plus a progressive frame period, rather
+than taking the last decoded B-picture timestamp. Missing timestamps after
+the latest maximum leave the endpoint unknown. Earlier missing timestamps can
+be superseded by a later qualified maximum in the continuous-timeline scope.
+This is header-based endpoint qualification, not a full tail decode or proof
+of arbitrary concatenated-file continuity. Repeat-field/extended-rate cases,
+ambiguous half-wrap spans, malformed headers and insufficient evidence remain
+unknown. A presented position beyond the qualified endpoint invalidates it.
+The 25-second preflight watchdog stops work; an outstanding storage request
+still has to retire before playback can safely take ownership.
+
+The current reader's existing 2 TiB implementation limit remains unchanged.
+The probe cache survives ordinary seeks, and a new mount/reload invalidates it.
+Normal codec delivery remains blocked by the session gate throughout preflight.
+No extra seek probe or duration byte-ratio estimate is introduced.
+
+Regression commands:
+
+```sh
+python3 tools/verify_ui_duration.py --media path/to/a/complete/test.mpg
+python3 tools/verify_player_overlay.py
+python3 tools/verify_media_file_reader.py
+python3 tools/verify_decoder_timing.py --playback-controls --display-ownership --output results/ui-overlay/reconstruction
+```
+
+`verify_ui_duration.py` checks synthetic endpoint cases and actual shared-reader
+retirement, including offsets above 4 GiB. The optional complete MPEG check
+compares the endpoint with ffprobe timestamps plus the exact frame period.
+`verify_player_overlay.py` checks every pixel at three HDMI sizes, time fields,
+unknown/hidden states, pause/seek, progress endpoints, timing alignment and
+retained-provider/epoch behavior. The synthesis CDC audit now expects 159
+preserved synchronizer registers, including the new six-stage mailbox.
+
 
 ## Scope
 

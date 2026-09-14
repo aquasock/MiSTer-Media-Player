@@ -23,6 +23,16 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Shared post-filter HDMI player overlay with the DVD-era progress bar and
+  Elapsed, Total and Remaining fields. Pause and seek feedback auto-hides after
+  ten seconds; the stock MiSTer menu stays above the player UI.
+- Bounded head/tail timestamp duration preflight through the existing mounted
+  file reader. Unavailable duration displays `--:--:--` and a patterned track.
+- Frame-atomic glyph/rectangle scenes and retained provider interfaces for
+  future subtitles. Subtitle loading and cue selection are not implemented.
+- Full-frame overlay pixel, scene lifetime, duration and response-retirement
+  regressions. FPGA timing/resource and hardware qualification are pending.
+
 - Direct timestamp-guided MPG seeking in both directions, including unseen
   destinations, with bounded byte-position probes and nearby reconstruction.
 - Partial MP2 frame resynchronization and open-GOP leading B-picture removal

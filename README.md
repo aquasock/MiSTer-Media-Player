@@ -56,6 +56,13 @@ the displayed frame and queued samples while silencing movie audio. Seeking
 while paused leaves the destination paused. Additional seek commands are
 ignored while a seek is in progress; Space still controls the final pause state.
 
+The scaled HDMI player overlay shows Elapsed, Total and Remaining above a
+progress bar. It appears at startup and on play/pause or seek activity, remains
+visible during a seek, and hides ten seconds afterward. Opening a file first
+performs a bounded timestamp probe; when duration cannot be qualified, Total
+and Remaining show `--:--:--`. The MiSTer menu remains above the player overlay.
+This overlay awaits hardware qualification; subtitle playback is not included.
+
 MPG seeks in either direction probe file positions for timestamped sequence
 headers and I-pictures, then restart nearby and decode the short lead-in.
 This works for previously unseen content without decoding the whole skipped

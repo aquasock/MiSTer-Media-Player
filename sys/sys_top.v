@@ -1238,6 +1238,13 @@ cyclonev_hps_interface_peripheral_i2c hdmi_i2c
 	wire [23:0] hdmi_data_osd;
 	wire        hdmi_de_osd, hdmi_vs_osd, hdmi_hs_osd;
 
+	wire [23:0] hdmi_data_player;
+	wire hdmi_hs_player,hdmi_vs_player,hdmi_de_player;
+	media_player_overlay player_overlay(
+	 .control_clk(player_ui_clock),.video_clk(clk_hdmi),.control_state(player_ui_state),
+	 .rgb(hdmi_data_mask),.hs(hdmi_hs_mask),.vs(hdmi_vs_mask),.de(hdmi_de_mask),
+	 .rgb_out(hdmi_data_player),.hs_out(hdmi_hs_player),.vs_out(hdmi_vs_player),.de_out(hdmi_de_player));
+
 	osd hdmi_osd
 	(
 		.hide_message(osd_hide_message),
@@ -1248,10 +1255,10 @@ cyclonev_hps_interface_peripheral_i2c hdmi_i2c
 		.io_din(io_din),
 
 		.clk_video(clk_hdmi),
-		.din(hdmi_data_mask),
-		.hs_in(hdmi_hs_mask),
-		.vs_in(hdmi_vs_mask),
-		.de_in(hdmi_de_mask),
+		.din(hdmi_data_player),
+		.hs_in(hdmi_hs_player),
+		.vs_in(hdmi_vs_player),
+		.de_in(hdmi_de_player),
 
 		.dout(hdmi_data_osd),
 		.hs_out(hdmi_hs_osd),
@@ -1821,6 +1828,8 @@ wire [13:0] fb_stride;
 	assign fb_stride = 0;
 `endif
 
+wire player_ui_clock;
+wire [90:0] player_ui_state;
 emu emu
 (
 	.CLK_50M(FPGA_CLK2_50),
@@ -1847,6 +1856,8 @@ emu emu
 	.HDMI_HEIGHT(direct_video ? 12'd0 : hdmi_height),
 	.HDMI_FREEZE(freeze),
 	.OSD_HIDE_MESSAGE(osd_hide_message),
+	.PLAYER_UI_CLOCK(player_ui_clock),
+	.PLAYER_UI_STATE(player_ui_state),
 	.HDMI_BLACKOUT(hdmi_blackout),
 	.HDMI_BOB_DEINT(bob_deint),
 

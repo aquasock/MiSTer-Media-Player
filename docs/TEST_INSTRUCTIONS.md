@@ -1,3 +1,38 @@
+# Unified player overlay candidate — qualification pending
+
+This change adds the historical progress strip and three time fields to normal
+scaled HDMI, after video filters and before the MiSTer menu. Keep accepted
+`3ff27c8` seed 52 below as rollback until hardware validation completes.
+
+On opening an MPG, allow the bounded head/tail timestamp preflight to finish.
+It adds startup reads; ordinary seeks reuse the cached result. If sufficient
+endpoint evidence is unavailable (including raw M2V), Total and Remaining show
+`--:--:--` with a patterned track. Duration never comes from a byte-size ratio.
+
+Check the following on the eventual timing-qualified RBF:
+
+1. Open a complete short MPG and a whole movie, including a file above 4 GiB.
+   Compare Total with the encoded stream duration, allowing timestamp rounding;
+   confirm Elapsed begins near zero and Remaining counts down.
+2. At 480p, 720p and 1080p HDMI output, check the three readable time fields,
+   track and fill. Change 4:3/16:9 and video filters: the UI should stay fixed
+   and retain its colors. Open the MiSTer OSD over the player UI.
+3. Pause with Space. Confirm elapsed position freezes, Paused appears and the
+   controls hide after ten seconds even while paused. Resume and confirm the
+   controls reappear briefly.
+4. Seek both directions with all three jump sizes, including while paused.
+   Seeking should remain visible over the existing black picture, then show
+   the actual landing time and restart the hide interval. Stress repeated
+   seeks and compare playback recovery with the accepted core.
+5. Open/reload another file, including raw M2V or one without usable tail
+   timestamps. Confirm the previous file's total and progress do not persist.
+   Check EOF, remaining clamping and playback at both 50 and 59.94 Hz.
+
+No subtitle files, cue selection, new keyboard shortcuts or HDMI refresh modes
+are added. The player overlay targets scaled HDMI; direct-video and analog
+paths retain their existing behavior. See `UI_OVERLAY_PLAN.md` for regression
+commands, implementation limits and the future provider contract.
+
 # Accepted IDCT intermediate RAM build: 3ff27c8 seed 52
 
 Preferred RBF: `results/hardware-test-3ff27c8/seed52/MediaPlayer_20260914.rbf`.
