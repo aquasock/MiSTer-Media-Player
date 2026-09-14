@@ -1,3 +1,32 @@
+## 76 COMMIT Unreleased 304e4dc 2026-09-14T09:45:46-07:00
+
+#### Coming From:
+
+Unreleased 0d13908
+
+#### Purpose:
+
+Record completed lowered-overlay build qualification and provide the preferred hardware candidate.
+
+#### Outcome:
+
+All ffafc79 seeds compile and pass four-corner timing, 159 CDC registers and scene-enable audits. Seeds 52, 61 and 87 have minimum setup +0.196, +0.224 and +0.371 ns and hold +0.097, +0.103 and +0.110 ns. Preferred seed 87 uses 37713 actual ALMs, 520 M10Ks, 69 DSPs and 47317 registers, leaving 4197 ALMs and 33 M10Ks. This is two fewer placed ALMs than 3d48cc5 seed 87, effectively unchanged resource usage. Its verified RBF is results/hardware-test-ffafc79/seed87/MediaPlayer_20260914.rbf with SHA-256 3d229f28cb7e12b0cde1f2da716754f6c307a80f94678e5668303f9896c93f0d. Per-seed testing notes and top-level instructions are ready; no deployment or hardware acceptance occurred. Subsequent user release requirements are M3U playlists with N/P navigation, automatic advance and final return to idle; session-only resume while the core stays loaded; predictable EOF; and matching-name separate SRT subtitles. Automatic filesystem access through stock Main remains unresolved. Image/package loading and manual subtitle selection were discussed as RBF-only alternatives, not approved replacements for the requested loose-file workflow. No feature implementation or shared-IDCT optimization was started.
+
+#### Next Steps:
+
+Have the user validate the lower bar and clock-only fields on seed 87; resolve the file-access workflow before implementing playlist and automatic subtitle loading.
+
+#### Files Modified:
+
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 75 COMMIT Unreleased 0d13908 2026-09-14T09:25:00-07:00
 
 #### Coming From:
@@ -1290,35 +1319,6 @@ Complete the timing/resource audit and exact-file bypass/seek-phase/storage-stal
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 36 COMMIT Unreleased aad072a 2026-09-14T00:15:26-07:00
-
-#### Coming From:
-
-Unreleased aad072a
-
-#### Purpose:
-
-Record the freeze telemetry reproduced with fellow.
-
-#### Outcome:
-
-The user reports making fellow freeze. The fresh screenshot and checksum-valid schema-10 decode are under results/telemetry-20260914-001450. Error flags are 0x2004: the same aggregate decoder probe error 0x0004 plus audio timestamp error 0x2000. Audio underrun, MP2 decoding error and transport error are zero; EOF is false. The final recorded picture type is P with temporal reference eleven, unlike the B-picture states in the Pee Strike captures. The snapshot reports 967021 played audio sample pairs, 1259 processed audio frames, transport position 2656842 and 649 completed requests in generation two. The common aggregate decoder error now occurs on both tested movies, while the audio underrun is not consistent across failures. This supports investigating a shared playback/seek path rather than treating the issue as specific to Pee Strike, but does not establish an exact cause or first-fault order. The loaded state was preserved.
-
-#### Next Steps:
-
-Use both captures to guide combined MPG/audio reproduction and add decoder error subcode plus first-fault visibility; do not attribute the failure to audio underrun alone.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
