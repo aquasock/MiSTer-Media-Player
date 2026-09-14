@@ -1,3 +1,37 @@
+## 70 COMMIT Unreleased ??? 2026-09-14T08:02:17-07:00
+
+#### Coming From:
+
+Unreleased b00920a
+
+#### Purpose:
+
+Recover bounded duration for sparse-timestamp progressive program streams.
+
+#### Outcome:
+
+The user authorizes the next duration fix after Groove.mpg exposes conservative rejection of pictures without individual PTS. Clarification explicitly keeps loading fast and permits unknown duration when bounded evidence is insufficient; no full-file scan is authorized or required. Use picture temporal references and supported progressive frame periods to interpolate within timestamp-anchored groups, respect group resets and reordering, and retain conservative rejection of malformed, discontinuous or genuinely unanchored endpoints. Preserve the existing head/tail byte budgets, reader ownership and startup watchdog. Validate real Groove windows and additional playable files against independently decoded presentation timing, plus adversarial reorder, sparse timestamp, group transition, truncation and timestamp-wrap cases before clean build qualification.
+
+#### Next Steps:
+
+Implement and regress the duration observer correction, then build and audit clean seeds 52, 61 and 87 and package the best qualified RBF for user testing.
+
+#### Files Modified:
+
+- rtl/media_duration_window.sv
+- tools/test_media_duration_window.sv
+- tools/verify_ui_duration.py
+- docs/UI_OVERLAY_PLAN.md
+- docs/TEST_INSTRUCTIONS.md
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 69 COMMIT Unreleased b00920a 2026-09-14T07:58:54-07:00
 
 #### Coming From:
@@ -1270,52 +1304,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 30 COMMIT Unreleased aad072a 2026-09-13T17:56:12-07:00
-
-#### Coming From:
-
-Unreleased 17743f8
-
-#### Purpose:
-
-Reduce forward seek latency by retaining the current decoder session and validate repeated MPG seeks.
-
-#### Outcome:
-
-Committed and pushed aad072a. Forward seeks retain the live decoder session; backward seeks keep the byte-zero retirement handshake and ignore old-session completion until the new reader starts. Every seek refreshes its audio destination instead of retaining the previous landing time. MP2 frames ending at least 24 ms before the target bypass decoding and synthesis; at least one decoded frame restores finite synthesis history before playback. Tests pass repeated retained-session I/P/B seeks with zero reconstruction mismatches, EOF clamping, three forward/backward asynchronous control cycles with delayed DDR/host retirement, all key modifiers and paused state. The MPG regression bypasses 16 audio frames, resumes at the exact expected sample with no audio errors, preserves all 307021 video bytes and validates 30 picture timestamps. Independent quantizer/joint-stereo tests verify exact post-preroll PCM across timestamp wrap and two reset sessions. Legacy MP2, mounted reader, OSD, raster, refresh and CDC regressions pass. Evidence is under results/build-aad072a-20260913-180758/regressions; clean seeds 52/61/87 are compiling. The user confirms the previous black-screen seek eventually resumed and the earlier display duplication was a monitor issue; previous pause is accepted, faster seeks remain untested on hardware.
-
-#### Next Steps:
-
-Finish all three builds and timing/CDC audits, deliver a qualified RBF, and compare forward skip duration near the start and late in fellow.mpg; verify backward seeks, paused seeks, EOF and audible continuity.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer_av.svh
-- MediaPlayer_top_00.svh
-- README.md
-- docs/OSD_PLAYBACK_PLAN.md
-- docs/TEST_INSTRUCTIONS.md
-- rtl/audio/mp2_decoder.sv
-- rtl/media_keyboard_control.sv
-- rtl/media_playback_control.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/test_media_keyboard_control.sv
-- tools/test_media_playback_control.sv
-- tools/test_mp2_decoder.sv
-- tools/test_mpg_audio_ingress.sv
-- tools/test_mpg_audio_playback.sv
-- tools/test_playback_restart.sv
-- tools/verify_mp2_seek.py
-- tools/verify_mpg_audio.py
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
