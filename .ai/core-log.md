@@ -1,3 +1,32 @@
+## 89 COMMIT Unreleased ??? 2026-09-14T13:07:28-07:00
+
+#### Coming From:
+
+Unreleased 7eb5088
+
+#### Purpose:
+
+Document and package gate-three build qualification for hardware testing.
+
+#### Outcome:
+
+All three 7eb5088 builds complete in 15.1-15.2 minutes. Seeds 61 and 87 pass all four timing corners; seed 52 fails setup at -0.191 ns. All pass 183 CDC stages, formatter enables, profiler/reporting absence and eleven test-audio removal checks with movie PCM, FIFO and finished synchronization retained. Preferred seed 61 has setup +0.334 ns and hold +0.074 ns, uses 37044 actual ALMs, 31325 estimated ALMs, 44804 registers, 525 M10Ks, 75 DSPs and three PLLs. This saves 282 placed ALMs, 495 estimated ALMs and two M10Ks against accepted gate-two seed 87, leaving 4866 ALMs and 28 M10Ks. Seed 87 uses 36916 actual/31285 estimated ALMs with setup +0.083 ns and hold +0.115 ns. Seed 52 uses 37029 actual/31287 estimated ALMs with hold +0.114 ns. Hash-verified RBFs are packaged under results/hardware-test-7eb5088; seed 52 is marked timing failed. Preferred seed61/MediaPlayer_20260914.rbf SHA-256 is bbd4c36588e5db22343e5e688ef177ed1f54ce24cb4206b8d76332e1d74b84fc. Hardware acceptance is pending; no deployment or additional timing-fix builds are performed.
+
+#### Next Steps:
+
+Publish the qualification in test instructions and have the user repeat Fellow, Groove, Jiggler and Star Wars at both refresh rates, checking black clocks on the lowered bar, lowered subtitles, absent status labels and Audio test menu, audio/filters, pause/seek, replacement and EOF. Retain accepted gate-two 100ab07 seed 87 as rollback.
+
+#### Files Modified:
+
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 88 COMMIT Unreleased 7eb5088 2026-09-14T12:45:21-07:00
 
 #### Coming From:
@@ -1382,39 +1411,6 @@ Finish the authorized batch, inspect resource fit and all timing classes, and pa
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 49 COMMIT Unreleased bcddb20 2026-09-14T03:08:16-07:00
-
-#### Coming From:
-
-Unreleased 3ab6615
-
-#### Purpose:
-
-Remove the added seek-fault telemetry hardware to recover placement capacity.
-
-#### Outcome:
-
-Source bcddb20 removes production instantiation of the persistent seek-fault observer, its 449-bit clock-domain mailbox and screen renderer, connects RGB directly to the retained cadence output, and removes the observer file from the Quartus project. Those three removed instances accounted for 712 combinational ALUTs and 1291 registers in the previous seed 87 synthesis hierarchy; these are attribution figures, not measured new fitted savings. Compact playback-health telemetry, audio comparison controls and playback/seek control signals remain. Standalone historical observer RTL/tests and screenshot decoding remain available outside the production project. The timing audit removes only the deleted mailbox and now requires 159 synchronizer registers instead of 165. Current testing instructions distinguish historical seek snapshots from current production behavior. Compact/detailed retained-field equivalence, actual RGB screenshot decoding, corruption rejection and legacy schemas pass. Direct-seek observer, VBR/bounded search, open-GOP byte filtering and asynchronous paused forward/backward restart regressions also pass. Evidence is under results/telemetry-removal. No Quartus build or hardware deployment was performed.
-
-#### Next Steps:
-
-Build source bcddb20 when authorized, measure actual fit and resource savings, and require all timing corners plus the 159-register CDC audit before selecting a hardware candidate. The old build-summary helper requires 165 checks and must be adapted for this source. Preserve a229a01 seed 87 as the timing-qualified rollback.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
-- files.qip
-- tools/phase1p_timing.tcl
-- CHANGELOG.md
-- docs/TEST_INSTRUCTIONS.md
 
 #### Status:
 
