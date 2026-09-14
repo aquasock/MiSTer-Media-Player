@@ -1,4 +1,4 @@
-## 81 COMMIT Unreleased ??? 2026-09-14T10:59:57-07:00
+## 81 COMMIT Unreleased b05b76f 2026-09-14T10:59:57-07:00
 
 #### Coming From:
 
@@ -10,15 +10,29 @@ Return completed playback to the startup state after safely draining audio and v
 
 #### Outcome:
 
-The user narrows the remaining work to EOF only and explicitly drops resume; replacement files continue forgetting the previous state. Add a completion controller requiring physical input EOF, decoder ingress completion, an empty presentation path and finished audio, with one final frame interval before closure and no closure while paused or seeking. Tag completion across clock domains by the existing restart generation so old EOF cannot close a replacement movie. Reuse the existing safe file-change reset/drain path with logical file size cleared, including subtitles, duration, controls and message suppression. Test terminal boundaries, longer audio tails, pause/seek inhibition, stale completion and replacement races, then qualify a new build after the ongoing layout batch.
+Source b05b76f implements EOF-only closure; resume is dropped. Physical EOF, completed ingress, drained presentation and finished audio gate a final source-frame interval, then a generation-tagged mailbox closes the logical file through the existing safe restart path. This clears subtitle association, times, controls and startup-message suppression; pause, seek and preflight block closure, and new mounts take priority over stale completion. The 64-check EOF/session test passes for five source frame rates, longer audio, pause/seek/probe inhibition, activity restart, stale completion, simultaneous replacement and delayed host/DDR retirement. The real mixed I/P/B pipeline completes EOF with 423936 pixel comparisons and zero mismatches. Existing playback/audio, reader/session and subtitle lifecycle regressions pass. Source is pushed and clean seeds 52/61/87 are running under /tmp/eof-build.log. The preceding b5a17cf layout batch is also qualified: all seeds pass four corners and 171 CDC checks; setup is +0.508/+0.436/+0.313 ns, hold +0.113/+0.098/+0.076 ns and actual ALMs 38593/38727/38559, with unchanged 527 M10Ks and 75 DSPs. Layout-only candidates are packaged under results/hardware-test-b5a17cf, preferred seed 52; layout hardware acceptance remains pending. No core was deployed.
 
 #### Next Steps:
 
-Implement and validate EOF-to-startup behavior without resume or unrelated playback changes; preserve the accepted subtitle baseline and finish the existing layout builds.
+Audit and package the EOF build timing/resources, then test clean completion, subtitle clearing, longer audio tails, paused EOF, seek endpoints and replacement movies at both output rates. Retain hardware-accepted ec56250 seed 87 as rollback.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_05.svh
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- docs/UI_OVERLAY_PLAN.md
+- files.qip
+- rtl/media_eof_control.sv
+- tools/audit_three_seeds.py
+- tools/phase1p_timing.tcl
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_mixed_raster_pixels.sv
+- tools/test_media_eof_control.sv
+- tools/verify_decoder_timing.py
+- tools/verify_playback_controls.py
 
 #### Status:
 
