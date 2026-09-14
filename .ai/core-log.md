@@ -1,3 +1,32 @@
+## 105 COMMIT Unreleased ??? 2026-09-14T16:40:32-07:00
+
+#### Coming From:
+
+Unreleased b3e4f1d
+
+#### Purpose:
+
+Move subtitles into a stock Main submenu with visibility, offset and speed controls.
+
+#### Outcome:
+
+The user requests Subtitles with Load SRT, Visible Yes/No, offset from -5.0 to +5.0 seconds in 0.1-second steps, and confirms speed limits 0.50x to 2.00x in 0.01x steps. Defaults remain visible, zero offset and 1.00x. Positive offset delays display; speed scales the subtitle timeline so 2.00x runs it twice as fast. Use absolute video elapsed time rather than an accumulating clock, reload the streaming SRT reader when timing settings change, and preserve video/audio/pause/seek behavior. Put extended menu strings in the existing block-RAM configuration ROM and use bounded serial arithmetic. Prepare this for the next build while the three b3e4f1d FLAC candidates continue unchanged.
+
+#### Next Steps:
+
+Implement and simulate the submenu, exact timing transform, offset/speed boundaries, backward retiming and in-flight SRT reload handling. Finish and report the separate in-progress FLAC builds. Do not silently replace their source snapshots or launch another build batch for these subtitle changes.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 104 COMMIT Unreleased b3e4f1d 2026-09-14T15:59:29-07:00
 
 #### Coming From:
@@ -1415,43 +1444,3 @@ Complete all-corner and CDC qualification, package the best passing seed and upd
 
 ---
 
-## 65 COMMIT Unreleased b00920a 2026-09-14T07:02:57-07:00
-
-#### Coming From:
-
-Unreleased 287cf6b
-
-#### Purpose:
-
-Remove the remaining identified pixel-path arithmetic bottlenecks before final overlay qualification.
-
-#### Outcome:
-
-Additional isolated timing analysis of fitted 5373dae finds the unchanged alpha blend also fails by -6.017 ns, independent of coordinate divisions and scene formatting. The 287cf6b batch passes synthesis but is stopped early during fitting to avoid completing another known-incomplete timing fix. Its status and cancellation reason are retained under results/build-287cf6b-20260914-065802. Replace the fixed dark-palette blend with synchronous byte lookup tables and pipeline the bounds, object selection and coordinate subtraction separately. These corrections preserve the approved pixels and shared provider design while using the reserved RAM budget; existing 287cf6b duration guards, coordinate/staging RAM and enabled formatter remain the basis. The completed correction uses ten aligned pixel registers, separately registered axis comparisons and qualification, precomputed object enables and ROM palette blending. Exact-width binary font and coordinate ROMs avoid padded storage. The isolated 148.5 MHz compositor fit passes all reported corners and shows +0.861 ns setup and +0.381 ns hold on the detailed default-model internal-register reports, with 12 M10Ks and no DSPs; this is not full-core qualification. All 5,414,400 full-frame pixel comparisons, varying-color alpha checks, lifetime/state tests and 518 enabled divider cases pass. ROM regeneration is exact. No hardware deployment or acceptance occurred.
-
-#### Next Steps:
-
-Run clean full-core seeds 52, 61 and 87 from b00920a. Require all-corner timing, 159 CDC registers and the real four-clock scene-enable audit, then measure actual resource usage before packaging a candidate.
-
-#### Files Modified:
-
-- docs/UI_OVERLAY_PLAN.md
-- files.qip
-- rtl/media_overlay_blend_b.hex
-- rtl/media_overlay_blend_rg.hex
-- rtl/media_overlay_compositor.sv
-- rtl/media_overlay_coordinates.hex
-- rtl/media_overlay_coordinates.mem
-- rtl/media_overlay_font.hex
-- rtl/media_overlay_font.mem
-- tools/make_overlay_roms.py
-- tools/test_media_player_overlay.sv
-- tools/verify_overlay_timing.py
-- tools/verify_player_overlay.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
