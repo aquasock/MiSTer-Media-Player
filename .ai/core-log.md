@@ -1,3 +1,32 @@
+## 97 COMMIT Unreleased b639ccc 2026-09-14T14:26:52-07:00
+
+#### Coming From:
+
+Unreleased db4bc3f
+
+#### Purpose:
+
+Record hardware acceptance of shared-IDCT seed 52.
+
+#### Outcome:
+
+The user reports that the latest build passes everything. Accept the preferred b639ccc MEDIUM seed 52 shared-IDCT candidate as the new hardware baseline, with corrected audit revision db4bc3f, RBF SHA-256 a9244b912ad3acd127366e10d6470fc509ccc3d0c63b29b1a031f6674d7b9f95, 35908 placed ALMs, 512 M10Ks, 59 DSPs, and four-corner setup/hold minima +0.645/+0.081 ns. This supersedes the pending acceptance recorded in entry 96. Retain 7eb5088 MEDIUM seed 61 as the previous rollback. The user also requests a FLAC implementation plan; no FLAC implementation or additional builds are authorized by this planning step.
+
+#### Next Steps:
+
+Draft the standalone 44100 Hz, 16-bit stereo FLAC plan against this accepted baseline, including output-rate handling, bounded on-chip memory, exact sample verification, playback controls and video regression gates.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 96 COMMIT Unreleased db4bc3f 2026-09-14T14:12:56-07:00
 
 #### Coming From:
@@ -1398,34 +1427,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 57 COMMIT Unreleased dc1dfc2 2026-09-14T04:33:57-07:00
-
-#### Coming From:
-
-Unreleased dc1dfc2
-
-#### Purpose:
-
-Qualify the row-buffer RAM builds and deliver the preferred seed 52 candidate.
-
-#### Outcome:
-
-All three clean dc1dfc2 seeds pass all four timing corners and the 153-register CDC audit, with both 512-by-8 row arrays confirmed as M10K in each synthesis report. Seeds 52, 61 and 87 have minimum setup +0.437, +0.322 and +0.303 ns and hold +0.089, +0.086 and +0.091 ns respectively; recovery, removal and pulse width also pass. Their actual placed ALMs are 37790, 37813 and 37878, while ALMs-needed estimates are 31925, 31938 and 31904; do not conflate these metrics. All use 484 RAM blocks, 69 DSP blocks and three PLLs. Preferred seed 52 uses 48362 registers and reduces actual placed ALMs by 3355 against accepted bcddb20 seed 61, at a cost of two additional M10K blocks; the intervening audio-menu removal is included. Estimated utilization is 76.2 percent while actual placement is 90.2 percent. Total compile/audit durations are 901.1, 905.0 and 889.6 seconds. Hash-verified handoffs and instructions are under results/hardware-test-dc1dfc2; preferred seed52/MediaPlayer_20260914.rbf has SHA-256 7eb9a5bebc66423885d5865a40dc55ab24f28d3ff6f4743f05c3ebd394358ce6. Documentation commit 29a54d3 identifies the candidate; runtime source remains dc1dfc2. No hardware acceptance, deployment or further build was performed.
-
-#### Next Steps:
-
-Have the user test seed 52 for normal playback, repeated short/long seeks both directions, paused seeks/resume, reload and EOF, confirming clean video, synchronized audio and removal of the diagnostic audio menu. Preserve accepted bcddb20 seed 61 as rollback and leave additional RAM conversions unstarted until requested.
-
-#### Files Modified:
-
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
