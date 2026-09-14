@@ -255,6 +255,7 @@ module tb_h262_live_raster_soak #(
     wire [1:0] display_frame_bank;
     wire display_scratch,display_scratch_bank;
     wire decode_scratch_bank,presentation_hold,presentation_complete;
+    wire scheduler_pending_frame,scheduler_reordering;
     wire presentation_error;
     wire reference_overlap_header;
     wire [2:0] framebuffer_swap_reset_count;
@@ -265,8 +266,8 @@ module tb_h262_live_raster_soak #(
     reg eof_observed=0;
     generate if(EOF_CONTROL_MODE)begin : eof_test
         wire drained=sequence_end_seen && !frame_waiting &&
-            !scheduler.scheduled_frame_valid && !scheduler.pending_frame_valid &&
-            !scheduler.reorder_active && !presentation_hold &&
+            !scheduler.scheduled_frame_valid && !scheduler_pending_frame &&
+            !scheduler_reordering && !presentation_hold &&
             !destination_ownership_hold && presentation_complete &&
             !scheduler.promotion_active && framebuffer_swap_reset_count==0 &&
             !pred_rd && !writer_we;
@@ -505,7 +506,8 @@ module tb_h262_live_raster_soak #(
         .reference_overlap_header(reference_overlap_header),
         .presentation_hold(presentation_hold),
         .presentation_complete(presentation_complete),
-        .presentation_error(presentation_error));
+        .presentation_error(presentation_error),
+        .pending_frame_valid(scheduler_pending_frame),.reorder_active(scheduler_reordering));
 
     initial begin
         reference_identity[0]=0;

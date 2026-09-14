@@ -1,10 +1,9 @@
 //============================================================================
 // MiSTer Media Player - new H.262 decoder front end
 //
-// Passive first-stage parser used while the legacy MPEG2FPGA decoder remains
-// connected to the video path.  This module observes the exact elementary-
-// stream bytes accepted by the decoder and validates the fundamental H.262
-// header hierarchy before we move decode ownership to the new implementation.
+// Production first-stage parser: observes accepted elementary-stream bytes
+// and validates the fundamental H.262 header hierarchy before reconstruction.
+// The historical parallel MPEG2FPGA decoder is no longer part of the project.
 //
 // Standards basis:
 //   ITU-T H.262 (02/2000) / ISO/IEC 13818-2:2000

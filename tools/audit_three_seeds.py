@@ -6,6 +6,7 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('build',type=Path);p.add_argument('--cdc-registers',type=int,default=None)
 p.add_argument('--baseline-alms',type=int,default=35774);p.add_argument('--baseline-ram',type=int,default=508)
 p.add_argument('--require-no-profiler',action='store_true')
+p.add_argument('--require-no-reporting',action='store_true')
 p.add_argument('--scope',default='See the source-specific test instructions for feature scope and hardware acceptance.')
 a=p.parse_args();base=a.build.resolve();state=json.loads((base/'status.json').read_text());summary={}
 for seed in (52,61,87):
@@ -13,10 +14,10 @@ for seed in (52,61,87):
  if info.get('stage')!='complete':
   summary[str(seed)]={'seed':seed,'stage':info.get('stage'),'timing_passed':False};continue
  lines=(root/'phase1p_timing_reports/configuration_cdc_audit.rpt').read_text().splitlines()
- # All functional mailboxes are mandatory; only the reporting mailbox may
- # disappear naturally after removal of its consumer. Older builds can pass
- # their explicit expected count through --cdc-registers.
- expected_cdc=a.cdc_registers if a.cdc_registers is not None else 177+(6 if any('media_telemetry_config' in x for x in lines) else 0)
+ # All functional mailboxes are mandatory. Gate one may retain the old
+ # reporting mailbox; gate two replaces it with the reader-failure mailbox.
+ # Older builds can supply --cdc-registers explicitly.
+ expected_cdc=a.cdc_registers if a.cdc_registers is not None else 177+(6 if any('media_telemetry_config' in x or 'reader_error_config' in x for x in lines) else 0)
  cdc=len(lines)==expected_cdc and all(x.endswith(': 1 registers') for x in lines)
  corners={}
  for i in range(4):
@@ -50,9 +51,12 @@ for seed in (52,61,87):
  enable_count=re.search(r'Four-cycle formatter registers: (\d+)',enable_text)
  enable_ok='Enable counter: 2 registers' in enable_text and enable_count is not None and int(enable_count.group(1))>=400
  profiler_absent=(root/'phase1p_timing_reports/diagnostic_removal_audit.rpt').exists() and (root/'phase1p_timing_reports/diagnostic_removal_audit.rpt').read_text().strip()=='Cadence profiler registers: 0'
- passed=cdc and enable_ok and (not a.require_no_profiler or profiler_absent) and all(v>=0 for v in minima.values())
+ reporting_file=root/'phase1p_timing_reports/reporting_removal_audit.rpt'
+ reporting_lines=reporting_file.read_text().splitlines() if reporting_file.exists() else []
+ reporting_absent=len(reporting_lines)==17 and all(x.endswith(': 0 registers') for x in reporting_lines)
+ passed=cdc and enable_ok and (not a.require_no_reporting or reporting_absent) and (not a.require_no_profiler or profiler_absent) and all(v>=0 for v in minima.values())
  item={'source':state['source'],'seed':seed,'corners':corners,'minimum_slack_ns':minima,
- 'profiler_absent':profiler_absent,'scene_enable_audit_passed':enable_ok,'cdc_registers':len(lines),'cdc_audit_passed':cdc,'timing_passed':passed,'resource_budget_passed':budget,
+ 'reporting_absent':reporting_absent,'profiler_absent':profiler_absent,'scene_enable_audit_passed':enable_ok,'cdc_registers':len(lines),'cdc_audit_passed':cdc,'timing_passed':passed,'resource_budget_passed':budget,
  'hardware_accepted':False,'rbf_sha256':info['rbf_sha256'],'resources':resources,
  'scope':a.scope}
  summary[str(seed)]=item

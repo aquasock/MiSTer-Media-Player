@@ -100,7 +100,7 @@ end
 // adjacent B headers cannot collapse into one coding-type level.  The scheduler
 // alternates two scratch frames and owns the complete B...B->future-reference
 // presentation transaction, including fail-open error retirement.
-wire [31:0] mpeg2_new_b_scheduler_debug_state;
+wire mpeg2_new_pending_frame_valid,mpeg2_new_reorder_active;
 mpeg2_h262_picture_timestamp mpeg2_h262_picture_timestamp
 (
     .clk                     (clk_mpeg2),
@@ -123,15 +123,15 @@ mpeg2_h262_picture_timestamp mpeg2_h262_picture_timestamp
     .display_pts_valid       (mpeg2_new_display_pts_valid),
     .candidate_pts           (mpeg2_new_candidate_pts),
     .candidate_pts_valid     (mpeg2_new_candidate_pts_valid),
-    .associated_count        (mpeg2_new_associated_count)
+    .associated_count        ()
 );
 
 wire media_scheduler_window,media_fast_seek,media_rebase;
 wire [32:0] media_seek_elapsed;
 wire media_seek_drained=mpeg2_new_sequence_end_seen &&
  !mpeg2_new_frame_waiting && !mpeg2_new_candidate_frame_valid &&
- !mpeg2_new_b_scheduler_debug_state[26] &&
- !mpeg2_new_b_scheduler_debug_state[0] &&
+ !mpeg2_new_pending_frame_valid &&
+ !mpeg2_new_reorder_active &&
  !mpeg2_new_b_presentation_hold && !mpeg2_new_p_destination_ownership_hold;
 // These are decoder/presentation completion signals, not video raster reads:
 // scanout keeps reading the final displayed frame until the safe reset path.
@@ -156,7 +156,7 @@ media_playback_control #(.ENABLE_MOVIE_ORIGIN(1)) media_playback_control(
  .swap_reset_count(mpeg2_new_framebuffer_swap_reset_count),
  .first_picture_complete(mpeg2_new_picture_420_complete),
  .swap_window(mpeg2_new_swap_window_pulse),.drained(media_seek_drained),
- .fatal(mpeg2_new_transport_fatal_error || (|media_telemetry[227:224])),
+ .fatal(mpeg2_new_transport_fatal_error || media_reader_error_mpeg),
  .display_pts_valid(mpeg2_new_display_pts_valid),.display_pts(mpeg2_new_display_pts),
  .elapsed_q(media_elapsed_q),.seek_done(media_seek_done),
  .scheduler_window(media_scheduler_window),.fast_seek(media_fast_seek),
@@ -173,8 +173,8 @@ mpeg2_h262_pts_presentation_timeline #(.ENABLE_PLAYBACK_CONTROL(1)) mpeg2_h262_p
     .metadata_pts     (av_is_ps ? av_origin : mpeg2_new_inband_pts_90k),
     .candidate_valid  (mpeg2_new_candidate_pts_valid),
     .candidate_pts    (mpeg2_new_candidate_pts),
-    .anchored         (mpeg2_new_pts_timeline_anchored),
-    .stc_90k          (mpeg2_new_pts_timeline_stc),
+    .anchored         (),
+    .stc_90k          (),
     .candidate_active (mpeg2_new_timestamp_candidate_active),
     .candidate_due    (mpeg2_new_timestamp_candidate_due)
 );
@@ -210,11 +210,13 @@ mpeg2_h262_b_presentation_scheduler #(.ENABLE_REFRESH_SELECTION(1)) mpeg2_h262_b
     .framebuffer_swap_reset_count(mpeg2_new_framebuffer_swap_reset_count),
     .reference_overlap_header    (mpeg2_new_b_reference_overlap_header),
     .presentation_hold           (mpeg2_new_b_presentation_hold),
-    .scratch_available           (mpeg2_new_b_scratch_available),
+    .scratch_available           (),
     .promotion_active            (mpeg2_new_b_promotion_active),
     .presentation_complete       (mpeg2_new_b_presentation_complete),
     .presentation_error          (mpeg2_new_b_presentation_error),
-    .debug_state                 (mpeg2_new_b_scheduler_debug_state)
+    .debug_state                 (),
+    .pending_frame_valid         (mpeg2_new_pending_frame_valid),
+    .reorder_active              (mpeg2_new_reorder_active)
 );
 
 wire mpeg2_new_display_bt709;

@@ -56,11 +56,6 @@ assign AUDIO_L = audio_pcm_output_l;
 assign AUDIO_R = audio_pcm_output_r;
 assign AUDIO_MIX = 2'd0;
 
-// kate - Commit 180 displaces the LED_DISK file-load indicator again so it can
-// blink the progress_error conjunct sub-code, exactly as Commit 176 did and
-// Commit 177 reverted.  The assignment now lives with the rest of the blink
-// machinery in MediaPlayer_top_07.svh; restore this line when the diagnostic
-// is retired.
 assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////
@@ -114,13 +109,12 @@ wire [8:0] media_stream_data,media_fifo_data;
 wire [14:0] media_fifo_used;
 wire [15:0] media_fifo_occupancy=mpeg2_stream_full ? 16'd32768 : {1'b0,media_fifo_used};
 wire media_stream_valid,media_reader_idle;
-wire media_prefill_mpeg,media_fatal_sys;
+wire media_prefill_mpeg,media_fatal_sys,media_reader_error_mpeg;
 reg media_prefill=0;
-reg [15:0] media_reservoir_min=16'hffff;
 wire media_reader_cancel,media_fifo_reset,media_reader_start;
 wire media_decoder_reset,media_quiesce,media_ddr_idle;
 wire [63:0] media_byte_position;
-wire [31:0] media_requests,media_completions,media_max_wait,media_generation;
+wire [31:0] media_generation;
 wire [3:0] media_error;
 reg media_mount_d=0,media_user_reset_d=0;
 reg [63:0] media_file_size=0;
@@ -230,27 +224,24 @@ media_file_reader media_file_reader (
  .sd_buff_addr(media_sd_addr),.sd_buff_dout(media_sd_data),
  .stream_data(media_stream_data),.stream_valid(media_stream_valid),
  .stream_ready(media_duration_busy ? media_duration_ready : (!mpeg2_stream_full && !media_fifo_reset)),.idle(media_reader_idle),
- .byte_position(media_byte_position),.requests(media_requests),
- .completions(media_completions),.max_wait(media_max_wait),.error(media_error)
+ .byte_position(media_byte_position),.requests(),
+ .completions(),.max_wait(),.error(media_error)
 );
 always @(posedge clk_sys) begin
- if(media_fifo_reset) begin media_prefill<=0;media_reservoir_min<=16'hffff;end
+ if(media_fifo_reset) media_prefill<=0;
  else begin
   if(media_fifo_used>=4096 || (media_stream_valid && media_stream_data[8])) media_prefill<=1;
-  if(media_prefill && media_fifo_occupancy<media_reservoir_min)
-   media_reservoir_min<=media_fifo_occupancy;
  end
 end
 video_config_cdc #(.WIDTH(1)) media_prefill_config (
  .src_clk(clk_sys),.dst_clk(clk_mpeg2),.src_data(media_prefill),.dst_data(media_prefill_mpeg));
 video_config_cdc #(.WIDTH(1)) media_fatal_config (
  .src_clk(clk_mpeg2),.dst_clk(clk_sys),.src_data(mpeg2_new_transport_fatal_error),.dst_data(media_fatal_sys));
-wire [255:0] media_telemetry;
-video_config_cdc #(.WIDTH(256)) media_telemetry_config (
+// Reader failure participates in seek termination; preserve that functional
+// event without carrying the former 256-bit statistics snapshot.
+video_config_cdc #(.WIDTH(1)) reader_error_config (
  .src_clk(clk_sys),.dst_clk(clk_mpeg2),
- .src_data({{26'd0,media_reader_cancel,media_reader_idle,media_error},
-            {16'd0,media_reservoir_min},media_generation,media_byte_position,
-            media_max_wait,media_completions,media_requests}),.dst_data(media_telemetry));
+ .src_data(|media_error),.dst_data(media_reader_error_mpeg));
 wire        mpeg2_stream_full;
 wire        mpeg2_stream_empty;
 wire [7:0]  mpeg2_fifo_data;
@@ -741,12 +732,12 @@ mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 	.stream_valid       (mpeg2_new_decode_stream_valid),
 	.stream_ready       (mpeg2_new_stream_ready),
 	.pts_90k            (mpeg2_new_inband_pts_90k),
-	.picture_structure  (mpeg2_new_inband_picture_structure),
-	.top_field_first    (mpeg2_new_inband_top_field_first),
-	.repeat_first_field (mpeg2_new_inband_repeat_first_field),
-	.progressive_frame  (mpeg2_new_inband_progressive_frame),
+	.picture_structure  (),
+	.top_field_first    (),
+	.repeat_first_field (),
+	.progressive_frame  (),
 	.metadata_valid     (mpeg2_new_inband_valid),
-	.metadata_count     (mpeg2_new_inband_count)
+	.metadata_count     ()
 );
 
 mpeg2_stream_fifo mpeg2_stream_fifo
@@ -800,22 +791,8 @@ wire        fb_video_hs;
 wire        fb_video_vs;
 
 // ---------------------------------------------------------------------------
-// Entry 389: presentation time base.
-//
-// The 90 kHz System Time Clock of H.222.0 is anchored to CLK_AUDIO (24.576
-// MHz), the same domain sys/audio_out.sv clocks samples out on, so externally
-// decoded audio will be consumed drift-free by construction once the PCM sink
-// exists.  Nothing consumes the clock yet: presentation remains free-running
-// and this cycle only proves the clock runs at the right rate on hardware.
-//
-// Only a single bit crosses domains.  A multi-bit counter synchronised into
-// clk_mpeg2 could tear across a carry, and a 33-bit gray decode would be a
-// 33-level XOR chain -- a new timing problem on a design that just spent this
-// development run recovering margin.  Instead the clock emits single-bit
-// 90 kHz and 1 Hz pulses.  Each crosses through an ordinary synchroniser; the
-// former advances the decoder-domain presentation timeline and the latter
-// remains the cadence profiler's human-readable seconds counter.
-// ---------------------------------------------------------------------------
+// Audio-clock-derived 90 kHz ticks drive video presentation and EOF timing.
+// The clock itself remains active; profiler-only whole-second reporting is gone.
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [1:0] stc_audio_reset_sync;
 always @(posedge CLK_AUDIO or posedge reset_mpeg2_base) begin
@@ -824,9 +801,7 @@ always @(posedge CLK_AUDIO or posedge reset_mpeg2_base) begin
 end
 wire stc_audio_reset = stc_audio_reset_sync[1];
 
-wire        stc_pulse_1hz;
 wire        stc_tick_90k_audio;
-wire [32:0] stc_90k_value;
 
 mpeg2_h262_system_time_clock mpeg2_h262_system_time_clock
 (
@@ -835,29 +810,16 @@ mpeg2_h262_system_time_clock mpeg2_h262_system_time_clock
 	.run           (!(media_paused_audio || media_seeking_audio)),
 	.load_valid    (1'b0),
 	.load_value    (33'd0),
-	.stc_90k       (stc_90k_value),
+	.stc_90k       (),
 	.tick_90k      (stc_tick_90k_audio),
 	.stc_180k_half (),
-	.pulse_1hz     (stc_pulse_1hz)
+	.pulse_1hz     ()
 );
 
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [2:0] stc_pulse_sync;
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] stc_tick_90k_sync;
-reg [13:0] mpeg2_new_stc_seconds;
-wire mpeg2_new_stc_tick_90k =
-	(stc_tick_90k_sync[2:1] == 2'b01);
+wire mpeg2_new_stc_tick_90k=(stc_tick_90k_sync[2:1]==2'b01);
 always @(posedge clk_mpeg2) begin
-	if (reset_mpeg2) begin
-		stc_pulse_sync        <= 3'b000;
-		stc_tick_90k_sync     <= 3'b000;
-		mpeg2_new_stc_seconds <= 14'd0;
-	end
-	else begin
-		stc_pulse_sync <= {stc_pulse_sync[1:0],stc_pulse_1hz};
-		stc_tick_90k_sync <= {stc_tick_90k_sync[1:0],stc_tick_90k_audio};
-		if (stc_pulse_sync[2:1] == 2'b01)
-			mpeg2_new_stc_seconds <= mpeg2_new_stc_seconds + 14'd1;
-	end
+ if(reset_mpeg2) stc_tick_90k_sync<=0;
+ else stc_tick_90k_sync<={stc_tick_90k_sync[1:0],stc_tick_90k_audio};
 end

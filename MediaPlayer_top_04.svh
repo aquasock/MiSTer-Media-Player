@@ -9,7 +9,7 @@
 	                  mpeg2_new_p_store_block_complete :
 	                  mpeg2_new_recon_block_complete),
 	.block_stored    (mpeg2_new_ddr_block_stored),
-	.write_seen      (mpeg2_new_ddr_write_seen),
+	.write_seen      (),
 	.store_error     (mpeg2_new_ddr_store_error),
 	.ddram_busy      (mpeg2_new_ddr_writer_busy),
 	.ddram_burstcnt  (mpeg2_new_ddr_wr_burstcnt),
@@ -69,18 +69,18 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
     .p_store_pixel_valid       (mpeg2_new_p_store_pixel_valid),
     .p_store_block_start       (mpeg2_new_p_store_block_start),
     .p_store_block_complete    (mpeg2_new_p_store_block_complete),
-    .read_seen                 (mpeg2_new_pred_read_seen),
-    .sample_value              (mpeg2_new_pred_sample_value),
-    .sample_nonzero            (mpeg2_new_pred_sample_nonzero),
-    .half_sample_seen          (mpeg2_new_pred_half_sample_seen),
-    .reconstructed_seen        (mpeg2_new_pred_reconstructed_seen),
-    .reconstructed_value       (mpeg2_new_pred_reconstructed_value),
+    .read_seen                 (),
+    .sample_value              (),
+    .sample_nonzero            (),
+    .half_sample_seen          (),
+    .reconstructed_seen        (),
+    .reconstructed_value       (),
     .persisted_seen            (mpeg2_new_pred_persisted_seen),
     .row_persisted             (mpeg2_new_pred_row_persisted),
-    .p_progress_stage          (mpeg2_new_pred_progress_stage),
+    .p_progress_stage          (),
     .probe_error               (mpeg2_new_pred_error),
-    .probe_error_source        (mpeg2_new_pred_error_source),
-    .probe_error_detail        (mpeg2_new_pred_error_detail)
+    .probe_error_source        (),
+    .probe_error_detail        ()
 );
 
 wire [1:0] mpeg2_new_display_frame_bank;
@@ -89,9 +89,7 @@ wire      mpeg2_new_display_scratch_bank;
 wire [2:0] mpeg2_new_framebuffer_swap_reset_count;
 reg       mpeg2_new_swap_window_video;
 wire      mpeg2_new_b_presentation_complete;
-// Entry 282: scheduler observability taps consumed only by the cadence
-// profiler's unconditional hold-attribution counters.
-wire      mpeg2_new_b_scratch_available;
+// Promotion state participates in the functional EOF drain guard.
 wire      mpeg2_new_b_promotion_active;
 wire      mpeg2_new_b_presentation_error;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)

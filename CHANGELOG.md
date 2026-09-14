@@ -18,6 +18,13 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Diagnostic-removal gate two removes reporting connections/crossings and
+  legacy LED-success wiring, with named functional scheduler drain outputs.
+  Keep live decode/transport protection and Audio test; retain standalone
+  simulation observations and require fitted reporting registers to be absent.
+- Remove the inactive MPEG2FPGA reference tree and its two unused wrappers;
+  preserve provenance in documentation and Git history.
+
 - Diagnostic-removal gate one removes the cadence profiler and telemetry screen
   from the production core, preserving functional seek/EOF checks and Audio test.
 - Draw Paused/Seeking as opaque black glyphs with transparent gaps instead of

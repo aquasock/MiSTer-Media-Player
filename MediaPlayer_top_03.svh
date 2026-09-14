@@ -5,12 +5,12 @@
 	.macroblock_quantiser_scale_code(mpeg2_new_macroblock_quantiser_scale_code),
 	.slice_vertical_position     (mpeg2_new_slice_vertical_position),
 	.slice_vertical_position_extension(mpeg2_new_slice_vertical_position_extension),
-	.first_luma_dc_size          (mpeg2_new_first_luma_dc_size),
-	.first_luma_dc_differential  (mpeg2_new_first_luma_dc_differential),
-	.first_luma_dc_coefficient   (mpeg2_new_first_luma_dc_coefficient),
-	.first_luma_ac_nonzero_count (mpeg2_new_first_luma_ac_nonzero_count),
-	.first_luma_last_coeff_index (mpeg2_new_first_luma_last_coeff_index),
-	.first_luma_last_ac_level    (mpeg2_new_first_luma_last_ac_level),
+	.first_luma_dc_size          (),
+	.first_luma_dc_differential  (),
+	.first_luma_dc_coefficient   (),
+	.first_luma_ac_nonzero_count (),
+	.first_luma_last_coeff_index (),
+	.first_luma_last_ac_level    (),
 	.slice_start                 (mpeg2_new_slice_start),
 	.luma_macroblock_start       (mpeg2_new_luma_macroblock_start),
 	.qfs_block_index             (mpeg2_new_qfs_block_index),
@@ -35,11 +35,11 @@ mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 	.quantiser_scale_code        (mpeg2_new_effective_quantiser_scale_code),
 	.q_scale_type                (mpeg2_new_q_scale_type),
 	.alternate_scan              (mpeg2_new_alternate_scan),
-	.block_complete              (mpeg2_new_inverse_quant_complete),
+	.block_complete              (),
 	.iq_error                    (mpeg2_new_inverse_quant_error),
 	.unsupported_matrix          (mpeg2_new_inverse_quant_unsupported_matrix),
-	.first_luma_f00              (mpeg2_new_first_luma_f00),
-	.first_luma_f77              (mpeg2_new_first_luma_f77),
+	.first_luma_f00              (),
+	.first_luma_f77              (),
 	.coeff_out_block_start       (mpeg2_new_iq_coeff_block_start),
 	.coeff_out_valid             (mpeg2_new_iq_coeff_valid),
 	.coeff_out_index             (mpeg2_new_iq_coeff_index),
@@ -61,8 +61,8 @@ mpeg2_h262_idct mpeg2_h262_idct
 	.sample_valid                (mpeg2_new_idct_sample_valid),
 	.sample_index                (mpeg2_new_idct_sample_index),
 	.sample_value                (mpeg2_new_idct_sample_value),
-	.first_luma_sample00         (mpeg2_new_first_luma_sample00),
-	.first_luma_sample77         (mpeg2_new_first_luma_sample77)
+	.first_luma_sample00         (),
+	.first_luma_sample77         ()
 );
 
 mpeg2_h262_intra_recon mpeg2_h262_intra_recon
@@ -88,10 +88,10 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 	.pixel_value                        (mpeg2_new_recon_pixel_value),
 	.block_start                        (mpeg2_new_recon_block_start),
 	.block_complete                     (mpeg2_new_recon_block_complete),
-	.macroblock_420_complete            (mpeg2_new_recon_macroblock_420_complete),
+	.macroblock_420_complete            (),
 	.recon_error                        (mpeg2_new_recon_error),
-	.block_origin_x                     (mpeg2_new_recon_block_origin_x),
-	.block_origin_y                     (mpeg2_new_recon_block_origin_y)
+	.block_origin_x                     (),
+	.block_origin_y                     ()
 );
 
 mpeg2_h262_ddram_store mpeg2_h262_ddram_store

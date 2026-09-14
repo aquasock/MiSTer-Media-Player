@@ -52,13 +52,16 @@ module mpeg2_h262_b_presentation_scheduler #(parameter ENABLE_REFRESH_SELECTION=
     output reg  presentation_error,
     // Entry 311: passive state export for the development cadence snapshot.
     // No bit feeds scheduler control or timing decisions.
-    output wire [31:0] debug_state
+    output wire [31:0] debug_state,
+    // Functional terminal state used by seek and EOF draining.
+    output reg pending_frame_valid,
+    output reg reorder_active
 );
 
-reg pending_frame_valid,pending_frame_released;reg[1:0] pending_frame_bank;
+reg pending_frame_released;reg[1:0] pending_frame_bank;
 reg terminal_boundary_pending;
 reg b_user_success_d;
-reg reorder_active,run_closed,decode_inflight;
+reg run_closed,decode_inflight;
 reg scratch0_pending,scratch1_pending,next_present_scratch_bank;
 reg future_frame_pending,future_reference_pending;reg[1:0] future_frame_bank;
 reg scratch_presented;

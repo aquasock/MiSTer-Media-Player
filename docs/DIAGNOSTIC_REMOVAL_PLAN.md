@@ -1,6 +1,6 @@
 # Production diagnostic removal plan
 
-Status: gate one authorized and implemented for qualification. The user accepts b05b76f seed 87's EOF and
+Status: gate two authorized and implemented for qualification; gate three remains pending. The user accepts b05b76f seed 87's EOF and
 layout behavior. Preserve that RBF as the hardware rollback baseline:
 37,410 placed ALMs, 527/553 M10Ks, 75/112 DSPs, setup +0.358 ns, hold +0.099 ns.
 The later 6688db2 audio warning tolerance is simulation-tested only.
@@ -46,7 +46,7 @@ filled and unknown progress at both output rates.
 
 ### Gate two: remove reporting sources and legacy diagnostic wiring
 
-Replace the consumed scheduler debug bits with named functional outputs before
+The gate-two implementation replaces consumed scheduler debug bits with named functional outputs before
 removing debug buses. Preserve the exact pending-frame and reorder-active
 logic. Trace consumers before removing counters, error details and warnings.
 Remove the 256-bit reporting mailbox, minimum-reservoir tracking, historical
@@ -99,3 +99,15 @@ OSD and filters, aspect/color/refresh, pause/short/long/reverse seeks, SRT load
 and cue timing, replacement movies and clean EOF at 50/59.94 Hz. Verify no
 telemetry pattern or test-tone menu remains and no audio/video/UI behavior has
 changed. Preserve b05b76f seed 87 until this candidate is accepted.
+
+Gate-two implementation disconnects reporting-only leaf outputs instead of
+deleting their standalone simulation ports. The fitter audit requires zero
+registers for the telemetry mailbox, reporting crossings, reader statistics,
+PCM warnings/sample count, MP2 decoded-frame count and whole-second counter.
+The functional PCM-finished crossing and 90 kHz tick remain connected. No
+additional timing-fix batches are planned without user direction.
+
+The old reporting bus also carried the reader-error bit used to terminate a
+failed seek. Gate two replaces that payload with a dedicated one-bit
+`reader_error_config` mailbox, retaining all six audited synchronizer stages.
+The required CDC total stays 183 while the 256-bit statistics payload disappears.

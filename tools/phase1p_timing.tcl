@@ -70,17 +70,32 @@ set diagnostic_audit [open "$output_dir/diagnostic_removal_audit.rpt" w]
 puts $diagnostic_audit "Cadence profiler registers: $profiler_regs"
 close $diagnostic_audit
 if {$profiler_regs != 0} {error "Gate one still contains cadence profiler registers"}
+# Reporting ports remain usable by standalone simulations, but no reporting
+# state may survive in this production netlist. Functional clocks/errors remain.
+set reporting_audit [open "$output_dir/reporting_removal_audit.rpt" w]
+foreach pattern {
+    {*video_config_cdc:media_telemetry_config|*}
+    {*media_reservoir_min*}
+    {*mp2_sample_toggle*} {*mp2_sample_sync*} {*mp2_samples_count*}
+    {*mp2_underrun_sync*} {*mp2_timestamp_error_sync*}
+    {*mpeg2_new_stc_seconds*} {*stc_pulse_sync*}
+    {*media_file_reader:*|requests[*]} {*media_file_reader:*|completions[*]}
+    {*media_file_reader:*|max_wait[*]}
+    {*mp2_pcm_output:*|samples_played[*]} {*mp2_pcm_output:*|timestamp_error}
+    {*mp2_pcm_output:*|underrun} {*mp2_decoder:*|frames_decoded[*]}
+    {*mpeg2_h262_system_time_clock:*|second_counter[*]}
+} {
+    set count [get_collection_size [get_registers -nowarn $pattern]]
+    puts $reporting_audit "$pattern: $count registers"
+    if {$count != 0} {error "Gate two still contains reporting registers: $pattern"}
+}
+close $reporting_audit
 set cdc_audit [open "$output_dir/configuration_cdc_audit.rpt" w]
-foreach instance {eof_generation_config eof_complete_config subtitle_command_config subtitle_ack_config player_ui_config seek_file_config seek_file_echo_config seek_probe_config playback_control_config playback_position_config playback_audio_config playback_hide_reset_config refresh_request_config refresh_applied_config color_mode_config display_color_config media_prefill_config media_fatal_config media_telemetry_config aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
+foreach instance {eof_generation_config eof_complete_config subtitle_command_config subtitle_ack_config player_ui_config seek_file_config seek_file_echo_config seek_probe_config playback_control_config playback_position_config playback_audio_config playback_hide_reset_config refresh_request_config refresh_applied_config color_mode_config display_color_config media_prefill_config media_fatal_config reader_error_config aspect_config playback_osd_config platform_aspect_config scaler_input_config scaler_output_config framebuffer_enable_config subcarrier_config hdmi_osd|video_config_cdc:osd_config vga_osd|video_config_cdc:osd_config} {
     if {[string first "|" $instance] < 0} {
         set prefix "*video_config_cdc:$instance"
     } else {
         set prefix "*osd:$instance"
-    }
-    # Gate one removes this mailbox's only reporting consumer. Synthesis may
-    # prune it naturally; if retained, require all six stages as before.
-    if {$instance eq "media_telemetry_config" && [get_collection_size [get_registers -nowarn "${prefix}|*"]] == 0} {
-        continue
     }
     foreach chain {req_sync ack_sync} {
         for {set stage 0} {$stage < 3} {incr stage} {

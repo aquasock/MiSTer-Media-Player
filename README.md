@@ -82,17 +82,20 @@ The decoder remains at 60 MHz. Smaller pictures are centered within the 720x480
 raster. There is no interlaced output, Bob or Weave support. The default direct analog
 output is 480p/31 kHz; this is not a 15 kHz 240p or 480i mode. The 50 Hz mode
 uses an internal 720x480-active scaler raster, not 576-line decoding.
-Interlace, Bob/Weave, DVD navigation and subtitles are outside this development
-scope. Historical v0.7–v0.9 releases describe the earlier DVD/ARM architecture.
+Interlace, Bob/Weave and DVD navigation are outside this development
+scope. Subtitles are supported through a manually loaded SRT file. Historical v0.7–v0.9 releases describe the earlier DVD/ARM architecture.
 
 See [building](docs/BUILDING.md), [architecture](docs/ARCHITECTURE.md), and
 [hardware tests](docs/TEST_INSTRUCTIONS.md). Active sources are in `files.qip`;
-`rtl/mpeg2fpga/` is frozen reference code.
+the inactive MPEG2FPGA reference copy and wrappers have been removed. See
+[legacy provenance](docs/LEGACY_MPEG2FPGA.md) for their Git-history location.
 
 Supported output targets are HDMI through 1920x1080 and standard CRT resolutions.
 ASCAL image width is capped at 2048 pixels; the analog output path is retained.
-The unused Linux ALSA path and legacy LED blink diagnostics are disabled;
-FPGA movie audio and the screen telemetry remain enabled.
+The unused Linux ALSA path is disabled. Screen telemetry, reporting-only
+circuitry and legacy LED diagnostics are removed; functional decode/transport
+checks remain active. FPGA movie audio and the Audio test menu remain enabled
+until diagnostic-removal gate three.
 
 On a clean end of file, the core finishes queued video and audio and returns to
 the startup screen, clearing times, playback controls and loaded subtitles.

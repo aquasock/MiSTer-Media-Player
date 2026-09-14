@@ -43,14 +43,13 @@ wire mp2_pcm_valid,mp2_pcm_ready,mp2_error,mp2_idle;
 wire signed [15:0] mp2_pcm_l,mp2_pcm_r;
 wire [32:0] mp2_pcm_pts;
 wire mp2_pcm_pts_valid;
-wire [31:0] mp2_frames_decoded;
 mp2_decoder #(.ENABLE_SEEK_SKIP(1),.ENABLE_START_SYNC(1)) mp2_decoder (
     .clk(clk_mpeg2),.reset(reset_mpeg2),.input_data(av_audio_q[7:0]),.input_valid(av_audio_q_valid),
     .input_ready(av_audio_q_ready),.input_end(av_ingress_end&&av_audio_empty),
     .input_pts(av_audio_q[40:8]),.input_pts_valid(av_audio_q[41]),
     .pcm_valid(mp2_pcm_valid),.pcm_ready(mp2_pcm_ready),.pcm_left(mp2_pcm_l),.pcm_right(mp2_pcm_r),
     .pcm_pts(mp2_pcm_pts),.pcm_pts_valid(mp2_pcm_pts_valid),.error(mp2_error),
-    .frames_decoded(mp2_frames_decoded),.idle(mp2_idle),
+    .frames_decoded(),.idle(mp2_idle),
     .resync_start(media_start_offset_mpeg!=0),
     .seek(media_seeking),.seek_target(media_seek_pts)
 );
@@ -95,8 +94,7 @@ always @(posedge CLK_AUDIO or posedge reset_mpeg2) begin
 end
 wire reset_mp2_out=mp2_reset_sync[2];
 wire signed [15:0] mp2_output_l,mp2_output_r;
-wire mp2_underrun,mp2_timestamp_error,mp2_finished;
-wire [31:0] mp2_samples_played;
+wire mp2_finished;
 // A single held bundle transfers pause, seek state and the destination PTS.
 reg [32:0] media_first_pts;
 reg media_first_pts_valid;
@@ -118,8 +116,8 @@ mp2_pcm_output #(.ENABLE_PLAYBACK_CONTROL(1)) mp2_pcm_output (
     .pause(media_paused_audio),.seek(media_seeking_audio),.seek_target(media_seek_pts_audio),
     .origin_valid(!av_origin_empty),.origin_pts(av_origin_q),
     .fifo_data(mp2_fifo_data),.fifo_empty(mp2_fifo_empty),.fifo_rd(mp2_fifo_rd),
-    .audio_l(mp2_output_l),.audio_r(mp2_output_r),.underrun(mp2_underrun),
-    .timestamp_error(mp2_timestamp_error),.finished(mp2_finished),.samples_played(mp2_samples_played)
+    .audio_l(mp2_output_l),.audio_r(mp2_output_r),.underrun(),
+    .timestamp_error(),.finished(mp2_finished),.samples_played()
 );
 assign audio_pcm_output_l=audio_mode_out!=0?audio_test_output_l:mp2_output_l;
 assign audio_pcm_output_r=audio_mode_out!=0?audio_test_output_r:mp2_output_r;
@@ -130,30 +128,10 @@ mpeg2_pes_picture_pts av_picture_pts_bind (
     .stream_valid(mpeg2_new_decode_stream_valid),.metadata_valid(mpeg2_new_inband_valid),
     .metadata_pts(mpeg2_new_inband_pts_90k),.pts_valid(av_picture_pts_valid),.pts(av_picture_pts)
 );
+// PCM completion is functional: EOF must wait for the final audio sample.
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [2:0] mp2_underrun_sync,mp2_timestamp_error_sync;
+reg [2:0] mp2_finished_sync;
 always @(posedge clk_mpeg2) begin
-    if(reset_mpeg2) begin mp2_underrun_sync<=0;mp2_timestamp_error_sync<=0;end
-    else begin
-        mp2_underrun_sync<={mp2_underrun_sync[1:0],mp2_underrun};
-        mp2_timestamp_error_sync<={mp2_timestamp_error_sync[1:0],mp2_timestamp_error};
-    end
-end
-// Count actual PCM consumption in the decoder domain using a single-bit event
-// toggle. 48 kHz events are separated by >1,000 decoder clocks; no counter CDC.
-reg mp2_sample_toggle;
-always @(posedge CLK_AUDIO) begin
-    if(reset_mp2_out) mp2_sample_toggle<=0;
-    else mp2_sample_toggle<=mp2_samples_played[0];
-end
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [2:0] mp2_sample_sync,mp2_finished_sync;
-reg [31:0] mp2_samples_count;
-always @(posedge clk_mpeg2) begin
-    if(reset_mpeg2) begin mp2_sample_sync<=0;mp2_finished_sync<=0;mp2_samples_count<=0;end
-    else begin
-        mp2_sample_sync<={mp2_sample_sync[1:0],mp2_sample_toggle};
-        mp2_finished_sync<={mp2_finished_sync[1:0],mp2_finished};
-        if(mp2_sample_sync[2]^mp2_sample_sync[1]) mp2_samples_count<=mp2_samples_count+32'd1;
-    end
+ if(reset_mpeg2) mp2_finished_sync<=0;
+ else mp2_finished_sync<={mp2_finished_sync[1:0],mp2_finished};
 end

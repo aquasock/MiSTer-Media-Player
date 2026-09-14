@@ -1,3 +1,33 @@
+# Diagnostic removal gate two
+
+Gate two removes the remaining telemetry mailbox, reporting crossings and
+statistics, unused status outputs and legacy LED-success expressions. Seek and
+EOF use named functional scheduler outputs with unchanged state logic. Live
+reader timeouts/quarantine, fatal decode checks, PCM-finished synchronization,
+90 kHz presentation timing and FIFO/DDR ownership remain intact. A dedicated
+one-bit mailbox preserves reader-error delivery to seek control, replacing the
+old telemetry-bus dependency; all 183 required CDC stages remain audited. Audio test is
+still present for gate three. Black Paused/Seeking text and subtitles are unchanged.
+
+The frozen MPEG2FPGA source tree and two unused wrappers are removed from the
+repository; they were not part of the compiled design. Git history and the
+legacy provenance document retain their origin information.
+
+Test Fellow, Groove, Jiggler and Star Wars: normal startup and audio/video,
+pause/resume, every seek size/direction including repeated long/backward seeks,
+SRT load and cue timing, OSD/filter operation, replacement movies, paused EOF,
+longer audio tails and EOF return to startup at 50 and 59.94 Hz. No telemetry
+or LED blink codes should appear. Retain gate-one seed 52 and hardware-accepted
+b05b76f seed 87 for comparison/rollback. Gate three waits for user authorization.
+
+Gate-two simulations pass: mixed I/P/B EOF and seek-to-EOF/display ownership
+oracles each check 423936 pixels without mismatches; playback/session controls,
+reader timeout/malformed-response quarantine, independent reader-error CDC and
+seek retirement, raster/refresh, UI/subtitle pixel and cue tests pass. The audio
+oracle checks 48384 sample pairs within one PCM unit of FFmpeg, exact pause/seek
+sample sequences and 30 picture timestamps with no underrun/timestamp warning.
+Evidence is under results/gate2-*. Build timing/resources remain pending.
+
 # Diagnostic removal gate one
 
 This candidate removes the on-screen telemetry profiler and its snapshot

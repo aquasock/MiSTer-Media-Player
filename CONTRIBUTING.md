@@ -10,7 +10,7 @@ This project is under active hardware development. Small, reviewable changes wit
 - Treat ITU-T H.222.0 / ISO/IEC 13818-1 as authoritative for systems/program-stream work.
 - Keep implementation limits separate from standards requirements.
 - Preserve the active clean decoder under `rtl/mpeg2_new/`.
-- Do not re-enable the frozen `rtl/mpeg2fpga/` implementation unless a change specifically requires it.
+- The legacy MPEG2FPGA implementation was removed from the working tree; do not reintroduce it as a build dependency. Its provenance remains in `docs/LEGACY_MPEG2FPGA.md` and Git history.
 - Keep clock-domain crossings explicit and intentional.
 - Avoid broad timing exceptions that hide real paths.
 - Prefer small hardware phases that can be synthesized, timed, and tested independently.

@@ -52,9 +52,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_picture_
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 
-# Phase 1R: MPEG2FPGA and its DDR bridge remain outside the active
-# Quartus design.  rtl/mpeg2fpga remains in the repository only as a
-# frozen reference implementation.
+# Legacy MPEG2FPGA and its unused bridge/wrapper were removed in gate two.
 set_global_assignment -name SDC_FILE MediaPlayer.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE MediaPlayer.sv
 

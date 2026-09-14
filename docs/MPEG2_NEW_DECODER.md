@@ -1,3 +1,7 @@
+> Historical development notes: the early parallel MPEG2FPGA integration
+> described below is no longer active. Its frozen copy and unused wrappers
+> were removed in diagnostic-removal gate two; see [provenance](LEGACY_MPEG2FPGA.md).
+
 # New MPEG-2 / H.262 decoder
 
 This directory tracks the clean-room MiSTer-oriented decoder being developed in
