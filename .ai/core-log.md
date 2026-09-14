@@ -1,3 +1,44 @@
+## 88 COMMIT Unreleased ??? 2026-09-14T12:45:21-07:00
+
+#### Coming From:
+
+Unreleased 0ad4b1b
+
+#### Purpose:
+
+Remove gate-three Audio test hardware and consolidate playback clocks onto the progress bar.
+
+#### Outcome:
+
+The user reports all gate-two hardware tests pass and authorizes gate three. Remove the Audio test menu, generator, test PCM FIFO, mode/restart mailboxes, reset/control state, adapter and output mux; retain functional movie PCM, pause/seek, EOF and safety logic. Reserve old status bits. The user additionally requests black time glyphs on the bar, complete removal of Paused/Seeking labels and their rendering logic, and moving the remaining bar/subtitles down one 14-pixel logical text line. Keep overlay activity and seek-preview behavior. Gate-two source 100ab07 seed 87 is the accepted rollback.
+
+#### Next Steps:
+
+Implement source and independent pixel oracles, run audio, controls, mixed/seek EOF and subtitle/UI regressions, then build seeds 52/61/87. Audit test-hardware absence, retained PCM and CDC, all timing corners and resources; no extra timing-fix builds. Await the user's four-file acceptance.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer_top_00.svh
+- MediaPlayer_av.svh
+- files.qip
+- rtl/media_ui_scene.sv
+- rtl/media_ui_state.sv
+- tools/phase1p_timing.tcl
+- tools/audit_three_seeds.py
+- tools/verify_player_overlay.py
+- tools/verify_subtitles.py
+- docs/ui/overlay-preview.html
+- docs/DIAGNOSTIC_REMOVAL_PLAN.md
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 87 COMMIT Unreleased 0ad4b1b 2026-09-14T12:36:07-07:00
 
 #### Coming From:
@@ -1373,35 +1414,6 @@ Build source bcddb20 when authorized, measure actual fit and resource savings, a
 - tools/phase1p_timing.tcl
 - CHANGELOG.md
 - docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 48 COMMIT Unreleased 3ab6615 2026-09-14T03:06:59-07:00
-
-#### Coming From:
-
-Unreleased 3ab6615
-
-#### Purpose:
-
-Record the completed reduced-source placement results and remaining device-capacity shortfall.
-
-#### Outcome:
-
-All three source 3ab6615 builds failed fitter LAB capacity and produced no RBF. Seeds 52, 61 and 87 required 4196, 4209 and 4192 LABs respectively against 4191 available, leaving seed 87 one LAB over capacity. The partial fitter ALM estimates were 41561, 41708 and 41542; these are incomplete-fit figures, not successful placement or timing qualification. Seed 87 synthesis confirms the observer dropped from 429 to 314 registers and 77 to 74 combinational ALUTs, while search logic dropped from 487 to 417 ALUTs with 332 registers unchanged. Thus the two edited modules saved 115 registers and 73 combinational ALUTs. The previous seed 87 required 4198 LABs; the reduction helped packing but did not yield a legal fit. Timing and fitted CDC qualification could not run. Evidence and failure-summary.json are under results/build-3ab6615-20260914-025405. No further builds were launched and the MiSTer was not changed.
-
-#### Next Steps:
-
-Plan another bounded resource reduction to create packing margin before repeating the three-seed build, preserving seek behavior and existing regression coverage. The prior a229a01 seed 87 remains the timing-qualified hardware rollback; there is no new direct-seek binary to test.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
