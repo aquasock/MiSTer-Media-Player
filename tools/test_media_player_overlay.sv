@@ -8,14 +8,14 @@ wire [23:0] out;
 wire ho,vo,deo;
 media_player_overlay dut(.control_clk(control_clk),.video_clk(clk),.control_state(state_in),
  .rgb(rgb),.hs(hs),.vs(vs),.de(de),.rgb_out(out),.hs_out(ho),.vs_out(vo),.de_out(deo));
-reg [26:0] expected[0:4];
+reg [26:0] expected[0:5];
 integer cycles=0;
 always @(posedge clk) begin
  expected[0]<={hs,vs,de,rgb};
- for(integer k=1;k<5;k=k+1) expected[k]<=expected[k-1];
+ for(integer k=1;k<6;k=k+1) expected[k]<=expected[k-1];
  cycles<=cycles+1;
  #1;
- if(cycles>8 && {ho,vo,deo}!==expected[4][26:24]) $fatal(1,"timing pipeline mismatch");
+ if(cycles>8 && {ho,vo,deo}!==expected[5][26:24]) $fatal(1,"timing pipeline mismatch");
 end
 integer w=720,h=480,known=1,shown=1,paused=0,seeking=0;
 integer fd,frame_no=0,pixels=0;

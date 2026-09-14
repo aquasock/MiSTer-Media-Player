@@ -10,10 +10,16 @@ remains a design aid; deterministic RTL renderings are produced by the tests.
 `media_ui_state` produces a coherent 91-bit presentation snapshot in the
 20 MHz core system domain. `player_ui_config` transfers it to HDMI with the
 existing coalescing request/acknowledge mailbox. `media_ui_scene` assembles an
-inactive scene there, using a sequential divider and serialized progress
-multiplication. The compositor acknowledges publication only at the next VS
-rising edge. Session/seek epochs reject stale scenes without blocking playback.
-The actual pixel pipeline delays RGB, HS, VS and DE together by five registers.
+inactive scene there, using a sequential divider and one serialized multiplier for all
+layout and progress arithmetic. Both advance only every fourth HDMI clock;
+timing exceptions apply exclusively between registers sharing that enable.
+Mailbox inputs, provider writes, pixel logic and compositor-facing outputs
+retain single-cycle timing. A pending latch captures short publication acks. The compositor starts publication at the next VS
+rising edge, copies twelve descriptors from staging RAM during blanking, then
+acknowledges the complete scene. Incomplete copies never draw. Session/seek epochs reject stale scenes without blocking playback.
+The actual pixel pipeline delays RGB, HS, VS and DE together by six registers.
+Pixel glyph-coordinate conversion uses a small synchronous lookup ROM instead
+of cascaded divisions. `tools/make_overlay_roms.py --check` verifies both ROMs.
 
 The scene holds eight text objects (64 eight-bit glyph IDs each) and four
 rectangles. Slots 0–3 carry controls; slots 4–7 are reserved for a retained
@@ -32,7 +38,8 @@ the dark alpha palette over the video in the one composition pass.
 Duration preflight reads at most 64 KiB from the head and 4 MiB from the tail.
 It first finds a pack prefix and then reuses a separate, strictly checked
 instance of the existing PES parser; it does not duplicate the reader RAM.
-The first head video PTS is the movie origin. The tail requires sequence/rate
+The first validated head video PTS is the movie origin; malformed head
+evidence and a different selected video-stream ID in the tail are rejected. The tail requires sequence/rate
 metadata, timestamped pictures, slice evidence and a complete packet boundary.
 It retains the maximum relative PTS plus a progressive frame period, rather
 than taking the last decoded B-picture timestamp. Missing timestamps after

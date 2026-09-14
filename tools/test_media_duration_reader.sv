@@ -27,7 +27,7 @@ media_file_reader #(.TIMEOUT_CYCLES(5000)) reader(
 reg [7:0] fixture[0:511];
 integer fixture_length=352;
 string path;
-reg host_enable=1,malformed=0;
+reg host_enable=1,malformed=0,corrupt_head=0,different_tail=0;
 reg [63:0] host_base,host_size;
 integer host_words,j,request_count=0,play_bytes=0;
 reg saw_high_lba=0;
@@ -36,6 +36,10 @@ function [7:0] file_byte(input [63:0] offset,input [63:0] size);
  begin
   index=offset>=size-512?offset-(size-512):offset;
   file_byte=index<fixture_length?fixture[index]:8'hff;
+  if(corrupt_head && offset<size-512 && index==18) file_byte=file_byte&8'hfe;
+  if(different_tail && offset>=size-512 && index>=3 && index<fixture_length &&
+     fixture[index]==8'he0 && fixture[index-1]==1 && fixture[index-2]==0 && fixture[index-3]==0)
+   file_byte=8'he1;
  end
 endfunction
 initial forever begin
@@ -90,6 +94,9 @@ initial begin
  // A new valid file recovers even when the previous reader error is sticky.
  mount(1024);done(1);
  malformed=1;mount(1024);done(0);malformed=0;
+ mount(1024);done(1);
+ corrupt_head=1;mount(1024);done(0);corrupt_head=0;
+ different_tail=1;mount(1024);done(0);different_tail=0;
  mount(1024);done(1);
  $display("DURATION_READER_PASS requests=%0d playback_bytes=%0d",request_count,play_bytes);$finish;
 end

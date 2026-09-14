@@ -150,3 +150,14 @@ set_false_path -to [get_keepers {*|media_session_control:*|ack_sync[0]}]
 set_false_path -to [get_keepers {*media_osd_sync[0]}]
 # Seek blanks/reinitializes scanout while reconstruction advances offscreen.
 set_false_path -from [get_keepers {*video_config_cdc:playback_control_config|dst_data[35]}] -to [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
+
+# Shared UI formatting advances only on scene_phase==0, every fourth HDMI
+# clock. Only register-to-register paths sharing that exact enable get four
+# cycles. Snapshot inputs, provider writes, publication, pixel processing and
+# all output-to-compositor paths retain ordinary single-cycle timing.
+set player_scene_ce_regs [get_registers {*media_ui_scene:scene|media_ui_divider:divider|*}]
+foreach player_scene_name {snapshot w h scale revision state resume_state field ch hours minutes seconds tx ty tw th track_x0 track_x1 fill_x0 fill_x1 track_y0 track_y1 fill_y0 fill_y1 fraction product multiplicand multiplier multiply_count multiply_resume product_low remaining_delta time_rounded remaining clamped_position time_operand glyph_span text_span numerator denominator div_start text_we text_addr text_data object_we object_addr object_data commit commit_epoch commit_groups commit_scale} {
+    set player_scene_ce_regs [add_to_collection $player_scene_ce_regs [get_registers -nowarn "*media_ui_scene:scene|${player_scene_name}*"]]
+}
+set_multicycle_path -setup -end 4 -from $player_scene_ce_regs -to $player_scene_ce_regs
+set_multicycle_path -hold -end 3 -from $player_scene_ce_regs -to $player_scene_ce_regs

@@ -99,6 +99,17 @@ foreach chain {req_sync ack_sync} {
 }
 close $cdc_audit
 
+# The formatter's multicycle exception is backed by a real modulo-four
+# enable. Pixel processing, mailbox inputs and compositor outputs stay timed
+# at the full HDMI rate; require the enable counter and scoped register set.
+set scene_enable_regs [get_registers {*media_player_overlay:player_overlay|scene_phase[*]}]
+if {[get_collection_size $scene_enable_regs] != 2} {error "Missing two-bit scene clock-enable counter"}
+if {[get_collection_size $player_scene_ce_regs] < 400} {error "Missing scoped scene formatter registers"}
+set scene_enable_audit [open "$output_dir/player_scene_enable_audit.rpt" w]
+puts $scene_enable_audit "Enable counter: [get_collection_size $scene_enable_regs] registers"
+puts $scene_enable_audit "Four-cycle formatter registers: [get_collection_size $player_scene_ce_regs]"
+close $scene_enable_audit
+
 # Current PLL configuration:
 #   decoder = 60.0 MHz = 16.667 ns
 #   video   = 27.0 MHz = 37.037 ns

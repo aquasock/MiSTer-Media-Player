@@ -6,7 +6,8 @@ module media_duration_window(
  input wire origin_valid,input wire [32:0] origin,
  output reg [32:0] first_pts=0,
  output wire valid,output reg [34:0] end_q=0,
- output reg have_origin=0
+ output reg have_origin=0,
+ output wire healthy,output wire [7:0] video_stream_id
 );
 // Tail windows can start inside an arbitrary payload. Align to a pack prefix
 // before feeding the production demux, replaying that prefix without buffering.
@@ -24,7 +25,7 @@ mpeg2_h262_program_stream_demux #(.STRICT_TIMESTAMPS(1)) demux(
  .video_data(es),.video_valid(es_valid),.video_ready(1'b1),.video_pts(pts),.video_pts_valid(pts_valid),
  .audio_data(),.audio_valid(),.audio_ready(1'b1),.audio_pts(),.audio_pts_valid(),
  .stream_end(),.demux_error(demux_error),.input_file_position(41'd0),
- .video_file_position(),.video_pack_position(),.packet_boundary(packet_boundary));
+ .video_file_position(),.video_pack_position(),.packet_boundary(packet_boundary),.selected_video_id(video_stream_id));
 reg [23:0] prefix=24'hffffff;
 reg [3:0] header_count=0;
 reg [7:0] header_code=0;
@@ -37,6 +38,7 @@ reg [32:0] max_relative=0;
 wire [32:0] relative=pending_pts-origin;
 // Half a 33-bit wrap is the unambiguous comparison domain (~13.25 hours).
 // Unknown is intentional for longer/discontinuous timelines.
+assign healthy=aligned && !demux_error;
 assign valid=origin_valid && picture_seen && slice_seen && period_q!=0 &&
  !bad && !unqualified_tail && !demux_error && packet_boundary && header_count==0 && end_q!=0;
 always @(posedge clk) begin

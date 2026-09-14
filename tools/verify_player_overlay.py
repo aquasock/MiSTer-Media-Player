@@ -39,7 +39,7 @@ for w,h,known,shown,paused,seeking,pos,total in cases:
  bad=np.any(actual!=expected,axis=2);count=int(bad.sum());print(name,'mismatched pixels',count,flush=True)
  if count:
   ys,xs=np.where(bad);print('first:',[(int(x),int(y),actual[y,x].tolist(),expected[y,x].tolist()) for x,y in zip(xs[:10],ys[:10])]);raise RuntimeError('pixel mismatch')
-for top,extra in [('test_media_ui_lifetime',['rtl/media_ui_scene.sv','rtl/media_ui_divider.sv','rtl/media_overlay_compositor.sv']),('test_media_ui_state',['rtl/media_ui_state.sv'])]:
+for top,extra in [('test_media_ui_lifetime',['rtl/media_ui_scene.sv','rtl/media_ui_divider.sv','rtl/media_overlay_compositor.sv']),('test_media_ui_state',['rtl/media_ui_state.sv']),('test_media_ui_divider',['rtl/media_ui_divider.sv'])]:
  subprocess.run(['iverilog','-g2012','-s',top,'-o',str(o/top),f'tools/{top}.sv',*extra],check=True)
  r=subprocess.run(['vvp',str(o/top)],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
  (o/(top+'.log')).write_text(r.stdout);print(r.stdout);r.check_returncode()

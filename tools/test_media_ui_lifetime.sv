@@ -1,6 +1,8 @@
 `timescale 1ns/1ps
 module test_media_ui_lifetime;
 reg clk=0;always #5 clk=~clk;
+reg [1:0] phase=0;always @(posedge clk) phase<=phase+1'b1;
+wire ce=phase==0;
 reg [90:0] state_in={16'd1,1'b1,1'b1,1'b0,1'b0,1'b1,35'd36000000,35'd3600000};
 wire tw,ow,commit,pending,ack;
 wire [8:0] ta;wire [7:0] td;wire [3:0] oa,scale;
@@ -8,7 +10,7 @@ wire [55:0] od;wire [15:0] epoch;wire [1:0] groups;
 reg atw=0,aow=0,ac=0,av=0;reg [7:0] ata=0,atd=0;reg [1:0] aoa=0;reg [55:0] aod=0;
 reg [15:0] ae=1;
 reg vs=0;
-media_ui_scene scene(.clk(clk),.state_in(state_in),.width(12'd720),.height(12'd480),
+media_ui_scene scene(.clk(clk),.ce(ce),.state_in(state_in),.width(12'd720),.height(12'd480),
  .pending(pending),.acknowledged(ack),.text_we(tw),.text_addr(ta),.text_data(td),
  .object_we(ow),.object_addr(oa),.object_data(od),.commit(commit),.commit_epoch(epoch),.commit_groups(groups),.commit_scale(scale),
  .aux_text_we(atw),.aux_text_addr(ata),.aux_text_data(atd),.aux_object_we(aow),.aux_object_addr(aoa),.aux_object_data(aod),
@@ -17,6 +19,11 @@ media_overlay_compositor renderer(.clk(clk),.rgb(24'h203040),.hs(1'b0),.vs(vs),.
  .text_we(tw),.text_addr(ta),.text_data(td),.object_we(ow),.object_addr(oa),.object_data(od),
  .commit(commit),.commit_epoch(epoch),.commit_groups(groups),.commit_scale(scale),
  .pending(pending),.acknowledged(ack),.width(),.height(),.rgb_out(),.hs_out(),.vs_out(),.de_out());
+reg [7:0] previous_state;reg [8:0] previous_addr;reg enabled;
+always @(posedge clk) begin
+ enabled=ce;previous_state=scene.state;previous_addr=ta;
+ #1;if(!enabled && (scene.state!==previous_state || ta!==previous_addr)) $fatal(1,"scene advanced off enable");
+end
 task publish;
  reg page;
  begin
@@ -24,7 +31,7 @@ task publish;
   repeat(29) @(negedge clk);
   if(renderer.page!=page || ack) $fatal(1,"publication before frame");
   vs=1;@(negedge clk);vs=0;
-  if(!ack) $fatal(1,"no frame acknowledgement");
+  wait(ack);@(negedge clk);
   repeat(2) @(negedge clk);
  end
 endtask

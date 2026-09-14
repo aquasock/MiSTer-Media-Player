@@ -1,5 +1,14 @@
 # Unified player overlay candidate — qualification pending
 
+Initial source `5373dae` compiled for all three seeds but fails HDMI setup
+through pixel-coordinate division, and exceeds the initial logic budget by
+351–454 ALMs. It is not recommended for testing. The follow-up replaces that
+path with a synchronous coordinate ROM, stores staging descriptors in RAM and
+uses a real modulo-four enable for scene arithmetic. Pixels remain full-rate;
+only the formatter's same-enable register paths receive multicycle constraints.
+Duration guards also reject malformed head evidence and mismatched stream IDs.
+
+
 This change adds the historical progress strip and three time fields to normal
 scaled HDMI, after video filters and before the MiSTer menu. Keep accepted
 `3ff27c8` seed 52 below as rollback until hardware validation completes.

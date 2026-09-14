@@ -51,7 +51,8 @@ module mpeg2_h262_program_stream_demux #(parameter ENABLE_FILE_POSITION=0, param
     output reg         demux_error,
     input wire [40:0] input_file_position,
     output reg [40:0] video_file_position, video_pack_position,
-    output wire packet_boundary
+    output wire packet_boundary,
+    output wire [7:0] selected_video_id
 );
 
 localparam [4:0]
@@ -98,6 +99,7 @@ assign in_ready = (!video_valid || video_ready) &&
                   (!audio_valid || audio_ready);
 
 wire accept = in_valid && in_ready;
+assign selected_video_id = selected_video;
 assign packet_boundary = state==S_SYNC && zero_run==0 && !video_valid;
 reg [40:0] pack_position;
 always @(posedge clk) begin

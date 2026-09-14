@@ -23,12 +23,14 @@ localparam IDLE=0,DRAIN=1,START_HEAD=2,HEAD=3,START_TAIL=4,TAIL=5,FINISH=6,ABORT
 reg [2:0] state=IDLE;
 reg [31:0] timer=0;
 reg head_valid=0;
+reg [7:0] head_video_id=0;
 reg [63:0] size=0;
 wire reading=state==HEAD || state==TAIL;
 assign busy=state!=IDLE || new_file;
 assign reader_cancel=new_file || state==DRAIN || state==ABORT;
 reg parser_reset=1;
-wire parser_ready,window_valid,window_origin;
+wire parser_ready,window_valid,window_origin,window_healthy;
+wire [7:0] window_video_id;
 wire [32:0] first_pts;
 wire [34:0] end_q;
 assign stream_ready=reading && parser_ready;
@@ -36,7 +38,7 @@ media_duration_window window(
  .clk(clk),.reset(parser_reset),.in_data(stream_data[7:0]),
  .in_valid(reading && stream_valid && !stream_data[8]),.in_ready(parser_ready),
  .origin_valid((state==TAIL || state==FINISH) && head_valid),.origin(origin),
- .first_pts(first_pts),.valid(window_valid),.end_q(end_q),.have_origin(window_origin));
+ .first_pts(first_pts),.valid(window_valid),.end_q(end_q),.have_origin(window_origin),.healthy(window_healthy),.video_stream_id(window_video_id));
 always @(posedge clk) begin
  reader_start<=0;parser_reset<=0;
  if(reset) begin state<=IDLE;duration_valid<=0;head_valid<=0;parser_reset<=1;timer<=0;end
@@ -57,7 +59,7 @@ always @(posedge clk) begin
    HEAD: if(stream_valid && stream_ready && stream_data[8]) begin
     // The head need only establish the first video timestamp. Endpoint
     // qualification belongs to the tail and may require much more data.
-    head_valid<=window_origin;origin<=first_pts;state<=START_TAIL;
+    head_valid<=window_origin && window_healthy;origin<=first_pts;head_video_id<=window_video_id;state<=START_TAIL;
    end
    START_TAIL: if(reader_idle) begin
     if(!head_valid) state<=ABORT;
@@ -68,7 +70,7 @@ always @(posedge clk) begin
    end
    TAIL: if(stream_valid && stream_ready && stream_data[8]) state<=FINISH;
    FINISH: if(reader_idle) begin
-    duration_valid<=window_valid && head_valid;duration_q<=end_q;state<=IDLE;
+    duration_valid<=window_valid && head_valid && window_video_id==head_video_id;duration_q<=end_q;state<=IDLE;
    end
    ABORT: if(reader_idle) begin state<=IDLE;parser_reset<=1;end
   endcase

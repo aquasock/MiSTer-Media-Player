@@ -5,6 +5,12 @@ module media_player_overlay(
  input wire [23:0] rgb,input wire hs,vs,de,
  output wire [23:0] rgb_out,output wire hs_out,vs_out,de_out
 );
+// Only scene construction advances every fourth pixel clock. Pixel lookup,
+// RAM publication and timing measurement continue on every clock. SDC applies
+// multicycle timing exclusively between these same-enable formatter registers.
+(* preserve *) reg [1:0] scene_phase=0;
+always @(posedge video_clk) scene_phase<=scene_phase+1'b1;
+wire scene_ce=scene_phase==0;
 wire [90:0] state_hdmi;
 video_config_cdc #(.WIDTH(91)) player_ui_config(
  .src_clk(control_clk),.dst_clk(video_clk),.src_data(control_state),.dst_data(state_hdmi));
@@ -17,7 +23,7 @@ wire [15:0] epoch;
 wire [1:0] groups;
 wire [11:0] width,height;
 media_ui_scene scene(
- .clk(video_clk),.state_in(state_hdmi),.width(width),.height(height),.pending(pending),.acknowledged(acknowledged),
+ .clk(video_clk),.ce(scene_ce),.state_in(state_hdmi),.width(width),.height(height),.pending(pending),.acknowledged(acknowledged),
  .text_we(text_we),.text_addr(text_addr),.text_data(text_data),
  .object_we(object_we),.object_addr(object_addr),.object_data(object_data),
  .commit(commit),.commit_epoch(epoch),.commit_groups(groups),.commit_scale(scale),
