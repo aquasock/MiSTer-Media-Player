@@ -1,3 +1,32 @@
+## 77 COMMIT Unreleased c4b40c4 2026-09-14T09:51:43-07:00
+
+#### Coming From:
+
+Unreleased 304e4dc
+
+#### Purpose:
+
+Record the user's revised next-release requirements.
+
+#### Outcome:
+
+The user replaces the preceding playlist and automatic matching-name subtitle proposal with session-only resume from last position, predictable EOF behavior and subtitles from a separate SRT selected through a menu entry. The earlier clarification that resume lasts only while the core stays loaded remains in force. Keep stock Main; playlists, N/P playlist navigation and automatic SRT discovery are not part of this target. Audio-track selection remains excluded. The UI plan records this scope and remaining design questions for resume identity, EOF draining and bounded subtitle parsing, storage and character coverage. No RTL changes, additional builds or hardware deployment occurred; ffafc79 seed 87 remains timing-qualified but not yet explicitly hardware accepted.
+
+#### Next Steps:
+
+Plan and implement the revised target using existing seek, duration and shared-overlay infrastructure, validating file transitions, EOF, pause and seek subtitle synchronization before release qualification.
+
+#### Files Modified:
+
+- docs/UI_OVERLAY_PLAN.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 76 COMMIT Unreleased 304e4dc 2026-09-14T09:45:46-07:00
 
 #### Coming From:
@@ -1271,54 +1300,6 @@ Let the user test seed 52 with Seek audio bypass On, preserve the first-fault sc
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 37 COMMIT Unreleased 6eb49e1 2026-09-14T00:24:33-07:00
-
-#### Coming From:
-
-Unreleased aad072a
-
-#### Purpose:
-
-Diagnose the hardware seek freeze with persistent first-fault telemetry and combined program-stream replay.
-
-#### Outcome:
-
-Source 6eb49e1 adds a fourteen-word first-observed seek snapshot, decoder subcodes, seek state, timestamps and queue observations; the new observer survives pause and decoder restart and clears on reset or a fresh file. A diagnostic OSD option disables only compressed MP2 frame bypass for comparison within one RBF. Actual RTL overlay pixels decode successfully, first-fault retention and seek timeout regressions pass, legacy telemetry compatibility passes, and the existing MPG audio/PTS oracle remains exact with no audio errors. The combined exact-file replay includes mounted input, demux, bounded queues, MP2 output, video reconstruction and PTS scheduling, with ideal CDC and separate compressed-video DDR service explicitly outside the hardware-equivalence claim. Source is pushed and the clean seed 52/61/87 batch has started. No freeze fix or hardware acceptance is claimed.
-
-#### Next Steps:
-
-Complete the timing/resource audit and exact-file bypass/seek-phase/storage-stall comparisons, then provide a qualified diagnostic RBF for user hardware testing. Retain first-fault evidence before changing the playback algorithm.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer_av.svh
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_07.svh
-- docs/TEST_INSTRUCTIONS.md
-- files.qip
-- rtl/audio/av_stream_fifo.sv
-- rtl/audio/mp2_pcm_fifo.sv
-- rtl/media_seek_diagnostics.sv
-- rtl/mpeg2_new/mpeg2_av_ddr_fifo.sv
-- tools/phase1p_timing.tcl
-- tools/replay_mpg_seek.py
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/mpg_replay_control.svh
-- tools/streams/mpg_replay_ingress.svh
-- tools/test_av_ddr_fifo.sv
-- tools/test_media_seek_diagnostics.sv
-- tools/test_mpg_audio_ingress.sv
-- tools/test_mpg_audio_playback.sv
-- tools/verify_seek_diagnostics.py
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
