@@ -1,3 +1,32 @@
+## 41 COMMIT Unreleased a229a01 2026-09-14T01:18:38-07:00
+
+#### Coming From:
+
+Unreleased a229a01
+
+#### Purpose:
+
+Build the simulation-verified seek display-bank release for hardware testing.
+
+#### Outcome:
+
+The user has now authorized proceeding after the source-only fix, lifting the build hold for this cycle. The standard clean seed 52/61/87 batch will use exact committed source a229a01. Normal playback, repeated retained seeks, EOF seeking, pixel oracles and DDR ownership/drain regressions already pass; no source changes are planned before this batch. The original diagnostic seed 61 is finishing timing independently and does not contain the fix.
+
+#### Next Steps:
+
+Compile the three fixed candidates, audit all timing corners and 147 CDC registers, package hash-verified RBFs, and identify the best completed candidate for the user. Do not deploy or start another placement batch without a further user request.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 40 COMMIT Unreleased a229a01 2026-09-14T01:08:20-07:00
 
 #### Coming From:
@@ -1309,40 +1338,6 @@ Changes are committed; run three clean Quartus seeds and require all standard an
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
 - tools/test_480p_scanout.sv
 - tools/test_mpeg2_progressive_framebuffer.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 001 COMMIT Unreleased 1750154 2026-09-13T08:38:36-07:00
-
-#### Coming From:
-
-Unreleased ace6b7b
-
-#### Purpose:
-
-Reduce FPGA resource pressure by removing legacy LED diagnostics, disabling Linux ALSA and limiting ASCAL image width to 2048 while retaining screen telemetry and core-generated MP2 audio.
-
-#### Outcome:
-
-The user authorized these changes and three builds. Prior source ace6b7b completed all seeds: 52 used 40671 ALMs with setup -0.307 ns, 61 used 40841 ALMs with setup -0.145 ns and hold -0.057 ns, and 87 used 40711 ALMs with setup -0.131 ns. None passed static timing. The user accepted seed 87 playback with synchronized flash/beep audio; captured schema-8 telemetry confirmed 1250 MP2 frames, exactly 1440000 stereo sample pairs, quiet completion and zero error flags, underruns or audio timestamp errors. One 106.62245 ms video gap was recorded. Detailed timing confirms ASCAL horizontal pixel and line-buffer paths dominate seeds 52 and 61; history records that retiming the extended-resolution read mux worsened RAM inference, so the approved 2048-width bound will remove its extension requirement instead. The cleanup reuses the LED removal from 391baa4 and existing MISTER_DISABLE_ALSA option, with explicit zero ties for inactive sample and DDR request inputs. Playback and telemetry RTL remain unchanged; packing remains MEDIUM. The standalone PCM sink regression passed 2304 samples in each of normal and wrapping timestamp sessions, and a source audit found no external consumers of the removed blink signals.
-
-#### Next Steps:
-
-Changes are committed. Inspect synthesis for removal of ALSA, LED diagnostics and extended-width scaler storage, then run clean seeds 87, 52 and 61 with standard and focused timing reports including HDMI setup and global hold. Compare fitted resources with ace6b7b and require new hardware playback validation; preserve the prior user-tested RBF.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
-- MediaPlayer.qsf
-- sys/sys_top.v
-- tools/phase1p_timing.tcl
-- README.md
-- CHANGELOG.md
 
 #### Status:
 
