@@ -1,3 +1,32 @@
+## 57 COMMIT Unreleased dc1dfc2 2026-09-14T04:33:57-07:00
+
+#### Coming From:
+
+Unreleased dc1dfc2
+
+#### Purpose:
+
+Qualify the row-buffer RAM builds and deliver the preferred seed 52 candidate.
+
+#### Outcome:
+
+All three clean dc1dfc2 seeds pass all four timing corners and the 153-register CDC audit, with both 512-by-8 row arrays confirmed as M10K in each synthesis report. Seeds 52, 61 and 87 have minimum setup +0.437, +0.322 and +0.303 ns and hold +0.089, +0.086 and +0.091 ns respectively; recovery, removal and pulse width also pass. Their actual placed ALMs are 37790, 37813 and 37878, while ALMs-needed estimates are 31925, 31938 and 31904; do not conflate these metrics. All use 484 RAM blocks, 69 DSP blocks and three PLLs. Preferred seed 52 uses 48362 registers and reduces actual placed ALMs by 3355 against accepted bcddb20 seed 61, at a cost of two additional M10K blocks; the intervening audio-menu removal is included. Estimated utilization is 76.2 percent while actual placement is 90.2 percent. Total compile/audit durations are 901.1, 905.0 and 889.6 seconds. Hash-verified handoffs and instructions are under results/hardware-test-dc1dfc2; preferred seed52/MediaPlayer_20260914.rbf has SHA-256 7eb9a5bebc66423885d5865a40dc55ab24f28d3ff6f4743f05c3ebd394358ce6. Documentation commit 29a54d3 identifies the candidate; runtime source remains dc1dfc2. No hardware acceptance, deployment or further build was performed.
+
+#### Next Steps:
+
+Have the user test seed 52 for normal playback, repeated short/long seeks both directions, paused seeks/resume, reload and EOF, confirming clean video, synchronized audio and removal of the diagnostic audio menu. Preserve accepted bcddb20 seed 61 as rollback and leave additional RAM conversions unstarted until requested.
+
+#### Files Modified:
+
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 56 COMMIT Unreleased dc1dfc2 2026-09-14T04:11:41-07:00
 
 #### Coming From:
@@ -1263,47 +1292,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 17 COMMIT Unreleased dd144a3 2026-09-13T14:52:23-07:00
-
-#### Coming From:
-
-Unreleased 24d3de0
-
-#### Purpose:
-
-Add user-selected 50 Hz progressive output alongside the accepted 59.94 Hz mode while retaining 720x480 decoding.
-
-#### Outcome:
-
-Source dd144a3 adds Refresh rate 59.94 Hz/50 Hz on status bit 6. Both modes use 27 MHz and 720x480 active pixels; total rasters are 858x525 and 864x625. Requests cross through a coherent mailbox and apply only at frame end; a second mailbox publishes the applied mode to the decoder before the next swap window. Exact cadence tests pass for all five source rates at both refresh rates, including 1000 presentations in 2000 windows for 25 fps/50 Hz. Pending-picture ownership and timestamp admission survive mode changes. Full raster tests pass six complete frames with four asynchronous live switches, while both fixed-mode scanout tests deliver all 345600 exact pixels despite DDR stalls and bank resets. Existing OSD, geometry, color arithmetic/control, cadence telemetry and MPG audio regressions pass; the audio oracle retains zero underrun and timestamp error. No audio or PTS clock changes are needed. Deterministic progressive 25/29.97 fps MPG and M2V hardware clips and README are under results/refresh-tests. Source is pushed and clean seeds 52, 61 and 87 are compiling under results/build-dd144a3-20260913-150109, which also retains regression evidence. The fitted audit now requires 108 preserved registers. HDMI relock and user-visible A/V behavior still require hardware validation; there is no DVD, interlaced, 576-line, gamut or gamma expansion.
-
-#### Next Steps:
-
-Complete the three clean builds, record all four timing corners and resources, and deliver timing-qualified RBFs with the generated refresh checks. Retain hardware-accepted 24d3de0 seed 52 as recovery until the user validates mode switching, 25 fps cadence, OSD controls and audio synchronization with vsync_adjust=1.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_05.svh
-- rtl/mpeg2_video_720x480p.sv
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/phase1p_timing.tcl
-- tools/test_480p_scanout.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/verify_video_sync.py
-- tools/test_refresh_rate.sv
-- tools/make_refresh_tests.py
-- docs/TEST_INSTRUCTIONS.md
-- CHANGELOG.md
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
