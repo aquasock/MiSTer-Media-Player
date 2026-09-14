@@ -1,3 +1,32 @@
+## 50 COMMIT Unreleased bcddb20 2026-09-14T03:10:33-07:00
+
+#### Coming From:
+
+Unreleased bcddb20
+
+#### Purpose:
+
+Build the telemetry-reduced direct-seek core with three placement seeds.
+
+#### Outcome:
+
+The user authorized the next build batch. Local master and GitHub were verified synchronized, and clean exports of source bcddb20 started at 2026-09-14T03:10:01-07:00 with seeds 52, 61 and 87 and six workers each under results/build-bcddb20-20260914-031001. Only seed and worker settings differ from committed source. The per-batch result checker now requires 159 CDC registers and identifies bcddb20 as its source, with all four timing corners still mandatory. Compilation is running; no new RBF or measured resource savings are available yet. The MiSTer remains unchanged.
+
+#### Next Steps:
+
+Finish the authorized batch, inspect resource fit and all timing classes, and package the best completed RBF with source, seed, checksum and qualification status. Retain the prior a229a01 seed 87 rollback and let the user load and validate the selected new build.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 49 COMMIT Unreleased bcddb20 2026-09-14T03:08:16-07:00
 
 #### Coming From:
@@ -1310,36 +1339,6 @@ Finish clean seeds 52, 61 and 87 from a0f153a, require the fitted 84-register au
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 010 COMMIT Unreleased 07b8688 2026-09-13T12:09:39-07:00
-
-#### Coming From:
-
-Unreleased 0710e81
-
-#### Purpose:
-
-Record the completed subcarrier-crossing repair builds and explicit four-corner timing qualification.
-
-#### Outcome:
-
-Clean seeds 52, 61 and 87 compiled successfully and each passed the 60-register fitted synchronizer audit. Explicit checks at all four available operating conditions supersede the initial default-corner summaries: seed 52 fails setup at -0.076 ns and seed 61 at -0.005 ns in HDMI scaler paths at Slow 1100mV -40C; both pass hold, recovery, removal and pulse width. Seed 87 passes all four corners with minimum setup +0.121 ns, hold +0.097 ns, recovery +2.991 ns, removal +0.194 ns and pulse width +0.925 ns. Seed 87 uses 40609 ALMs, 55779 registers, 472 RAM blocks and 69 DSP blocks. Reports and corner-summary.json are retained under results/build-07b8688-20260913-114641/. The timing-qualified candidate is results/hardware-test-07b8688-seed87/MediaPlayer_20260913.rbf, SHA-256 9e5fe835433a1ca2141f37a7a84f870c10069cab645ad120e994bd59c435ee5e, with build-info.json. No new RTL or audio changes were made during validation and no candidate was installed. Loading-message suppression has only the earlier partial hardware acceptance; interactive OSD access remains absent. Read-only investigation found stock Main's generic mounted-file sector service provides a proposed RBF-side route to interactive menus, correcting the earlier overly categorical suggestion that a Main change might be necessary. The user requested a plan accommodating later pause and seeking; a local proposed docs/OSD_PLAYBACK_PLAN.md describes bounded reads, explicit sessions/EOF, coordinated flushing, future presentation pause and offset-based restart, pending implementation authorization.
-
-#### Next Steps:
-
-Have the user validate the seed-87 candidate on hardware. Preserve the timing reports and rollback reference. Implement the proposed stock-Main mounted-file transport only after the user accepts that plan, validating installed Main identity, menu responsiveness, buffering, repeated loads and exact EOF; pause and user seeking remain future milestones. Update the committed timing helper in a future authorized source cycle so file reports explicitly enumerate operating corners instead of relying on ineffective multi_corner file output.
-
-#### Files Modified:
-
-- sys/sys_top.v
-- tools/phase1p_timing.tcl
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
