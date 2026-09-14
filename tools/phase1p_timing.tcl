@@ -102,11 +102,24 @@ close $cdc_audit
 # The formatter's multicycle exception is backed by a real modulo-four
 # enable. Pixel processing, mailbox inputs and compositor outputs stay timed
 # at the full HDMI rate; require the enable counter and scoped register set.
-set scene_enable_regs [get_registers {*media_player_overlay:player_overlay|scene_phase[*]}]
-if {[get_collection_size $scene_enable_regs] != 2} {error "Missing two-bit scene clock-enable counter"}
+set scene_enable_regs [get_registers {*media_player_overlay:player_overlay|scene_phase*}]
+set scene_enable_originals {}
+set scene_enable_copies 0
+foreach_in_collection scene_reg $scene_enable_regs {
+    set scene_name [get_register_info -name $scene_reg]
+    if {[regexp {\|scene_phase\[([01])\]$} $scene_name -> scene_bit]} {
+        lappend scene_enable_originals $scene_bit
+    } elseif {[regexp {\|scene_phase\[[01]\]~DUPLICATE(?:~[0-9]+)?$} $scene_name]} {
+        incr scene_enable_copies
+    } else {
+        error "Unexpected scene clock-enable register: $scene_name"
+    }
+}
+if {[lsort $scene_enable_originals] ne {0 1}} {error "Missing two-bit scene clock-enable counter"}
 if {[get_collection_size $player_scene_ce_regs] < 400} {error "Missing scoped scene formatter registers"}
 set scene_enable_audit [open "$output_dir/player_scene_enable_audit.rpt" w]
-puts $scene_enable_audit "Enable counter: [get_collection_size $scene_enable_regs] registers"
+puts $scene_enable_audit "Enable counter: [llength $scene_enable_originals] registers"
+puts $scene_enable_audit "Routing counter duplicates: $scene_enable_copies"
 puts $scene_enable_audit "Four-cycle formatter registers: [get_collection_size $player_scene_ce_regs]"
 close $scene_enable_audit
 
