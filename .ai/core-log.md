@@ -1,4 +1,4 @@
-## 89 COMMIT Unreleased ??? 2026-09-14T13:07:28-07:00
+## 89 COMMIT Unreleased a206435 2026-09-14T13:07:28-07:00
 
 #### Coming From:
 
@@ -14,7 +14,7 @@ All three 7eb5088 builds complete in 15.1-15.2 minutes. Seeds 61 and 87 pass all
 
 #### Next Steps:
 
-Publish the qualification in test instructions and have the user repeat Fellow, Groove, Jiggler and Star Wars at both refresh rates, checking black clocks on the lowered bar, lowered subtitles, absent status labels and Audio test menu, audio/filters, pause/seek, replacement and EOF. Retain accepted gate-two 100ab07 seed 87 as rollback.
+Qualification is documented and pushed; have the user repeat Fellow, Groove, Jiggler and Star Wars at both refresh rates, checking black clocks on the lowered bar, lowered subtitles, absent status labels and Audio test menu, audio/filters, pause/seek, replacement and EOF. Retain accepted gate-two 100ab07 seed 87 as rollback.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Publish the qualification in test instructions and have the user repeat Fellow, 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
