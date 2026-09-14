@@ -316,3 +316,12 @@ from [438,452) to [452,466), and its fill from [441,449) to [455,463).
 The 14-pixel displacement is one outer bar height and scales with HDMI height.
 The separate Paused/Seeking status stays at y=403. This supersedes the labeled
 clock geometry above; the retained future subtitle provider is unchanged.
+
+## Player feature scope update
+
+Audio-track selection is excluded by user decision. Do not add a soundtrack
+selector or reserve implementation resources for track switching. The original
+feature list now comprises playback position/total duration, brief pause/seek
+feedback, resume from last position, predictable EOF behavior, clear playback
+errors and subtitle support. The first two are implemented; subtitle playback
+remains deferred, with only its shared overlay framework in place.
