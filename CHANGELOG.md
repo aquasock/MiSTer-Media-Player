@@ -21,7 +21,7 @@ This project is still in active pre-release development. Published milestone rel
   at direct restart, with movie timestamp origin retained across seeks.
 - Direct seek control, real-file probe, byte-filter and PCM recovery regressions.
 
-- Diagnostic OSD audio-bypass comparison and exact-MPG combined replay harness.
+- Exact-MPG combined replay harness with simulation audio-bypass comparison.
   The captured display-bank ownership freeze is addressed by the fix above.
 
 - Space toggles play/pause; Left/Right seek backward/forward by 10 seconds,
@@ -71,6 +71,9 @@ This project is still in active pre-release development. Published milestone rel
 - Align telemetry coordinates with the framebuffer RGB/DE pipeline.
 
 ### Changed
+
+- Remove the diagnostic Seek audio bypass menu option; normal compressed-audio
+  bypass with decoded preroll remains enabled during seeks.
 
 - Remove the added persistent seek-fault snapshot, clock-domain mailbox and
   screen renderer from production hardware to recover placement capacity.

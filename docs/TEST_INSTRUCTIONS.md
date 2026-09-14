@@ -28,7 +28,9 @@ Test 10-second, 30-second and five-minute jumps both ways in Pee Strike and
 fellow.mpg, including a first-time jump far ahead and a backward jump late in
 the movie. Allow approximate GOP landing initially. Repeat while paused, resume,
 open the OSD during a search, and check audio synchronization. Test near zero,
-past EOF, and after selecting a different file. Compare audio-bypass On and Off.
+past EOF, and after selecting a different file. The packaged bcddb20 RBF still
+provides the historical audio comparison switch; current source removes that
+menu option and always uses normal compressed-audio bypass with decoded preroll.
 Leave a failed state loaded for inspection; report the file and key combination.
 
 # Seek display-bank ownership fix
@@ -60,24 +62,23 @@ python3 tools/verify_decoder_timing.py --playback-controls --display-ownership -
 Repeat the captured Pee Strike seek near 18.45 seconds with the fixed RBF,
 then test repeated forward seeks from both moving and paused playback, backward
 seeks, resume, and seeking past EOF. The diagnostic audio bypass comparison
-remains available. The older a229a01 test RBF includes first-fault telemetry;
+is available in that older RBF. The older a229a01 test RBF includes first-fault telemetry;
 current source removes that additional overlay to recover placement capacity.
 
-# Seek audio comparison and historical diagnostics
+# Historical seek diagnostics and audio comparison
 
-Current source retains the audio-bypass comparison and compact playback-health
-telemetry. The additional persistent seek-fault observer, mailbox and renderer
-are removed from production hardware. Playback and seek controls are unchanged.
-Use the same file, refresh setting and seek key for both runs:
+Current source retains compact playback-health telemetry and enables normal
+compressed MP2 bypass with decoded preroll during seeking. The diagnostic
+**Seek audio bypass** menu item and its configuration mailbox are removed;
+previously saved settings for that option no longer affect playback.
+The additional persistent seek-fault observer, mailbox and renderer are also
+removed from production hardware.
 
-1. Set **Seek audio bypass** to **On**, reload `01 - Pee Strike.mpg`, and
-   press Right once a few seconds into playback. Repeat with `fellow.mpg`.
-2. If it freezes, leave the file loaded and record the file, playback position
-   and key command. Current source does not generate the seek-fault block.
-3. Set **Seek audio bypass** to **Off**, reload the same file and repeat.
-   This disables only compressed MP2 frame bypass; file-position searching,
-   PCM draining, target calculation and video reconstruction remain enabled.
-   Set the option before reloading and do not change it during a seek.
+Older RBFs such as bcddb20 have the audio comparison switch. For historical
+investigation, compare On and Off using the same file and key, setting the
+option before reloading. Current simulation tools retain `--no-audio-bypass`
+for regression comparisons. If playback freezes, leave the file loaded and
+record the file, position and key command.
 
 The following applies only to historical RBFs with the seek-fault observer
 (such as a229a01), and their saved screenshots. The standalone observer test

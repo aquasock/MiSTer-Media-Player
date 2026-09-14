@@ -8,9 +8,6 @@ wire av_mem_read,av_mem_write,av_mem_busy,av_mem_q_valid;
 wire [20:0] av_video_ram_level;
 wire [10:0] av_audio_ram_level;
 wire [11:0] mp2_pcm_wr_used;
-wire media_audio_skip_disabled;
-video_config_cdc #(.WIDTH(1)) seek_audio_config(
- .src_clk(clk_sys),.dst_clk(clk_mpeg2),.src_data(status[7]),.dst_data(media_audio_skip_disabled));
 reg av_eof_queued;
 always @(posedge clk_mpeg2) begin
     if(reset_mpeg2) av_eof_queued<=0;
@@ -55,7 +52,7 @@ mp2_decoder #(.ENABLE_SEEK_SKIP(1),.ENABLE_START_SYNC(1)) mp2_decoder (
     .pcm_pts(mp2_pcm_pts),.pcm_pts_valid(mp2_pcm_pts_valid),.error(mp2_error),
     .frames_decoded(mp2_frames_decoded),.idle(mp2_idle),
     .resync_start(media_start_offset_mpeg!=0),
-    .seek(media_seeking && !media_audio_skip_disabled),.seek_target(media_seek_pts)
+    .seek(media_seeking),.seek_target(media_seek_pts)
 );
 wire mp2_fifo_full,mp2_fifo_empty,mp2_fifo_rd;
 wire [66:0] mp2_fifo_data;
