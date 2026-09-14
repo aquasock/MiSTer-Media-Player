@@ -1,4 +1,4 @@
-## 90 COMMIT Unreleased ??? 2026-09-14T13:10:02-07:00
+## 90 COMMIT Unreleased 78c82f1 2026-09-14T13:10:02-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Record gate-three hardware acceptance and the completed diagnostic-removal cycle
 
 #### Outcome:
 
-The user reports all tests pass after the preferred 7eb5088 seed 61 handoff, completing the three-gate diagnostic-removal cycle including the compact black-clock progress bar and lowered subtitles. Seed 61 becomes the hardware-accepted baseline; its packaged RBF hash is verified and local build metadata records acceptance. Source 7eb5088 retains four-corner timing qualification, setup +0.334 ns, hold +0.074 ns, 37044 actual ALMs, 31325 estimated ALMs, 525 M10Ks and 75 DSPs, leaving 4866 ALMs and 28 M10Ks. Functional protection and playback remain; standalone diagnostic modules are retained only for offline simulation where applicable. Update test instructions and the removal plan to mark completion. No source logic changes, new builds, deployment or release are requested.
+The user reports all tests pass after the preferred 7eb5088 seed 61 handoff, completing the three-gate diagnostic-removal cycle including the compact black-clock progress bar and lowered subtitles. Seed 61 becomes the hardware-accepted baseline; its packaged RBF hash is verified and local build metadata records acceptance. Source 7eb5088 retains four-corner timing qualification, setup +0.334 ns, hold +0.074 ns, 37044 actual ALMs, 31325 estimated ALMs, 525 M10Ks and 75 DSPs, leaving 4866 ALMs and 28 M10Ks. Functional protection and playback remain; standalone diagnostic modules are retained only for offline simulation where applicable. Test instructions and the removal plan record completion; this documentation commit leaves the accepted 7eb5088 hardware unchanged. No source logic changes, new builds, deployment or release are requested.
 
 #### Next Steps:
 
@@ -23,8 +23,8 @@ Use 7eb5088 seed 61 as the accepted baseline for future authorized work and reta
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 
