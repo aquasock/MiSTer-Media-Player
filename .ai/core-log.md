@@ -1,3 +1,32 @@
+## 42 COMMIT Unreleased a229a01 2026-09-14T01:42:00-07:00
+
+#### Coming From:
+
+Unreleased a229a01
+
+#### Purpose:
+
+Provide the first timing-qualified RBF containing the seek display-bank release.
+
+#### Outcome:
+
+Seed 87 of the clean a229a01 batch passes all four timing corners: setup +0.104 ns, hold +0.077 ns, recovery +3.845 ns, removal +0.155 ns and pulse width +0.925 ns, with all 147 CDC registers verified. It uses 41216 ALMs, 56163 registers, 480 RAM blocks, 69 DSPs and three PLLs. The hash-verified handoff is results/hardware-test-a229a01/seed87/MediaPlayer_20260914.rbf, SHA-256 b0c4fd56e4051d7898010c2895880d017bcb84a52d7906871675317494b59e7c. Compilation and timing took 1158.6 seconds. Seed 61 finished in 1198 seconds but misses setup by 0.370 ns; all other timing categories and its CDC audit pass. Seed 52 is still fitting. Synthesis adds 67 combinational ALUTs compared with diagnostic source 6eb49e1, with unchanged registers, memory bits, DSPs and PLLs before placement. Documentation commit 89cf3da updates test instructions to the qualified RBF; runtime source remains a229a01. The prior diagnostic seed 61 eventually completed with setup -4.551 ns and is superseded for testing. No new placement batch was started beyond the user-authorized fixed-source three seeds. The MiSTer has not been reloaded or deployed by the agent.
+
+#### Next Steps:
+
+Let the user test seed 87 against the captured Pee Strike freeze and repeated/paused/backward/EOF seeks. Finish auditing the already-running seed 52 without starting further builds. Hardware acceptance remains pending.
+
+#### Files Modified:
+
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 41 COMMIT Unreleased a229a01 2026-09-14T01:18:38-07:00
 
 #### Coming From:
@@ -1291,53 +1320,6 @@ Run three clean Quartus seeds from the committed fixes, verify standard and focu
 - rtl/video_config_cdc.sv
 - tools/test_video_config_cdc.sv
 - tools/verify_video_sync.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 002 COMMIT Unreleased f960c0e 2026-09-13T09:12:17-07:00
-
-#### Coming From:
-
-Unreleased 1750154
-
-#### Purpose:
-
-Restore native 720x480 progressive output while retaining the hardware-accepted I/P/B decoder, FPGA MP2 audio and screen telemetry.
-
-#### Outcome:
-
-The user accepted 1750154 seed 87 and authorized continuing the progressive output plan. That baseline passed setup +0.257 ns, hold +0.248 ns, recovery +3.716 ns, removal +0.641 ns and pulse +1.122 ns, using 40132 ALMs and 470 RAM blocks; seed 61 also passed timing, while seed 52's fitter exited unexpectedly with Quartus error 293007. This cycle reuses progressive raster geometry and centered-picture policy from b3626a6 without importing its interlace or helper architecture. Prepared changes select a 27 MHz pixel clock, 858x525 total raster with 720x480 active pixels at 60000/1001 Hz, negative sync, a 480-line blanking swap boundary and exact fallback cadence ratios. Decoder and MP2 clocks remain unchanged. A full raster/cache simulation verifies all 345600 visible pixels with varied DDR stalls and two-stage DE/sync alignment; centered geometry and scheduler regressions pass all five frame rates, B reordering, timestamp waits, terminal draining and ownership cases. Exact 30 fps requires occasional adjacent refreshes because it exceeds half the output refresh rate. Schema-eight telemetry moves to line 312; its RTL regression passes, and the Python decoder round-trips native and prior SVGA layouts. Original aspect follows 4:3 versus default 16:9 sequence signalling. Direct analog is progressive 480p/31 kHz, not a newly implemented 15 kHz mode. Static timing and hardware validation of these prepared changes remain pending.
-
-#### Next Steps:
-
-Changes are committed; run three clean Quartus seeds and require all standard and focused timing reports including the new 27 MHz video clock and HDMI scaler. Preserve the accepted 1750154 seed-87 RBF, compare frame edges, aspect and audio synchronization on hardware, and revisit the previously recorded video cadence outlier using retained telemetry.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_04.svh
-- README.md
-- files.qip
-- rtl/mpeg2_luma_framebuffer.sv
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_progressive_geometry.sv
-- rtl/mpeg2_video_720x480p.sv
-- rtl/pll/pll_0002.v
-- tools/phase1p_timing.tcl
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/test_480p_scanout.sv
-- tools/test_mpeg2_progressive_framebuffer.sv
 
 #### Status:
 
