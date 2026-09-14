@@ -1,4 +1,4 @@
-## 100 COMMIT Unreleased ??? 2026-09-14T14:54:34-07:00
+## 100 COMMIT Unreleased 09a4d66 2026-09-14T14:54:34-07:00
 
 #### Coming From:
 
@@ -10,15 +10,23 @@ Establish a codec-independent native PCM playback boundary for FLAC and future W
 
 #### Outcome:
 
-The user authorizes continuing and asks that later native 44100 Hz WAV support be accommodated without implementing WAV now. Correct the earlier wording: production movie input supports 48000 Hz MP2; the inherited 96 kHz platform output option is not 96 kHz media decoding. Preserve that platform option without claiming a supported 96 kHz input profile. Implement and simulate a format-independent PCM sink with source-sample position, tick-driven consumption, pause, EOF drain and cancellation, so FLAC and future PCM WAV can share output controls. Keep format parsing and file seeking outside the sink. Continue native HDMI work subject to bus ownership validation; no resampling.
+The user authorizes continuing and requires that future native 44100 Hz WAV share the playback framework. Commit 09a4d66 adds a standalone codec-independent signed stereo PCM sink with source-sample position, serializer fetch timing, initial prefill, pause, EOF drain, restart/cancel and functional starvation handling. Simulation passes 202 exact samples plus empty EOF, replacement/seek offset and cancellation; Verilator lint passes. FLAC and future WAV use the same sample/EOF token contract, with format parsing and file seeking upstream; WAV parsing is deliberately not implemented yet. A separate HDMI I2C ownership prototype passes active/repeated-START, slave ACK/stretching, driver isolation, STOP release and reset tests. The prototype is not a real Cyclone V HPS controller model or a complete native-audio register writer; real bus-busy/timeout behavior, reset recovery and register shadow/reapply remain integration gates. Three-stage bus-input synchronizers carry recognition attributes. Both prototypes remain outside files.qip, so the accepted production movie core is unchanged. Documentation corrects the 96 kHz ambiguity: input support is 48 kHz MP2, with native 44.1 kHz FLAC planned; the inherited 96 kHz platform output option is not a 96 kHz media decoder and is not removed. Evidence is results/flac/pcm-sink and results/flac/i2c-owner; interfaces and limitations are recorded in docs/PCM_PLAYBACK_CONTRACT.md and docs/FLAC_FEASIBILITY.md. No new playable FLAC RBF or production build was generated.
 
 #### Next Steps:
 
-Verify exact emitted sample order, pause/resume, last-sample duration, starvation and reset/seek cancellation. Document the shared PCM contract and native-output integration requirements; preserve accepted b639ccc production behavior until the integrated path is ready.
+Continue full FLAC byte/bit parsing and validated frame delivery through the shared PCM boundary, together with the native HDMI transaction controller and actual HPS interface validation. Keep future WAV limited to a later adapter using this same PCM contract. Preserve accepted b639ccc seed 52 and do not claim native HDMI playback until integration and hardware checks pass.
 
 #### Files Modified:
 
-None.
+- docs/FLAC_PLAN.md
+- docs/FLAC_FEASIBILITY.md
+- docs/PCM_PLAYBACK_CONTRACT.md
+- rtl/audio/media_pcm_sink.sv
+- rtl/platform/hdmi_i2c_owner.sv
+- tools/test_media_pcm_sink.sv
+- tools/verify_media_pcm_sink.py
+- tools/test_hdmi_i2c_owner.sv
+- tools/verify_hdmi_i2c_owner.py
 
 #### Status:
 
