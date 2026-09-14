@@ -110,3 +110,8 @@ set_global_assignment -name HEX_FILE rtl/media_overlay_blend_rg.hex
 set_global_assignment -name HEX_FILE rtl/media_overlay_blend_b.hex
 
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_duration_timeline.sv
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_srt_parser.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_subtitles.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_sd_owner.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_subtitle_cdc.sv

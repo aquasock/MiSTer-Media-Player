@@ -78,6 +78,8 @@ assign VIDEO_ARY = ar ? 13'd9 : 13'd3;
 localparam CONF_STR = {
 	"MediaPlayer;;",
 	"S0,M2VMPG,Open MPEG-2 Video;",
+	"S1,SRT,Load subtitles;",
+	"O[120],Subtitles,On,Off;",
 	"-;",
 	"-;",
 	"O[121],Aspect ratio,4:3,16:9;",
@@ -97,15 +99,16 @@ wire [127:0] status;
 wire  [10:0] ps2_key;
 
 // Mounted-file sector reads leave stock Main's menu polling responsive.
-wire [0:0] media_img_mounted;
+wire [1:0] media_img_mounted;
 wire [63:0] media_img_size;
-wire [31:0] media_sd_lba[1];
-wire [5:0] media_sd_blocks[1];
-wire [0:0] media_sd_rd,media_sd_ack;
+wire [31:0] media_sd_lba[2];
+wire [5:0] media_sd_blocks[2];
+wire [1:0] media_sd_rd,media_sd_ack,media_host_rd,media_reader_wr;
 wire [12:0] media_sd_addr;
 wire [15:0] media_sd_data;
-wire [15:0] media_sd_unused[1];
+wire [15:0] media_sd_unused[2];
 assign media_sd_unused[0]=16'd0;
+assign media_sd_unused[1]=16'd0;
 wire media_sd_wr;
 wire [8:0] media_stream_data,media_fifo_data;
 wire [14:0] media_fifo_used;
@@ -220,7 +223,7 @@ media_file_reader media_file_reader (
  .file_size(media_duration_busy ? media_duration_size : media_file_size),
  .start_offset(media_duration_busy ? media_duration_offset : {23'd0,media_start_offset}),
  .sd_lba(media_sd_lba[0]),.sd_blk_cnt(media_sd_blocks[0]),.sd_rd(media_sd_rd[0]),
- .sd_ack(media_sd_ack[0]),.sd_buff_wr(media_sd_wr),
+ .sd_ack(media_sd_ack[0]),.sd_buff_wr(media_reader_wr[0]),
  .sd_buff_addr(media_sd_addr),.sd_buff_dout(media_sd_data),
  .stream_data(media_stream_data),.stream_valid(media_stream_valid),
  .stream_ready(media_duration_busy ? media_duration_ready : (!mpeg2_stream_full && !media_fifo_reset)),.idle(media_reader_idle),
@@ -259,7 +262,18 @@ wire        mpeg2_new_decoder_stream_ready;
 wire        mpeg2_new_b_presentation_hold;
 wire        mpeg2_new_p_destination_ownership_hold;
 
-hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
+media_sd_owner mounted_file_owner(.clk(clk_sys),.reset(RESET),.request(media_sd_rd),.ack(media_sd_ack),
+ .buff_wr(media_sd_wr),.host_request(media_host_rd),.reader_wr(media_reader_wr));
+media_subtitles subtitles(.clk(clk_sys),.reset(RESET),.new_movie(media_new_file),
+ .mount(media_img_mounted[1]),.mount_size(media_img_size),
+ .loaded(PLAYER_UI_STATE[74]),.seeking(media_seek_sys),.enabled(!status[120]),
+ .suspend(media_duration_busy || media_seek_sys || (media_fifo_occupancy<16'd8192 && !media_reader_idle)),
+ .elapsed_q(media_elapsed_sys),.epoch(PLAYER_UI_STATE[90:75]),
+ .sd_lba(media_sd_lba[1]),.sd_blocks(media_sd_blocks[1]),.sd_rd(media_sd_rd[1]),
+ .sd_ack(media_sd_ack[1]),.sd_wr(media_reader_wr[1]),.sd_addr(media_sd_addr),.sd_data(media_sd_data),
+ .command(PLAYER_SUBTITLE_COMMAND),.command_ack(PLAYER_SUBTITLE_ACK),.warning());
+
+hps_io #(.CONF_STR(CONF_STR), .WIDE(1), .VDNUM(2)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -275,7 +289,7 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 
     .img_mounted(media_img_mounted),.img_size(media_img_size),
     .sd_lba(media_sd_lba),.sd_blk_cnt(media_sd_blocks),
-    .sd_rd(media_sd_rd),.sd_wr(1'b0),.sd_ack(media_sd_ack),
+    .sd_rd(media_host_rd),.sd_wr(2'b0),.sd_ack(media_sd_ack),
     .sd_buff_addr(media_sd_addr),.sd_buff_dout(media_sd_data),
     .sd_buff_din(media_sd_unused),.sd_buff_wr(media_sd_wr),
     .ioctl_wait(1'b0)

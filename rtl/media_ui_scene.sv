@@ -10,7 +10,8 @@ module media_ui_scene(
  output reg [1:0] commit_groups=0,output reg [3:0] commit_scale=4,
  input wire aux_text_we,input wire [7:0] aux_text_addr,aux_text_data,
  input wire aux_object_we,input wire [1:0] aux_object_addr,input wire [55:0] aux_object_data,
- input wire aux_commit,input wire [15:0] aux_epoch,input wire aux_visible
+ input wire aux_commit,input wire [15:0] aux_epoch,input wire aux_visible,
+ input wire aux_auto_layout,input wire [6:0] aux_length0,aux_length1
 );
 (* ramstyle="M10K" *) reg [7:0] auxiliary_text[0:255];
 reg [55:0] auxiliary_objects[0:3];
@@ -28,6 +29,7 @@ reg [5:0] ch=0;
 reg [6:0] hours=0,minutes=0,seconds=0;
 reg [11:0] tx=0,ty=0,tw=0,th=0,track_x0=0,track_x1=0,fill_x0=0,fill_x1=0;
 reg [11:0] track_y0=0,track_y1=0,fill_y0=0,fill_y1=0;
+reg [55:0] subtitle_rect0=0,subtitle_rect1=0;
 reg [11:0] fraction=0;
 reg [47:0] product=0,multiplicand=0;
 reg [11:0] multiplier=0;
@@ -61,7 +63,7 @@ wire known=snapshot[70];
 wire [34:0] duration=snapshot[69:35],position=snapshot[34:0];
 
 // Clocks occupy eight glyphs; the fourth field remains playback status.
-wire [5:0] length=field<3?8:snapshot[71]?7:snapshot[72]?6:0;
+wire [5:0] length=field<3?8:field==3?(snapshot[71]?7:snapshot[72]?6:0):field==4?aux_length0[5:0]:field==5?aux_length1[5:0]:0;
 function [7:0] seeking_glyph;
  input [5:0] index;
  reg [55:0] label;
@@ -140,14 +142,16 @@ always @(posedge clk) begin
   7:begin
    tw<=(text_span+12'd3)>>2;th<=scale==9?12'd16:scale==6?12'd11:12'd7;
    tx<=quotient[11:0]-(text_span>>3);
-   multiply({36'd0,h},field==3?12'd403:12'd436,47);
+   multiply({36'd0,h},field==3?12'd417:field==4?(aux_length1!=0?12'd389:12'd403):field==5?12'd403:12'd436,47);
   end
   47:divide(product,35'd480,8);
   8:begin ty<=quotient[11:0];state<=9;end
   9:begin
    object_we<=1;object_addr<={1'b0,field};
-   object_data<={length!=0,1'b0,2'd3,4'd0,(tx+tw),(ty+th),ty,tx};
-   if(field==3) begin field<=4;ch<=0;state<=10;end
+   object_data<={length!=0,(field>=4),2'd3,4'd0,(tx+tw),(ty+th),ty,tx};
+   if(field==4)subtitle_rect0<={length!=0,1'b1,2'd1,4'd0,(ty+th+12'd2),(tx+tw+12'd2),(ty-12'd2),(tx-12'd2)};
+   if(field==5)subtitle_rect1<={length!=0,1'b1,2'd1,4'd0,(ty+th+12'd2),(tx+tw+12'd2),(ty-12'd2),(tx-12'd2)};
+   if(field>=3) begin field<=field+1'b1;ch<=0;state<=10;end
    else begin field<=field+1'b1;state<=1;end
   end
   10:state<=11; // synchronous retained-provider character read
@@ -155,7 +159,7 @@ always @(posedge clk) begin
    text_we<=1;text_addr<={field,ch};text_data<=aux_read;
    if(ch==63) state<=12;else begin ch<=ch+1'b1;state<=10;end
   end
-  12:begin
+  12:if(aux_auto_layout && field<6) state<=6;else begin
    object_we<=1;object_addr<={1'b0,field};object_data<=auxiliary_objects[field[1:0]];
    if(field==7) state<=20;else begin field<=field+1'b1;ch<=0;state<=10;end
   end
@@ -197,8 +201,8 @@ always @(posedge clk) begin
    object_data<={1'b1,1'b0,2'd2,4'd0,track_y1,track_x1,track_y0,track_x0};state<=31;end
   31:begin object_we<=1;object_addr<=9;
    object_data<={1'b1,1'b0,(known?2'd3:2'd2),!known,3'd0,fill_y1,(fill_x0+fraction),fill_y0,fill_x0};state<=32;end
-  32:begin object_we<=1;object_addr<=10;object_data<=0;state<=33;end
-  33:begin object_we<=1;object_addr<=11;object_data<=0;state<=34;end
+  32:begin object_we<=1;object_addr<=10;object_data<=aux_auto_layout?subtitle_rect0:56'd0;state<=33;end
+  33:begin object_we<=1;object_addr<=11;object_data<=aux_auto_layout?subtitle_rect1:56'd0;state<=34;end
   34:begin
    if(snapshot[90:75]==state_in[90:75] && revision==auxiliary_revision) begin
     commit<=1;commit_epoch<=snapshot[90:75];commit_scale<=scale;

@@ -1242,6 +1242,7 @@ cyclonev_hps_interface_peripheral_i2c hdmi_i2c
 	wire hdmi_hs_player,hdmi_vs_player,hdmi_de_player;
 	media_player_overlay player_overlay(
 	 .control_clk(player_ui_clock),.video_clk(clk_hdmi),.control_state(player_ui_state),
+	 .subtitle_command(player_subtitle_command),.subtitle_ack(player_subtitle_ack),
 	 .rgb(hdmi_data_mask),.hs(hdmi_hs_mask),.vs(hdmi_vs_mask),.de(hdmi_de_mask),
 	 .rgb_out(hdmi_data_player),.hs_out(hdmi_hs_player),.vs_out(hdmi_vs_player),.de_out(hdmi_de_player));
 
@@ -1830,6 +1831,8 @@ wire [13:0] fb_stride;
 
 wire player_ui_clock;
 wire [90:0] player_ui_state;
+wire [34:0] player_subtitle_command;
+wire player_subtitle_ack;
 emu emu
 (
 	.CLK_50M(FPGA_CLK2_50),
@@ -1858,6 +1861,8 @@ emu emu
 	.OSD_HIDE_MESSAGE(osd_hide_message),
 	.PLAYER_UI_CLOCK(player_ui_clock),
 	.PLAYER_UI_STATE(player_ui_state),
+	.PLAYER_SUBTITLE_COMMAND(player_subtitle_command),
+	.PLAYER_SUBTITLE_ACK(player_subtitle_ack),
 	.HDMI_BLACKOUT(hdmi_blackout),
 	.HDMI_BOB_DEINT(bob_deint),
 

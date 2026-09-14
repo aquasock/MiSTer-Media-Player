@@ -6,6 +6,8 @@ audio/video baseline is `0b6eb0e` seed 87, with native progressive output,
 manual refresh/aspect controls and compact telemetry accepted on hardware.
 Keyboard play/pause is hardware tested. Faster seeking is implemented and awaits hardware validation.
 
+- Manually loaded `.srt` subtitles through **Load subtitles**, using stock Main.
+  Initial format coverage and hardware-test status: [subtitle notes](docs/SUBTITLES.md).
 - Raw `.m2v` and MPEG Program Stream `.mpg` through the normal file menu.
 - Progressive 4:2:0 I/P/B video through 720x480, within the baseline decoder's
   motion/residual limits, at 23.976–30 fps (frame-rate codes 1–5).

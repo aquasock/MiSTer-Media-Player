@@ -6,7 +6,16 @@ This project is still in active pre-release development. Published milestone rel
 
 ## [Unreleased]
 
+### Added
+
+- Manual SRT loading through a second stock Main file slot, with presentation-
+  timed cues, pause/seek synchronization and an independent shared-overlay
+  visibility group. Initial display supports two lines of printable ASCII.
+
 ### Changed
+
+- Move Paused/Seeking down one text line and place subtitles directly above it.
+  Complete the existing font ROM's printable ASCII character set.
 
 - Lower the playback progress bar and three clocks by one bar height; show
   clock values without Elapsed, Total or Remaining prefixes.

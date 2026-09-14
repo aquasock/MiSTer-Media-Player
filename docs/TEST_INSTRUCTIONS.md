@@ -1,3 +1,17 @@
+# Next candidate: manually loaded SRT subtitles
+
+Open a movie, then choose **Load subtitles** and select its SRT. Subtitles
+appear above the relocated Paused/Seeking text, independently of controls
+visibility. Use **Subtitles: On/Off** to toggle them. New movies clear the
+association. Test exact cue boundaries, pause and every seek direction/size,
+including paused seeks, replacing SRTs and changing movies during subtitle
+reads. Check 480p, 720p and 1080p, OSD access and filters.
+
+Run `python3 tools/make_subtitle_test.py` for a one-hour timing fixture that
+works alongside any movie. See [SRT coverage and limits](SUBTITLES.md).
+Compilation/timing and hardware acceptance are pending. Retain ffafc79 seed 87
+below as the previous timing-qualified candidate.
+
 # Timing-qualified ffafc79 seed 87: lower progress strip and clocks without labels
 
 The three clocks retain their elapsed / total / remaining order, left to right,

@@ -14,7 +14,7 @@ media_ui_scene scene(.clk(clk),.ce(ce),.state_in(state_in),.width(12'd720),.heig
  .pending(pending),.acknowledged(ack),.text_we(tw),.text_addr(ta),.text_data(td),
  .object_we(ow),.object_addr(oa),.object_data(od),.commit(commit),.commit_epoch(epoch),.commit_groups(groups),.commit_scale(scale),
  .aux_text_we(atw),.aux_text_addr(ata),.aux_text_data(atd),.aux_object_we(aow),.aux_object_addr(aoa),.aux_object_data(aod),
- .aux_commit(ac),.aux_epoch(ae),.aux_visible(av));
+ .aux_commit(ac),.aux_epoch(ae),.aux_auto_layout(1'b0),.aux_length0(7'd0),.aux_length1(7'd0),.aux_visible(av));
 media_overlay_compositor renderer(.clk(clk),.rgb(24'h203040),.hs(1'b0),.vs(vs),.de(1'b0),.current_epoch(state_in[90:75]),
  .text_we(tw),.text_addr(ta),.text_data(td),.object_we(ow),.object_addr(oa),.object_data(od),
  .commit(commit),.commit_epoch(epoch),.commit_groups(groups),.commit_scale(scale),

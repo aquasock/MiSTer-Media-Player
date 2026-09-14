@@ -3,7 +3,7 @@
 from pathlib import Path
 import argparse,json,re,hashlib,shutil,datetime
 p=argparse.ArgumentParser(description=__doc__)
-p.add_argument('build',type=Path);p.add_argument('--cdc-registers',type=int,default=159)
+p.add_argument('build',type=Path);p.add_argument('--cdc-registers',type=int,default=171)
 p.add_argument('--baseline-alms',type=int,default=35774);p.add_argument('--baseline-ram',type=int,default=508)
 a=p.parse_args();base=a.build.resolve();state=json.loads((base/'status.json').read_text());summary={}
 for seed in (52,61,87):

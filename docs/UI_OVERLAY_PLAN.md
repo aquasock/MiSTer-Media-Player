@@ -347,3 +347,12 @@ and the separate SRT load interface with bounded parsing/storage and character
 coverage. Subtitle timing must follow pause and actual seek landing, and use
 the shared overlay independently of the controls' hide timer. Exact limits
 and resume matching rules remain to be designed and tested.
+
+## Manual SRT implementation boundary
+
+Feature three is now authorized and implemented for qualification. See
+[SUBTITLES.md](SUBTITLES.md) for the streaming second-slot loader, parser limits,
+cue lifecycle, atomic shared-overlay transfer and verification. This supersedes
+older notes deferring all subtitle loading. The user's accompanying layout
+change moves Paused/Seeking down one line to y=417 at 480p, with the bottom
+subtitle line at y=403 and an additional line at y=389. Bar/clocks stay put.

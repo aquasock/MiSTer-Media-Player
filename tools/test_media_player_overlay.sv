@@ -2,11 +2,12 @@
 module test_media_player_overlay;
 reg control_clk=0,clk=0;always #7 control_clk=~control_clk;always #5 clk=~clk;
 reg [90:0] state_in=0;
+reg [34:0] sub_command=0;wire sub_ack;
 reg [23:0] rgb=24'h203040;
 reg hs=0,vs=0,de=0;
 wire [23:0] out;
 wire ho,vo,deo;
-media_player_overlay dut(.control_clk(control_clk),.video_clk(clk),.control_state(state_in),
+media_player_overlay dut(.control_clk(control_clk),.video_clk(clk),.subtitle_command(sub_command),.subtitle_ack(sub_ack),.control_state(state_in),
  .rgb(rgb),.hs(hs),.vs(vs),.de(de),.rgb_out(out),.hs_out(ho),.vs_out(vo),.de_out(deo));
 reg [26:0] expected[0:9];
 integer cycles=0;
@@ -19,8 +20,15 @@ always @(posedge clk) begin
 end
 integer w=720,h=480,known=1,shown=1,paused=0,seeking=0;
 integer fd,frame_no=0,pixels=0,pattern=0;
-reg [34:0] position=1340400000,total=2629890000;
+reg [34:0] position=35'd1340400000,total=35'd2629890000;
 string path;
+integer subtitles=0,subepoch=1;
+string sub0="Hello, world!",sub1="Subtitle line two.";
+task sub_send(input [1:0] op,input [15:0] payload);begin
+ @(negedge control_clk);while(sub_ack!=sub_command[34])@(negedge control_clk);
+ sub_command={~sub_command[34],subepoch[15:0],op,payload};
+ @(negedge control_clk);while(sub_ack!=sub_command[34])@(negedge control_clk);
+end endtask
 initial begin
  if(!$value$plusargs("OUT=%s",path)) $fatal(1,"OUT");
  if($value$plusargs("W=%d",w)) begin end
@@ -32,7 +40,13 @@ initial begin
  if($value$plusargs("PATTERN=%d",pattern)) begin end
  if($value$plusargs("POSITION=%d",position)) begin end
  if($value$plusargs("TOTAL=%d",total)) begin end
+ if($value$plusargs("SUBTITLES=%d",subtitles))begin end
+ if($value$plusargs("SUBEPOCH=%d",subepoch))begin end
  state_in={16'd1,1'b1,shown[0],paused[0],seeking[0],known[0],total,position};
+ if(subtitles!=0)begin
+  for(integer i=0;i<128;i=i+1) sub_send(0,{i[7:0],(i<sub0.len()?sub0[i]:(i>=64 && i<64+sub1.len() && subtitles==2?sub1[i-64]:8'd0))});
+  sub_send(1,{(subtitles==2?8'd18:8'd0),8'h8d});
+ end
  fd=$fopen(path,"wb");$fwrite(fd,"P6\n%0d %0d\n255\n",w,h);
  repeat(12) @(negedge clk);
  for(frame_no=0;frame_no<5;frame_no=frame_no+1) begin

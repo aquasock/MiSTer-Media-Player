@@ -4,7 +4,7 @@ from pathlib import Path
 import argparse,subprocess,re,json
 import numpy as np
 p=argparse.ArgumentParser();p.add_argument('--output',type=Path,default=Path('results/ui-overlay/render'));a=p.parse_args();o=a.output.resolve();o.mkdir(parents=True,exist_ok=True)
-src=['tools/test_media_player_overlay.sv','rtl/media_player_overlay.sv','rtl/media_ui_scene.sv','rtl/media_ui_divider.sv','rtl/media_overlay_compositor.sv','rtl/video_config_cdc.sv']
+src=['tools/test_media_player_overlay.sv','rtl/media_player_overlay.sv','rtl/media_subtitle_cdc.sv','rtl/media_ui_scene.sv','rtl/media_ui_divider.sv','rtl/media_overlay_compositor.sv','rtl/video_config_cdc.sv']
 with (o/'compile.log').open('w') as log:subprocess.run(['verilator','--binary','--timing','-j','6','-Wno-fatal','--top-module','test_media_player_overlay','--Mdir',str(o/'obj'),*src],stdout=log,stderr=subprocess.STDOUT,check=True)
 glyphs=json.loads(re.search(r'const glyphs=(\{.*?\});',Path('docs/ui/overlay-preview.html').read_text()).group(1))
 colors={1:(24,27,32),2:(104,125,137),3:(238,242,244)}
@@ -25,7 +25,7 @@ def oracle(w,h,known,shown,paused,seeking,pos=1340400000,total=2629890000,patter
  else:
   for x in range(x0,x1):
    if x&8:im[y0:y1,x]=((background[y0:y1,x].astype(np.uint16)*95+np.array(colors[1],dtype=np.uint16)*160)//255).astype(np.uint8)
- for label,center,y in zip(labels,[141,360,579,360],[436,436,436,403]):
+ for label,center,y in zip(labels,[141,360,579,360],[436,436,436,417]):
   x0=w*center//720-len(label)*6*scale//8;y0=h*y//480
   for dy in range((7*scale+3)//4):
    gy=dy*4//scale
