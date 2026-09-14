@@ -1,3 +1,32 @@
+## 60 COMMIT Unreleased 3ff27c8 2026-09-14T05:09:29-07:00
+
+#### Coming From:
+
+Unreleased 3ff27c8
+
+#### Purpose:
+
+Qualify and deliver the IDCT intermediate RAM conversion hardware candidate.
+
+#### Outcome:
+
+All three clean 3ff27c8 builds finish; seeds 52 and 87 pass all four timing corners, while seed 61 fails setup at -0.152 ns in the slow -40C corner. All pass the 153-register CDC audit. Seeds 52 and 87 have minimum setup/hold +0.133/+0.110 and +0.067/+0.074 ns. Actual placed ALMs are 35774, 35923 and 35876 for seeds 52, 61 and 87, versus estimates 29791, 29693 and 29634; all use 508 M10Ks, 69 DSPs and three PLLs. Each fitter report confirms 24 distinct physical intermediate M10K sites despite requested type AUTO in its RAM table. Preferred seed 52 saves 2016 actually placed ALMs versus accepted dc1dfc2 seed 52, reducing placement from 90.2 to 85.4 percent; estimated utilization drops from 76.2 to 71.1 percent. RAM rises by 24 blocks and leaves 45 free; registers total 43508. Synthesis IDCT instances remove 4608 registers and 1382 combinational ALUTs with unchanged arithmetic and output cycles. Full validation evidence is under results/idct-storage and results/build-3ff27c8-20260914-045213. Hash-verified handoffs are under results/hardware-test-3ff27c8, with seed 61 visibly marked timing-failed. Preferred seed52/MediaPlayer_20260914.rbf SHA-256 is 236c9817ccfd04b10e23ff0ee052f2c11e5a39d7fcfdb88e3e42b29e969406f1. Documentation commit 863e254 records the candidate. No hardware acceptance or deployment occurred. While builds ran, the user requested better film cadence and clarified that only standard HDMI timings and refresh frequencies are acceptable. Exact 24 and 23.976 fps need consideration separately; 50 and 59.94 Hz cannot evenly repeat either. Standard 1080p23.976/24 is an investigation candidate, subject to stock Main/scaler and display compatibility verification; no new refresh mode was implemented.
+
+#### Next Steps:
+
+Have the user validate seed 52 playback at both existing refresh rates, OSD/aspect/filters, repeated short and long seeks both directions, paused seeks, reload and EOF, retaining accepted dc1dfc2 seed 52 as rollback. For future film cadence work, verify complete standardized HDMI timing modes including blanking, sync and pixel clock through stock Main before proposing an implementation. No additional builds are running.
+
+#### Files Modified:
+
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 59 COMMIT Unreleased 3ff27c8 2026-09-14T04:48:02-07:00
 
 #### Coming From:
@@ -1252,35 +1281,6 @@ All three clean source-0b6eb0e seeds compile and pass the unchanged 108-register
 #### Next Steps:
 
 Offer source-0b6eb0e seed 87 for compact-telemetry hardware validation with the updated decoder, retaining the detailed dd144a3 candidate and saved freeze captures for diagnosis. Confirm normal playback, retained EOF/error/audio/transport fields and OSD controls before accepting telemetry cuts. Investigate fellow.mpg separately, using reproducible position and a 59.94 Hz comparison or fresh live-state diagnostics; do not present telemetry cuts as a freeze fix. Do not use timing-failed seeds 52 or 61 as qualified artifacts.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 20 COMMIT Unreleased dd144a3 2026-09-13T15:46:46-07:00
-
-#### Coming From:
-
-Unreleased 0b6eb0e
-
-#### Purpose:
-
-Record the user's long-movie freeze report and preserve non-disruptive hardware evidence during the telemetry builds.
-
-#### Outcome:
-
-While separately testing the dd144a3 refresh candidate, the user reports a whole-movie file froze well into playback at 50 Hz, that other files worked at both refresh rates, and that the OSD still opens. Two fresh FTP-triggered captures 26.5 seconds apart are pixel-identical across all 720x480 pixels, confirming a stationary movie picture while Main remains responsive. Evidence is retained under results/telemetry-20260913-154407 and results/telemetry-20260913-154434, including comparison.json. Both images decode a valid schema-9 snapshot with source rate code 2 (24 fps), audio-underrun flag 0x1000, no decoder/presentation/file-reader error, no EOF, 7380 decoded MP2 frames and 8501760 played sample pairs, and audio STC 177 seconds. The profiler latches at the first triggering event, so this may be an earlier underrun snapshot rather than the freeze state; neither 177 seconds nor the wrapped FPS/cycle/picture counters establishes the freeze time or cause. The RTL underrun flag does not gate transport or playback. Large file size and 50 Hz are not established causes. No reset, file reload, deployment or mode change was performed. This is partial refresh validation with an unresolved long-file playback failure, not overall hardware acceptance; compact-telemetry source 0b6eb0e continues compiling separately and has not been installed.
-
-#### Next Steps:
-
-Preserve the detailed dd144a3 candidate and captured evidence for investigation, distinguish the current stall from the previously latched snapshot, and obtain a reproducible file/position or fresh live diagnostic evidence before choosing a playback fix. Complete the already authorized compact-telemetry builds and report their resources and timing without treating them as a fix for this freeze.
 
 #### Files Modified:
 
