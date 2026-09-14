@@ -1,4 +1,4 @@
-## 82 COMMIT Unreleased ??? 2026-09-14T11:22:33-07:00
+## 82 COMMIT Unreleased 6688db2 2026-09-14T11:22:33-07:00
 
 #### Coming From:
 
@@ -10,15 +10,21 @@ Reproduce and correct the startup audio timestamp warning observed on Fellow and
 
 #### Outcome:
 
-The user authorizes exact-file simulation and a fix while the EOF builds continue unchanged. Hardware captures under results/telemetry-20260914-111940 and results/telemetry-20260914-112030 both show only timestamp flag 0x2000 at sample 4609, with no underrun, decoder or transport errors. Measure the timestamp/sample discrepancy in a bounded opening replay of the local MPG files, compare Jiggler and Star Wars, and correct the demonstrated scheduling or timestamp interpretation issue without hiding material lateness. Add regressions for the measured case and retain pause/seek, sample cadence and PCM equivalence. Do not change the running b05b76f build snapshots.
+Source 6688db2 changes only the audio timestamp warning tolerance from two to 90 ticks (1 ms); sample scheduling and underrun detection are unchanged. Exact first-MiB replays reproduce Fellow and Groove at sample 4608 before consumption (hardware count 4609): second audio PES PTS is 56477 instead of the continuous sample-grid value 56492, a 15-tick/167-us backward step. Jiggler and Star Wars have the aligned timestamp and no warning. Before/after replays of all four files preserve identical PCM, video bytes and PTS output and now have no warning or underrun. Seven directed cases cover zero/two/15/90-tick tolerance, retained warnings at 91/900 ticks, timestamp wrap, exact 512-clock cadence and 6912 sample pairs each. Playback, EOF/session and generated-MPG PCM/PTS, pause and seek regressions pass. The timed MPG bench now uses production 60/24.576 MHz clocks rather than 100/40.96 MHz. Evidence is in results/audio-startup-before, results/audio-startup-after, results/audio-tolerance-controls.json and results/audio-tolerance-mpg.json. The unchanged EOF source b05b76f finished all builds: seeds 52 and 87 pass four corners, 183 CDC registers and scene-enable checks; seed 61 misses setup by 0.009 ns. Preferred EOF seed 87 has setup +0.358 ns, hold +0.099 ns, 37410 actual ALMs, 527 M10Ks and 75 DSPs, leaving 4500 ALMs and 26 M10Ks. Packaged results/hardware-test-b05b76f/seed87/MediaPlayer_20260914.rbf has SHA-256 e9ac8007db6a50877ea9ebc7b666b7879f0c30954bf168beefe3569fff08b093. It does not include the audio warning fix. No new Quartus batch or hardware deployment was started for 6688db2.
 
 #### Next Steps:
 
-Reproduce the flag with exact file bytes, implement and validate the justified fix, then report source and EOF build status.
+Have the user validate EOF and layout with b05b76f seed 87, retain accepted ec56250 seed 87 as rollback, and include 6688db2 in the next hardware build to confirm startup telemetry stays absent on Fellow/Groove.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- docs/TEST_INSTRUCTIONS.md
+- rtl/audio/mp2_pcm_output.sv
+- tools/replay_audio_startup.py
+- tools/test_mp2_timestamp_tolerance.sv
+- tools/test_mpg_audio_playback.sv
+- tools/verify_playback_controls.py
 
 #### Status:
 
