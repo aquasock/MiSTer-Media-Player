@@ -1,4 +1,4 @@
-## 49 COMMIT Unreleased ??? 2026-09-14T03:08:16-07:00
+## 49 COMMIT Unreleased bcddb20 2026-09-14T03:08:16-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Remove the added seek-fault telemetry hardware to recover placement capacity.
 
 #### Outcome:
 
-The user authorized removing the added telemetry after all reduced-source builds exceeded LAB capacity. The seek-fault observer, its 449-bit clock-domain mailbox and overlay renderer account for 712 combinational ALUTs and 1291 registers in the source 3ab6615 seed 87 synthesis hierarchy. Remove their production instantiation and project inclusion, connect video directly to the retained cadence output, and remove the obsolete mailbox from the required CDC audit. Retain compact playback-health telemetry, audio comparison controls, playback and seek control signals, and offline decoding support for historical captures.
+Source bcddb20 removes production instantiation of the persistent seek-fault observer, its 449-bit clock-domain mailbox and screen renderer, connects RGB directly to the retained cadence output, and removes the observer file from the Quartus project. Those three removed instances accounted for 712 combinational ALUTs and 1291 registers in the previous seed 87 synthesis hierarchy; these are attribution figures, not measured new fitted savings. Compact playback-health telemetry, audio comparison controls and playback/seek control signals remain. Standalone historical observer RTL/tests and screenshot decoding remain available outside the production project. The timing audit removes only the deleted mailbox and now requires 159 synchronizer registers instead of 165. Current testing instructions distinguish historical seek snapshots from current production behavior. Compact/detailed retained-field equivalence, actual RGB screenshot decoding, corruption rejection and legacy schemas pass. Direct-seek observer, VBR/bounded search, open-GOP byte filtering and asynchronous paused forward/backward restart regressions also pass. Evidence is under results/telemetry-removal. No Quartus build or hardware deployment was performed.
 
 #### Next Steps:
 
-Update current testing instructions and changelog, run retained telemetry and seek regressions, verify the required CDC count decreases from 165 to 159, then commit and push. Actual placement savings and timing require the next authorized build; do not deploy automatically.
+Build source bcddb20 when authorized, measure actual fit and resource savings, and require all timing corners plus the 159-register CDC audit before selecting a hardware candidate. The old build-summary helper requires 165 checks and must be adapted for this source. Preserve a229a01 seed 87 as the timing-qualified rollback.
 
 #### Files Modified:
 
