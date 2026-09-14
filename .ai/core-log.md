@@ -1,3 +1,32 @@
+## 58 COMMIT Unreleased dc1dfc2 2026-09-14T04:41:39-07:00
+
+#### Coming From:
+
+Unreleased dc1dfc2
+
+#### Purpose:
+
+Record hardware acceptance and investigate optimization techniques in the original upstream decoder.
+
+#### Outcome:
+
+The user reports everything works perfectly like before with the delivered dc1dfc2 seed 52 row-buffer candidate. Passed records that reported playback acceptance; detailed file/key/EOF coverage was not enumerated. Its build-info now records hardware acceptance. The user requested comparison with mrchrisster/MiSTer_MPEG2; upstream main was pinned to 11d1aa2d11649d0c4048d1b33fb1d2abc84771ef and inspected from a read-only clone. Active local files.qip selects mpeg2_new, while upstream idct.v is byte-identical to the dormant local mpeg2fpga IDCT. Useful adaptation candidates are upstream's RAM-backed transpose storage and shared streamed transform pipeline. Current three active IDCT instances total 4196 combinational ALUTs, 7971 registers and 24 DSP blocks with no block memory; this is total module cost, not forecast savings. Their eight parallel reads mean RAM banking or prefetch needs design work, and upstream's two-RAM count cannot be copied as a local budget. The current intra inverse quantizer also holds qfs/reconstructed arrays in registers and totals 1073 combinational ALUTs, 1776 registers and six DSP blocks; a RAM-backed or streamed adaptation is another candidate. A shared IDCT would require overlap/throughput and seek-ownership proof. Upstream VLC tables are combinational too, so no ready-made ROM saving was found. Different transform widths, rounding and output clipping prevent claiming a drop-in replacement; current audio, PTS and seek behavior must remain. Findings and source references are saved in results/upstream-optimization-audit/findings.md. No source optimization, build or deployment was performed.
+
+#### Next Steps:
+
+Present the bounded opportunities and select an approved optimization boundary before implementation. Prefer retaining current transform arithmetic while redesigning storage, or first converting the simpler inverse-quantizer buffers; require numerical equivalence, pixel-oracle and seek recovery tests, then measured RAM/ALM and timing qualification. Retain accepted dc1dfc2 seed 52 as baseline.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 57 COMMIT Unreleased dc1dfc2 2026-09-14T04:33:57-07:00
 
 #### Coming From:
@@ -1263,35 +1292,6 @@ Measure synthesized and fitted savings against dd144a3, complete all four timing
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 18 COMMIT Unreleased dd144a3 2026-09-13T15:26:03-07:00
-
-#### Coming From:
-
-Unreleased dd144a3
-
-#### Purpose:
-
-Record completed manual-refresh builds, the timing-qualified candidate and the resource review requested during compilation.
-
-#### Outcome:
-
-All three clean source-dd144a3 builds compile and pass the 108-register fitted CDC audit. Seed 52 passes every timing category at all four operating corners, with minimum setup +0.114 ns, hold +0.018 ns, recovery +2.714 ns, removal +0.186 ns and pulse width +0.925 ns. It uses 41215 ALMs, 57400 registers, 480 RAM blocks and 69 DSP blocks; its RBF SHA-256 is 6a0720e4623c77c65e1736a729686b7c9165ef10c42265311a029dd57131de45. Seed 61 uses 41082 ALMs and fails setup at -0.004 ns in ASCAL, while seed 87 uses 41279 ALMs and fails setup at -4.958 ns from the prediction fetcher descriptor count into a reference-cache tag; their other timing classes pass. Build plus timing durations are 1353, 1267 and 1421 seconds for seeds 52, 61 and 87 respectively. Source synthesis adds 157 combinational ALUTs and 24 registers versus 24d3de0, with unchanged memory bits, DSPs and PLLs; the smaller fitted seed-52 ALM total reflects placement and is not an architectural saving. Complete evidence is under results/build-dd144a3-20260913-150109 and copied RBFs with hashes and explicit qualification status are under results/hardware-test-dd144a3. The user was given seed 52 and results/refresh-tests/README.txt; hardware acceptance is pending. During compilation the user requested resource and removable-telemetry analysis. The accepted 24d3de0 seed-52 hierarchy attributes approximately 3110 ALMs, 65 RAM blocks and 12 DSPs to identifiable audio blocks excluding shared A/V logic, and 2612 ALMs to the observational cadence profiler alone. Detailed ranked-gap history, per-picture stall and overlapping hold counters, DDR performance totals and scheduler dumps are candidates for a smaller diagnostic profile, while errors, basic cadence, audio counts/status and transport health should remain. No telemetry removal or RAM-storage redesign was authorized or implemented.
-
-#### Next Steps:
-
-Have the user validate the preferred dd144a3 seed 52 using the generated 25/29.97 fps MPG and M2V controls, manual refresh switches, display-rate confirmation with vsync_adjust=1, OSD/aspect/matrix/filter operation and A/V synchronization. Retain 24d3de0 seed 52 as recovery and do not present seeds 61 or 87 as timing-qualified. Further telemetry reduction remains a proposal requiring user direction and measured synthesis savings.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
