@@ -1,3 +1,32 @@
+# Row-buffer RAM conversion candidate
+
+Current source restores the two 512-byte P/B parser row buffers to M10K RAM,
+using the prefetch and rollover handling from historical commit 047f5b2.
+The previously accepted bcddb20 seed 61 below remains the rollback; it does
+not contain this conversion or the subsequent audio-menu removal.
+
+Run the differential parser comparison against the pre-conversion source:
+
+```sh
+python3 tools/verify_row_buffer_equivalence.py --baseline 1349c82 --output results/row-buffer-equivalence
+python3 tools/verify_decoder_timing.py --playback-controls --display-ownership --output results/row-buffer-pixels
+```
+
+Require identical parser results and reported cycle counts, including chunk
+rollover, dense residuals and abort recovery. Two historical dense-stream
+fixture/test pairings fail unchanged baseline assertions and are excluded
+explicitly. Require current full reconstruction/seek checks for publication
+ordering as well; parser equivalence alone does
+not model vendor RAM inference or physical timing. In Quartus confirm both
+row arrays infer RAM, compare actual placed ALMs separately from the ALMs-needed
+estimate, and require all timing corners plus the 153-register CDC audit.
+Expected memory cost is two M10K blocks; historical ALM savings are not a
+prediction of the current placement result.
+
+On hardware repeat short/long forward and backward seeks, paused seeks/resume,
+new-file load and EOF, checking clean pictures and synchronized audio. The
+Seek audio bypass diagnostic menu item is removed; normal bypass remains enabled.
+
 # Direct file seeking candidate
 
 Source **bcddb20, seed 61** passes all four timing corners and the 159-register

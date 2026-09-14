@@ -425,6 +425,7 @@
                             init_row_parser();
                         end else begin
                             parse_byte_index<=0;
+                            parse_cur_byte<=row_head0;
                             parse_bit_index<=3'd7;
                         end
                     end else if(
@@ -444,6 +445,7 @@
                             init_row_parser();
                         end else begin
                             parse_byte_index<=0;
+                            parse_cur_byte<=row_head0;
                             parse_bit_index<=3'd7;
                         end
                     end else begin
@@ -453,12 +455,18 @@
                         if(!probe_error)probe_error_detail<=5'd30;
                     end
                 end else if(row_byte_count<(ROW_BUFFER_BYTES-1)) begin
-                    row_bytes[row_byte_count]<=stream_data;
+                    if(row_byte_count==9'd0)row_head0<=stream_data;
+                    else if(row_byte_count==9'd1)row_head1<=stream_data;
+                    else row_bytes[row_byte_count]<=stream_data;
+                    row_tail_prev<=row_tail_last;
+                    row_tail_last<=stream_data;
                     row_byte_count<=row_byte_count+1'b1;
                 end else begin
                     // Fill the final byte, parse through byte 509, and retain
                     // bytes 510..511 as start-code overlap for the next window.
                     row_bytes[row_byte_count]<=stream_data;
+                    row_tail_prev<=row_tail_last;
+                    row_tail_last<=stream_data;
                     slice_capture<=0;
                     parse_active<=1;
                     parse_hold<=1;
@@ -469,6 +477,7 @@
                         init_row_parser();
                     end else begin
                         parse_byte_index<=0;
+                        parse_cur_byte<=row_head0;
                         parse_bit_index<=3'd7;
                     end
                 end

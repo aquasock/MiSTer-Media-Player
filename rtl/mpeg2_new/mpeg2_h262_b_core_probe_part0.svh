@@ -106,7 +106,15 @@ wire [39:0] pce_next={pce_shift[31:0],stream_data};
 reg [3:0] b_forward_f_code_horizontal,b_forward_f_code_vertical;
 reg [3:0] b_backward_f_code_horizontal,b_backward_f_code_vertical;
 
-reg [7:0] row_bytes [0:ROW_BUFFER_BYTES-1];
+// Commit 420: the row window lives in block memory with a registered read.
+// Entries 0 and 1 stay in registers so the chunk rollover needs neither a
+// second write port nor a combinational read of the array's final entries,
+// which are tracked in shadow registers as they are written.
+(* ramstyle = "M10K" *) reg [7:0] row_bytes [0:ROW_BUFFER_BYTES-1];
+reg [7:0] row_ram_q;
+reg [7:0] row_head0,row_head1;
+reg [7:0] row_tail_last,row_tail_prev;
+reg [7:0] parse_cur_byte;
 reg slice_capture, slice_parser_started, chunk_boundary_known;
 reg [5:0] slice_row_number; reg [8:0] row_byte_count;
 reg [10:0] row_base_index;
@@ -116,7 +124,11 @@ reg final_row_queued;
 reg producer_rearm_pending;
 reg [8:0] parse_byte_limit,parse_byte_index; reg [2:0] parse_bit_index;
 wire parser_at_end=(parse_byte_index>=parse_byte_limit);
-wire parser_current_bit=row_bytes[parse_byte_index][parse_bit_index];
+// The parser consumes one bit per consume_bit and therefore crosses a byte
+// boundary at most once every eight cycles, which is the lead time the
+// registered block-memory read needs.
+wire parser_current_bit=parse_cur_byte[parse_bit_index];
+wire [7:0] parse_next_byte=(parse_byte_index==9'd0)?row_head1:row_ram_q;
 
 localparam [5:0]
     S_QSCALE=0,S_EXTRA_FLAG=1,S_EXTRA_INFO=2,S_MBA=3,S_MBTYPE=4,

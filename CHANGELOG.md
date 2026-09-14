@@ -72,6 +72,9 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Restore the P/B parser row buffers to synchronous block memory, with byte
+  prefetch and rollover shadow registers, to recover logic capacity.
+
 - Remove the diagnostic Seek audio bypass menu option; normal compressed-audio
   bypass with decoded preroll remains enabled during seeks.
 

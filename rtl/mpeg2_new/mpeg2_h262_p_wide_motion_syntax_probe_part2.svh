@@ -71,8 +71,9 @@
                 parse_active<=0;
                 parse_hold<=0;
                 slice_capture<=1;
-                row_bytes[0]<=row_bytes[ROW_BUFFER_BYTES-2];
-                row_bytes[1]<=row_bytes[ROW_BUFFER_BYTES-1];
+                row_head0<=row_tail_prev;
+                row_head1<=row_tail_last;
+                parse_cur_byte<=row_tail_prev;
                 row_byte_count<=9'd2;
                 parse_byte_index<=0;
                 parse_bit_index<=3'd7;
@@ -81,6 +82,7 @@
                 if(parse_bit_index==0) begin
                     parse_bit_index<=3'd7;
                     parse_byte_index<=parse_byte_index+1'b1;
+                    parse_cur_byte<=parse_next_byte;
                 end else begin
                     parse_bit_index<=parse_bit_index-1'b1;
                 end
