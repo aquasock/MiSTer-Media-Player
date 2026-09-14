@@ -1,3 +1,34 @@
+## 71 COMMIT Unreleased ??? 2026-09-14T08:14:32-07:00
+
+#### Coming From:
+
+Unreleased 9076405
+
+#### Purpose:
+
+Finish duration build qualification and extend the independent oracle to untimestamped final frames.
+
+#### Outcome:
+
+Clean 9076405 seeds 52, 61 and 87 have passed synthesis and are fitting. Additional media checks expose an oracle limitation: ffprobe leaves the final reference picture of test_progressive_mpg.mpg untimestamped despite decoding it. Extend the test-only comparison to count decoded display frames after the last available timestamp, independently of the RTL temporal-reference arithmetic. The updated comparison confirms 30.03 seconds for both test_progressive_mpg.mpg and test_av_sync.mpg; fellow_fixed.mpg also passes its bounded-tail comparison. No RTL change or new build is needed for this test-tool correction. Finish all-corner timing, 159 CDC and scene-enable audits and report actual resource deltas from tested b00920a seed 52 before packaging.
+
+#### Next Steps:
+
+Complete the remaining real-file comparison and build qualification, then record the preferred RBF hash, resources and hardware instructions without changing the MiSTer automatically.
+
+#### Files Modified:
+
+- tools/verify_ui_duration.py
+- docs/TEST_INSTRUCTIONS.md
+- docs/UI_OVERLAY_PLAN.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 70 COMMIT Unreleased 9076405 2026-09-14T08:02:17-07:00
 
 #### Coming From:
@@ -1269,35 +1300,6 @@ The user requested the best first-batch RBF and received hash-verified aad072a s
 #### Next Steps:
 
 Compare ordinary playback and an in-flight forward seek on the exact opening stream, isolate the aggregate decoder error source, and validate a correction before hardware acceptance; finish the existing placement reports separately.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 31 COMMIT Unreleased aad072a 2026-09-13T18:30:07-07:00
-
-#### Coming From:
-
-Unreleased aad072a
-
-#### Purpose:
-
-Record the first seek-acceleration build results and continue timing qualification.
-
-#### Outcome:
-
-All three aad072a seeds compile and pass the 135-register CDC audit, but none passes setup at every corner. Seed 52 uses 40401 ALMs and 54723 registers with setup -0.311 ns on scaler pixel unpacking; seed 61 uses 40612 ALMs and 54703 registers with setup -0.382 ns on scaler vertical polyphase rounding; seed 87 uses 40339 ALMs and 54709 registers with setup -0.010 ns on scaler horizontal position to picture-enable. Hold, recovery, removal and pulse width pass in all seeds. All retain 480 RAM blocks, 69 DSPs and three PLLs. Synthesis versus 17743f8 uses 147 fewer combinational ALUTs and 30 more registers, with unchanged block memory bits and DSP/PLL counts. Full build plus audits took 1157 to 1197 seconds. Evidence and explicitly unqualified RBFs are under results/build-aad072a-20260913-180758 and results/hardware-test-aad072a. A second clean placement batch of seeds 53, 62 and 88 from the identical aad072a source is running under results/build-aad072a-20260913-182853; playback logic and timing constraints are unchanged. No candidate has been deployed or hardware accepted.
-
-#### Next Steps:
-
-Finish the additional placement batch and deliver a timing-qualified seek acceleration candidate; if no seed qualifies, address the reported scaler timing paths before qualification.
 
 #### Files Modified:
 
