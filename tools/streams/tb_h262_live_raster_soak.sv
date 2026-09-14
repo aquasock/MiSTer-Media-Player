@@ -392,6 +392,7 @@ module tb_h262_live_raster_soak #(
 
     wire controlled_window;
     wire seek_override;
+    reg playback_test_complete=0;
     generate if(PLAYBACK_CONTROL_MODE) begin: playback_test
         reg seeking=1,paused=1;
         wire done,rebase,fast;
@@ -400,23 +401,28 @@ module tb_h262_live_raster_soak #(
         reg [3:0] saved_bank;
         media_playback_control control(
             .clk(clk),.reset(reset),.paused(paused),.seek_active(seeking),
-            .seek_target_q(35'd144000),.frame_rate_code(4'd3),
+            .seek_target_q(PLAYBACK_CONTROL_MODE==2?35'd108000000:35'd144000),.frame_rate_code(4'd3),
             .swap_reset_count(framebuffer_swap_reset_count),
             .first_picture_complete(picture_count!=0),.swap_window(swap_window_pulse),
-            .drained(1'b0),.fatal(1'b0),.display_pts_valid(1'b0),.display_pts(33'd0),
+            .drained(PLAYBACK_CONTROL_MODE==2 && sequence_end_seen &&
+                !frame_waiting && !scheduler.scheduled_frame_valid &&
+                !scheduler.pending_frame_valid && !scheduler.reorder_active &&
+                !presentation_hold && !destination_ownership_hold),
+            .fatal(1'b0),.display_pts_valid(1'b0),.display_pts(33'd0),
             .elapsed_q(elapsed),.seek_done(done),.scheduler_window(controlled_window),
             .fast_seek(fast),.rebase(rebase),.seek_elapsed_90k(seek_elapsed));
         assign seek_override=seeking;
         initial begin
             wait(!reset);wait(done);@(negedge clk);
-            if(elapsed!=144000) $fatal(1,"reconstructed seek missed frame ten");
+            if(elapsed!=(PLAYBACK_CONTROL_MODE==2?331200:144000))
+                $fatal(1,"reconstructed seek missed target mode=%d elapsed=%d swaps=%d",PLAYBACK_CONTROL_MODE,elapsed,display_swaps);
             seeking=0;saved_bank={display_scratch,display_scratch_bank,display_frame_bank};
             repeat(100000) begin
                 @(negedge clk);
                 if({display_scratch,display_scratch_bank,display_frame_bank}!=saved_bank)
                     $fatal(1,"queued I/P/B changed display while paused");
             end
-            paused=0;
+            paused=0;playback_test_complete=1;
             $display("PLAYBACK RECONSTRUCTION PASS: seek to frame ten and retain display through queued decode");
         end
     end else begin
@@ -1459,7 +1465,11 @@ module tb_h262_live_raster_soak #(
                    scheduler.display_frame_bank,frame_waiting,
                    probe_error,writer_error,pred_error,presentation_error);
 
-        if(quiet_cycles==30000)begin
+        if(quiet_cycles==(PLAYBACK_CONTROL_MODE?130000:30000))begin
+            if(PLAYBACK_CONTROL_MODE&&!playback_test_complete)
+                $fatal(1,"seek control did not complete: pending=%b reorder=%b candidate=%b frame_waiting=%b seq=%b hold=%b",
+                    scheduler.pending_frame_valid,scheduler.reorder_active,
+                    scheduler.scheduled_frame_valid,frame_waiting,sequence_end_seen,presentation_hold);
             $display("LIVE_RASTER_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d display_identity=%0d swaps=%0d last_p_temporal=%0d ref_writes=%0d bank2_ref_writes=%0d scratch0_writes=%0d scratch1_writes=%0d ddr_reads=%0d cache=%0d/%0d/%0d cycles=%0d read=%0d recon=%0d presentation=%0d queued=%0d promoted=%0d error=%0d/%0d/%0d/%0d",
                      stream_index,p_rows,p_pictures,b_rows,b_pictures,
                      published_references,picture_count,reference_promotion_count,
