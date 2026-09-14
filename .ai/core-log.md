@@ -1,4 +1,4 @@
-## 73 COMMIT Unreleased ??? 2026-09-14T08:49:53-07:00
+## 73 COMMIT Unreleased 1d58018 2026-09-14T08:49:53-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Document revised duration build qualification and reproduce the reported convers
 
 #### Outcome:
 
-The completed 3d48cc5 seeds 61 and 87 pass timing and audits; seed 87 is preferred, while seed 52 fails setup. Prepare hardware handoff documentation without deployment. The user's full-start encoding recipe reproduces repeated and skipped pictures in Groove and fellow independently of thread count. Compare the original fps filter with output CFR synchronization using bounded sample encodes and retain logs; full movie files remain unchanged.
+All 3d48cc5 builds completed. Seeds 61 and 87 pass all four timing corners, 159 CDC registers and scene-enable audits; seed 52 fails setup at -0.381 ns. Preferred seed 87 has setup +0.427 ns, hold +0.107 ns, 37715 actual ALMs, 520 M10Ks and 69 DSPs, leaving 4195 ALMs and 33 M10Ks. Its packaged RBF is results/hardware-test-3d48cc5/seed87/MediaPlayer_20260914.rbf with verified SHA-256 d6f66b6870113e53e46f8d229b11c90b0d0f8870e5c6cb621cc99cf1991a80e7. Hardware acceptance remains pending. Separately, full-start 68-second fellow conversion reproduces 477 dropped and 475 duplicated frames inside the fps filter; millisecond timestamps near a half-frame phase explain the failure. Removing that filter and using output -r:v 24000/1001 -fps_mode:v cfr eliminates reported synchronization drops/duplicates. Groove's corrected moving sample advances through every source frame; fellow's dark opening makes low-resolution image matching ambiguous, so no exact pixel-oracle claim is made for it. Thread count variants do not explain the failure; one encoder thread accounts for approximately 3.6 percent of 28 logical CPUs. The committed bounded reproduction tool was run successfully on fellow and reproduced both outcomes. Full movie originals remain unchanged; no hardware deployment or additional builds occurred.
 
 #### Next Steps:
 
-Publish the preferred binary path, timing and resources, preserve a reproducible short encoding comparison and document the verified command correction and its limits.
+Have the user test the corrected short encoding and timing-qualified seed 87, including Groove duration and existing playback controls; retain tested b00920a seed 52 as rollback. Select encoding frame rate to match each source and keep unknown duration when bounded evidence is unavailable.
 
 #### Files Modified:
 
