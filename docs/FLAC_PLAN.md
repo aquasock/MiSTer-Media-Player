@@ -1,6 +1,7 @@
 # Standalone CD-quality FLAC playback plan
 
-Planning only: no FLAC RTL or builds started. Baseline: hardware-accepted
+Implementation started with isolated arithmetic simulation, a verified corpus
+and clock/resource feasibility probes. Production integration is pending. Baseline: hardware-accepted
 b639ccc MEDIUM seed 52; timing audit db4bc3f. Free physical resources are
 6,002 ALMs, 41 M10Ks and 53 DSP blocks. Preserve this RBF for regression.
 
@@ -22,8 +23,7 @@ and multichannel audio are separate future scope.
 ## Format and implementation approach
 
 Use [RFC 9639](https://www.rfc-editor.org/rfc/rfc9639.html) as the normative
-format reference. It is not yet catalogued in `.ai/core-reference.md`; add
-its controlled reference before implementing the decoder. The previously
+format reference. It is catalogued in `.ai/core-reference.md`. The previously
 inspected fLaCPGA repository is an architectural reference, not code to merge.
 
 Implement STREAMINFO, frame headers and CRCs; constant, verbatim, fixed and
@@ -65,15 +65,14 @@ I2S/SPDIF declarations, HDMI transmitter configuration, clock crossings and
 clean return to movie playback must agree under stock Main. Do not promise
 bit-perfect HDMI merely because decoded PCM is exact.
 
-If native output needs changes outside the approved RBF-only scope, present
-that finding before selecting an alternative. The compatible alternative is
-a measured polyphase FIR converter from 44.1 to 48 kHz (ratio 160/147), with
-adequate accumulator precision, rounding and saturation. Include its memory
-and DSP costs in the gate. It preserves pitch and duration but changes sample
-values, so it cannot be advertised as bit-perfect digital output. Simple
-sample repetition/dropping is not the proposed quality solution. Verify
-frequency response, alias rejection, clipping, impulse response and duration
-against a high-precision software reference, including 96 kHz platform mode.
+The user requires native 44.1 kHz and explicitly retains both 48 and 96 kHz
+platform modes. Sample-rate conversion is excluded. Preserve the existing
+24.576 MHz clock and investigate a separate 22.5792 MHz PLL with integer
+sample division, controlled output switching and FIFO/reset handshakes.
+The system time clock and movie timing must remain on their existing clock.
+HDMI audio setup must track music/movie transitions and Main reconfiguration;
+stock Main remains mandatory. See FLAC_FEASIBILITY.md for measured progress
+and the remaining I2C integration gate.
 
 ## Integration
 
@@ -97,7 +96,7 @@ Preserve pause through a seek; clamp start/end; cancel stale reads and queued
 PCM on replacement or repeated seeks. Bound probe attempts and provide a
 controlled failure instead of hanging or estimating a false position.
 
-EOF is complete only after validated PCM and output-converter tail handling
+EOF is complete only after validated PCM and serializer drain handling
 finish. Truncated/corrupt files stop cleanly with a concise functional error;
 do not restore persistent diagnostic overlays or hardware telemetry. CRC
 checking is production integrity logic. PCM comparisons and stream MD5 checks
@@ -135,7 +134,7 @@ that gate rather than launching builds during planning.
 
 Initial design budgets, **not measured estimates**: at most 3,500 additional
 placed ALMs, 28 additional M10Ks and 12 additional DSP blocks for the complete
-music path including output conversion and integration. That would preserve
+music path including native output control and integration. That would preserve
 at least 2,502 ALMs, 13 M10Ks and 41 DSPs relative to today's placement; actual
 whole-core placement may differ. Prefer existing mutually exclusive buffers
 where ownership can be proved, but account for any changed port requirements.
