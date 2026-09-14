@@ -11,7 +11,8 @@ seeks, reset/file replacement, subtitles/filters and EOF return to startup.
 Retain accepted 7eb5088 MEDIUM seed 61 as rollback. Differential transform,
 three-client timing, paired EOF/50 Hz seek and the real Pee Strike opening/seek
 replay pass. The latter confirms resumed audio/video without underrun or
-timestamp warning after the ten-second seek. Hardware acceptance remains pending.
+timestamp warning after the ten-second seek. The user reports all tests pass for the preferred b639ccc seed 52; this is
+the current hardware-accepted baseline.
 
 **Preferred candidate: b639ccc MEDIUM seed 52**, available at
 `results/hardware-test-b639ccc/seed52/MediaPlayer_20260914.rbf`.
