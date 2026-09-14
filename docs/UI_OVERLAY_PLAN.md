@@ -325,3 +325,25 @@ feature list now comprises playback position/total duration, brief pause/seek
 feedback, resume from last position, predictable EOF behavior, clear playback
 errors and subtitle support. The first two are implemented; subtitle playback
 remains deferred, with only its shared overlay framework in place.
+
+## Current next-release target
+
+The user's revised target supersedes the earlier playlist and automatic
+same-name subtitle discovery proposal:
+
+- Resume playback from the last position, remembered only while this core stays
+  loaded; no persistence across reboot or core reload is required.
+- Predictable end-of-file behavior.
+- Subtitle playback from a separate `.srt` selected through a menu entry.
+
+Keep stock Main. Manual SRT loading replaces automatic filename discovery;
+playlists and N/P playlist navigation are outside this release target.
+Audio-track selection remains excluded. Existing timing-qualified source
+ffafc79 seed 87 is the candidate baseline, pending user hardware acceptance.
+
+Implementation planning should settle clean audio/video draining and idle
+transition at EOF, session resume identification and completed-file handling,
+and the separate SRT load interface with bounded parsing/storage and character
+coverage. Subtitle timing must follow pause and actual seek landing, and use
+the shared overlay independently of the controls' hide timer. Exact limits
+and resume matching rules remain to be designed and tested.
