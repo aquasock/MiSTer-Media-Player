@@ -1,4 +1,4 @@
-## 101 COMMIT Unreleased ??? 2026-09-14T15:01:56-07:00
+## 101 COMMIT Unreleased 36587f6 2026-09-14T15:01:56-07:00
 
 #### Coming From:
 
@@ -10,15 +10,20 @@ Implement streamed FLAC subframe parsing and reconstruction against independent 
 
 #### Outcome:
 
-The user authorizes continued FLAC work. Implement the subframe bitstream state machine, including constant/verbatim/fixed/LPC coding, wasted bits, both Rice parameter widths and escaped residuals, synchronous history/coefficient storage and the existing serial predictor. Validate exact samples and bit consumption with independently generated syntax vectors, stalls, invalid syntax and reset cancellation. Samples remain provisional until future outer frame CRC validation and DDR commit; no production file support is claimed by this subframe boundary.
+Commit 36587f6 implements streamed RFC 9639 subframe decoding for coded 16/17-bit CD channels: constant/verbatim, fixed orders 0–4, LPC orders 1–32, wasted bits, both Rice widths, escaped residuals including zero width, partition constraints and signed range checks. It reuses the serial MAC with synchronous 32x16 coefficient and 32x17 history M10Ks. Constructed vectors first pass 83 cases; real first-frame corpus testing passes 193 cases. Full-corpus Verilator regression passes 3173 cases covering every frame of all 55 files, original PCM lengths, short final blocks, input/output stalls and 3160 midstream reset/replays. There are 7777824 complete-subframe expected samples and 7964966 provisional transfers including replayed prefixes; malformed cases may emit provisional samples before rejection. The independent offline parser validates header/frame CRCs and stereo reconstruction against original PCM before supplying coded-channel expectations. Outer framing/CRC commit and stereo joining remain software responsibilities in this harness, not implemented FPGA behavior. Isolated Quartus fitting includes the MAC and uses 1160 placed ALMs, 1154 estimated ALMs, 396 registers, two M10Ks and one DSP; no need to add the standalone MAC cost again. Strict RTL lint passes with the intentional unconnected status port excluded. Evidence is results/flac/subframe-full-corpus and results/flac/subframe-fit. No production files.qip change, integrated core build or playable FLAC RBF is claimed.
 
 #### Next Steps:
 
-Complete subframe simulation and resource checks, then integrate outer FLAC headers/CRC and native HDMI control. Preserve native 44.1 kHz FLAC, 48 kHz movie input, future WAV's shared PCM boundary and the inherited output option without claiming 96 kHz media decoding.
+Implement FPGA outer metadata/frame headers, CRC admission and DDR-backed stereo/frame ownership, then connect validated PCM to the shared sink. Continue native HDMI transaction and HPS interface integration before hardware handoff. Preserve native 44.1 kHz FLAC, future WAV adapter compatibility, 48 kHz movie input and the existing platform output option without claiming 96 kHz input decoding. Accepted b639ccc seed 52 remains the hardware baseline.
 
 #### Files Modified:
 
-None.
+- docs/FLAC_FEASIBILITY.md
+- rtl/audio/flac/flac_subframe.sv
+- tools/flac_reference.py
+- tools/test_flac_subframe.sv
+- tools/verify_flac_subframe.py
+- tools/synth_flac_predict.py
 
 #### Status:
 
