@@ -53,7 +53,8 @@ wire [1:0] live_owner=direct_grant?direct_owner:owner;
 wire live=direct_grant || state==LIVE;
 // An idle engine accepts a producer's strobes immediately, preserving normal
 // single-client latency. Staging/replay is used only if another client owns it.
-for(genvar g=0;g<3;g=g+1) begin: client
+genvar g;
+generate for(g=0;g<3;g=g+1) begin: client
  assign {starts[g],valids[g],indices[g],values[g],ends[g]}=requests[g*21+:21];
  (* ramstyle="M10K" *) reg [11:0] coefficients[0:63];
  reg [11:0] read_data;
@@ -66,7 +67,7 @@ for(genvar g=0;g<3;g=g+1) begin: client
  wire routed=state==WAIT && owner==g && !reset;
  assign responses[g*25+:25]={complete[g]||(routed&&finishing),
   errors[g]||(routed&&engine_error),routed&&engine_valid,engine_index,engine_value};
-end
+end endgenerate
 mpeg2_h262_idct engine(
  .clk(clk),.reset(reset || state==CLEAR || (state==IDLE && !direct_grant) || state==PRIME),
  .coeff_block_start(direct_grant || (state==STREAM && replay_index==0)),
