@@ -15,6 +15,8 @@
 // same 3-I/22-P/47-B repeated-GOP transaction sequence as the 720x480 stream.
 module tb_h262_live_raster_soak #(
     parameter integer MIXED_PIXEL_MODE=0,
+    parameter integer DISPLAY_OWNERSHIP_MODE=0,
+    parameter integer SEEK_DISPLAY_RELEASE=1,
     parameter integer PLAYBACK_CONTROL_MODE=0,
     parameter integer MEMORY_READ_LATENCY=1,
     parameter integer SWAP_WINDOW_CYCLES=10000,
@@ -55,7 +57,7 @@ module tb_h262_live_raster_soak #(
     integer b_quad_tap_lookups=0;
     integer reference_writes=0,scratch0_writes=0,scratch1_writes=0;
     integer bank2_reference_writes=0;
-    integer memory_reads=0,total_cycles=0;
+    integer memory_reads=0,total_cycles=0,simulated_display_reads=0;
     integer stream_stall_cycles=0,last_stream_index=0;
     integer progress_interval=0;
     reg [1023:0] motion_trace_path;
@@ -377,12 +379,23 @@ module tb_h262_live_raster_soak #(
         .ddram_addr(writer_addr),.ddram_rd(writer_rd),
         .ddram_din(writer_din),.ddram_be(writer_be),.ddram_we(writer_we));
 
-    mpeg2_h262_ddram_arbiter arbiter(
+    // Periodic display reads claim the bank, including while paused. Seeking
+    // stops requests, as the production framebuffer reset does. This models
+    // ownership and outstanding responses rather than full raster bandwidth.
+    wire simulated_display_read=DISPLAY_OWNERSHIP_MODE && !reset &&
+        display_swaps!=0 && !seek_override && framebuffer_swap_reset_count==0 &&
+        total_cycles[5:0]==0 &&
+        !((stream_index==stream_len)&&sequence_end_seen&&!pred_active&&
+          !presentation_hold&&!destination_ownership_hold&&!writer.writing);
+    wire [28:0] simulated_display_addr=DDR_BASE+
+        (display_scratch ? (display_scratch_bank?29'h30000:29'h20000) :
+         display_frame_bank==2 ? 29'h40000 : display_frame_bank==1 ? 29'h10000 : 29'd0);
+    mpeg2_h262_ddram_arbiter #(.ENABLE_DISPLAY_RELEASE(SEEK_DISPLAY_RELEASE)) arbiter(
         .clk(clk),.reset(reset),.writer_burstcnt(writer_burstcnt),
         .writer_addr(writer_addr),.writer_rd(writer_rd),
         .writer_din(writer_din),.writer_be(writer_be),.writer_we(writer_we),
-        .writer_busy(writer_busy),.reader_burstcnt(8'd0),.reader_addr(29'd0),
-        .reader_rd(1'b0),.prediction_burstcnt(pred_burstcnt),
+        .writer_busy(writer_busy),.reader_burstcnt(8'd1),.reader_addr(simulated_display_addr),
+        .release_display_bank(seek_override),.reader_rd(simulated_display_read),.prediction_burstcnt(pred_burstcnt),
         .prediction_addr(pred_addr),.prediction_rd(pred_rd),
         .prediction_busy(pred_busy),.prediction_dout_ready(pred_dout_ready),
         .ddram_busy(1'b0),.ddram_dout_ready(memory_dout_ready),
@@ -1157,6 +1170,7 @@ module tb_h262_live_raster_soak #(
         read_valid_pipe[read_pipe_pointer]<=memory_rd;
         if(memory_rd)begin
             memory_reads<=memory_reads+1;
+            if(simulated_display_read)simulated_display_reads<=simulated_display_reads+1;
             if((memory_addr<DDR_BASE)||((memory_addr-DDR_BASE)>=DDR_WORDS))
                 $fatal(1,"DDR read outside frame regions: %h",memory_addr);
             read_index_pipe[read_pipe_pointer]<=memory_addr-DDR_BASE;
@@ -1577,7 +1591,7 @@ module tb_h262_live_raster_soak #(
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
                     (prediction.reference_cache.cache_miss_count!=32'd69556))||
                    prediction.reference_cache.uncached_count!=0||
-                   (memory_reads!=prediction.reference_cache.cache_miss_count)||
+                   (memory_reads-simulated_display_reads!=prediction.reference_cache.cache_miss_count)||
                    b_queue_current_starts!=720||
                    b_queue_prefetch_starts!=3600||
                    b_queue_handoffs!=3600||
@@ -1591,10 +1605,10 @@ module tb_h262_live_raster_soak #(
                    profile_b_replay_coeff_writes!=26591||
                    profile_b_replay_coeff_wait!=0||
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
-                    (MEMORY_READ_LATENCY==1)&&!PLAYBACK_CONTROL_MODE&&(total_cycles!=1239996))||
+                    (MEMORY_READ_LATENCY==1)&&!PLAYBACK_CONTROL_MODE&&!DISPLAY_OWNERSHIP_MODE&&(total_cycles!=1239996))||
                    // Matched against a0f153a with the current Verilator bench.
                    ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
-                    (MEMORY_READ_LATENCY==1)&&!PLAYBACK_CONTROL_MODE&&(total_cycles!=1239997))||
+                    (MEMORY_READ_LATENCY==1)&&!PLAYBACK_CONTROL_MODE&&!DISPLAY_OWNERSHIP_MODE&&(total_cycles!=1239997))||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||
@@ -1618,6 +1632,7 @@ module tb_h262_live_raster_soak #(
                         total_cycles);
                     $fclose(prediction_trace_fd);
                 end
+                $display("MIXED_RASTER_PIXEL_PASS");
                 $finish;
             end
             else if(generic_stream)begin
@@ -1649,7 +1664,7 @@ module tb_h262_live_raster_soak #(
                ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
                 (prediction.reference_cache.cache_miss_count!=32'd372696))||
                prediction.reference_cache.uncached_count!=0||
-               (memory_reads!=prediction.reference_cache.cache_miss_count)||
+               (memory_reads-simulated_display_reads!=prediction.reference_cache.cache_miss_count)||
                b_queue_current_starts!=2256||
                b_queue_prefetch_starts!=11280||
                b_queue_handoffs!=11280||

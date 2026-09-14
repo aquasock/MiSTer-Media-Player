@@ -6,6 +6,13 @@ This project is still in active pre-release development. Published milestone rel
 
 ## [Unreleased]
 
+### Fixed
+
+- Seeking now retires the stopped display reader's retained DDR bank protection
+  after outstanding reads drain. This allows reconstruction to reuse the bank
+  instead of stalling until its watchdog expires. Normal display and pause
+  protection remain active. Simulation verified; hardware validation pending.
+
 ### Added
 
 - Persistent first-observed seek fault snapshot with decoder subcodes, state,

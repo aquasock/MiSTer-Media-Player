@@ -32,7 +32,7 @@
 `define H262_PREDICTION_DESCRIPTOR_DEPTH 4
 `endif
 
-module mpeg2_h262_ddram_arbiter #(parameter ENABLE_QUIESCE=0)
+module mpeg2_h262_ddram_arbiter #(parameter ENABLE_QUIESCE=0, parameter ENABLE_DISPLAY_RELEASE=0)
 (
     input  wire        clk,
     input  wire        reset,
@@ -72,7 +72,10 @@ module mpeg2_h262_ddram_arbiter #(parameter ENABLE_QUIESCE=0)
     output wire        ddram_rd,
     output wire [63:0] ddram_din,
     output wire [7:0]  ddram_be,
-    output wire        ddram_we
+    output wire        ddram_we,
+
+    // Assert only while display reads are stopped (seeking, not ordinary pause).
+    input wire release_display_bank
 );
 
 localparam integer DESCRIPTOR_DEPTH=`H262_PREDICTION_DESCRIPTOR_DEPTH;
@@ -224,6 +227,13 @@ always @(posedge clk) begin
         if(reader_accept)begin
             reader_bank_valid<=1'b1;
             reader_frame_region<=reader_addr[18:16];
+        end else if(ENABLE_DISPLAY_RELEASE && release_display_bank &&
+                    !read_outstanding && !ddram_busy)begin
+            // Keep descriptor ownership intact until every pending response
+            // has retired. A same-cycle display acceptance takes precedence.
+            // Clearing only the bank guard leaves prediction/stream sessions
+            // untouched, allowing the stopped display's scratch bank to recur.
+            reader_bank_valid<=1'b0;
         end
     end
 end

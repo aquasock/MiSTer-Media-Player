@@ -1,3 +1,30 @@
+# Seek display-bank ownership fix (source only)
+
+The updated source releases the stopped display reader's bank protection during
+seeking after pending DDR reads drain. The seek diagnostic RBF from 6eb49e1 does
+not contain this fix. No new Quartus build has been started, as requested.
+
+The regression now models periodic display reads that continue during pause
+and stop during seeking. With release disabled, reconstruction fails its
+progress check; with release enabled, both retained seeks complete and the
+423936-sample pixel oracle passes. A focused test also checks all five frame
+regions, queued multi-beat read responses, DDR busy, simultaneous new display
+acceptance, pause protection and re-acquisition after seeking.
+
+```sh
+iverilog -g2012 -s test_seek_display_ownership -o /tmp/seek-display-test \
+  tools/test_seek_display_ownership.sv rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+vvp /tmp/seek-display-test
+python3 tools/verify_decoder_timing.py --playback-controls --display-ownership --output results/seek-fixed
+# Expected failure control:
+python3 tools/verify_decoder_timing.py --playback-controls --display-ownership --disable-display-release --output results/seek-old
+```
+
+Once a fixed RBF is built, repeat the captured Pee Strike seek near 18.45 seconds,
+then test repeated forward seeks from both moving and paused playback, backward
+seeks, resume, and seeking past EOF. Keep the file loaded if first-fault telemetry
+appears. The diagnostic audio bypass comparison remains available.
+
 # Seek freeze diagnostic candidate
 
 This build adds observation and an audio-bypass comparison, not a claimed freeze fix.
@@ -46,8 +73,9 @@ python3 tools/replay_mpg_seek.py opening.mpg results/replay-shared --shared-ddr 
 It runs the actual mounted reader, PS demux, MP2 decoder/output, bounded queues,
 video reconstruction and PTS scheduling. The optional `--shared-ddr` mode routes compressed-video traffic through the
 production reconstruction/prediction arbiter; default mode uses separate DDR
-service. Vendor FIFO CDC and physical display-reader traffic remain outside
-this behavioral model. A prefix may end mid-packet; only explicitly completed pre-EOF seek
+service. With `--display-ownership`, periodic display reads claim the current bank,
+continue during pause and stop during seeking. This exercises ownership but
+not full raster bandwidth. Vendor FIFO CDC remains outside this behavioral model. A prefix may end mid-packet; only explicitly completed pre-EOF seek
 boundaries count as success. `--no-skip` provides an ordinary-playback comparison.
 
 # Keyboard playback controls
