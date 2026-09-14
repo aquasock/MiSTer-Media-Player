@@ -1,5 +1,10 @@
 # Diagnostic removal gate three and compact time bar
 
+**Hardware accepted:** the user reports all tests pass for the preferred
+7eb5088 seed 61 handoff. This is the current tested baseline; all three
+diagnostic-removal gates are complete. The checks below remain the regression
+checklist for future work.
+
 Gate two (100ab07 seed 87) is hardware accepted: the user reports all tests pass.
 Retain it as rollback. This candidate removes Audio test and its independent
 source, test FIFOs, control/reset state and output adapter. Movie PCM connects
@@ -27,7 +32,7 @@ reader-error cancellation, pause/seek and EOF controls. Both mixed and seek-EOF
 oracles check 423936 reconstruction pixels without mismatches. Audio compares
 48384 stereo pairs against FFmpeg within one PCM unit, retains exact pause/seek
 sequences, and checks 30 picture timestamps without underrun or timestamp warning.
-Hardware acceptance remains pending. All three 7eb5088 builds completed;
+Gate-three hardware acceptance is complete. All three 7eb5088 builds completed;
 seeds 61 and 87 pass all four timing corners. All three pass the 183-stage CDC,
 formatter-enable, profiler/reporting-removal and Audio test absence/retained-PCM
 audits. No extra timing-fix builds were started.

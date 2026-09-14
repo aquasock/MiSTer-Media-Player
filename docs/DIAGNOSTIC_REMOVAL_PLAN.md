@@ -1,5 +1,11 @@
 # Production diagnostic removal plan
 
+All three gates are complete and hardware accepted. The user reports all tests
+pass after the preferred gate-three 7eb5088 seed 61 handoff. Use that RBF as the
+current tested baseline, retaining gate-two 100ab07 seed 87 as rollback.
+The plan below records the completed scope and validation boundaries.
+
+
 Status: gate two authorized and implemented for qualification; gate three remains pending. The user accepts b05b76f seed 87's EOF and
 layout behavior. Preserve that RBF as the hardware rollback baseline:
 37,410 placed ALMs, 527/553 M10Ks, 75/112 DSPs, setup +0.358 ns, hold +0.099 ns.
