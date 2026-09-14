@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Media Player — unified overlay design preview</title>
+<style>
+body{margin:0;background:#101216;color:#eef2f4;font:16px system-ui,sans-serif}main{max-width:1100px;margin:24px auto;padding:0 20px}h1{font-size:24px}p{color:#b9c2cb;line-height:1.5}canvas{display:block;width:100%;height:auto;background:#000;border:1px solid #414851}fieldset{border:1px solid #414851;margin:18px 0;padding:15px;display:flex;gap:18px;flex-wrap:wrap;align-items:center}button,select{background:#252c34;color:#eef2f4;border:1px solid #687d89;padding:9px;font:inherit}input[type=range]{width:240px}label{display:flex;align-items:center;gap:8px}.note{font-size:14px}a{color:#c8e0ef}
+</style><main>
+<h1>One overlay for playback information and future subtitles</h1>
+<p>Design preview only. The picture below is a layout background, not decoded video. The bar, palette, time-field order and pixel-font style come from the former DVD-era player.</p>
+<canvas id="screen" width="1280" height="720" aria-label="Video layout with elapsed, total and remaining times and playback progress"></canvas>
+<fieldset><legend>Preview controls</legend>
+<button id="pause">Pause</button><button id="back">−10 seconds</button><button id="forward">+10 seconds</button>
+<label>Position <input id="position" type="range" min="0" max="7542" value="2287"></label>
+<label>Output <select id="resolution"><option value="720,480">720×480</option><option value="1280,720" selected>1280×720</option><option value="1920,1080">1920×1080</option></select></label>
+<label>Picture <select id="aspect"><option>16:9</option><option>4:3</option><option>2.39:1</option></select></label>
+<label><input id="known" type="checkbox" checked>Duration probe succeeded</label>
+<label><input id="hud" type="checkbox" checked>Show playback controls</label>
+<label><input id="guide" type="checkbox">Show future subtitle-region guide</label>
+<label><input id="menu" type="checkbox">Show menu placement guide</label>
+</fieldset>
+<p class="note">Labels: Elapsed / Total / Remaining, always HH:MM:SS. Unknown duration uses --:--:-- and a patterned track, with no percentage claim. Picture aspect changes leave the overlay fixed to the output screen. The subtitle-region guide is not subtitle playback; no subtitle loading, parsing or timing is implemented.</p>
+<p class="note">The prototype keeps controls visible for inspection. Hardware behavior is specified in <a href="../UI_OVERLAY_PLAN.md">the implementation plan</a>, including the independent ten-second hide timer and frame-boundary publication.</p>
+</main><script>
+const glyphs={"A":[14,17,17,31,17,17,17],"B":[30,17,17,30,17,17,30],"C":[14,17,16,16,16,17,14],"D":[30,17,17,17,17,17,30],"E":[31,16,16,30,16,16,31],"F":[31,16,16,30,16,16,16],"G":[14,17,16,23,17,17,15],"H":[17,17,17,31,17,17,17],"I":[31,4,4,4,4,4,31],"J":[7,2,2,2,18,18,12],"K":[17,18,20,24,20,18,17],"L":[16,16,16,16,16,16,31],"M":[17,27,21,21,17,17,17],"N":[17,25,21,19,17,17,17],"O":[14,17,17,17,17,17,14],"P":[30,17,17,30,16,16,16],"Q":[14,17,17,17,21,18,13],"R":[30,17,17,30,20,18,17],"S":[15,16,16,14,1,1,30],"T":[31,4,4,4,4,4,4],"U":[17,17,17,17,17,17,14],"V":[17,17,17,17,17,10,4],"W":[17,17,17,21,21,21,10],"X":[17,17,10,4,10,17,17],"Y":[17,17,10,4,4,4,4],"Z":[31,1,2,4,8,16,31],"0":[14,17,19,21,25,17,14],"1":[4,12,4,4,4,4,14],"2":[14,17,1,2,4,8,31],"3":[30,1,1,14,1,1,30],"4":[2,6,10,18,31,2,2],"5":[31,16,16,30,1,1,30],"6":[14,16,16,30,17,17,14],"7":[31,1,2,4,8,8,8],"8":[14,17,17,14,17,17,14],"9":[14,17,17,15,1,1,14],":":[0,4,4,0,4,4,0],"-":[0,0,0,31,0,0,0],"/":[1,1,2,4,8,16,16],"a":[0,0,14,1,15,17,15],"d":[1,1,15,17,17,17,15],"e":[0,0,14,17,31,16,14],"g":[0,0,15,17,15,1,14],"i":[4,0,12,4,4,4,14],"l":[12,4,4,4,4,4,14],"m":[0,0,26,21,21,21,21],"n":[0,0,30,17,17,17,17],"o":[0,0,14,17,17,17,14],"p":[0,0,30,17,30,16,16],"r":[0,0,22,25,16,16,16],"s":[0,0,15,16,14,1,30],"t":[8,8,30,8,8,9,6],"u":[0,0,17,17,17,19,13],"k":[16,16,18,20,24,20,18]};
+const el=id=>document.getElementById(id), c=el('screen'), ctx=c.getContext('2d');
+let paused=false,seekLabel='',seekUntil=0;
+const colors=['rgba(0,0,0,0)','rgba(24,27,32,.62745)','#687d89','#eef2f4'];
+function time(n){n=Math.max(0,Math.floor(n));return [Math.floor(n/3600),Math.floor(n/60)%60,n%60].map(x=>String(x).padStart(2,'0')).join(':')}
+function textWidth(s,k){return Math.max(0,s.length*6-1)*k}
+function text(s,x,y,k,color){ctx.fillStyle=color;for(const ch of s){let rows=glyphs[ch]||glyphs[ch.toUpperCase()]||[];rows.forEach((r,j)=>{for(let i=0;i<5;i++)if(r&(1<<(4-i)))ctx.fillRect(Math.round(x+i*k),Math.round(y+j*k),Math.max(1,Math.round(x+(i+1)*k)-Math.round(x+i*k)),Math.max(1,Math.round(y+(j+1)*k)-Math.round(y+j*k)))});x+=6*k}}
+function render(){
+ const w=c.width,h=c.height,k=h/480,pos=+el('position').value,total=+el('position').max,known=el('known').checked;
+ ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);
+ let ar=el('aspect').value==='4:3'?4/3:el('aspect').value==='2.39:1'?2.39:16/9;
+ let vw=Math.min(w,h*ar),vh=vw/ar,vx=(w-vw)/2,vy=(h-vh)/2;
+ let gradient=ctx.createLinearGradient(vx,vy,vx+vw,vy+vh);gradient.addColorStop(0,'#172d3c');gradient.addColorStop(.55,'#41585c');gradient.addColorStop(1,'#796650');ctx.fillStyle=gradient;ctx.fillRect(vx,vy,vw,vh);
+ ctx.save();ctx.beginPath();ctx.rect(vx,vy,vw,vh);ctx.clip();ctx.fillStyle='#243b43';ctx.beginPath();ctx.moveTo(vx,vy+vh*.73);ctx.lineTo(vx+vw*.27,vy+vh*.30);ctx.lineTo(vx+vw*.56,vy+vh*.77);ctx.lineTo(vx+vw*.8,vy+vh*.46);ctx.lineTo(vx+vw,vy+vh*.7);ctx.lineTo(vx+vw,vy+vh);ctx.lineTo(vx,vy+vh);ctx.fill();ctx.restore();
+ ctx.fillStyle='#c0ccd2';ctx.font=`${Math.round(14*k)}px monospace`;ctx.textAlign='center';ctx.fillText('PICTURE AREA — '+el('aspect').value,w/2,h*.24);
+ // One list of drawing objects feeds one compositing pass.
+ const objects=[];
+ if(el('hud').checked){
+  const fields=[['Elapsed: '+time(pos),32,218],['Total: '+(known?time(total):'--:--:--'),250,220],['Remaining: '+(known?time(total-pos):'--:--:--'),470,218]];
+  for(const [s,x,width] of fields)objects.push({kind:'text',s,x:(x+width/2)/720*w-textWidth(s,k)/2,y:422*k,k,color:3});
+  objects.push({kind:'rect',x:32/720*w,y:438*k,width:656/720*w,height:14*k,color:2});
+  if(known)objects.push({kind:'rect',x:34/720*w,y:441*k,width:652/720*w*pos/total,height:8*k,color:3});
+  else for(let x=34;x<686;x+=12)objects.push({kind:'rect',x:x/720*w,y:441*k,width:6/720*w,height:8*k,color:1});
+  let status=performance.now()<seekUntil?seekLabel:paused?'Paused':'';
+  if(status)objects.push({kind:'text',s:status,x:w/2-textWidth(status,k)/2,y:403*k,k,color:3});
+ }
+ for(const o of objects){if(o.kind==='text')text(o.s,o.x,o.y,o.k,colors[o.color]);else{ctx.fillStyle=colors[o.color];ctx.fillRect(o.x,o.y,o.width,o.height)}}
+ if(el('guide').checked){ctx.strokeStyle='#d4c08c';ctx.setLineDash([6*k,4*k]);ctx.strokeRect(32/720*w,334*k,656/720*w,58*k);ctx.setLineDash([]);ctx.font=`${Math.round(11*k)}px monospace`;ctx.fillStyle='#e4d5ae';ctx.fillText('Reserved subtitle region — layout guide only',w/2,366*k)}
+ if(el('menu').checked){ctx.fillStyle='#10131a';ctx.fillRect(w*.29,h*.25,w*.42,h*.36);ctx.strokeStyle='#899caa';ctx.strokeRect(w*.29,h*.25,w*.42,h*.36);ctx.fillStyle='#eef2f4';ctx.font=`${Math.round(13*k)}px monospace`;ctx.fillText('MiSTer menu remains above player UI',w/2,h*.43)}
+}
+function seek(delta){el('position').value=Math.max(0,Math.min(+el('position').max,+el('position').value+delta));seekLabel='Seeking';seekUntil=performance.now()+1000;el('hud').checked=true;render();setTimeout(render,1050)}
+el('pause').onclick=()=>{paused=!paused;el('pause').textContent=paused?'Play':'Pause';el('hud').checked=true;render()};el('back').onclick=()=>seek(-10);el('forward').onclick=()=>seek(10);
+for(const id of ['position','aspect','known','hud','guide','menu'])el(id).oninput=render;
+el('resolution').onchange=()=>{[c.width,c.height]=el('resolution').value.split(',').map(Number);render()};render();
+</script></html>
