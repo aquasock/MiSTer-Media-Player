@@ -1,8 +1,15 @@
 # Direct file seeking candidate
 
-The next build adds timestamp-guided byte-position probing for both directions,
-including unseen forward destinations. It retains the a229a01 bank-release fix.
-The older RBF documented below does not contain this direct-seek path.
+Source **bcddb20, seed 61** passes all four timing corners and the 159-register
+CDC audit, with worst setup +0.205 ns and hold +0.066 ns. Its test RBF is
+`results/hardware-test-bcddb20/seed61/MediaPlayer_20260914.rbf`.
+SHA-256: `98a3957e92ffb71112a31d373082854673a45c97fb5c5169c2b48971e75a2f24`.
+Hardware acceptance is pending. Seeds 52 and 87 fail setup timing.
+
+This candidate adds timestamp-guided byte-position probing for both directions,
+including unseen forward destinations. It retains the a229a01 bank-release fix
+and removes the added seek-fault telemetry. The older rollback RBF documented
+below does not contain this direct-seek path.
 
 ```sh
 python3 tools/verify_direct_seek.py --output results/direct-seek-check --input path/to/bounded-prefix.mpg
@@ -14,15 +21,15 @@ and prefers a timestamped I-picture within two seconds before the target.
 These are implementation bounds, not MPEG requirements. If no usable point
 is found, it reconstructs from the beginning. Original movie PTS origin is
 retained across seeks. Raw M2V uses reconstruction fallback in both directions.
-The first-fault stall observer monitors decoder reconstruction, excluding the
-header-only probe phase.
+Compact playback-health telemetry remains; the separate persistent seek-fault
+snapshot is removed from this candidate.
 
 Test 10-second, 30-second and five-minute jumps both ways in Pee Strike and
 fellow.mpg, including a first-time jump far ahead and a backward jump late in
 the movie. Allow approximate GOP landing initially. Repeat while paused, resume,
 open the OSD during a search, and check audio synchronization. Test near zero,
 past EOF, and after selecting a different file. Compare audio-bypass On and Off.
-Leave a failed state loaded for telemetry; report the file and key combination.
+Leave a failed state loaded for inspection; report the file and key combination.
 
 # Seek display-bank ownership fix
 
