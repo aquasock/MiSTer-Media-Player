@@ -1,3 +1,32 @@
+## 104 COMMIT Unreleased ??? 2026-09-14T15:59:29-07:00
+
+#### Coming From:
+
+Unreleased bfdafe2
+
+#### Purpose:
+
+Integrate standalone native FLAC playback into the production mounted-file and platform paths.
+
+#### Outcome:
+
+The user authorizes production integration and a first hardware candidate. Add content-based FLAC selection, mutually exclusive DDR ownership, PCM clock crossing, native clock/output and HDMI configuration handoffs, source-sample timestamps, pause and drained EOF. Preserve movie decoding and its existing filter/output behavior. The first music candidate uses the exact native PCM boundary with volume control; FLAC seeking and additional music output processing remain later gates. Verify regressions and integration before a clean seed 52 hardware build; report actual timing and area rather than isolated estimates.
+
+#### Next Steps:
+
+Complete production integration and simulations, then build and document a candidate for native-rate hardware and four-movie regression tests. Preserve b639ccc seed 52 as rollback; stock Main and future WAV compatibility remain mandatory.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 103 COMMIT Unreleased bfdafe2 2026-09-14T15:29:03-07:00
 
 #### Coming From:
@@ -1392,54 +1421,6 @@ Run clean full-core seeds 52, 61 and 87 from b00920a. Require all-corner timing,
 - tools/make_overlay_roms.py
 - tools/test_media_player_overlay.sv
 - tools/verify_overlay_timing.py
-- tools/verify_player_overlay.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 64 COMMIT Unreleased 287cf6b 2026-09-14T06:34:44-07:00
-
-#### Coming From:
-
-Unreleased 5373dae
-
-#### Purpose:
-
-Tighten duration qualification and correct any measured implementation issues before delivering the shared overlay.
-
-#### Outcome:
-
-Initial 5373dae seeds all compile and pass the 159-register CDC audit but fail all-corner HDMI setup at minimum -14.139, -13.905 and -13.197 ns for 52, 61 and 87. Actual placed ALMs are 38206, 38125 and 38228, exceeding the initial 2000-ALM incremental budget by 432, 351 and 454; RAM totals 510 M10Ks and DSPs 81. Evidence and explicitly failed handoffs are under results/build-5373dae-20260914-062804 and results/hardware-test-5373dae. Critical paths are cascaded pixel-coordinate divisions and formatter arithmetic. Corrected source 287cf6b uses a synchronous coordinate ROM, RAM staging descriptors copied during vertical blanking, six-stage aligned RGB/sync processing, one serialized layout/progress multiplier and a split restoring divider. Scene construction advances on a real modulo-four HDMI clock enable; narrowly scoped multicycle constraints cover only registers sharing that enable, while snapshot inputs, provider writes, publication and pixel logic remain single-cycle. A pending latch retains short compositor acknowledgements. Duration guards reject malformed head evidence and differing selected video-stream IDs between windows; an adversarial test first demonstrates the missing guard then passes with the correction. Full 4.7-million-pixel overlay oracles, independent visibility and retained-provider lifetime tests, 518 wide divider cases, ROM regeneration checks, bounded reader/remount/timeout recovery, real-file duration comparison and existing program-stream ingress tests pass. TimeQuest accepts the scoped constraint syntax; new fitted enable-counter and register-set audits are required. Clean corrected seeds 52, 61 and 87 are now compiling. No candidate was deployed or hardware accepted.
-
-#### Next Steps:
-
-Audit corrected builds across all corners, the 159 CDC registers and real four-clock enable endpoints, then measure actual placed ALMs and M10Ks against the initial budgets. Resolve any remaining failures before recommending an RBF. Package the best qualified seed with hardware test instructions, retaining accepted 3ff27c8 seed 52 as rollback.
-
-#### Files Modified:
-
-- MediaPlayer.sdc
-- docs/TEST_INSTRUCTIONS.md
-- docs/UI_OVERLAY_PLAN.md
-- files.qip
-- rtl/media_duration_probe.sv
-- rtl/media_duration_window.sv
-- rtl/media_overlay_compositor.sv
-- rtl/media_overlay_coordinates.hex
-- rtl/media_player_overlay.sv
-- rtl/media_ui_divider.sv
-- rtl/media_ui_scene.sv
-- rtl/mpeg2_new/mpeg2_h262_program_stream_demux.sv
-- tools/audit_three_seeds.py
-- tools/make_overlay_roms.py
-- tools/phase1p_timing.tcl
-- tools/test_media_duration_reader.sv
-- tools/test_media_player_overlay.sv
-- tools/test_media_ui_divider.sv
-- tools/test_media_ui_lifetime.sv
 - tools/verify_player_overlay.py
 
 #### Status:
