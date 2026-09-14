@@ -1,4 +1,4 @@
-## 65 COMMIT Unreleased ??? 2026-09-14T07:02:57-07:00
+## 65 COMMIT Unreleased b00920a 2026-09-14T07:02:57-07:00
 
 #### Coming From:
 
@@ -10,17 +10,26 @@ Remove the remaining identified pixel-path arithmetic bottlenecks before final o
 
 #### Outcome:
 
-Additional isolated timing analysis of fitted 5373dae finds the unchanged alpha blend also fails by -6.017 ns, independent of coordinate divisions and scene formatting. The 287cf6b batch passes synthesis but is stopped early during fitting to avoid completing another known-incomplete timing fix. Its status and cancellation reason are retained under results/build-287cf6b-20260914-065802. Replace the fixed dark-palette blend with synchronous byte lookup tables and pipeline the bounds, object selection and coordinate subtraction separately. These corrections preserve the approved pixels and shared provider design while using the reserved RAM budget; existing 287cf6b duration guards, coordinate/staging RAM and enabled formatter remain the basis. No hardware deployment or acceptance occurred.
+Additional isolated timing analysis of fitted 5373dae finds the unchanged alpha blend also fails by -6.017 ns, independent of coordinate divisions and scene formatting. The 287cf6b batch passes synthesis but is stopped early during fitting to avoid completing another known-incomplete timing fix. Its status and cancellation reason are retained under results/build-287cf6b-20260914-065802. Replace the fixed dark-palette blend with synchronous byte lookup tables and pipeline the bounds, object selection and coordinate subtraction separately. These corrections preserve the approved pixels and shared provider design while using the reserved RAM budget; existing 287cf6b duration guards, coordinate/staging RAM and enabled formatter remain the basis. The completed correction uses ten aligned pixel registers, separately registered axis comparisons and qualification, precomputed object enables and ROM palette blending. Exact-width binary font and coordinate ROMs avoid padded storage. The isolated 148.5 MHz compositor fit passes all reported corners and shows +0.861 ns setup and +0.381 ns hold on the detailed default-model internal-register reports, with 12 M10Ks and no DSPs; this is not full-core qualification. All 5,414,400 full-frame pixel comparisons, varying-color alpha checks, lifetime/state tests and 518 enabled divider cases pass. ROM regeneration is exact. No hardware deployment or acceptance occurred.
 
 #### Next Steps:
 
-Verify full-frame RGB and sync alignment with varying pixel colors as well as fixed backgrounds, confirm unchanged palette and text, then commit and run the clean three-seed qualification. Check all corners, 159 CDC registers, the real four-clock scene enable and actual resource budgets before packaging an RBF.
+Run clean full-core seeds 52, 61 and 87 from b00920a. Require all-corner timing, 159 CDC registers and the real four-clock scene-enable audit, then measure actual resource usage before packaging a candidate.
 
 #### Files Modified:
 
+- docs/UI_OVERLAY_PLAN.md
+- files.qip
+- rtl/media_overlay_blend_b.hex
+- rtl/media_overlay_blend_rg.hex
 - rtl/media_overlay_compositor.sv
+- rtl/media_overlay_coordinates.hex
+- rtl/media_overlay_coordinates.mem
+- rtl/media_overlay_font.hex
+- rtl/media_overlay_font.mem
 - tools/make_overlay_roms.py
 - tools/test_media_player_overlay.sv
+- tools/verify_overlay_timing.py
 - tools/verify_player_overlay.py
 
 #### Status:
