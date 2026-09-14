@@ -1,4 +1,4 @@
-## 78 COMMIT Unreleased ??? 2026-09-14T09:56:47-07:00
+## 78 COMMIT Unreleased ec56250 2026-09-14T09:56:47-07:00
 
 #### Coming From:
 
@@ -10,15 +10,43 @@ Implement manually loaded SRT subtitles through stock Main and the existing shar
 
 #### Outcome:
 
-The user authorizes feature three. Add a second mounted-file menu slot for SRT, bounded streaming cue parsing and selection on the existing presentation timeline, and a backpressured cue transfer into the retained HDMI overlay provider. Preserve normal video file access with explicit drive-response ownership. Clear subtitle association on a new movie and hide stale cues during seeking, then rescan at the actual landing time. Support ordinary plain-text SRT line endings and basic text with complete printable ASCII glyphs; document parser and display limits. No subtitle database is preallocated. Test transport isolation, parsing, pause/seek and file-change behavior, CDC transfer and rendered pixels before clean three-seed qualification.
+Source ec56250 adds stock Main S1 mounted SRT loading and an On/Off control. A serialized drive owner isolates movie/SRT response writes through the trailing hps_io pipeline. Bounded streaming parsing retains two 63-character lines and timestamps rather than a whole-file database; headers support CRLF/LF and a final cue at EOF, tags are stripped, and non-ASCII UTF-8 codepoints use question-mark fallback. The existing font now covers all printable ASCII without enlarging its ROM. New subtitle reads yield to duration probing, seeks and low movie buffering. Acknowledged commands cross two audited configuration mailboxes into the retained shared-overlay provider, with independent visibility, dark backdrops and seek/file epochs. New movies clear association; seeks drain and rescan at the actual landing position. The user additionally requests lowering Paused/Seeking one line; status is y=417 at 480p and subtitle lines y=389/403, leaving clocks/bar unchanged. Parser, actual two-drive hps_io, asynchronous controller/command transfer, pause, Off/On, both seek directions, in-flight new-movie cancellation, reload and video-priority tests pass. Nine existing full-frame player cases and five subtitle cases at 480p/720p/1080p pass with zero mismatches, plus provider lifetime/state and 518 divider cases. Existing reader cancellation, timeout quarantine and session regressions pass; parser/controller lint is clean. Source is pushed and clean seeds 52, 61 and 87 are starting under /tmp/subtitle-build.log. Require 171 CDC audit registers. No RBF is qualified or deployed yet.
 
 #### Next Steps:
 
-Implement and run directed regressions, measure resource use and timing, and package a qualified hardware candidate without automatic deployment.
+Check synthesis RAM inference, final resources and all-corner timing for the three seeds, package the best qualified RBF and test with the generated Subtitle Test.srt plus real movie subtitles. Retain ffafc79 seed 87 as rollback; session resume and EOF policy remain separate release tasks.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer.sdc
+- MediaPlayer_top_00.svh
+- README.md
+- docs/SUBTITLES.md
+- docs/TEST_INSTRUCTIONS.md
+- docs/UI_OVERLAY_PLAN.md
+- docs/ui/font-sheet.html
+- docs/ui/overlay-preview.html
+- files.qip
+- rtl/media_overlay_font.mem
+- rtl/media_player_overlay.sv
+- rtl/media_sd_owner.sv
+- rtl/media_srt_parser.sv
+- rtl/media_subtitle_cdc.sv
+- rtl/media_subtitles.sv
+- rtl/media_ui_scene.sv
+- sys/emu_ports.vh
+- sys/sys_top.v
+- tools/audit_three_seeds.py
+- tools/make_subtitle_test.py
+- tools/phase1p_timing.tcl
+- tools/test_media_player_overlay.sv
+- tools/test_media_srt_parser.sv
+- tools/test_media_subtitle_hps_io.sv
+- tools/test_media_subtitles.sv
+- tools/test_media_ui_lifetime.sv
+- tools/verify_player_overlay.py
+- tools/verify_subtitles.py
 
 #### Status:
 
