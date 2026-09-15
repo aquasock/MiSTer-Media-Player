@@ -1,3 +1,32 @@
+## 130 COMMIT Unreleased 64722d0 2026-09-14T22:07:33-07:00
+
+#### Coming From:
+
+Unreleased 64722d0
+
+#### Purpose:
+
+Build the combined audio aspect-ratio and video-only menu corrections.
+
+#### Outcome:
+
+The user authorizes the next three-core build cycle. Build source 64722d0 includes the d3c416a viewport correction and audio-mode menu disabling, together with the earlier CD track navigation and FLAC seeking. The tracked working tree is clean and synchronized with origin/master, HIGH ALM packing is enabled, and no previous Quartus build remains active. Launch clean source archives for seeds 52, 61 and 87 with the standard build supervisor. The completed 36085f6 seed 87 remains available for comparison. No RBF is automatically deployed.
+
+#### Next Steps:
+
+After compilation, inspect resources, all four timing corners and configuration/reset audits, package the best candidate, then have the user test aspect switching, disabled menu controls, CD navigation, FLAC seeking and MPG regression files.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 129 COMMIT Unreleased 64722d0 2026-09-14T22:03:44-07:00
 
 #### Coming From:
@@ -1317,35 +1346,5 @@ None.
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 90 COMMIT Unreleased 78c82f1 2026-09-14T13:10:02-07:00
-
-#### Coming From:
-
-Unreleased a206435
-
-#### Purpose:
-
-Record gate-three hardware acceptance and the completed diagnostic-removal cycle.
-
-#### Outcome:
-
-The user reports all tests pass after the preferred 7eb5088 seed 61 handoff, completing the three-gate diagnostic-removal cycle including the compact black-clock progress bar and lowered subtitles. Seed 61 becomes the hardware-accepted baseline; its packaged RBF hash is verified and local build metadata records acceptance. Source 7eb5088 retains four-corner timing qualification, setup +0.334 ns, hold +0.074 ns, 37044 actual ALMs, 31325 estimated ALMs, 525 M10Ks and 75 DSPs, leaving 4866 ALMs and 28 M10Ks. Functional protection and playback remain; standalone diagnostic modules are retained only for offline simulation where applicable. Test instructions and the removal plan record completion; this documentation commit leaves the accepted 7eb5088 hardware unchanged. No source logic changes, new builds, deployment or release are requested.
-
-#### Next Steps:
-
-Use 7eb5088 seed 61 as the accepted baseline for future authorized work and retain 100ab07 seed 87 as rollback; no further diagnostic-removal gate remains.
-
-#### Files Modified:
-
-- docs/DIAGNOSTIC_REMOVAL_PLAN.md
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
