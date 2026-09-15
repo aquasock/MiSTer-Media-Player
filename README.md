@@ -1,155 +1,83 @@
-# MiSTer Media Player
+# MiSTer-Phosphor
 
-A progressive MPEG-2/MP2 player core for stock MiSTer Main. Audio decoding
-runs in FPGA logic; no ARM helper or modified Main is required. The accepted
-audio/video baseline is `0b6eb0e` seed 87, with native progressive output,
-manual refresh/aspect controls and compact telemetry accepted on hardware.
-Keyboard play/pause is hardware tested. Faster seeking is implemented and awaits hardware validation.
+A media player core for [MiSTer](https://github.com/MiSTer-devel), targeting
+QMTech DE10-Nano-compatible hardware (Cyclone V `5CSEBA6U23I7`). It plays
+back DVD-style MPEG-2 Program Stream video with MP2 audio, standalone or
+album FLAC music, SRT subtitles, and includes a transport UI overlay and
+three PCM-driven audio visualizer modes — all implemented natively in FPGA
+logic, no HPS software or soft CPU involved in the playback path.
 
-- Manually loaded `.srt` subtitles through **Load subtitles**, using stock Main.
-  Initial format coverage and hardware-test status: [subtitle notes](docs/SUBTITLES.md).
-- Raw `.m2v` and MPEG Program Stream `.mpg` through the normal file menu.
-- Progressive 4:2:0 I/P/B video through 720x480, within the baseline decoder's
-  motion/residual limits, at 23.976–30 fps (frame-rate codes 1–5).
-- MPEG-1 Layer II audio: 48 kHz, stereo/dual/joint stereo, 112–384 kb/s,
-  unprotected frames. The conversion script uses 192 kb/s stereo.
-- PES timestamps, audio-clock-based presentation, and independent compressed
-  video buffering. Missing individual video PTS retain encoded-cadence fallback.
-- Native 720x480 progressive raster with manual 59.94/50 Hz selection.
-- User-controlled 4:3 or 16:9 aspect ratio; video metadata never overrides it.
-- Frame-associated Auto/BT.601/BT.709 color matrix selection.
-- **Audio test Off selects movie audio**; test-tone modes remain available.
+## What it does
 
-The player targets continuous FFmpeg-generated MPG files with
-initial audio/video timestamps and nearby start times. It rejects unsupported
-MP2 headers, CRC-protected audio, and malformed frames; it does not implement
-mono, 44.1/32 kHz, MP3, AC3, or arbitrary timestamp discontinuity recovery.
-These are implementation limits, not MPEG standard limits.
+- **MPEG-2 / H.262 video decode** — progressive 4:2:0 video up to 720×480,
+  full I/P/B-picture support including B-picture display-order reordering,
+  at any of H.262's eight standard frame rates. One shared IDCT engine
+  serves all three picture types.
+- **MP2 audio** — MPEG-1 Layer II, 48 kHz, stereo/dual-channel/joint-stereo,
+  demuxed from the same Program Stream as the video.
+- **FLAC music and album playback** — a separate path from movie audio,
+  handling both standalone `.flac` files and embedded-CUESHEET albums with
+  full track navigation (next/previous track, seek-table-assisted direct
+  seeking), covering the format's full subframe/residual/stereo-decorrelation
+  syntax within a fixed 44.1 kHz/16-bit/stereo profile.
+- **SRT subtitles** — a bounded streaming parser (no whole-file index),
+  adjustable timing offset and playback speed, rendered as part of the same
+  on-screen scene as the transport UI rather than a separate overlay layer.
+- **Transport UI** — an on-screen time/progress-bar overlay with
+  resolution-aware font scaling, a real proportional progress bar, and
+  music-mode-aware track/album time display, shown on activity and hidden
+  automatically afterward.
+- **Audio visualizers** — Waveforms (dual-trace oscilloscope), FFT
+  (quantized spectrum blocks with peak-hold), and O-Scope (a green-phosphor
+  stereo XY vectorscope with genuine multi-level phosphor decay, compatible
+  with music specifically authored for X/Y display).
 
-## HDMI setup
+## Current limitations
 
-Add this override to MiSTer.ini, including when the global setting is zero:
+This is a deliberately scoped implementation, not a general-purpose decoder
+— see the MPEG and FLAC documents for the full detail, but in short:
+interlaced/field-structured video, non-4:2:0 chroma, resolutions above
+720×480, and non-default quantization matrices are all valid H.262 that
+this decoder doesn't implement yet (tracked explicitly as capability limits,
+distinct from genuine stream corruption). FLAC and MP2 audio are both fixed
+to a stereo-only profile; mono isn't accepted by either. Subtitles are
+plain-text SRT only, two lines of 63 characters each, with in-line
+formatting tags stripped rather than rendered.
 
-```ini
-[MediaPlayer]
-vsync_adjust=1
-```
+## Building
 
-The Refresh rate menu chooses the core's 50 or 59.94 Hz timing. Mode one lets
-HDMI follow that rate; leave it set to one when changing the menu. With zero,
-HDMI uses the configured output timing and may repeat/drop frames to convert
-between rates, reducing the benefit of the refresh switch.
-See [MiSTer's video configuration guide](https://mister-devel.github.io/MkDocs_MiSTer/basics/video/#vsync_adjust).
+Quartus Prime 17.0.2 Lite targeting the Cyclone V part above. The project
+uses a three-seed build methodology — Quartus's fitter seed affects
+placement and therefore timing closure on a design this close to full (block
+RAM in particular regularly sits around 99% utilized), so a candidate build
+sweeps three seeds and takes whichever one(s) actually close timing rather
+than committing to a single seed in advance. Full details, including the
+dedicated multi-corner timing validation pass beyond Quartus's default flow
+check, are in the build document.
 
-Use 50 Hz for 25 fps video and 59.94 Hz for 29.97 fps video. This does not
-change the encoded playback speed or the audio sample rate.
+## Documentation
 
-## Keyboard controls
+- **Architecture** — the system map: top-level module structure, the
+  decode/audio/session pipeline, DDR arbitration, and how everything above
+  connects together.
+- **MPEG** — H.262 video decode and MP2 audio decode in depth, including
+  exactly what's a capability limit versus a genuine syntax error.
+- **FLAC** — the music/album audio path: format coverage, DDR frame
+  storage, and CUESHEET-driven track navigation.
+- **Subtitles** — the SRT parser, timing controls, and how subtitle content
+  merges into the shared on-screen scene.
+- **UI** — the transport overlay: visibility timing, scene assembly, the
+  full OSD menu structure, and what each menu entry actually does.
+- **Visualizers** — how each of the three audio visualizer modes works,
+  including a naming-history note for anyone cross-referencing source (the
+  FFT mode's renderer is still named after its original "Fire" identity).
+- **Build** — the actual Quartus build flow, seed/reproducibility
+  requirements, and known build-process gotchas.
 
-| Key | Action |
-| --- | --- |
-| Space | Play/pause |
-| Left / Right | Backward / forward 10 seconds |
-| Ctrl + Left / Right | Backward / forward 30 seconds |
-| Ctrl + Alt + Left / Right | Backward / forward 1 minute |
-| F1–F8 | Jump to 0%, 12.5%, 25%, 37.5%, 50%, 62.5%, 75%, 87.5% of the current audio track or whole video |
-| N / P | Next / previous embedded CD track (FLAC albums) |
+## License
 
-F1–F8 require a known nonzero duration and use the existing seek mechanism
-without scanning the whole file first. Pause is retained; presses during an
-active seek are ignored. FLAC without a seek table uses its existing slower fallback.
-
-Controls operate with the OSD closed, once per physical press. Pause retains
-the displayed frame and queued samples while silencing movie audio. Seeking
-while paused leaves the destination paused. Additional seek commands are
-ignored while a seek is in progress; Space still controls the final pause state.
-
-The scaled HDMI player overlay shows elapsed, total and remaining times on the
-progress bar. It appears at startup and on play/pause or seek activity, remains
-visible during a seek, and for video hides three seconds afterward. Opening a file first
-performs a bounded timestamp probe; when duration cannot be qualified, Total
-and Remaining show `--:--:--`. The MiSTer menu remains above the player overlay.
-
-The same arrow controls work for native FLAC, including whole-CD FLAC files.
-N/P selects embedded CUESHEET INDEX 01 track starts; a separate `.cue` file is
-not read. P selects the previous track (clamped at the first), and N on the
-last track does nothing. Playback continues between tracks without interruption.
-Both track changes and timed seeks preserve pause and land at the exact target
-sample after CRC-checked preroll. On initial playback and natural track changes,
-audio progress shows the current track for three seconds, then the album for
-three seconds. Play/pause and manual seeks show only track progress for three
-seconds; an active seek holds the track-relative preview visible, and the
-three-second timeout restarts on landing. Seek previews clamp to the displayed
-track bounds until the actual landing track is known. F1–F8 always target the
-current audio track, regardless of which progress view is visible. A FLAC
-without cue markers is treated as one track. Unknown track duration is shown
-as unknown until metadata is ready.
-
-The core caches up to 99 CD tracks and 512 FLAC seek points in block RAM.
-Missing seek points fall back to decoding from the first audio frame, which
-can make long jumps slow. Invalid or non-CD cue metadata disables N/P without
-blocking ordinary playback or timed seeking. Seeking requires a known, nonzero
-STREAMINFO sample count. Loading another file clears all navigation state.
-To make one CD image with an embedded cue sheet: `abcde -d /dev/sr0 -1 -o 'flac:-8 -V' -a default,cue`.
-
-MPG seeks in either direction probe file positions for timestamped sequence
-headers and I-pictures, then restart nearby and decode the short lead-in.
-This works for previously unseen content without decoding the whole skipped
-interval. Partial audio frames are resynchronized, and leading B-pictures
-that need an unavailable reference are discarded during startup. The screen
-is blank during seeking and the OSD remains usable. Jumps clamp at the start/end
-of media. Files without usable restart timestamps, including raw M2V, use the
-slower reconstruction fallback. Sparse headers or unusual timestamps can also
-make a seek slower; initial GOP landing may be approximate.
-See the [hardware test procedure](docs/TEST_INSTRUCTIONS.md) for validation.
-
-## Decoder and output scope
-
-The decoder remains at 60 MHz. Smaller pictures are centered within the 720x480
-raster. There is no interlaced output, Bob or Weave support. The default direct analog
-output is 480p/31 kHz; this is not a 15 kHz 240p or 480i mode. The 50 Hz mode
-uses an internal 720x480-active scaler raster, not 576-line decoding.
-Interlace, Bob/Weave and DVD navigation are outside this development
-scope. Subtitles are supported through a manually loaded SRT file. Historical v0.7–v0.9 releases describe the earlier DVD/ARM architecture.
-
-See [building](docs/BUILDING.md), [architecture](docs/ARCHITECTURE.md), and
-[hardware tests](docs/TEST_INSTRUCTIONS.md). Active sources are in `files.qip`;
-the inactive MPEG2FPGA reference copy and wrappers have been removed. See
-[legacy provenance](docs/LEGACY_MPEG2FPGA.md) for their Git-history location.
-
-Supported output targets are HDMI through 1920x1080 and standard CRT resolutions.
-ASCAL image width is capped at 2048 pixels; the analog output path is retained.
-The unused Linux ALSA path is disabled. Screen telemetry, reporting-only
-circuitry and legacy LED diagnostics are removed; functional decode/transport
-checks remain active. FPGA movie audio and the Audio test menu remain enabled
-until diagnostic-removal gate three.
-
-On a clean end of file, the core finishes queued video and audio and returns to
-the startup screen, clearing times, playback controls and loaded subtitles.
-Select a movie to start again; playback positions are not remembered. Paused
-playback stays paused at the endpoint until resumed. Opening another movie
-replaces the previous session immediately through the safe restart path.
-
-## Native music waveform (pending hardware validation)
-
-The next waveform candidate draws cyan left-channel and orange right-channel
-traces during native FLAC playback, behind the player UI and stock OSD. It uses
-post-volume output samples, a roughly 23 ms history and a coherent snapshot per
-HDMI frame. Pause and mute settle the traces to silence; replacing the file
-clears the history. This is HDMI-only and does not add a spectrum analyzer.
-
-Generate RTL previews and run verification with:
-
-```sh
-python3 tools/verify_waveform_visualizer.py --output results/waveform --synthesize
-```
-
-The separate punctuation build `6d460d2` does not include the visualizer.
-
-## Visualizer selection
-
-During FLAC playback, open **Visualizers:** and select **Waveforms** for the
-mirrored stereo ribbons, **FFT** for spectrum blocks, or **O-Scope** for a green
-phosphor stereo XY trace. FFT blocks extend to the bottom of the viewport, with thin red peak-hold markers. The submenu
-is hidden outside audio playback. Both use the selected aspect ratio and retain
-the existing progress UI and OSD. See [Visualizer design and tests](docs/FIRE_VISUALIZER.md).
+Distributed under the GNU General Public License (v2 or later), matching
+the license carried in the project's own source headers. Built on the
+standard MiSTer platform framework (scaler, on-screen menu, platform
+top-level wrapper) alongside this project's own playback/decode logic;
+platform-provided components retain their own upstream licensing.
