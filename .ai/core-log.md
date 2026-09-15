@@ -1,4 +1,4 @@
-## 129 COMMIT Unreleased ??? 2026-09-14T22:03:44-07:00
+## 129 COMMIT Unreleased 64722d0 2026-09-14T22:03:44-07:00
 
 #### Coming From:
 
@@ -10,15 +10,19 @@ Disable video-only menu settings while native audio playback is active.
 
 #### Outcome:
 
-The user requests grayed-out Color matrix, Refresh rate and Subtitles entries during audio playback. Use stock Main's D0 disable prefix with menu-mask bit zero driven by music_play_request. Apply the same prefix to generated subtitle controls so flattened menus and existing subtitle pages also remain disabled. Keep the user settings intact and automatically restore access when audio playback ends or a video is loaded; Aspect ratio remains selectable.
+Stock Main menu-mask bit zero now follows music_play_request, and D0 prefixes disable Color matrix, Refresh rate and every generated subtitle menu entry during native audio playback, including pause and flattened-menu mode. Aspect ratio and Load media remain available. EOF/reset or video replacement restores access without modifying saved settings. The subtitle generator and generated file agree, and Quartus full-core Analysis and Elaboration passes. The cached stock Main parser confirms D applies both rendering and action rejection before page handling. No full RBF build was launched; this correction and d3c416a aspect layout await the next build cycle. Evidence is results/audio-menu/elaboration.log.
 
 #### Next Steps:
 
-Update the menu generator and configuration, verify generated output and full-core elaboration, and include the correction with the pending audio aspect fix in the next build cycle.
+Build the combined audio aspect and menu corrections, then verify disabled rows during playing/paused FLAC and restored controls after EOF/reset or MPG replacement.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer_subtitle_menu.svh
+- MediaPlayer_top_00.svh
+- docs/TEST_INSTRUCTIONS.md
+- tools/make_subtitle_menu.py
 
 #### Status:
 
