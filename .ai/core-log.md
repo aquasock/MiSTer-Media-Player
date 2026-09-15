@@ -1,4 +1,4 @@
-## 117 COMMIT Unreleased ??? 2026-09-14T18:57:23-07:00
+## 117 COMMIT Unreleased 6d460d2 2026-09-14T18:57:23-07:00
 
 #### Coming From:
 
@@ -10,15 +10,20 @@ Normalize the dialogue punctuation found in the user's SRT files.
 
 #### Outcome:
 
-The three root GIT HDD SRT files are now available. UTF-8 inspection confirms curly apostrophes and dialogue-leading U+2013 en dashes, plus U+2014 em dashes and U+201C/U+201D double quotes. These unsupported punctuation marks explain the leading question marks; no invisible prefix markers occur in these files. Extend the existing smart-apostrophe normalization to ASCII hyphens and double quotes, including corresponding standalone Windows-1252 bytes. Preserve unsupported-character fallback and bounded parser behavior.
+Inspection of the three now-available root GIT HDD SRT files confirms dialogue-leading UTF-8 en dashes caused question marks, alongside curly apostrophes, em dashes and double quotation marks. Extended normalization maps U+2013/U+2014 to hyphen and U+201C/U+201D to ASCII double quote, with standalone Windows-1252 equivalents; the prior apostrophe fix is retained. Parser punctuation/boundary tests pass and lint has no warnings. A reusable complete-file RTL replay compares normalized text and timestamps against an independent Python oracle. All 1162 A New Hope, 1019 Empire Strikes Back and 949 Return of the Jedi cues pass, totaling 3130, with zero parser warnings. Evidence and source-file hashes are in results/srt-punctuation. User SRT files remain untouched. This source is queued for the next build; no new RBF batch was started.
 
 #### Next Steps:
 
-Regress punctuation and replay all three complete local SRT files against an independent normalized cue oracle. Commit the correction for the next authorized build without altering the user's SRT files or launching a new batch.
+Include both punctuation corrections in the next authorized hardware build and verify those same SRT files on the MiSTer.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- docs/TEST_INSTRUCTIONS.md
+- rtl/media_srt_parser.sv
+- tools/test_media_srt_parser.sv
+- tools/test_srt_file.sv
+- tools/verify_srt_files.py
 
 #### Status:
 
