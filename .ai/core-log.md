@@ -1,3 +1,38 @@
+## 146 COMMIT Unreleased ??? 2026-09-15T01:49:24-07:00
+
+#### Coming From:
+
+Unreleased faf37ec
+
+#### Purpose:
+
+Show track progress before album progress and restrict seek and pause feedback to three seconds of track progress.
+
+#### Outcome:
+
+The user authorizes reversing the audio sequence to track for three seconds then album for three seconds, while manual seeking and play/pause show only track values for three seconds. Initial playback and natural track transitions retain the six-second sequence. Active seeks retain visible track-relative previews and restart the three-second timeout on landing. Suppress the metadata-refresh track-change event caused by a seek so it cannot reopen the album phase. Keep current-track F-key targeting and video behavior. The prior instruction not to build remains active.
+
+#### Next Steps:
+
+Implement event-specific UI lifetime and relative seek preview, verify exact timers and delayed landing metadata in simulation, commit and push without Quartus builds.
+
+#### Files Modified:
+
+- rtl/media_ui_state.sv
+- MediaPlayer_top_00.svh
+- tools/test_media_ui_state.sv
+- tools/test_audio_track_ui.sv
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 145 COMMIT Unreleased faf37ec 2026-09-15T01:46:18-07:00
 
 #### Coming From:
@@ -1276,35 +1311,6 @@ The production menu, matching fixture and instructions are updated; full block-R
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 106 COMMIT Unreleased b3e4f1d 2026-09-14T16:50:07-07:00
-
-#### Coming From:
-
-Unreleased b3e4f1d
-
-#### Purpose:
-
-Record the completed first production FLAC builds and their timing qualification.
-
-#### Outcome:
-
-All three clean b3e4f1d seeds 52/61/87 compiled and completed timing audits. Setup and hold pass across all four corners, but recovery fails in the new selected audio and native CD clock domains, so no seed is fully timing-qualified. Seed 87 has setup +0.354 ns, hold +0.102 ns and recovery -12.538 ns; it uses 37919 placed ALMs, 507 M10Ks, 61 DSPs and four PLLs. Seed 61 uses 37979 ALMs with setup +0.284 ns, hold +0.112 ns and recovery -12.210 ns. Seed 52 uses 38066 ALMs with setup +0.080 ns, hold +0.094 ns and recovery -12.691 ns. Resource counts other than ALMs are common to all three. RBFs and the complete report are packaged under results/hardware-test-b3e4f1d. Physical native 44.1 kHz output remains untested. The separate pending subtitle work targets the user's final 0.50x to 1.50x speed range and is absent from these build snapshots.
-
-#### Next Steps:
-
-Inspect and correct audio reset-recovery paths before claiming timing closure, and bundle the prepared subtitle controls into the next authorized FLAC build. Preserve the accepted b639ccc seed 52 rollback and perform native audio plus four-movie hardware regression before acceptance.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
