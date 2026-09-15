@@ -1,3 +1,32 @@
+## 147 COMMIT Unreleased 06256f8 2026-09-15T02:02:31-07:00
+
+#### Coming From:
+
+Unreleased 06256f8
+
+#### Purpose:
+
+Launch the authorized three-core build of shorter XY persistence and revised audio progress behavior.
+
+#### Outcome:
+
+The user authorizes three Quartus builds after converting the oscilloscope calibration file. Converted /home/vash/Desktop/calibration-8s.wav from 192 kHz sixteen-bit stereo to 44.1 kHz sixteen-bit stereo FLAC using a 64-tap-size resampling filter, compression level eight and 4096-sample frames. Output is /home/vash/Desktop/calibration-8s.flac, with 352800 samples per channel and eight-second duration; flac integrity testing passes. Stereo X/Y channels remain separate, but resampling can reduce fine drawing detail. Launch source 06256f8 using the standard seeds 52/61/87 with HIGH ALM packing. This includes source faf37ec shorter XY persistence and track-first automatic UI, with track-only pause/seek feedback. Prior source 3a72b70 seed61 remains the timing-qualified hardware candidate. No RBF deployment is authorized or performed; new fit and timing results are pending.
+
+#### Next Steps:
+
+Inspect all timing corners and CDC audits when the builds finish, report final resources, package the best passing candidate and have the user test the calibration FLAC, shorter trails and revised progress behavior.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 146 COMMIT Unreleased 06256f8 2026-09-15T01:49:24-07:00
 
 #### Coming From:
@@ -1280,37 +1309,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 107 COMMIT Unreleased 78c919f 2026-09-14T17:11:12-07:00
-
-#### Coming From:
-
-Unreleased da59ce0
-
-#### Purpose:
-
-Rename the media picker and limit its displayed filters to MPG and FLAC for the next build.
-
-#### Outcome:
-
-The user requests Load media *.MPG,FLAC. Stock Main automatically appends extensions in three-character groups, so the compatible core-only entry is S0,MPGFL*,Load media and displays Load media *.MPG,FL*. The FL* wildcard still includes FLAC files; the picker no longer advertises M2V. Do not inject duplicate suffix text or change Main. The running da59ce0 three-seed build snapshots remain unchanged.
-
-#### Next Steps:
-
-The production menu, matching fixture and instructions are updated; full block-RAM HPS menu readback and file-slot isolation pass. Include this change in the next build after the running da59ce0 batch.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- tools/test_media_subtitle_hps_io.sv
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
