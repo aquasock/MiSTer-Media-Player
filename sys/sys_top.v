@@ -1242,15 +1242,28 @@ cyclonev_hps_interface_peripheral_i2c hdmi_i2c
 	wire hdmi_hs_player,hdmi_vs_player,hdmi_de_player;
 	wire [23:0] visual_rgb;
 	wire visual_hs,visual_vs,visual_de;
+	wire [47:0] audio_viewport_bounds;
+	wire audio_viewport_enabled;
+	video_config_cdc #(.WIDTH(48)) audio_viewport_config(.src_clk(clk_vid),.dst_clk(clk_hdmi),
+	 .src_data({hmin,hmax,vmin,vmax}),.dst_data(audio_viewport_bounds));
+	video_config_cdc #(.WIDTH(1)) audio_viewport_enable(.src_clk(clk_sys),.dst_clk(clk_hdmi),
+	 .src_data(music_request),.dst_data(audio_viewport_enabled));
+	wire [23:0] viewport_rgb;
+	wire viewport_hs,viewport_vs,viewport_de,viewport_layout_de;
+	media_audio_viewport audio_viewport(.clk(clk_hdmi),.enabled(audio_viewport_enabled),.bounds(audio_viewport_bounds),
+	 .rgb(hdmi_data_mask),.hs(hdmi_hs_mask),.vs(hdmi_vs_mask),.de(hdmi_de_mask),
+	 .rgb_out(viewport_rgb),.hs_out(viewport_hs),.vs_out(viewport_vs),.de_out(viewport_de),.layout_de(viewport_layout_de));
+	reg [8:0] viewport_layout_pipe=0;
+	always @(posedge clk_hdmi)viewport_layout_pipe<={viewport_layout_pipe[7:0],viewport_layout_de};
 	media_waveform_visualizer visualizer(
 	 .audio_clk(music_clock),.video_clk(clk_hdmi),.audio_active(visual_active),.sample_tick(visual_tick),
 	 .sample_left(visual_left),.sample_right(visual_right),
-	 .rgb(hdmi_data_mask),.hs(hdmi_hs_mask),.vs(hdmi_vs_mask),.de(hdmi_de_mask),
+	 .rgb(viewport_rgb),.hs(viewport_hs),.vs(viewport_vs),.de(viewport_de),.layout_de(viewport_layout_de),
 	 .rgb_out(visual_rgb),.hs_out(visual_hs),.vs_out(visual_vs),.de_out(visual_de));
 	media_player_overlay player_overlay(
 	 .control_clk(player_ui_clock),.video_clk(clk_hdmi),.control_state(player_ui_state),
 	 .subtitle_command(player_subtitle_command),.subtitle_ack(player_subtitle_ack),
-	 .rgb(visual_rgb),.hs(visual_hs),.vs(visual_vs),.de(visual_de),
+	 .rgb(visual_rgb),.hs(visual_hs),.vs(visual_vs),.de(visual_de),.layout_de(viewport_layout_pipe[8]),
 	 .rgb_out(hdmi_data_player),.hs_out(hdmi_hs_player),.vs_out(hdmi_vs_player),.de_out(hdmi_de_player));
 
 	osd hdmi_osd

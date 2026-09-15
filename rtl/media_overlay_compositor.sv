@@ -5,6 +5,7 @@
 module media_overlay_compositor(
  input wire clk,
  input wire [23:0] rgb,input wire hs,vs,de,
+ input wire layout_de,
  input wire [15:0] current_epoch,
  input wire text_we,input wire [8:0] text_addr,input wire [7:0] text_data,
  input wire object_we,input wire [3:0] object_addr,input wire [55:0] object_data,
@@ -41,9 +42,9 @@ reg [11:0] x=0,y=0;
 reg de_d=0,vs_d=0;
 wire frame=vs&&!vs_d;
 always @(posedge clk) begin
- de_d<=de;vs_d<=vs;staged_matches<=staged_epoch==current_epoch;
- if(de) x<=x+1'b1;else x<=0;
- if(de_d&&!de) begin width<=x;y<=y+1'b1;end
+ de_d<=layout_de;vs_d<=vs;staged_matches<=staged_epoch==current_epoch;
+ if(layout_de) x<=x+1'b1;else x<=0;
+ if(de_d&&!layout_de) begin width<=x;y<=y+1'b1;end
  if(frame) begin height<=y;y<=0;end
  acknowledged<=0;
  if(!pending) begin
@@ -84,7 +85,7 @@ reg page0;
 integer i;
 always @(posedge clk) begin
  x_capture<=x;y_capture<=y;scale_capture<=scale;page_capture<=page;
- enable_capture<=object_enable;valid_capture<=de && !copy_busy;
+ enable_capture<=object_enable;valid_capture<=layout_de && !copy_busy;
  epoch_capture<=active_epoch==current_epoch;
  for(integer t=0;t<8;t=t+1) begin
   text_x[t]<=x>=active[t][11:0] && x<active[t][47:36];

@@ -4,6 +4,7 @@ module media_player_overlay(
  input wire control_clk,video_clk,input wire [90:0] control_state,
  input wire [34:0] subtitle_command,output wire subtitle_ack,
  input wire [23:0] rgb,input wire hs,vs,de,
+ input wire layout_de,
  output wire [23:0] rgb_out,output wire hs_out,vs_out,de_out
 );
 // Only scene construction advances every fourth pixel clock. Pixel lookup,
@@ -42,7 +43,7 @@ media_ui_scene scene(
  .aux_commit(subtitle_commit),.aux_epoch(subtitle_epoch),.aux_visible(subtitle_visible),
  .aux_auto_layout(1'b1),.aux_length0(subtitle_length0),.aux_length1(subtitle_length1));
 media_overlay_compositor compositor(
- .clk(video_clk),.rgb(rgb),.hs(hs),.vs(vs),.de(de),.current_epoch(state_hdmi[90:75]),
+ .clk(video_clk),.rgb(rgb),.hs(hs),.vs(vs),.de(de),.layout_de(layout_de),.current_epoch(state_hdmi[90:75]),
  .text_we(text_we),.text_addr(text_addr),.text_data(text_data),
  .object_we(object_we),.object_addr(object_addr),.object_data(object_data),
  .commit(commit),.commit_epoch(epoch),.commit_groups(groups),.commit_scale(scale),

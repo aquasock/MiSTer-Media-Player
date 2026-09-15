@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module test_media_player_overlay;
+module test_media_audio_viewport;
 reg control_clk=0,clk=0;always #7 control_clk=~control_clk;always #5 clk=~clk;
 reg [90:0] state_in=0;
 reg [34:0] sub_command=0;wire sub_ack;
@@ -7,17 +7,26 @@ reg [23:0] rgb=24'h203040;
 reg hs=0,vs=0,de=0;
 wire [23:0] out;
 wire ho,vo,deo;
-media_player_overlay dut(.layout_de(de),.control_clk(control_clk),.video_clk(clk),.subtitle_command(sub_command),.subtitle_ack(sub_ack),.control_state(state_in),
- .rgb(rgb),.hs(hs),.vs(vs),.de(de),.rgb_out(out),.hs_out(ho),.vs_out(vo),.de_out(deo));
-reg [26:0] expected[0:9];
+reg enabled=1;reg [47:0] bounds=0;
+wire [23:0] vrgb,wrgb;wire vh,vv,vd,ld,wh,wv,wd;
+media_audio_viewport viewport(.clk(clk),.enabled(enabled),.bounds(bounds),.rgb(rgb),.hs(hs),.vs(vs),.de(de),
+ .rgb_out(vrgb),.hs_out(vh),.vs_out(vv),.de_out(vd),.layout_de(ld));
+reg [8:0] layout_pipe=0;always @(posedge clk)layout_pipe<={layout_pipe[7:0],ld};
+media_waveform_visualizer waveform(.audio_clk(control_clk),.video_clk(clk),.audio_active(enabled),.sample_tick(1'b1),
+ .sample_left(16'sd16384),.sample_right(-16'sd16384),.rgb(vrgb),.hs(vh),.vs(vv),.de(vd),.layout_de(ld),
+ .rgb_out(wrgb),.hs_out(wh),.vs_out(wv),.de_out(wd));
+media_player_overlay dut(.layout_de(layout_pipe[8]),.control_clk(control_clk),.video_clk(clk),.subtitle_command(sub_command),.subtitle_ack(sub_ack),.control_state(state_in),
+ .rgb(wrgb),.hs(wh),.vs(wv),.de(wd),.rgb_out(out),.hs_out(ho),.vs_out(vo),.de_out(deo));
+reg [26:0] expected[0:19];
 integer cycles=0;
 always @(posedge clk) begin
  expected[0]<={hs,vs,de,rgb};
- for(integer k=1;k<10;k=k+1) expected[k]<=expected[k-1];
+ for(integer k=1;k<20;k=k+1) expected[k]<=expected[k-1];
  cycles<=cycles+1;
  #1;
- if(cycles>8 && {ho,vo,deo}!==expected[9][26:24]) $fatal(1,"timing pipeline mismatch");
+ if(cycles>20 && {ho,vo,deo}!==expected[19][26:24]) $fatal(1,"timing pipeline mismatch");
 end
+integer view_x=0,view_y=0,view_w=720,view_h=480,music=1;
 integer w=720,h=480,known=1,shown=1,paused=0,seeking=0;
 integer fd,frame_no=0,pixels=0,pattern=0;
 reg [34:0] position=35'd1340400000,total=35'd2629890000;
@@ -31,7 +40,6 @@ task sub_send(input [1:0] op,input [15:0] payload);begin
 end endtask
 initial begin
  if(!$value$plusargs("OUT=%s",path)) $fatal(1,"OUT");
- if($value$plusargs("BACKGROUND=%h",rgb))begin end
  if($value$plusargs("W=%d",w)) begin end
  if($value$plusargs("H=%d",h)) begin end
  if($value$plusargs("KNOWN=%d",known)) begin end
@@ -46,6 +54,12 @@ initial begin
  if($value$plusargs("SUB0=%s",sub0))begin end
  if($value$plusargs("SUB1=%s",sub1))begin end
  if(sub0.len()>64 || sub1.len()>64)$fatal(1,"subtitle fixture too long");
+ if($value$plusargs("X=%d",view_x))begin end
+ if($value$plusargs("Y=%d",view_y))begin end
+ if($value$plusargs("VW=%d",view_w))begin end
+ if($value$plusargs("VH=%d",view_h))begin end
+ if($value$plusargs("MUSIC=%d",music))begin end
+ enabled=music!=0;bounds={12'(view_x),12'(view_x+view_w-1),12'(view_y),12'(view_y+view_h-1)};
  state_in={16'd1,1'b1,shown[0],paused[0],seeking[0],known[0],total,position};
  if(subtitles!=0)begin
   for(integer i=0;i<128;i=i+1) sub_send(0,{i[7:0],(i<sub0.len()?sub0[i]:(i>=64 && i<64+sub1.len() && subtitles==2?sub1[i-64]:8'd0))});
@@ -69,6 +83,7 @@ initial begin
  end
  $fclose(fd);
  if(pixels!=w*h) $fatal(1,"pixels %0d",pixels);
+ if(dut.width!=12'(music!=0?view_w:w)||dut.height!=12'(music!=0?view_h:h)||waveform.width!=dut.width||waveform.height!=dut.height)$fatal(1,"viewport dimensions");
  $display("OVERLAY_RENDER_PASS pixels=%0d width=%0d height=%0d",pixels,dut.width,dut.height);$finish;
 end
 endmodule

@@ -6,6 +6,12 @@ This project is still in active pre-release development. Published milestone rel
 
 ## [Unreleased]
 
+### Audio graphics aspect ratio
+
+- Fit the native audio waveform and player UI to the scaler's selected 4:3 or
+  16:9 picture rectangle. Keep fonts integer-scaled, clip graphics to that area,
+  and preserve full HDMI timing. Movie graphics retain their existing layout.
+
 ### FLAC album navigation and seeking
 
 - Add N/P navigation through embedded CD CUESHEET INDEX 01 positions and video-style

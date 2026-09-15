@@ -4,6 +4,7 @@ module media_waveform_visualizer(
  input wire audio_clk,video_clk,audio_active,sample_tick,
  input wire signed [15:0] sample_left,sample_right,
  input wire [23:0] rgb,input wire hs,vs,de,
+ input wire layout_de,
  output reg [23:0] rgb_out=0,output reg hs_out=0,vs_out=0,de_out=0
 );
  reg was_active=0,epoch=0;
@@ -66,7 +67,7 @@ module media_waveform_visualizer(
    divide_count<=divide_count-1'b1;
    if(divide_count==1)step_x<={quotient[6:0],trial>={2'b0,divided_width}};
   end
-  if(de)position_x<=position_x+{8'b0,step_x};else position_x<=0;
+  if(layout_de)position_x<=position_x+{8'b0,step_x};else position_x<=0;
  end
  wire [7:0] column=position_x[15:8];
  wire [7:0] copy_address=copy_head+8'd1+copy_index[7:0];
@@ -89,18 +90,18 @@ module media_waveform_visualizer(
   end
   copy_q<=history[copy_address];
   history_q<=frame_history[column];
-  de_d<=de;vs_d<=vs;
-  if(de)begin
+  de_d<=layout_de;vs_d<=vs;
+  if(layout_de)begin
    x<=x+1'b1;
   end else x<=0;
-  if(de_d&&!de)begin width<=x;y<=y+1'b1;end
+  if(de_d&&!layout_de)begin width<=x;y<=y+1'b1;end
   if(vs&&!vs_d)begin height<=y;y<=0;end
  end
  // Reads concurrent with writes are never consumed: history writes stop
  // during copying, and display pixels are masked throughout frame copying.
  // no_rw_check avoids a RAM write-forwarding mux on the interpolation path.
  // Nine stages, including registered RAM output and a separate subtraction. The same delay is applied
- // to bypass pixels and all syncs; geometry uses the measured HDMI raster.
+ // to bypass pixels and all syncs; geometry uses the measured layout rectangle.
  reg [23:0] pixels[0:7];
  reg [7:0] hpipe=0,vpipe=0,dpipe=0,enable_pipe=0;
  reg [11:0] ypos[0:6];
@@ -128,7 +129,7 @@ module media_waveform_visualizer(
   for(i=1;i<8;i=i+1)pixels[i]<=pixels[i-1];
   for(i=1;i<7;i=i+1)ypos[i]<=ypos[i-1];
   hpipe<={hpipe[6:0],hs};vpipe<={vpipe[6:0],vs};dpipe<={dpipe[6:0],de};
-  enable_pipe<={enable_pipe[6:0],active&&!copying&&valid_history&&width>=256&&height>=240};
+  enable_pipe<={enable_pipe[6:0],layout_de&&active&&!copying&&valid_history&&width>=256&&height>=240};
   fraction_q<=position_x[7:0];
   history_pixels<=history_q;fraction_ram<=fraction_q;
   difference_l<=$signed({history_pixels[15],history_pixels[15:8]})-$signed({history_pixels[31],history_pixels[31:24]});

@@ -1,3 +1,22 @@
+# Audio graphics aspect-ratio correction
+
+The waveform and player UI now use the selected scaler picture rectangle during
+FLAC playback. At 1080p, 4:3 uses a centered 1440x1080 area and 16:9 uses 1920x1080.
+The font keeps its integer pixel scale; the waveform and bar adapt to the picture
+width. HDMI DE/sync stay full-size and the stock OSD is unchanged.
+
+Run `python3 tools/verify_audio_viewport.py --output results/audio-aspect/integration`
+for complete pipeline checks and PNG previews at 480p, 720p and 1080p in both
+aspect modes. The test checks renderer dimensions, untouched borders, UI pixels,
+waveform presence, full-raster sync/DE and exact movie bypass after pipeline delay.
+
+On hardware, switch 4:3/16:9 during FLAC playback with the progress bar visible.
+Confirm both graphics follow the picture area, text stays sharp, and playback,
+pause, OSD and subsequent MPG playback still work. This correction is separate
+from the already-running 36085f6 CD navigation builds; those do not include it.
+
+---
+
 # FLAC CD albums and keyboard seeking
 
 Run `python3 tools/verify_flac_album.py --output results/flac-album` to generate

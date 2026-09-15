@@ -8,7 +8,7 @@ module test_media_waveform_visualizer;
  reg [23:0] rgb=24'h315579;
  reg hs=0,vs=0,de=0;
  wire [23:0] rgb_out;wire hs_out,vs_out,de_out;
- media_waveform_visualizer dut(.*);
+ media_waveform_visualizer dut(.layout_de(de),.*);
 `ifdef WAVEFORM_BASELINE
  wire [23:0] baseline_rgb;
  wire baseline_hs,baseline_vs,baseline_de;
