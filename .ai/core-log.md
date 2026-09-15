@@ -1,4 +1,4 @@
-## 134 COMMIT Unreleased ??? 2026-09-14T23:21:00-07:00
+## 134 COMMIT Unreleased d2487b8 2026-09-14T23:21:00-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add F1 through F8 absolute seeks to eight equal runtime section starts for audio
 
 #### Outcome:
 
-The user authorizes F1 at zero through F8 at seven eighths of the known duration using the existing seek path. Use the duration and validity already supplied to the UI, suppress shortcuts during OSD interaction or active seeks, retain pause and handle held keys once per press. No extra file scan is required. Include the three-second UI timeout and one-minute modified arrow jumps in the next build.
+Implemented F1 through F8 as absolute seeks to zero through seven eighths of the duration for audio and video. The shared keyboard uses the qualified duration and validity from the UI scene, so unknown or contradicted durations are rejected without another file scan. Widened shift/add arithmetic prevents overflow without a multiplier. Tests cover every key with ordinary, short, uneven and maximum durations, paused and playing states, held and busy keys, OSD suppression, seek gating and file replacement. The production video seek-search/restart simulation passes absolute beginning, middle and late-file jumps with asynchronous configuration and DDR retirement. All 27 FLAC album cases pass, including all eight sample targets. All eight playback regressions pass; the unchanged timestamp-tolerance test initially exceeded its sixty-second wall limit under concurrent Quartus load and passes when rerun with a three-hundred-second allowance. Source d2487b8 is pushed and includes Fire, the three-second UI timeout and one-minute modified-arrow jumps. Three HIGH-packing builds are queued after the active a77a2da batch by results/runtime-keys/queue-build.py, supervisor PID 1000726. Full compile, timing and hardware validation remain pending.
 
 #### Next Steps:
 
-Implement and test all eight targets, duration bounds and unknown duration, key release suppression and FLAC sample-target translation, then prepare the next three HIGH-packing builds.
+Inspect the queued d2487b8 seeds 52, 61 and 87 when complete, qualify timing and package a hardware candidate for audio/video function-key and visualizer checks.
 
 #### Files Modified:
 
