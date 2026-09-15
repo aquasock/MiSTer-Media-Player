@@ -1,3 +1,32 @@
+## 139 COMMIT Unreleased ??? 2026-09-15T00:08:18-07:00
+
+#### Coming From:
+
+Unreleased f874dcd
+
+#### Purpose:
+
+Require an explicit album filename operand for the FLAC splitter.
+
+#### Outcome:
+
+The user requests a CD-independent command taking its input FLAC as an operand. Remove automatic adjacent-album discovery and require the album path through argparse, preserving script-directory output and the existing lossless splitting behavior.
+
+#### Next Steps:
+
+Check the command-line interface, update the companion copy in the user's album folder and document the generic invocation.
+
+#### Files Modified:
+
+- tools/split_flac_album.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 138 COMMIT Unreleased f874dcd 2026-09-15T00:04:19-07:00
 
 #### Coming From:
@@ -1319,42 +1348,6 @@ Continue full FLAC byte/bit parsing and validated frame delivery through the sha
 - tools/verify_media_pcm_sink.py
 - tools/test_hdmi_i2c_owner.sv
 - tools/verify_hdmi_i2c_owner.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 99 COMMIT Unreleased 6d564e9 2026-09-14T14:31:40-07:00
-
-#### Coming From:
-
-Unreleased ba9e0d8
-
-#### Purpose:
-
-Begin authorized FLAC feasibility and simulation implementation.
-
-#### Outcome:
-
-The user authorizes implementation and then explicitly selects native 44.1 kHz FLAC while preserving 48 and 96 kHz platform modes; conversion is excluded. Commit 6d564e9 adds a standalone serial FLAC prediction primitive and reproducible simulation/corpus/Quartus probes, with no production integration. Python integer comparisons pass 4097 vectors including orders 0–32, 17-bit side-channel history, residual/range checks and backpressure, plus 33 reset cancellation points; Verilator lint passes. Isolated virtual-pin prediction fitting uses 150 placed ALMs, 192 estimated ALMs, 106 registers, one DSP and zero M10Ks; this is not full decoder area or production timing. A deterministic 55-file corpus reproduces all original PCM through independent source comparisons; two damaged cases are rejected. Local FFmpeg emits no samples for the large-block noise file, while reference flac 1.5.0 decodes it exactly; the manifest records this secondary-reference limitation. A separate dual-PLL probe fits with two PLLs and 18 registers; fitter frequencies are 24.576 and 22.579199 MHz. The proposed native path retains the movie clock and adds one CD PLL, but current whole-core PLL placement and HDMI operation are unproven. ADV7513 documentation confirms automatic CTS and the channel-status rate field; the remaining native-output gate is an FPGA/HPS I2C owner or proxy that preserves Main traffic and restores/reapplies audio configuration correctly. Proposed frame storage reuses 1 MiB of the inactive compressed-video FIFO's reserved DDR range, subject to explicit drain/ownership testing. RFC 9639 and ADV7513 references are catalogued. Evidence is results/flac and docs/FLAC_FEASIBILITY.md. No playable FLAC RBF exists yet; accepted b639ccc seed 52 remains current.
-
-#### Next Steps:
-
-Implement and simulate the serialized HDMI audio-control path, validating HPS contention, ACK/NACK, reads, resets and reconnects before platform integration. Continue the FLAC bitstream/parser, memory ownership and full-file PCM comparison work using the corpus. Preserve native 44.1 kHz plus existing 48/96 kHz; no resampler and no removal of 96 kHz. Whole-core builds and hardware validation follow meaningful integration gates rather than treating isolated fits as a completed player.
-
-#### Files Modified:
-
-- docs/FLAC_PLAN.md
-- docs/FLAC_FEASIBILITY.md
-- rtl/audio/flac/flac_predict_mac.sv
-- tools/make_flac_tests.py
-- tools/synth_flac_clock.py
-- tools/synth_flac_predict.py
-- tools/test_flac_predict.sv
-- tools/verify_flac_predict.py
 
 #### Status:
 
