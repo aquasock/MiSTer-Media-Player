@@ -8,6 +8,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Show audio track progress before album progress on initial playback and
+  natural track changes (three seconds each). Pause/resume and manual seeks
+  show only three seconds of track progress, with track-relative seek previews.
+
 - Shorten XY O-Scope phosphor persistence from fifteen to eight decay sweeps
   while preserving stereo geometry and the 128 by 128 drawing buffer.
 
@@ -16,9 +20,7 @@ This project is still in active pre-release development. Published milestone rel
   the FFT baseline to the viewport bottom while keeping the UI above it, and
   add thin red peak-hold markers with slow decay.
 
-- Audio progress shows the album for three seconds followed by the current
-  track for three seconds; natural track changes also reopen the bar. Audio
-  F1–F8 shortcuts now divide the current track, independent of the display
+- Audio F1–F8 shortcuts divide the current track, independent of the display
   phase. Video retains its three-second UI and whole-video section shortcuts.
 
 - Quantize Fire into separate spectrum blocks: one solid orange cap per band, yellow below, with no band or color blending.

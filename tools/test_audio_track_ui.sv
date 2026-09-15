@@ -29,7 +29,7 @@ module test_audio_track_ui;
  media_ui_state #(.CLOCK_HZ(1000)) ui(.clk(clk),.reset(reset),.new_file(new_file),.loaded(loaded),
   .paused(paused),.seeking(seeking),.elapsed_q(elapsed),.target_q(target),.duration_q(duration),.duration_valid(total!=0),
   .music_mode(1'b1),.track_changed(track_changed),.track_valid(track_valid&&times_valid),
-  .track_elapsed_q(track_elapsed),.track_duration_q(track_duration),.album_duration_known(known),.scene_state(scene));
+  .track_elapsed_q(track_elapsed),.track_origin_q(track_origin),.track_duration_q(track_duration),.album_duration_known(known),.scene_state(scene));
  task press(input [8:0] code);begin
   @(negedge clk);key={!key[10],1'b1,code};repeat(4)@(negedge clk);
   key={!key[10],1'b0,code};repeat(4)@(negedge clk);
@@ -45,17 +45,21 @@ module test_audio_track_ui;
   repeat(5)@(negedge clk);reset=0;
   for(j=0;j<n;j=j+1)begin byte_data=data[j];byte_valid=1;@(negedge clk);end
   byte_valid=0;wait(times_valid);loaded=1;repeat(100)@(negedge clk);
-  if(!scene[73]||scene[69:35]!=1080000)$fatal(1,"initial album time");
-  repeat(3100)@(negedge clk);
   if(!scene[73]||scene[69:35]!=360000)$fatal(1,"initial track time");
+  repeat(3100)@(negedge clk);
+  if(!scene[73]||scene[69:35]!=1080000)$fatal(1,"initial album time");
   repeat(3000)@(negedge clk);if(scene[73])$fatal(1,"audio UI did not hide");
-  // A natural crossing alone starts a fresh album/track sequence.
+  // A natural crossing alone starts a fresh track/album sequence.
   position=44100;wait(track_changed);@(negedge clk);repeat(300)@(negedge clk);
-  if(track_number!=2||!scene[73]||scene[69:35]!=1080000)$fatal(1,"natural track album phase");
+  if(track_number!=2||!scene[73]||scene[69:35]!=360000)$fatal(1,"natural track phase");
+  // F-keys use track coordinates in either display phase.
+  repeat(3100)@(negedge clk);
+  if(!scene[73]||scene[69:35]!=1080000)$fatal(1,"natural album phase");
   // Album display is active, but F5 must target the middle of track 2.
   section(9'h003,35'd540000);
-  repeat(3100)@(negedge clk);
+  repeat(100)@(negedge clk);
   if(!scene[73]||scene[69:35]!=360000||scene[34:0]!=0)$fatal(1,"track-relative time");
+  repeat(3000)@(negedge clk);if(scene[73])$fatal(1,"manual seek exceeded three seconds");
   section(9'h005,35'd360000);
   press(9'h029);if(!paused)$fatal(1,"pause");section(9'h00a,35'd675000);
   if(!paused)$fatal(1,"F-key lost pause");

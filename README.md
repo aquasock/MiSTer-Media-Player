@@ -75,12 +75,15 @@ N/P selects embedded CUESHEET INDEX 01 track starts; a separate `.cue` file is
 not read. P selects the previous track (clamped at the first), and N on the
 last track does nothing. Playback continues between tracks without interruption.
 Both track changes and timed seeks preserve pause and land at the exact target
-sample after CRC-checked preroll. Audio progress first shows the album for three
-seconds, then the current track
-for three seconds. Natural track changes also trigger this sequence. F1–F8
-always target the current audio track, regardless of which progress view is
-visible. A FLAC without cue markers is treated as one track. During a seek the
-bar remains visible; the six-second sequence starts again after landing.
+sample after CRC-checked preroll. On initial playback and natural track changes,
+audio progress shows the current track for three seconds, then the album for
+three seconds. Play/pause and manual seeks show only track progress for three
+seconds; an active seek holds the track-relative preview visible, and the
+three-second timeout restarts on landing. Seek previews clamp to the displayed
+track bounds until the actual landing track is known. F1–F8 always target the
+current audio track, regardless of which progress view is visible. A FLAC
+without cue markers is treated as one track. Unknown track duration is shown
+as unknown until metadata is ready.
 
 The core caches up to 99 CD tracks and 512 FLAC seek points in block RAM.
 Missing seek points fall back to decoding from the first audio frame, which

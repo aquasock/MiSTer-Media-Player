@@ -278,7 +278,7 @@ media_ui_state player_ui_state(
  .clk(clk_sys),.reset(RESET),.new_file(media_new_file),
  .loaded(media_file_size!=0 && !media_duration_busy && !media_fifo_reset),
  .music_mode(media_music_hint),.track_changed(album_track_changed),.track_valid(album_track_valid&&media_track_times_valid),
- .track_elapsed_q(media_track_elapsed),.track_duration_q(media_track_duration),.album_duration_known(media_album_duration_known),
+ .track_elapsed_q(media_track_elapsed),.track_origin_q(media_track_origin),.track_duration_q(media_track_duration),.album_duration_known(media_album_duration_known),
  .paused(media_paused_sys),.seeking(media_seek_sys||album_busy),
  .elapsed_q(media_music_hint?media_music_elapsed:media_elapsed_sys),.target_q(media_target_sys),
  .duration_q(media_music_hint?media_music_duration:media_duration_q),.duration_valid(media_music_hint?(media_music_total_sys!=0):media_duration_valid),.scene_state(PLAYER_UI_STATE));

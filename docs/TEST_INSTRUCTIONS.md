@@ -1081,19 +1081,22 @@ trigger another seek until released and pressed again. Unknown-duration files
 must ignore these shortcuts. The progress bar stays visible during seeking and
 hides three seconds after landing. Check both indexed and unindexed FLAC files.
 
-### Album then track progress
+### Track then album progress
 
-Load an embedded-cue FLAC album. Each UI activation shows album elapsed/total/
-remaining and progress for three seconds, then current-track values for three
-seconds before hiding. Verify that natural transitions trigger the sequence,
-including the final track; stationary playback must not repeatedly reopen it.
-Test Space, relative seeks, N/P, and F1–F8 while paused and playing. F1 must
-return to the current track's beginning and F8 near its end, both during the
-album view and during the track view. Arrow seeks remain relative to playback
-and can cross tracks. While actively seeking the bar remains visible; landing
-starts a fresh six-second sequence. A plain FLAC uses the whole file as its
-single track. Replacing media/EOF must clear old track state. MPG retains its
-three-second timeout and whole-video F-key targets.
+Load an embedded-cue FLAC album. Initial playback and natural transitions show
+track elapsed/total/remaining for three seconds, then album values for three
+seconds before hiding. Check the final track too; stationary playback must not
+repeatedly reopen the UI. Space must interrupt either phase and show only three
+seconds of track progress, both on pause and resume. Active seeks keep a
+track-relative preview visible and restart only three seconds of track display
+on landing. The later track metadata refresh must not reopen an album phase.
+Check forward/backward arrows, N/P and F1–F8 while paused and playing. F1 must
+return to the current track's beginning and F8 near its end, even from the
+album display phase. Cross-track seek previews clamp to the displayed track
+bounds until landing metadata is ready, then show the actual new track.
+A later natural track transition must still show track then album. A plain
+FLAC uses the whole file as one track. Replacement/EOF clears old state. MPG
+retains its three-second timeout and whole-video F-key targets.
 
 ### Three audio visualizers
 
