@@ -1,3 +1,32 @@
+## 127 COMMIT Unreleased ??? 2026-09-14T21:47:29-07:00
+
+#### Coming From:
+
+Unreleased 36085f6
+
+#### Purpose:
+
+Make the audio waveform and player UI respect the selected aspect ratio.
+
+#### Outcome:
+
+The user reports that native audio visualizer and UI ignore aspect selection. Both post-scaler renderers measure the full HDMI DE raster rather than the selected picture rectangle. Add a coherent frame-boundary audio viewport from the platform scaler bounds, use it for local renderer geometry and clipping while preserving full HDMI DE and integer font scaling, and keep movie rendering unchanged. Existing 36085f6 seed builds continue from their immutable source snapshots.
+
+#### Next Steps:
+
+Simulate audio viewport layout and clipping at standard resolutions and both aspect selections, verify unchanged movie bypass and HDMI timing, then commit the correction for the next build cycle.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 126 COMMIT Unreleased 36085f6 2026-09-14T21:24:58-07:00
 
 #### Coming From:
@@ -1316,33 +1345,3 @@ Audit all three builds for timing, retained PCM and CDC, test-hardware absence a
 - [ ] Passed
 
 ---
-
-## 87 COMMIT Unreleased 0ad4b1b 2026-09-14T12:36:07-07:00
-
-#### Coming From:
-
-Unreleased 100ab07
-
-#### Purpose:
-
-Qualify and package gate-two builds for the user's four-file hardware test.
-
-#### Outcome:
-
-All 100ab07 seeds complete in 15.1-15.6 minutes and pass four timing corners, 183 CDC stage checks, scene-enable checks, zero-profiler audit and all 17 reporting-removal patterns. Seeds 52/61/87 have setup +0.072/+0.188/+0.344 ns, hold +0.116/+0.115/+0.106 ns, actual ALMs 37325/37366/37326 and estimated ALMs 31844/31900/31820. All retain 527 M10Ks, 75 DSPs and three PLLs. Preferred seed 87 leaves 4584 ALMs and 26 M10Ks, with resources essentially flat versus gate-one seed 52: +59 placed and +33 estimated ALMs despite verified reporting-register removal. No further savings should be claimed from this gate. Hash-verified candidates are under results/hardware-test-100ab07; preferred seed87/MediaPlayer_20260914.rbf SHA-256 is 297690c42da92880077be53601e23a7a7fc8c6d4d90fc50105577f0c7f288dba. Audio test remains for gate three. No additional builds, timing fixes or deployment were performed; gate-two hardware acceptance is pending.
-
-#### Next Steps:
-
-Have the user test Fellow, Groove, Jiggler and Star Wars with playback, pause/seek, subtitles, OSD/filters, file replacement and EOF at both output rates; await authorization before gate three. Retain gate-one seed 52 and accepted b05b76f seed 87 as rollback.
-
-#### Files Modified:
-
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
