@@ -49,7 +49,8 @@ module media_xy_visualizer(
   fade_q<=phosphor[ram_address];
   if(clear)phosphor[ram_address]<=0;
   else if(drawing)phosphor[ram_address]<=15;
-  else if(fade_busy&&fade_state==2)phosphor[ram_address]<=fade_q==0?4'd0:fade_q-1'b1;
+  // Two intensity steps per frame: eight sweeps to black, saturating at zero.
+  else if(fade_busy&&fade_state==2)phosphor[ram_address]<=(fade_q<=4'd2) ? 4'd0 : fade_q-4'd2;
   display_q<=phosphor[{pixel_y,pixel_x}];
  end
  always @(posedge clk)begin

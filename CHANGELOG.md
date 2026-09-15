@@ -8,6 +8,9 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Shorten XY O-Scope phosphor persistence from fifteen to eight decay sweeps
+  while preserving stereo geometry and the 128 by 128 drawing buffer.
+
 - Add a green-phosphor stereo XY **O-Scope** with fading connected traces.
   Rename the original ribbons **Waveforms** and spectrum bars **FFT**. Move
   the FFT baseline to the viewport bottom while keeping the UI above it, and

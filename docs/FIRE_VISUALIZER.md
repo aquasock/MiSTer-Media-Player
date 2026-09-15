@@ -83,8 +83,9 @@ Left-channel amplitude sets horizontal position; right-channel amplitude sets
 vertical position (positive upwards). A centered square inside the selected
 aspect viewport displays a 128 by 128 intensity map. Connected sample traces
 use integer Bresenham line drawing and sixteen green phosphor intensity levels.
-An idle-port sweep subtracts one intensity level per frame, yielding roughly a
-quarter-second trail at 60 Hz. A stationary signal produces a stationary spot;
+An idle-port sweep subtracts two intensity levels per frame, saturating at zero.
+An untouched trace fades out in eight sweeps, roughly 133 ms at 60 Hz (160 ms
+at 50 Hz), reduced from fifteen sweeps to reveal more individual wires. A stationary signal produces a stationary spot;
 unrelated stereo channels produce a cloud, while correlated channels produce
 lines or loops. This is a stereo vectorscope, not an FFT or time-domain ribbon.
 

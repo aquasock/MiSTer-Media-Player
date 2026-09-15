@@ -39,14 +39,20 @@ module test_media_xy_visualizer;
   sample(20,70);line(127,127,20,70);check_trace();
   sample(25,5);line(20,70,25,5);check_trace();
   sample(25,5);check_trace();
-  for(integer level=14;level>=0;level=level-1)begin
+  for(integer sweep=1;sweep<=8;sweep=sweep+1)begin
+   integer level;level=sweep>=8?0:15-2*sweep;
    vs=1;repeat(2)@(negedge clk);vs=0;repeat(50000)@(negedge clk);
    for(integer i=0;i<16384;i=i+1)
     if(dut.phosphor[i]!=(expected[i]?4'(level):4'd0))$fatal(1,"fade mismatch level %d address %d got %d",level,i,dut.phosphor[i]);
   end
+  // Seed every possible stored intensity to catch underflow and even levels.
+  for(integer i=0;i<16;i=i+1)dut.phosphor[i]=4'(i);
+  vs=1;repeat(2)@(negedge clk);vs=0;repeat(50000)@(negedge clk);
+  for(integer i=0;i<16;i=i+1)
+   if(dut.phosphor[i]!=4'(i<=2?0:i-2))$fatal(1,"saturating fade at intensity %d",i);
   sample(64,64);active=0;repeat(2)@(negedge clk);active=1;repeat(16400)@(negedge clk);
   for(integer i=0;i<16384;i=i+1)if(dut.phosphor[i]!=0)$fatal(1,"replacement retained trace");
-  $display("PASS XY line octants, endpoints, stationary samples, all phosphor decay levels and replacement clear");$finish;
+  $display("PASS XY line octants, endpoints, stationary samples, eight-frame decay, all intensity saturation cases and replacement clear");$finish;
  end
  initial begin #20000000;$fatal(1,"timeout");end
 endmodule
