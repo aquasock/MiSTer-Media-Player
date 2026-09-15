@@ -1,3 +1,32 @@
+## 110 COMMIT Unreleased ??? 2026-09-14T17:44:28-07:00
+
+#### Coming From:
+
+Unreleased 3f393c5
+
+#### Purpose:
+
+Simulate integer font scaling and produce exact-resolution UI previews for review.
+
+#### Outcome:
+
+The user requests implementation in simulation and screenshots at 480p, 720p and 1080p. Use integer glyph scaling 1x, 2x and 3x respectively, replacing the fractional 1.5x and 2.25x modes. Preserve overlay layout anchors and colors, and expand coordinate/height bounds for full 64-character subtitle lines at 3x. Render the production RTL and compare pixels against an independent oracle before exporting PNG previews. This is simulation and review work only; do not start another RBF batch or change the running 3f393c5 snapshots.
+
+#### Next Steps:
+
+Update RTL, deterministic coordinate ROM generation and pixel oracles; test all supported resolutions including maximum-length subtitles, then provide full-resolution screenshots.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 109 COMMIT Unreleased 3f393c5 2026-09-14T17:34:06-07:00
 
 #### Coming From:
@@ -1424,42 +1453,6 @@ Complete corrected build qualification, then record the preferred RBF hash, reso
 - docs/ui/font-sheet.html
 - rtl/media_ui_scene.sv
 - tools/make_font_sheet.py
-- tools/verify_ui_duration.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 70 COMMIT Unreleased 9076405 2026-09-14T08:02:17-07:00
-
-#### Coming From:
-
-Unreleased b00920a
-
-#### Purpose:
-
-Recover bounded duration for sparse-timestamp progressive program streams.
-
-#### Outcome:
-
-The user clarified that loading must remain fast and unknown duration is acceptable when bounded evidence is insufficient. The corrected observer uses progressive picture temporal references to reconstruct timestamps within anchored groups, unwrap reference-picture indices across modulo-1024 transitions and position B-pictures before their future reference. Late B-picture timestamps can backfill an earlier-coded reference endpoint, and anchored group endpoints carry into following unannotated groups. One serial multiplier computes offsets without DSPs. Conflicting anchors beyond one 90 kHz tick, unsupported/mixed rates, malformed endpoints and genuinely unanchored windows remain unknown. Existing byte budgets, reader ownership and watchdog are unchanged. All 32 synthetic cases, shared-reader remount/error/timeout and above-4-GiB tests, and Verilator lint pass. Exact bounded head/tail comparisons against independently decoded frames pass Groove, Star Wars LOWER, Pee Strike and fellow; Groove differs by three quarter-ticks, the other endpoints match exactly. Evidence is under results/ui-duration-sparse. No hardware deployment occurred.
-
-#### Next Steps:
-
-Build clean seeds 52, 61 and 87, audit all four corners and 159 CDC registers plus scene enable, compare incremental resources with tested b00920a seed 52 and package the best qualified candidate.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- docs/TEST_INSTRUCTIONS.md
-- docs/UI_OVERLAY_PLAN.md
-- files.qip
-- rtl/media_duration_timeline.sv
-- rtl/media_duration_window.sv
-- tools/test_media_duration_window.sv
 - tools/verify_ui_duration.py
 
 #### Status:
