@@ -1,4 +1,4 @@
-## 124 COMMIT Unreleased ??? 2026-09-14T20:44:36-07:00
+## 124 COMMIT Unreleased d24abc0 2026-09-14T20:44:36-07:00
 
 #### Coming From:
 
@@ -10,15 +10,20 @@ Pipeline the waveform interpolation timing path and adopt HIGH packing for subse
 
 #### Outcome:
 
-The user authorizes fixing timing and rebuilding three seeds with HIGH packing as the new default. All four original waveform candidates compile but fail setup: MEDIUM 52/61/87 minima are -2.795/-1.885/-2.783 ns and HIGH 87 is -2.053 ns. Other timing categories and 289 CDC/reset audit checks pass. HIGH 87 uses 37379 ALMs versus MEDIUM 87 at 38609, saving 1230. The user receives the HIGH 87 binary for functional testing with its timing failure disclosed. The fix will separate RAM output, sample subtraction and interpolation multiplication, preserve matching pixel/sync latency, and remove unnecessary read-during-write forwarding only where overlapping reads are unused. Local source and build snapshots will retain reproducible evidence.
+Implemented separate RAM-output, difference and multiply pipeline stages, extending RGB/sync and coordinate latency from seven to nine cycles and matching glow delay. Both RAMs use no_rw_check only because read/write-overlap values are discarded. HIGH register packing is now the tracked QSF default. Full cycle-by-cycle RGB/sync equivalence to 2498125 passes with two-cycle compensation at 480p, 720p and 1080p, alongside existing constant-signal pixel, stereo history, silence, replacement and bypass tests. Standalone Quartus mapping succeeds with 541 estimated ALMs, 908 registers, two M10Ks and four DSPs. Three clean HIGH seeds 52, 61 and 87 of d24abc0 are running; full-core resource and timing results remain pending. Local source commits and results/waveform-timing-equivalence preserve the evidence. The original HIGH seed 87 remains available for functional testing with its -2.053 ns setup violation disclosed.
 
 #### Next Steps:
 
-Run waveform pixel and bypass regressions, check equivalence against the original renderer with latency compensation, and launch clean HIGH seeds 52, 61 and 87.
+Finish the three HIGH builds, inspect every timing corner and CDC audit, and package the best timing-qualified waveform candidate. Hardware acceptance remains pending.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer.qsf
+- docs/TEST_INSTRUCTIONS.md
+- rtl/media_waveform_visualizer.sv
+- tools/test_media_waveform_visualizer.sv
+- tools/verify_waveform_visualizer.py
 
 #### Status:
 
