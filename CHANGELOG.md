@@ -8,6 +8,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Add a green-phosphor stereo XY **O-Scope** with fading connected traces.
+  Rename the original ribbons **Waveforms** and spectrum bars **FFT**. Move
+  the FFT baseline to the viewport bottom while keeping the UI above it, and
+  add thin red peak-hold markers with slow decay.
+
 - Audio progress shows the album for three seconds followed by the current
   track for three seconds; natural track changes also reopen the bar. Audio
   F1–F8 shortcuts now divide the current track, independent of the display

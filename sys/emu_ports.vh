@@ -37,7 +37,7 @@ input  [11:0] HDMI_HEIGHT,
 output        OSD_HIDE_MESSAGE,
 // Native music PCM producer; status returns in CLK_AUDIO_CD.
 output        PLAYER_MUSIC,
-output        PLAYER_VISUALIZER,
+output [1:0]  PLAYER_VISUALIZER,
 output        PLAYER_MUSIC_PAUSED,
 output        PLAYER_PCM_RESET,
 output        PLAYER_PCM_VALID,

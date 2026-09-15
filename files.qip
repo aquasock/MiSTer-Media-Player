@@ -143,3 +143,5 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_audio_viewport.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_audio_fft.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_fire_renderer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_audio_visualizers.sv
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_xy_visualizer.sv

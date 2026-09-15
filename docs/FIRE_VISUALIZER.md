@@ -1,17 +1,17 @@
 # Native audio visualizers
 
 Stock Main exposes **Visualizers:** during native audio playback. The submenu's
-Type row selects **O-scope** (the existing mirrored stereo ribbons, default) or
-**Fire**. The page is hidden while video is loaded and at idle. Selection persists
+Type row selects **Waveforms** (the mirrored stereo ribbons, default), **FFT**
+(the separate yellow spectrum blocks with orange caps), or **O-Scope** (stereo XY). The page is hidden while video is loaded and at idle. Selection persists
 across file changes, and video rendering is independent of the selected mode.
 
-Both displays observe the existing post-volume native PCM tap. They have no audio
+All three displays observe the existing post-volume native PCM tap. They have no audio
 ready output, never access stream DDR, and cannot delay decoded audio. They render
 inside the selected aspect rectangle, before the existing progress UI and OSD.
-Both renderer paths have nine pixel-clock stages; mode changes publish at vertical
+All renderer paths have nine pixel-clock stages; mode changes publish at vertical
 sync. The waveform implementation itself is unchanged.
 
-## Fire analysis
+## FFT analysis
 
 The original FFT uses 256 native stereo sample pairs, a symmetric Hann window and
 an iterative radix-2 DIT butterfly. It stores L+jR in one complex transform, then
@@ -29,13 +29,15 @@ blocks, with its highest lit block solid orange and every lower block solid
 yellow. There is no interpolation between bands, color blending or procedural
 turbulence. Frequency increases from left to right. A remainder accumulator
 spreads all 32 columns evenly across the selected viewport; integer row spacing
-scales the blocks for each output resolution. The renderer uses no multipliers.
+scales the blocks for each output resolution. The lowest block reaches the
+viewport bottom, including its final pixel row; the progress UI renders above it.
+The renderer uses no multipliers.
 
 Acquisition takes about 5.8 ms. It pauses while the reusable FFT engine computes
 (less than 1 ms), without pausing audio. A coalescing mailbox publishes a complete
 32-band snapshot; the renderer commits its band RAM during vertical blank.
 Visible response also includes frame refresh and display latency. Silence and
-pause extinguish Fire after the current analysis window; media replacement clears
+pause extinguish FFT after the current analysis window; media replacement clears
 the analysis state. No randomized data is added to the FFT signal itself.
 
 ## Reproducible checks
@@ -46,7 +48,7 @@ the analysis state. No randomized data is added to the FFT signal itself.
 
 The FFT test compares all 256 complex bins and all 32 displayed levels for silence,
 DC, low/mid/high tones, one-sided stereo, opposite-phase stereo and deterministic
-noise. The full renderer test checks O-scope pixel equivalence, no flames during
+noise. The full renderer test checks Waveforms pixel equivalence, no flames during
 silence, full HDMI timing, aspect clipping, UI placement and exact movie bypass
 at 480p, 720p and 1080p. PNG previews come from RTL simulation, not artwork.
 
@@ -73,4 +75,53 @@ M10K and stores 160 bits instead of 512. These are standalone comparisons;
 full-core packing and RAM inference may differ.
 
 The block-render regression additionally checks that every nonempty band has
-exactly one orange cap above yellow blocks, with no other colors or blending.
+exactly one orange cap above yellow blocks, plus a thin solid red peak marker without blending.
+
+## O-Scope XY phosphor
+
+Left-channel amplitude sets horizontal position; right-channel amplitude sets
+vertical position (positive upwards). A centered square inside the selected
+aspect viewport displays a 128 by 128 intensity map. Connected sample traces
+use integer Bresenham line drawing and sixteen green phosphor intensity levels.
+An idle-port sweep subtracts one intensity level per frame, yielding roughly a
+quarter-second trail at 60 Hz. A stationary signal produces a stationary spot;
+unrelated stereo channels produce a cloud, while correlated channels produce
+lines or loops. This is a stereo vectorscope, not an FFT or time-domain ribbon.
+
+A coherent sample/toggle mailbox crosses from the native PCM clock to video.
+If rendering falls behind, the newest pending point replaces the old pending
+point; audio is never held. The map uses dual-port M10K RAM, one port for drawing,
+clearing and fading and the other for display. Mode entry clears the previous
+trace. Rendering and mode selection retain nine pixel stages. The palette is
+black to bright green, with a small red/blue component at the brightest levels.
+No new external DDR access, PLL or audio processing is introduced.
+
+`tools/test_media_xy_visualizer.sv` compares line endpoints and all line
+orientations with an independent integer reference and checks every decay level
+and memory clearing. `tools/verify_fire_visualizers.py` runs that bench together
+with full-frame waveform/FFT/XY and movie-bypass checks and exports PNG previews.
+
+### FFT peak-hold markers
+
+Each band has a thin red horizontal marker, as tall as the vertical block gap
+(minimum one pixel). It rises immediately to a new peak, holds for 30 video
+frames, then falls one block every four frames. At 59.94 Hz this is about a
+half-second hold and a two-second full-height fall. The live orange/yellow
+blocks remain independent beneath it. A short inactive pulse clears retained
+peaks on the next frame so file replacement does not inherit the old album.
+
+Peak height and age share the existing band M10K with the live level: 32 by
+16 bits instead of 32 by 5 bits. A two-cycle blanking pass reads and updates
+one band at a time. No new multiplier or RAM block is needed for peak tracking.
+`tools/test_media_fft_peaks.sv` checks all bands, attack, exact hold/decay cadence,
+silence and clearing; the render regression checks cap thickness and placement.
+
+### Three-mode resource estimate
+
+Standalone fitting of all three modes uses 1,440 estimated ALMs (1,613
+placed), 2,511 registers, 99,924 memory data bits, 15 M10Ks and ten DSPs.
+Against the previous two-mode block renderer, the combined change adds
+311 estimated ALMs (345 placed), eight M10Ks and no DSPs. The red peak
+markers alone add 29 estimated ALMs (38 placed), 22 registers and 352
+data bits inside the existing band RAM. These are standalone deltas;
+the full-core build determines final packing and timing.

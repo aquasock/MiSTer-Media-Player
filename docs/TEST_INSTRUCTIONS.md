@@ -1094,3 +1094,19 @@ and can cross tracks. While actively seeking the bar remains visible; landing
 starts a fresh six-second sequence. A plain FLAC uses the whole file as its
 single track. Replacing media/EOF must clear old track state. MPG retains its
 three-second timeout and whole-video F-key targets.
+
+### Three audio visualizers
+
+The audio-only Visualizers menu offers Waveforms, FFT and O-Scope. Waveforms
+must retain the original ribbons; FFT must retain separate yellow blocks and
+one orange cap per band, now touching the bottom of the aspect viewport. The
+progress UI remains over the graphics. O-Scope should show green stereo XY
+traces with fading persistence. Test correlated and varied stereo material,
+pause/silence, repeated mode changes, both aspect settings and output resolutions.
+Switch back to MPG and confirm normal video and hidden Visualizers menu. Repeat
+file replacement, EOF, N/P and current-track F-key checks. The album/track UI
+sequence from the preceding build is included.
+
+Check FFT red peak markers: they should jump up with a loud beat, remain briefly
+above falling blocks, and descend slowly. They must clear on file replacement;
+the yellow/orange bars must still reach the bottom screen edge.

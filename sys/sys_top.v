@@ -1256,7 +1256,7 @@ cyclonev_hps_interface_peripheral_i2c hdmi_i2c
 	reg [8:0] viewport_layout_pipe=0;
 	always @(posedge clk_hdmi)viewport_layout_pipe<={viewport_layout_pipe[7:0],viewport_layout_de};
 	media_audio_visualizers visualizer(
-	 .control_clk(player_ui_clock),.select_fire(player_visualizer),
+	 .control_clk(player_ui_clock),.select_visualizer(player_visualizer),
 	 .audio_clk(music_clock),.video_clk(clk_hdmi),.audio_active(visual_active),.sample_tick(visual_tick),
 	 .sample_left(visual_left),.sample_right(visual_right),
 	 .rgb(viewport_rgb),.hs(viewport_hs),.vs(viewport_vs),.de(viewport_de),.layout_de(viewport_layout_de),
@@ -1661,7 +1661,7 @@ assign SDCD_SPDIF = (mcp_en & ~spdif) ? 1'b0 : 1'bZ;
 `endif
 
 wire native_scl_low,native_sda_low,native_hps_scl,native_hps_sda;
-wire player_visualizer;
+wire [1:0] player_visualizer;
 wire music_request,music_paused,music_pcm_reset,music_pcm_valid,music_pcm_ready;
 wire [32:0] music_pcm_data;
 wire music_clock,music_finished,music_error;

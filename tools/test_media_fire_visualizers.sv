@@ -29,7 +29,7 @@ media_waveform_visualizer reference_scope(.audio_clk(audio_clk),.video_clk(clk),
  .sample_left(left_sample),.sample_right(right_sample),.rgb(vrgb),.hs(vh),.vs(vv),.de(vd),.layout_de(ld),
  .rgb_out(scope_reference[23:0]),.hs_out(scope_reference[26]),.vs_out(scope_reference[25]),.de_out(scope_reference[24]));
 always @(negedge clk)if(fire_mode==0&&waveform.mode_pipe==0&&cycles>30&&{wh,wv,wd,wrgb}!==scope_reference)$fatal(1,"O-scope changed");
-media_audio_visualizers waveform(.control_clk(control_clk),.select_fire(fire_mode!=0),.audio_clk(audio_clk),.video_clk(clk),.audio_active(enabled),.sample_tick(sample_tick),
+media_audio_visualizers waveform(.control_clk(control_clk),.select_visualizer(2'(fire_mode)),.audio_clk(audio_clk),.video_clk(clk),.audio_active(enabled),.sample_tick(sample_tick),
  .sample_left(left_sample),.sample_right(right_sample),.rgb(vrgb),.hs(vh),.vs(vv),.de(vd),.layout_de(ld),
  .rgb_out(wrgb),.hs_out(wh),.vs_out(wv),.de_out(wd));
 media_player_overlay dut(.layout_de(layout_pipe[8]),.control_clk(control_clk),.video_clk(clk),.subtitle_command(sub_command),.subtitle_ack(sub_ack),.control_state(state_in),
@@ -95,12 +95,12 @@ initial begin
      rgb[23:16]=(x-20)&255;rgb[15:8]=(x+y-30)&255;rgb[7:0]=((x-20)*7+y-10)&255;
     end
     if(switch_test!=0&&y==20&&x==10)begin
-     if(frame_no==1)fire_mode=0;
+     if(frame_no==1)fire_mode=switch_test==2?2:0;
      if(frame_no==3)fire_mode=1;
     end
     @(negedge clk);
-    if(switch_test!=0&&y>=21&&frame_no==1&&!waveform.frame_fire)$fatal(1,"mode changed midframe");
-    if(switch_test!=0&&y>=21&&frame_no==3&&waveform.frame_fire)$fatal(1,"mode changed midframe");
+    if(switch_test!=0&&y>=21&&frame_no==1&&waveform.frame_mode!=1)$fatal(1,"mode changed midframe");
+    if(switch_test!=0&&y>=21&&frame_no==3&&waveform.frame_mode!=(switch_test==2?2:0))$fatal(1,"mode changed midframe");
     if(frame_no==4 && deo) begin
      $fwrite(fd,"%c%c%c",out[23:16],out[15:8],out[7:0]);pixels=pixels+1;
     end
