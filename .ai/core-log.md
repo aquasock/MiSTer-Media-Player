@@ -1,4 +1,4 @@
-## 137 COMMIT Unreleased ??? 2026-09-14T23:57:03-07:00
+## 137 COMMIT Unreleased 17abc57 2026-09-14T23:57:03-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Provide a standalone Python utility that bundles adjacent CD-format FLAC tracks 
 
 #### Outcome:
 
-The user requests a script placed beside already correctly formatted FLAC tracks, with no other input files. Use the script directory, filename ordering and a folder-named output, preserving decoded PCM and embedding CD track markers plus a bounded seek table. Refuse an existing output and leave source files unchanged. This is a host utility and requires no new RBF build.
+Added tools/bundle_flac_album.py as a standalone no-argument utility that reads adjacent FLAC tracks in filename order and writes a folder-named album FLAC. It assumes CD-format sources, streams decoded PCM through a temporary WAV, embeds CD track markers and up to 400 evenly spaced seek points plus track points to stay within the core's 512-point capacity, and verifies FLAC encoding. Source tracks remain unchanged and existing output is refused. A generated three-track Unicode-path fixture passes exact concatenated-PCM comparison, embedded CD CUESHEET and SEEKTABLE checks, unchanged-source hashes and overwrite refusal; evidence is under results/flac-bundler. A copy is placed beside the user's tracks at /run/media/vash/ROCKBOX/Audio/Artists/Groovehouse – Elmúlt A Nyár/bundle_flac_album.py. The user's album conversion was not run. Source 17abc57 is pushed; this utility does not require an RBF rebuild.
 
 #### Next Steps:
 
-Check a small generated album for exact PCM concatenation and embedded cue/seek metadata, commit the utility and provide a copy in the specified album folder for the user to run.
+The user can run python3 bundle_flac_album.py from the album folder and load the resulting single FLAC for playback, seeking and N/P navigation; continue monitoring the separately queued hardware builds.
 
 #### Files Modified:
 
