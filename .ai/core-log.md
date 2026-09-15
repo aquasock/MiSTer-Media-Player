@@ -1,3 +1,32 @@
+## 118 COMMIT Unreleased 6d460d2 2026-09-14T19:57:08-07:00
+
+#### Coming From:
+
+Unreleased 6d460d2
+
+#### Purpose:
+
+Build the subtitle punctuation corrections for hardware validation on the fresh MiSTer installation.
+
+#### Outcome:
+
+The user authorizes three clean Quartus builds of source 6d460d2 using the standard seeds 52, 61 and 87. The source includes apostrophe, quotation-mark and dialogue-dash normalization already verified against 3130 real subtitle cues. The normal build helper will run compilation and four-corner timing and CDC audits for each seed. The test MiSTer is now 10.10.0.33, with official Main 20260912 and Linux image 260912 verified on the fresh installation. No automatic RBF deployment is requested.
+
+#### Next Steps:
+
+Check the three build results, package the best timing-qualified candidate and have the user verify punctuation, subtitles, movie playback and native FLAC on hardware.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 117 COMMIT Unreleased 6d460d2 2026-09-14T18:57:23-07:00
 
 #### Coming From:
@@ -1409,63 +1438,6 @@ Have the user test manual SRT selection, cue timing, pause and all seek sizes/di
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 78 COMMIT Unreleased ec56250 2026-09-14T09:56:47-07:00
-
-#### Coming From:
-
-Unreleased c4b40c4
-
-#### Purpose:
-
-Implement manually loaded SRT subtitles through stock Main and the existing shared overlay.
-
-#### Outcome:
-
-Source ec56250 adds stock Main S1 mounted SRT loading and an On/Off control. A serialized drive owner isolates movie/SRT response writes through the trailing hps_io pipeline. Bounded streaming parsing retains two 63-character lines and timestamps rather than a whole-file database; headers support CRLF/LF and a final cue at EOF, tags are stripped, and non-ASCII UTF-8 codepoints use question-mark fallback. The existing font now covers all printable ASCII without enlarging its ROM. New subtitle reads yield to duration probing, seeks and low movie buffering. Acknowledged commands cross two audited configuration mailboxes into the retained shared-overlay provider, with independent visibility, dark backdrops and seek/file epochs. New movies clear association; seeks drain and rescan at the actual landing position. The user additionally requests lowering Paused/Seeking one line; status is y=417 at 480p and subtitle lines y=389/403, leaving clocks/bar unchanged. Parser, actual two-drive hps_io, asynchronous controller/command transfer, pause, Off/On, both seek directions, in-flight new-movie cancellation, reload and video-priority tests pass. Nine existing full-frame player cases and five subtitle cases at 480p/720p/1080p pass with zero mismatches, plus provider lifetime/state and 518 divider cases. Existing reader cancellation, timeout quarantine and session regressions pass; parser/controller lint is clean. Source is pushed and clean seeds 52, 61 and 87 are starting under /tmp/subtitle-build.log. Require 171 CDC audit registers. No RBF is qualified or deployed yet.
-
-#### Next Steps:
-
-Check synthesis RAM inference, final resources and all-corner timing for the three seeds, package the best qualified RBF and test with the generated Subtitle Test.srt plus real movie subtitles. Retain ffafc79 seed 87 as rollback; session resume and EOF policy remain separate release tasks.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- README.md
-- docs/SUBTITLES.md
-- docs/TEST_INSTRUCTIONS.md
-- docs/UI_OVERLAY_PLAN.md
-- docs/ui/font-sheet.html
-- docs/ui/overlay-preview.html
-- files.qip
-- rtl/media_overlay_font.mem
-- rtl/media_player_overlay.sv
-- rtl/media_sd_owner.sv
-- rtl/media_srt_parser.sv
-- rtl/media_subtitle_cdc.sv
-- rtl/media_subtitles.sv
-- rtl/media_ui_scene.sv
-- sys/emu_ports.vh
-- sys/sys_top.v
-- tools/audit_three_seeds.py
-- tools/make_subtitle_test.py
-- tools/phase1p_timing.tcl
-- tools/test_media_player_overlay.sv
-- tools/test_media_srt_parser.sv
-- tools/test_media_subtitle_hps_io.sv
-- tools/test_media_subtitles.sv
-- tools/test_media_ui_lifetime.sv
-- tools/verify_player_overlay.py
-- tools/verify_subtitles.py
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
