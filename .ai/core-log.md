@@ -1,4 +1,4 @@
-## 146 COMMIT Unreleased ??? 2026-09-15T01:49:24-07:00
+## 146 COMMIT Unreleased 06256f8 2026-09-15T01:49:24-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Show track progress before album progress and restrict seek and pause feedback t
 
 #### Outcome:
 
-The user authorizes reversing the audio sequence to track for three seconds then album for three seconds, while manual seeking and play/pause show only track values for three seconds. Initial playback and natural track transitions retain the six-second sequence. Active seeks retain visible track-relative previews and restart the three-second timeout on landing. Suppress the metadata-refresh track-change event caused by a seek so it cannot reopen the album phase. Keep current-track F-key targeting and video behavior. The prior instruction not to build remains active.
+Implemented initial playback and natural transitions as three seconds of track progress followed by three seconds of album progress. Pause/resume and manual seek activity interrupt either phase with only three seconds of track feedback. Active seeks keep the track-relative preview visible and restart three seconds on landing, with target previews clamped to the current track bounds. The existing track-origin converter output is connected to UI state; no decoder or seek targeting changes were made. A pending flag suppresses the track metadata refresh and loaded transition after a seek, preventing an unwanted album phase, while later natural transitions still show both phases. Unavailable track duration is shown as unknown until metadata is ready. Exact unit tests pass phase boundaries, both pause transitions, seeking preview bounds, delayed metadata and loaded recovery, timeout and replacement, with unchanged video tests. The real-cue integration passes natural transitions, current-track F-keys from both views, pause and file replacement. Renderer-state lint and diff checks pass; evidence is under results/track-first-ui. Source 06256f8 is pushed and includes the preceding shorter XY persistence change. No Quartus build or deployment was started. The user clarified that the 4:3 comment was an aspect-accuracy question, not a requested default change; aspect behavior remains unchanged.
 
 #### Next Steps:
 
-Implement event-specific UI lifetime and relative seek preview, verify exact timers and delayed landing metadata in simulation, commit and push without Quartus builds.
+Wait for user authorization before Quartus builds, then qualify timing and have the user check track-first automatic feedback, track-only manual feedback and shorter XY trails.
 
 #### Files Modified:
 
