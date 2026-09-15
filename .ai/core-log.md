@@ -1,4 +1,4 @@
-## 148 COMMIT Unreleased ??? 2026-09-15T02:45:34-07:00
+## 148 COMMIT Unreleased c3549fe 2026-09-15T02:45:34-07:00
 
 #### Coming From:
 
@@ -10,21 +10,27 @@ Double XY rendering resolution within available RAM and repair the observed HDMI
 
 #### Outcome:
 
-The user approves a 256 by 256 scope with three-bit phosphor storage, preserving stereo mapping and approximately the shorter persistence, bundled with timing fixes and three HIGH-packing builds. Prior source 06256f8 builds all compiled but failed setup at -0.374, -0.347 and -0.407 ns for seeds 52, 61 and 87; all other timing categories and configuration CDC audits passed. Seed61 uses 39369 placed ALMs and 530 M10Ks. The failures include XY geometry, Waveforms thickness selection and scaler arithmetic or routing. Plan to register slow geometry calculations, optimize scaler arithmetic with equivalence checks, and verify memory inference before full builds. The user also confirms flawless playback of all five converted N-SPHERES FLAC files; this does not establish acceptance of the latest progress and persistence build.
+Implemented 256 by 256 XY coordinates and three-bit phosphor storage in separate bit planes, with seven-sweep saturating decay and unchanged native PCM mapping, square aspect layout and nine-stage output latency. Registered XY, FFT and Waveforms geometry and added a fabric register within the existing three-cycle fade transaction to break banked RAM feedback timing. Replaced the scaler polyphase final sum with a carry-select equivalent without changing latency. Line tests pass all octants, endpoints, clearing and decay, including continuous full-span 44.1 kHz traffic at 25.2 MHz with both 50/60 Hz fade deadlines. Seven full-frame raster oracles pass every coordinate and palette pixel; visualizer integration and movie bypass pass at 480p/720p/1080p, with unchanged non-XY previews. GHDL passes 1048576 boundary/carry cases and one million random scaler sum pairs. Calibration before/after RTL PNGs and evidence are under results/xy-256. Standalone all-visualizer fitting passes all corners, minimum setup +0.071 ns, using 1625 placed ALMs, 1449 estimated, 2646 registers, 230996 memory bits, 31 M10Ks and ten DSPs; against the previous fit this adds twelve placed ALMs and sixteen M10Ks. Full-core RAM projects to 546 of 553 blocks; actual full fit remains pending. Source c3549fe is pushed and three HIGH-packing seeds 52/61/87 are running under supervisor PID 1275015. No RBF has been deployed. The preceding 06256f8 batch compiled but failed setup in every seed, and user-confirmed N-SPHERES playback remains evidence for the earlier hardware candidate.
 
 #### Next Steps:
 
-Implement and test the larger coordinate map, line octants and boundaries, clearing and fading under continuous samples, palette and aspect mapping at all supported resolutions, and exact scaler arithmetic. Generate comparative previews, synthesize resource usage, commit the verified source and build seeds 52, 61 and 87, inspecting every timing corner before packaging.
+Inspect the three full-core build results and every timing corner, package the best candidate and have the user validate scope detail, fading, track-first progress behavior, filters and the MPG/FLAC regression set.
 
 #### Files Modified:
 
-- rtl/media_xy_visualizer.sv
+- CHANGELOG.md
+- docs/FIRE_VISUALIZER.md
+- docs/TEST_INSTRUCTIONS.md
+- rtl/media_fire_renderer.sv
 - rtl/media_waveform_visualizer.sv
+- rtl/media_xy_visualizer.sv
 - sys/ascal.vhd
+- tools/test_media_fire_visualizers.sv
+- tools/test_media_xy_raster.sv
 - tools/test_media_xy_visualizer.sv
 - tools/verify_fire_visualizers.py
-- docs/FIRE_VISUALIZER.md
-- CHANGELOG.md
+- tools/verify_scaler_poly_sum.py
+- tools/verify_xy_audio_preview.py
 
 #### Status:
 
