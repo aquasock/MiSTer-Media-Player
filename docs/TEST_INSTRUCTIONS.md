@@ -1,5 +1,14 @@
 # Shared IDCT candidate
 
+## Apostrophe fix queued for the next build
+
+Straight ASCII apostrophes already have a font glyph. The new parser also maps
+UTF-8 U+2018/U+2019 and standalone Windows-1252 bytes 0x91/0x92 to that glyph.
+Other unsupported Unicode still becomes `?`. Test contractions and quoted text
+in a matching SRT; the completed 6bfcea3 candidates do not include this fix.
+Parser regressions cover both encodings, ordinary ASCII, unsupported characters,
+truncated sequences, tag boundaries and the 63-character line limit.
+
 ## Combined UI and timing build qualification
 
 The next candidate combines integer fonts, the taller centered bar, direct

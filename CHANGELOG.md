@@ -29,6 +29,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Fixed
 
+- Normalize UTF-8 curly apostrophes and Windows-1252 single quotation marks
+  to the existing straight-apostrophe subtitle glyph instead of a question mark.
+  Truncated UTF-8 sequences no longer consume characters from the following line.
+
 - Scope native audio power-up reset timing exceptions to the asynchronous
   reset-release chains, including fitted reset-source duplicates; verify that
   every synchronizer release stage remains timed.

@@ -18,6 +18,8 @@ task check(input [36:0] a,b,input string x,y);integer i;begin
  repeat(20)@(negedge clk);if(!cv || ready)$fatal(1,"cue backpressure");
  consume=1;@(negedge clk);consume=0;
 end endtask
+task smart(input [7:0] last_byte);begin byte_in(9'he2);byte_in(9'h80);byte_in({1'b0,last_byte});end endtask
+string long_line;
 initial begin
  restart();
  send("1\015\n00:00:01,250 --> 00:00:03,500\015\nHello, world!\015\n<i>Second line.</i>\015\n\015\n");
@@ -28,9 +30,21 @@ initial begin
  send("bad\n00:99:01,000 --> 00:99:02,000\nbad\n\n3\n00:00:05,000 --> 00:00:04,000\nwrong\n\n4\n00:00:09,000 --> 00:00:10,000\nOK\n\n");
  check(3240000,3600000,"OK","");
  restart();send("1\n00:00:00,000 --> 00:00:01,001\nCaf");byte_in(9'h0c3);byte_in(9'h0a9);send("\n\n");check(0,360360,"Caf?","");
+ restart();send("1\n00:00:00,000 --> 00:00:01,000\nIt's already ASCII.\n\n");check(0,360000,"It's already ASCII.","");
+ restart();send("1\n00:00:00,000 --> 00:00:01,000\nIt");smart(8'h99);send("s ");smart(8'h98);send("quoted");smart(8'h99);send(".\n\n");check(0,360000,"It's 'quoted'.","");
+ restart();send("1\n00:00:00,000 --> 00:00:01,000\n");byte_in(9'h91);send("It's legacy");byte_in(9'h92);send("\n\n");check(0,360000,"'It's legacy'","");
+ // Unsupported three-byte characters still occupy exactly one fallback cell.
+ restart();send("1\n00:00:00,000 --> 00:00:01,000\nA");smart(8'h9a);send("B");byte_in(9'he2);byte_in(9'h81);byte_in(9'h99);send("C\n\n");check(0,360000,"A?B?C","");
+ // A truncated character cannot consume or rewrite the next line.
+ restart();send("1\n00:00:00,000 --> 00:00:01,000\nA");byte_in(9'he2);byte_in(9'h80);send("\n");byte_in(9'h99);send("B\n\n");check(0,360000,"A?","?B");
+ restart();send("1\n00:00:00,000 --> 00:00:01,000\nA");byte_in(9'he2);byte_in(9'h80);send("<i>X</i>");byte_in(9'h99);send("\n\n");check(0,360000,"A?X?","");
+ long_line="";repeat(62)long_line={long_line,"A"};
+ restart();send("1\n00:00:00,000 --> 00:00:01,000\n");send(long_line);smart(8'h99);send("\n\n");check(0,360000,{long_line,"'"},"");
+ long_line={long_line,"A"};
+ restart();send("1\n00:00:00,000 --> 00:00:01,000\n");send(long_line);smart(8'h99);send("\n\n");check(0,360000,long_line,"");if(!warn)$fatal(1,"missing overflow warning");
  restart();send("1\n00:00:00,000 --> 00:00:01,000\n");repeat(70)send("A");send("\nB\nC\n\n");wait(cv);if(n0!=63 || n1!=1 || !warn)$fatal(1,"bounds");
  restart();send("1\n00:00:00,000 --> 00:00:01,000\nCancelled");restart();if(cv || eof)$fatal(1,"stale cue after reset");
- $display("SRT_PARSER_PASS timestamps CRLF LF final EOF tags Unicode fallback bounds invalid headers reset backpressure");$finish;
+ $display("SRT_PARSER_PASS timestamps CRLF LF final EOF tags ASCII/UTF-8/Windows-1252 apostrophes Unicode fallback/truncation bounds invalid headers reset backpressure");$finish;
 end
 initial begin #5000000;$fatal(1,"parser timeout state %d",dut.state);end
 endmodule

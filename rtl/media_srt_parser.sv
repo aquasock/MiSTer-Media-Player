@@ -1,6 +1,7 @@
 // Bounded streaming SRT parser. Two 63-character display lines, no cue database.
 // Header lines are searched for HH:MM:SS,mmm --> HH:MM:SS,mmm. Text is plain
-// printable ASCII; tags are removed and non-ASCII UTF-8 codepoints become '?'.
+// Printable ASCII plus normalized smart apostrophes; tags are removed and
+// unsupported UTF-8 codepoints become '?'.
 module media_srt_parser(
  input wire clk,reset,
  input wire [8:0] data,input wire valid,output wire ready,
@@ -21,6 +22,7 @@ reg [1:0] line_number=0;
 reg [6:0] column=0;
 reg tag=0;
 reg [1:0] utf_left=0;
+reg utf_smart=0,utf_replace=0;
 reg [31:0] milliseconds=0,start_ms=0,end_ms=0;
 reg [9:0] number=0;
 reg [4:0] ti=0;
@@ -33,7 +35,7 @@ always @(posedge clk) begin
  text_q<=text[text_addr];
  if(reset) begin
   state<=COLLECT;count<=0;index<=0;in_cue<=0;ended<=0;eof<=0;cue_valid<=0;
-  length0<=0;length1<=0;line_number<=0;column<=0;warning<=0;tag<=0;utf_left<=0;overflow<=0;
+  length0<=0;length1<=0;line_number<=0;column<=0;warning<=0;tag<=0;utf_left<=0;utf_smart<=0;utf_replace<=0;overflow<=0;
   ti<=0;half<=0;number<=0;milliseconds<=0;start_ms<=0;end_ms<=0;start_q<=0;end_q<=0;reading_text<=0;
  end else case(state)
  COLLECT:if(valid && ready) begin
@@ -80,25 +82,34 @@ always @(posedge clk) begin
  CONVERT:begin
   // Constant products only; no variable multiplier or timing division.
   start_q<={5'd0,start_ms}*37'd360;end_q<={5'd0,end_ms}*37'd360;
-  count<=0;overflow<=0;length0<=0;length1<=0;line_number<=0;column<=0;tag<=0;utf_left<=0;
+  count<=0;overflow<=0;length0<=0;length1<=0;line_number<=0;column<=0;tag<=0;utf_left<=0;utf_smart<=0;utf_replace<=0;
   if(end_ms>start_ms && !ended) in_cue<=1;else begin warning<=1;if(ended)eof<=1;end
   state<=COLLECT;
  end
  TEXT:begin
-  if(line_q=="<") tag<=1;
-  else if(line_q==">") tag<=0;
+  if(line_q=="<")begin tag<=1;utf_left<=0;utf_smart<=0;utf_replace<=0;end
+  else if(line_q==">")begin tag<=0;utf_left<=0;utf_smart<=0;utf_replace<=0;end
   else if(!tag) begin
-   if(utf_left!=0 && line_q[7:6]==2'b10) utf_left<=utf_left-1'b1;
+   if(utf_left!=0 && line_q[7:6]==2'b10)begin
+    utf_left<=utf_left-1'b1;
+    // E2 80 98/99 (left/right single quotation marks). Replace the one
+    // fallback cell allocated by the lead byte only after the full match.
+    if(utf_left==1 && utf_smart && utf_replace && (line_q==8'h98 || line_q==8'h99))
+     text[{line_number[0],(column[5:0]-6'd1)}]<=8'h27;
+    utf_smart<=utf_smart && utf_left==2 && line_q==8'h80;
+   end
    else begin
+    utf_smart<=line_q==8'he2;utf_replace<=line_number<2 && column<63;
     utf_left<=line_q[7:5]==3'b110 ? 2'd1:line_q[7:4]==4'b1110 ? 2'd2:line_q[7:3]==5'b11110 ? 2'd3 : 2'd0;
     if(line_number<2 && column<63) begin
-     text[{line_number[0],column[5:0]}]<=line_q==9?8'd32:(line_q>=32 && line_q<=126?line_q:8'd63);
+     text[{line_number[0],column[5:0]}]<=line_q==9?8'd32:(line_q==8'h91 || line_q==8'h92)?8'h27:(line_q>=32 && line_q<=126?line_q:8'd63);
      column<=column+1'b1;
      if(line_number==0)length0<=column+1'b1;else length1<=column+1'b1;
     end else warning<=1;
    end
   end
   if(index+1'b1==count) begin
+   utf_left<=0;utf_smart<=0;utf_replace<=0;
    count<=0;overflow<=0;if(line_number<2)line_number<=line_number+1'b1;
    if(ended)state<=PUBLISH;else state<=COLLECT;
   end else begin index<=index+1'b1;state<=READ;end
