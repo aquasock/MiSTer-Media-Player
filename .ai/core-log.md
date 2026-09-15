@@ -1,3 +1,34 @@
+## 107 COMMIT Unreleased ??? 2026-09-14T17:11:12-07:00
+
+#### Coming From:
+
+Unreleased da59ce0
+
+#### Purpose:
+
+Rename the media picker and limit its displayed filters to MPG and FLAC for the next build.
+
+#### Outcome:
+
+The user requests Load media *.MPG,FLAC. Stock Main automatically appends extensions in three-character groups, so the compatible core-only entry is S0,MPGFL*,Load media and displays Load media *.MPG,FL*. The FL* wildcard still includes FLAC files; the picker no longer advertises M2V. Do not inject duplicate suffix text or change Main. The running da59ce0 three-seed build snapshots remain unchanged.
+
+#### Next Steps:
+
+Update the production menu, matching HPS transport fixture and user instructions; verify menu readback and queue the label change for the next build.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- tools/test_media_subtitle_hps_io.sv
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 106 COMMIT Unreleased b3e4f1d 2026-09-14T16:50:07-07:00
 
 #### Coming From:
@@ -1421,36 +1452,6 @@ Continue the current hardware test, especially pause/resume and seeking with tim
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 67 COMMIT Unreleased aa8d067 2026-09-14T07:41:06-07:00
-
-#### Coming From:
-
-Unreleased 9f16364
-
-#### Purpose:
-
-Document and package the timing-qualified shared-overlay hardware candidate.
-
-#### Outcome:
-
-Clean b00920a seeds 52, 61 and 87 all pass four-corner setup, hold, recovery, removal and pulse-width timing, 159 preserved CDC registers and the corrected scene-enable audit from 9f16364. Minimum setup is +0.135, +0.100 and +0.028 ns; minimum hold is +0.096, +0.069 and +0.111 ns. Actual placed ALMs are 37450, 37424 and 37503, with 520 M10Ks, 69 DSPs and three PLLs. All meet the initial incremental budget. Preferred seed 52 is packaged at results/hardware-test-b00920a/seed52/MediaPlayer_20260914.rbf with SHA-256 bf7e9aff272e5f819e16358dba90d2d05e18b9ca78436df6e3cd204e1d520973, per-seed build metadata, README and TESTING instructions. It leaves 4460 actual ALMs and 33 M10Ks free. Documentation distinguishes estimated logic from actual placement and audit-tool revision from unchanged binary source. Hardware-accepted 3ff27c8 seed 52 remains rollback. No deployment or hardware acceptance occurred.
-
-#### Next Steps:
-
-Have the user test duration, progress, pause/seek feedback and OSD/filter coexistence at the supported HDMI modes.
-
-#### Files Modified:
-
-- docs/TEST_INSTRUCTIONS.md
-- docs/UI_OVERLAY_PLAN.md
 
 #### Status:
 
