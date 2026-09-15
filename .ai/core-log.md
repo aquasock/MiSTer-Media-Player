@@ -1,3 +1,32 @@
+## 138 COMMIT Unreleased ??? 2026-09-15T00:04:19-07:00
+
+#### Coming From:
+
+Unreleased 17abc57
+
+#### Purpose:
+
+Add a standalone companion that splits embedded-cue album FLACs into adjacent track files.
+
+#### Outcome:
+
+The user authorizes reversing the album bundler into the script directory. Detect a single album containing embedded CD track markers, decode once and split at exact sample boundaries, then verify each re-encoding. The original bundler did not retain song titles or filenames, so use numbered generic names and preserve the source album. Refuse existing output tracks and ambiguous input selection.
+
+#### Next Steps:
+
+Test a generated bundle/split round trip for exact PCM and track lengths, verify overwrite refusal, and copy the script beside the user's album files without running their conversion.
+
+#### Files Modified:
+
+- tools/split_flac_album.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 137 COMMIT Unreleased 17abc57 2026-09-14T23:57:03-07:00
 
 #### Coming From:
@@ -1326,36 +1355,6 @@ Implement and simulate the serialized HDMI audio-control path, validating HPS co
 - tools/synth_flac_predict.py
 - tools/test_flac_predict.sv
 - tools/verify_flac_predict.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 98 COMMIT Unreleased ba9e0d8 2026-09-14T14:28:21-07:00
-
-#### Coming From:
-
-Unreleased b639ccc
-
-#### Purpose:
-
-Document the staged standalone CD-quality FLAC implementation plan.
-
-#### Outcome:
-
-Added docs/FLAC_PLAN.md and updated the shared-IDCT test instructions to reflect user acceptance. The plan preserves stock Main and standalone 44100 Hz, 16-bit stereo FLAC with exact decoded PCM, normal encoder settings, pause/seek, shared progress UI and drain-to-startup EOF. The current 24.576 MHz audio clock and 48/96 kHz platform output require an early native-44.1-kHz feasibility decision; a high-quality 160/147 converter is a separately disclosed alternative, not bit-perfect HDMI. Plan a serial predictor, CRC-validated frames, bounded M10K queues and DDR-backed channel storage after a memory ownership audit, with full CD-format block/order handling rather than a silently restricted 4096-only decoder. RFC 9639 was consulted as the normative FLAC source and is not yet in core-reference.md; add its controlled reference before RTL implementation. Four gates cover output/resource feasibility, standalone sample equivalence, integrated continuous playback and controls/UI with four-movie regressions. Proposed whole-feature budgets are 3500 ALMs, 28 M10Ks and 12 DSPs, not measured resource estimates. No FLAC RTL or new builds were started.
-
-#### Next Steps:
-
-Review the plan with the user and begin feasibility/output qualification when implementation is authorized. Retain accepted b639ccc MEDIUM seed 52, keep PCM fidelity distinct from output conversion, and measure fitted costs before full integration.
-
-#### Files Modified:
-
-- docs/FLAC_PLAN.md
-- docs/TEST_INSTRUCTIONS.md
 
 #### Status:
 
