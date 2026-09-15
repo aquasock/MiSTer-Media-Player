@@ -1,4 +1,4 @@
-## 109 COMMIT Unreleased ??? 2026-09-14T17:34:06-07:00
+## 109 COMMIT Unreleased 3f393c5 2026-09-14T17:34:06-07:00
 
 #### Coming From:
 
@@ -10,15 +10,24 @@ Replace cycling subtitle timing options with directly selectable value pages in 
 
 #### Outcome:
 
-The user authorizes fewer values near the existing ranges, separate Offset and Speed pages, the already queued Load media picker label, and the next build. Use 51 offset values from -5.0 to +5.0 seconds in 0.2-second steps and 51 speed values from 0.50x to 1.50x in 0.02x steps, default first. Stock Main T actions on unused status bits select stored timing codes without cycling. Keep reset/file behavior and the existing absolute timing arithmetic. Provide links back to Subtitles and leave room below the 64-bit page-selection limit for Main navigation. The picker retains MPGFL* for normal .flac filenames. Timing fixes remain deferred.
+Commit 3f393c5 replaces both cycling options with direct value pages using stock Main T actions and retained timing codes. Each page has 51 values, a Subtitles return link and Main Back, totaling 53 selectable rows. Offset spans -5.0 to +5.0 seconds in 0.2-second steps; speed spans 0.50x to 1.50x in 0.02x steps, with defaults first. The source includes 78c919f Load media *.MPG,FL* and the previous FLAC-to-MPG fix. All 102 actions and repeated defaults pass actual HPS status transport with exact resulting subtitle time and unrelated status preservation. Menu readback, all 10,201 arithmetic setting pairs plus boundaries, streaming retiming and full-frame rendering pass, as does strict selection-module lint. The memory handoff regression still passes while the original wiring reproduces the stall. Clean seeds 52/61/87 are running in results/build-3f393c5-20260914-173653. No new hardware acceptance or timing closure is claimed.
 
 #### Next Steps:
 
-Generate the value pages and action mapping, simulate direct selection through the real HPS interface plus timing/subtitle regressions, then build clean seeds 52/61/87 and report results for hardware testing.
+Finish and report three builds with resource and timing results. Test direct value selection, long-list scrolling and parent navigation, subtitle timing, file picker and FLAC/MPG replacement on hardware. Timing fixes remain deferred by user instruction.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer_subtitle_menu.svh
+- MediaPlayer_top_00.svh
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/media_subtitle_select.sv
+- rtl/media_subtitle_select_map.svh
+- tools/make_subtitle_menu.py
+- tools/test_media_subtitle_hps_io.sv
+- tools/verify_subtitles.py
 
 #### Status:
 
