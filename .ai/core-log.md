@@ -1,3 +1,32 @@
+## 120 COMMIT Unreleased 6d460d2 2026-09-14T20:16:11-07:00
+
+#### Coming From:
+
+Unreleased 2498125
+
+#### Purpose:
+
+Package and report the completed subtitle punctuation builds.
+
+#### Outcome:
+
+All three clean seeds compile. Explicit four-corner report inspection finds seed 52 fails setup by 0.062 ns despite the timing script returning zero; seeds 61 and 87 pass setup, hold, recovery, removal and pulse width. All three pass 273 CDC register checks and ten native reset-release path checks. Recommended seed 87 has setup +0.518 ns and hold +0.117 ns, with 38138 placed ALMs, 46365 registers, 509 M10Ks, 62 DSPs and four PLLs. Seed 61 uses 38060 ALMs with setup +0.236 ns and hold +0.110 ns. Seed 52 uses 38147 ALMs. Hash-verified RBFs and resource/timing reports are packaged in results/hardware-test-6d460d2; seed 52 has an explicit timing-failed marker. These binaries include punctuation fixes but no waveform visualizer. Hardware acceptance remains pending.
+
+#### Next Steps:
+
+Have the user test seed 87 with the three SRT files and MPG/FLAC regression cases on 10.10.0.33; retain the separately committed waveform for a later build.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 119 COMMIT Unreleased 2498125 2026-09-14T20:01:26-07:00
 
 #### Coming From:
@@ -1406,43 +1435,6 @@ Audit and package the EOF build timing/resources, then test clean completion, su
 - tools/test_media_eof_control.sv
 - tools/verify_decoder_timing.py
 - tools/verify_playback_controls.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 80 COMMIT Unreleased b5a17cf 2026-09-14T10:42:12-07:00
-
-#### Coming From:
-
-Unreleased 47630c7
-
-#### Purpose:
-
-Rearrange the hardware-accepted subtitle overlay around the progress bar.
-
-#### Outcome:
-
-The user reports everything works perfectly after the ec56250 seed 87 handoff, accepting the subtitle baseline. Source b5a17cf implements their requested layout: reference clocks y=469 below the unchanged [452,466) progress track, Paused/Seeking y=455 on the bar, and subtitle lines y=417/431, two 14-pixel lines below the previous positions. Text palette one provides dark status lettering on a light inset; rectangle palette one retains the existing subtitle backdrop alpha blend. Twelve player-frame cases and five subtitle-frame cases pass with zero pixel mismatches at 480p, 720p and 1080p, including status over empty/full/unknown progress, controls hiding and stale cue epochs. Parser, two-drive transport, pause/seek controller, retained-provider and 518 divider checks also pass. Preview, subtitle notes, test instructions and changelog are updated. Source is pushed and clean seeds 52, 61 and 87 are starting under /tmp/subtitle-layout-build.log. Subtitle parsing and playback behavior are unchanged; no new core was deployed.
-
-#### Next Steps:
-
-Audit completed timing and resources, package the preferred qualified RBF, then have the user confirm bottom margins, status contrast and subtitle positioning. Retain accepted ec56250 seed 87 as rollback.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- docs/SUBTITLES.md
-- docs/TEST_INSTRUCTIONS.md
-- docs/UI_OVERLAY_PLAN.md
-- docs/ui/overlay-preview.html
-- rtl/media_overlay_compositor.sv
-- rtl/media_ui_scene.sv
-- tools/verify_player_overlay.py
-- tools/verify_subtitles.py
 
 #### Status:
 
