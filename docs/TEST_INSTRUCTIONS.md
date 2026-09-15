@@ -1,3 +1,16 @@
+# Audio-mode menu controls
+
+While FLAC is playing or paused, Color matrix, Refresh rate and Subtitles must
+remain visible but grayed out and unselectable. The generated subtitle rows also
+carry the disable flag for flattened-menu mode. Load media and Aspect ratio remain
+available. After EOF/reset or loading MPG, the video settings become selectable
+again and retain their previous values. This uses stock Main's menu-disable mask.
+
+This source correction and the audio aspect fix await the next RBF build; neither
+is present in the completed 36085f6 navigation builds.
+
+---
+
 # Audio graphics aspect-ratio correction
 
 The waveform and player UI now use the selected scaler picture rectangle during

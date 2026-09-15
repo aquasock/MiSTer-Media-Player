@@ -18,6 +18,8 @@ for page,values,start,kind in [(2,offsets,7,'offset'),(3,speeds,58,'speed')]:
  items.append(f'P{page}P1,Subtitles;')
  # 51 actions + explicit Subtitles link + Main Back = 53 selectable rows.
  assert len(values)+2<64
+# Disable every subtitle row in audio mode, including Main's flattened view.
+items=['D0'+item for item in items]
 assert len(set(offsets))==len(set(speeds))==51
 assert all(len(x)<2048 for x in items)
 assert sum(map(len,items))<9000

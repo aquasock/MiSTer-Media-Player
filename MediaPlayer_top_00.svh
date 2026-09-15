@@ -70,8 +70,8 @@ localparam CONF_STR = {
 	"-;",
 	"-;",
 	"O[121],Aspect ratio,4:3,16:9;",
-	"O[6],Refresh rate,59.94 Hz,50 Hz;",
-	"O[5:4],Color matrix,Auto,BT.601,BT.709;",
+	"D0O[6],Refresh rate,59.94 Hz,50 Hz;",
+	"D0O[5:4],Color matrix,Auto,BT.601,BT.709;",
 
 	"-;",
 	"T[0],Reset;",
@@ -343,7 +343,7 @@ hps_io #(.CONF_STR(CONF_STR), .CONF_STR_BRAM(1), .WIDE(1), .VDNUM(2)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask(0),
+	.status_menumask({15'd0,music_play_request}),
 	.ps2_key(ps2_key),
 
     .img_mounted(media_img_mounted),.img_size(media_img_size),

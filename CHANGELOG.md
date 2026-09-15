@@ -6,6 +6,12 @@ This project is still in active pre-release development. Published milestone rel
 
 ## [Unreleased]
 
+### Audio-mode menu controls
+
+- Gray out Color matrix, Refresh rate and all Subtitles controls while native
+  audio is active. Restore access on EOF or video replacement without changing
+  saved settings; keep Aspect ratio available for the audio graphics.
+
 ### Audio graphics aspect ratio
 
 - Fit the native audio waveform and player UI to the scaler's selected 4:3 or
