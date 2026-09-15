@@ -1,3 +1,32 @@
+## 125 COMMIT Unreleased d24abc0 2026-09-14T21:04:30-07:00
+
+#### Coming From:
+
+Unreleased d24abc0
+
+#### Purpose:
+
+Qualify and package the completed pipelined waveform builds.
+
+#### Outcome:
+
+Reviewed the other agent's interpolation pipeline and HIGH-packing change, then independently inspected the three completed d24abc0 builds. All seeds pass setup, hold, recovery, removal and pulse width at all four corners, plus 279 CDC register checks and ten native reset-release paths. Seed 52 is recommended with 37347 placed ALMs, 46810 registers, 511 M10Ks, 66 DSPs and four PLLs; worst margins are setup +0.574 ns, hold +0.117 ns, recovery +4.185 ns, removal +0.128 ns and pulse width +0.925 ns. Seed 61 uses 37470 ALMs with setup +0.395 ns and hold +0.095 ns; seed 87 uses 37474 with +0.370/+0.114 ns. Hash-verified packages are in results/hardware-test-d24abc0. Recommended seed 52 SHA-256 is d4a4545a56af3f8bdb0cf90b9004d6dbf6ce1d61970f6f1d8d0abb9e350802c6. Hardware acceptance is pending and no RBF was deployed automatically.
+
+#### Next Steps:
+
+Have the user test seed 52 with native FLAC waveforms, pause/mute, EOF, OSD and MPG/FLAC replacement; retain punctuation seed 87 as rollback.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 124 COMMIT Unreleased d24abc0 2026-09-14T20:44:36-07:00
 
 #### Coming From:
@@ -1381,36 +1410,6 @@ Audit and package gate-two timing, remaining CDC, reporting-register absence and
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 85 COMMIT Unreleased a406feb 2026-09-14T12:07:01-07:00
-
-#### Coming From:
-
-Unreleased 8e418b3
-
-#### Purpose:
-
-Qualify and package diagnostic-removal gate one for the user's four-file hardware test.
-
-#### Outcome:
-
-All 8e418b3 seeds compile and pass all four timing corners, 183 CDC checks, scene-enable checks and zero-profiler-register audits. Seed 52 is preferred with setup +0.397 ns and hold +0.114 ns; seeds 61/87 have setup +0.397/+0.197 ns and hold +0.099/+0.089 ns. Actual ALMs are 37267/37169/37350 and estimated ALMs 31787/31731/31708, with unchanged 527 M10Ks and 75 DSPs. Compared with accepted b05b76f seed 87, preferred gate-one seed 52 saves 964 estimated ALMs but only 143 placed ALMs because packing differs. The reporting mailbox survives this gate and all six stages remain audited; profiler hardware is absent. Hash-verified candidates and notes are under results/hardware-test-8e418b3; preferred seed52/MediaPlayer_20260914.rbf SHA-256 is 78501002b4e4d9669635ffa30e9f744e47103baf0e12740e09594f2a40c625a8. The user says not to pursue timing closure now; no fixes or extra builds were needed or started. They additionally authorize frozen MPEG2FPGA reference cleanup at gate two; the plan records checking unused wrappers and retaining required attribution. Gate-one hardware acceptance is pending; no core was deployed.
-
-#### Next Steps:
-
-Have the user test Fellow, Groove, Jiggler and Star Wars including no telemetry, black transparent status text, audio/video, controls, subtitles and EOF at both output rates. Proceed to reporting-source and frozen-reference cleanup only after gate-one acceptance; retain b05b76f seed 87 as rollback.
-
-#### Files Modified:
-
-- docs/DIAGNOSTIC_REMOVAL_PLAN.md
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
