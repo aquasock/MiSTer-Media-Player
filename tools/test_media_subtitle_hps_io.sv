@@ -9,7 +9,11 @@ assign ext[32]=0;
 wire [1:0] host_rd,reader_wr;
 wire [31:0] lba[2];wire [5:0] blocks[2];wire [1:0] rd,ack;
 wire [12:0] addr;wire [15:0] data;wire wr;wire [15:0] unused_data[2];assign unused_data[0]=0;assign unused_data[1]=0;
-hps_io #(.CONF_STR("MediaPlayer;;S0,M2VMPG,Open MPEG-2 Video;"),.WIDE(1),.VDNUM(2)) hps(
+localparam CONF={"MediaPlayer;;S0,M2VMPGFL*,Open video or FLAC;",
+`include "MediaPlayer_subtitle_menu.svh"
+"v,2;"};
+localparam CONF_LEN=$bits(CONF)/8;
+hps_io #(.CONF_STR(CONF),.CONF_STR_BRAM(1),.WIDE(1),.VDNUM(2)) hps(
  .clk_sys(clk),.HPS_BUS(bus),.EXT_BUS(ext),.ioctl_wait(1'b0),
  .sd_lba(lba),.sd_blk_cnt(blocks),.sd_rd(host_rd),.sd_wr(2'b0),.sd_ack(ack),
  .sd_buff_addr(addr),.sd_buff_dout(data),.sd_buff_wr(wr),.sd_buff_din(unused_data));
@@ -42,7 +46,14 @@ begin
  repeat(3) @(negedge clk);
 end endtask
 initial begin
- repeat(8) @(negedge clk);reset=0;start=1;@(negedge clk);start=0;
+ repeat(8) @(negedge clk);reset=0;
+ enable=1;send(16'h0014);
+ for(k=0;k<CONF_LEN;k=k+1)begin
+  send(0);
+  if(bus[7:0]!==CONF[(CONF_LEN-k)*8-1 -:8])$fatal(1,"block-RAM menu byte %0d got %h",k,bus[7:0]);
+ end
+ @(negedge clk);enable=0;repeat(5)@(negedge clk);
+ start=1;@(negedge clk);start=0;
  while(ends==0 || sub_ends==0) begin
   wait(|host_rd || (ends && sub_ends));if(|host_rd) begin
    drive=host_rd[1]?1:0;
@@ -56,7 +67,7 @@ initial begin
   end
  end
  if(error || sub_error) $fatal(1,"reader error %0d",error);
- $display("SUBTITLE_HPS_PASS simultaneous movie/SRT requests, actual hps_io drive isolation, trailing writes, byte order and EOF");$finish;
+ $display("SUBTITLE_HPS_PASS complete block-RAM menu readback, simultaneous movie/SRT requests, actual hps_io drive isolation, trailing writes, byte order and EOF");$finish;
 end
 initial begin #10000000;$fatal(1,"timeout error=%d count=%d",error,count);end
 endmodule

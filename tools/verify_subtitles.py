@@ -5,14 +5,16 @@ import argparse, subprocess, json, re
 import numpy as np
 p=argparse.ArgumentParser();p.add_argument('--output',type=Path,default=Path('results/subtitles'));a=p.parse_args();o=a.output.resolve();o.mkdir(parents=True,exist_ok=True)
 tests={
+ 'test_media_subtitle_time':['rtl/media_subtitle_time.sv'],
  'test_media_srt_parser':['rtl/media_srt_parser.sv'],
- 'test_media_subtitles':['rtl/media_subtitles.sv','rtl/media_srt_parser.sv','rtl/media_subtitle_cdc.sv','rtl/video_config_cdc.sv','rtl/media_file_reader.sv'],
+ 'test_media_subtitles':['rtl/media_subtitle_time.sv','rtl/media_subtitles.sv','rtl/media_srt_parser.sv','rtl/media_subtitle_cdc.sv','rtl/video_config_cdc.sv','rtl/media_file_reader.sv'],
  'test_media_subtitle_hps_io':['sys/hps_io.sv','rtl/media_file_reader.sv','rtl/media_sd_owner.sv'],
 }
 for top,sources in tests.items():
  with (o/(top+'-compile.log')).open('w') as f:subprocess.run(['iverilog','-g2012','-s',top,'-o',str(o/top),'tools/'+top+'.sv',*sources],stdout=f,stderr=subprocess.STDOUT,check=True)
  r=subprocess.run(['vvp',str(o/top)],capture_output=True,text=True,timeout=60);(o/(top+'.log')).write_text(r.stdout+r.stderr);print(r.stdout,flush=True);r.check_returncode()
 subprocess.run(['python3','tools/make_overlay_roms.py','--check'],check=True)
+subprocess.run(['python3','tools/make_subtitle_menu.py','--check'],check=True)
 # Load the established player oracle and reuse its compiled renderer and checks.
 import sys,runpy
 sys.argv=['tools/verify_player_overlay.py','--output',str(o/'render')]

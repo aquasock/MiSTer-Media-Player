@@ -66,8 +66,7 @@ assign VIDEO_ARY = ar ? 13'd9 : 13'd3;
 localparam CONF_STR = {
 	"MediaPlayer;;",
 	"S0,M2VMPGFL*,Open video or FLAC;",
-	"S1,SRT,Load subtitles;",
-	"O[120],Subtitles,On,Off;",
+`include "MediaPlayer_subtitle_menu.svh"
 	"-;",
 	"-;",
 	"O[121],Aspect ratio,4:3,16:9;",
@@ -285,16 +284,21 @@ wire        mpeg2_new_p_destination_ownership_hold;
 
 media_sd_owner mounted_file_owner(.clk(clk_sys),.reset(RESET),.request(media_sd_rd),.ack(media_sd_ack),
  .buff_wr(media_sd_wr),.host_request(media_host_rd),.reader_wr(media_reader_wr));
+wire[36:0] subtitle_elapsed_q;
+wire subtitle_before_start,subtitle_retime;
+media_subtitle_time subtitle_time(.clk(clk_sys),.reset(RESET||media_new_file),
+ .elapsed_q(media_elapsed_sys),.offset_code(status[119:113]),.speed_code(status[112:106]),
+ .subtitle_q(subtitle_elapsed_q),.before_start(subtitle_before_start),.restart(subtitle_retime));
 media_subtitles subtitles(.clk(clk_sys),.reset(RESET),.new_movie(media_new_file),
  .mount(media_img_mounted[1]),.mount_size(media_img_size),
- .loaded(PLAYER_UI_STATE[74]),.seeking(media_seek_sys),.enabled(!status[120]),
+ .loaded(PLAYER_UI_STATE[74]),.seeking(media_seek_sys||subtitle_retime),.enabled(!status[120]&&!subtitle_before_start),
  .suspend(media_duration_busy || media_seek_sys || (media_fifo_occupancy<16'd8192 && !media_reader_idle)),
- .elapsed_q(media_elapsed_sys),.epoch(PLAYER_UI_STATE[90:75]),
+ .elapsed_q(subtitle_elapsed_q),.epoch(PLAYER_UI_STATE[90:75]),
  .sd_lba(media_sd_lba[1]),.sd_blocks(media_sd_blocks[1]),.sd_rd(media_sd_rd[1]),
  .sd_ack(media_sd_ack[1]),.sd_wr(media_reader_wr[1]),.sd_addr(media_sd_addr),.sd_data(media_sd_data),
  .command(PLAYER_SUBTITLE_COMMAND),.command_ack(PLAYER_SUBTITLE_ACK),.warning());
 
-hps_io #(.CONF_STR(CONF_STR), .WIDE(1), .VDNUM(2)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .CONF_STR_BRAM(1), .WIDE(1), .VDNUM(2)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),

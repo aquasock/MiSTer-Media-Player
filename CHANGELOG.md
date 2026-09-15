@@ -8,6 +8,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Subtitles submenu with SRT loading, Yes/No visibility, -5.0 to +5.0 second
+  offset in 0.1-second steps and 0.50x to 1.50x speed in 0.01x steps.
+  Timing changes reload the subtitle reader without changing movie playback.
+
 - First standalone native 44.1 kHz/16-bit stereo FLAC hardware candidate:
   content-based mounted-file selection, CRC-admitted DDR frames, exact PCM
   clock crossing, native HDMI/I2S/SPDIF and analog outputs, volume, Space pause,
@@ -21,6 +25,12 @@ This project is still in active pre-release development. Published milestone rel
 - Manual SRT loading through a second stock Main file slot, with presentation-
   timed cues, pause/seek synchronization and an independent shared-overlay
   visibility group. Initial display supports two lines of printable ASCII.
+
+### Fixed
+
+- FLAC-to-MPG replacement deadlock: inactive movie memory requests remain
+  quiesced while the handoff checks physical DDR readiness, allowing drained
+  music ownership to return to video.
 
 ### Changed
 

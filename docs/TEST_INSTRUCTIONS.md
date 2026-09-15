@@ -1,5 +1,33 @@
 # Shared IDCT candidate
 
+## Subtitle controls and FLAC replacement follow-up
+
+Open **Subtitles** for **Load SRT**, **Visible Yes/No**, **Offset**, and **Speed**.
+Defaults are Yes, 0.0 seconds and 1.00x. Offset ranges from -5.0 to +5.0 seconds
+in 0.1-second steps; positive values delay display. Speed ranges from 0.50x to
+1.50x in 0.01x steps and scales the subtitle clock, not video or audio. Menus
+cycle through their values. Timing uses `(video elapsed - offset) * speed`.
+Changing settings restarts the SRT reader and may briefly hide cues while it
+catches up. Settings stay selected across file replacement; old cues are cleared.
+
+1. Load a movie and matching SRT through the submenu. Toggle visibility and
+   confirm the movie, audio and overlay continue normally.
+2. Check positive/negative offsets, both limits and zero. Check 0.50x, 1.00x,
+   1.50x and intermediate speed values. Restore defaults after testing.
+3. Change timing while paused, after seeking backward and after the final cue.
+   Resume and seek again; cues should follow the adjusted movie timeline.
+4. Replace actively playing and paused FLAC with MPG repeatedly, then reverse
+   direction. Include a large FLAC, short FLAC and each of the four movie tests.
+   Confirm movie frames and sound resume, with OSD, subtitles and seeking intact.
+
+The previous b3e4f1d seed 87 passed the user's audio checks but stalled on
+FLAC-to-MPG replacement. This follow-up fixes that handoff. Reset-recovery timing
+failures are deferred at the user's request; compilation does not imply timing
+qualification. Regressions: `tools/verify_media_format_handoff.py` exercises the
+production mode and arbiter connections with delayed responses and cancellation,
+and confirms the previous wiring stalls. `tools/verify_subtitles.py` covers all
+10,201 timing combinations, streaming retiming, HPS menu readback and rendering.
+
 ## Native FLAC first hardware gate
 
 The new candidate adds standalone native **44.1 kHz, 16-bit stereo FLAC** to

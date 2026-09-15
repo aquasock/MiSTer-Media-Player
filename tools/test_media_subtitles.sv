@@ -4,10 +4,14 @@ reg clk=0,vclk=0;always #5 clk=~clk;always #7 vclk=~vclk;
 reg reset=1,new_movie=0,mount=0,loaded=1,seeking=0,enabled=1,suspended=1;
 reg [34:0] elapsed=0;reg [15:0] epoch=1;reg [63:0] size=0;
 wire [31:0] lba;wire [5:0] blocks;wire rd;reg ack=0,wr=0;reg [12:0] addr=0;reg [15:0] data=0;
+reg[6:0] offset_code=0,speed_code=0;
+wire[36:0] adjusted_time;wire before_start,retime;
+media_subtitle_time timing(.clk(clk),.reset(reset||new_movie),.elapsed_q(elapsed),.offset_code(offset_code),.speed_code(speed_code),
+ .subtitle_q(adjusted_time),.before_start(before_start),.restart(retime));
 wire [34:0] command;wire echo,warn;
 wire text_we,commit,visible;wire [7:0] text_addr,text_data;wire [15:0] cue_epoch;wire [6:0] n0,n1;
 media_subtitles dut(.clk(clk),.reset(reset),.new_movie(new_movie),.mount(mount),.mount_size(size),
- .loaded(loaded),.seeking(seeking),.enabled(enabled),.suspend(suspended),.elapsed_q(elapsed),.epoch(epoch),
+ .loaded(loaded),.seeking(seeking||retime),.enabled(enabled&&!before_start),.suspend(suspended),.elapsed_q(adjusted_time),.epoch(epoch),
  .sd_lba(lba),.sd_blocks(blocks),.sd_rd(rd),.sd_ack(ack),.sd_wr(wr),.sd_addr(addr),.sd_data(data),
  .command(command),.command_ack(echo),.warning(warn));
 media_subtitle_cdc bridge(.control_clk(clk),.video_clk(vclk),.command(command),.command_ack(echo),
@@ -43,6 +47,16 @@ initial begin
  wait_visible(1);if(chars[0]!="F" || n1!=0 || requests<2)$fatal(1,"backward seek stale cue");
  seeking=1;epoch=epoch+1;wait_visible(0);elapsed=2160000;repeat(100)@(negedge clk);seeking=0;wait_visible(1);if(chars[0]!="S")$fatal(1,"forward seek stale cue");
  elapsed=2520000;wait_visible(0);repeat(5000)@(negedge clk);if(!dut.parse_eof)$fatal(1,"SRT EOF");
+ // Delay after passing EOF must rewind the streaming reader and recover cue 1.
+ offset_code=50;wait_visible(1);if(chars[0]!="F")$fatal(1,"positive offset did not recover earlier cue");
+ speed_code=50;wait_visible(0); // (7 - 5) * 1.50 = exclusive cue end at 3.
+ offset_code=0;speed_code=51;repeat(200)@(negedge clk);
+ elapsed=3960000;wait_visible(1);if(chars[0]!="S")$fatal(1,"half speed cue");
+ // Positive offset must hide even a time-zero cue before playback reaches it.
+ offset_code=50;elapsed=0;wait_visible(0);
+ offset_code=51;speed_code=0;repeat(200)@(negedge clk);wait_visible(1);
+ if(chars[0]!="S")$fatal(1,"negative offset did not advance subtitle time");
+ offset_code=0;speed_code=0;
  // Loading another subtitle file during a live transfer must retire commands
  // already in flight and never publish the old text as the replacement.
  elapsed=360000;load();wait(rd);@(negedge clk);new_movie=1;epoch=epoch+1;@(negedge clk);new_movie=0;

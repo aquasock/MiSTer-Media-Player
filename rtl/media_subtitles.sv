@@ -2,7 +2,7 @@
 // a whole-file index. All host responses drain before a new reader session.
 module media_subtitles(
  input wire clk,reset,new_movie,mount,input wire [63:0] mount_size,
- input wire loaded,seeking,enabled,suspend,input wire [34:0] elapsed_q,input wire [15:0] epoch,
+ input wire loaded,seeking,enabled,suspend,input wire [36:0] elapsed_q,input wire [15:0] epoch,
  output wire [31:0] sd_lba,output wire [5:0] sd_blocks,output wire sd_rd,
  input wire sd_ack,sd_wr,input wire [12:0] sd_addr,input wire [15:0] sd_data,
  output reg [34:0] command=0,input wire command_ack,
@@ -25,7 +25,7 @@ wire [6:0] length0,length1;
 reg [6:0] char_index=0;
 wire [7:0] char_data;
 wire active=associated && loaded && !seeking && enabled && cue_valid &&
- {2'd0,elapsed_q}>=cue_start && {2'd0,elapsed_q}<cue_end && reader_error==0;
+ elapsed_q>=cue_start && elapsed_q<cue_end && reader_error==0;
 always @(posedge clk)begin
  mount_d<=mount;seek_d<=seeking;reader_start<=0;
  if(reset || new_movie)begin associated<=0;size<=0;restart_pending<=0;end
@@ -57,9 +57,9 @@ always @(posedge clk)begin
   if(!invalidate)dirty<=0;
  end else if(!dirty && !invalidate)case(state)
  IDLE:begin
-  if(cue_valid && !sent && {2'd0,elapsed_q}<cue_end && associated && reader_error==0)begin char_index<=0;state<=FETCH;end
+  if(cue_valid && !sent && elapsed_q<cue_end && associated && reader_error==0)begin char_index<=0;state<=FETCH;end
   else if(visible!=active || published_epoch!=epoch)state<=COMMIT;
-  else if(cue_valid && {2'd0,elapsed_q}>=cue_end)begin cue_ready<=1;sent<=0;end
+  else if(cue_valid && elapsed_q>=cue_end)begin cue_ready<=1;sent<=0;end
   else if(!cue_valid)sent<=0;
  end
  FETCH:state<=WRITE;

@@ -129,3 +129,5 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/platform/media_native_audio.s
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/media_pcm_sink.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/media_pcm_i2s.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/media_music_time.sv
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_subtitle_time.sv
