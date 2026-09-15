@@ -1,3 +1,32 @@
+## 117 COMMIT Unreleased ??? 2026-09-14T18:57:23-07:00
+
+#### Coming From:
+
+Unreleased 3aff0f9
+
+#### Purpose:
+
+Normalize the dialogue punctuation found in the user's SRT files.
+
+#### Outcome:
+
+The three root GIT HDD SRT files are now available. UTF-8 inspection confirms curly apostrophes and dialogue-leading U+2013 en dashes, plus U+2014 em dashes and U+201C/U+201D double quotes. These unsupported punctuation marks explain the leading question marks; no invisible prefix markers occur in these files. Extend the existing smart-apostrophe normalization to ASCII hyphens and double quotes, including corresponding standalone Windows-1252 bytes. Preserve unsupported-character fallback and bounded parser behavior.
+
+#### Next Steps:
+
+Regress punctuation and replay all three complete local SRT files against an independent normalized cue oracle. Commit the correction for the next authorized build without altering the user's SRT files or launching a new batch.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 116 COMMIT Unreleased 3aff0f9 2026-09-14T18:53:35-07:00
 
 #### Coming From:
@@ -1428,35 +1457,6 @@ Check synthesis RAM inference, final resources and all-corner timing for the thr
 - tools/test_media_ui_lifetime.sv
 - tools/verify_player_overlay.py
 - tools/verify_subtitles.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 77 COMMIT Unreleased c4b40c4 2026-09-14T09:51:43-07:00
-
-#### Coming From:
-
-Unreleased 304e4dc
-
-#### Purpose:
-
-Record the user's revised next-release requirements.
-
-#### Outcome:
-
-The user replaces the preceding playlist and automatic matching-name subtitle proposal with session-only resume from last position, predictable EOF behavior and subtitles from a separate SRT selected through a menu entry. The earlier clarification that resume lasts only while the core stays loaded remains in force. Keep stock Main; playlists, N/P playlist navigation and automatic SRT discovery are not part of this target. Audio-track selection remains excluded. The UI plan records this scope and remaining design questions for resume identity, EOF draining and bounded subtitle parsing, storage and character coverage. No RTL changes, additional builds or hardware deployment occurred; ffafc79 seed 87 remains timing-qualified but not yet explicitly hardware accepted.
-
-#### Next Steps:
-
-Plan and implement the revised target using existing seek, duration and shared-overlay infrastructure, validating file transitions, EOF, pause and seek subtitle synchronization before release qualification.
-
-#### Files Modified:
-
-- docs/UI_OVERLAY_PLAN.md
 
 #### Status:
 
