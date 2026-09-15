@@ -11,9 +11,7 @@ This project is still in active pre-release development. Published milestone rel
 - Double O-Scope to 256 by 256 positions using eight phosphor levels and 24
   M10Ks. Preserve native stereo mapping, square aspect geometry and short
   seven-sweep trails. Pipeline geometry and RAM fading for HDMI timing.
-- Register resolution-derived Waveforms/FFT geometry and shorten the scaler's
-  polyphase final sum with carry selection, preserving exact pixel arithmetic
-  and pipeline latency.
+- Register resolution-derived Waveforms/FFT geometry.
 
 - Show audio track progress before album progress on initial playback and
   natural track changes (three seconds each). Pause/resume and manual seeks

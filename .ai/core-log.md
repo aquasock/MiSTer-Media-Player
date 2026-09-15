@@ -1,3 +1,62 @@
+## 150 COMMIT Unreleased ??? 2026-09-15T03:44:48-07:00
+
+#### Coming From:
+
+Unreleased c3549fe
+
+#### Purpose:
+
+Revert the c3549fe carry-select scaler rewrite that caused the setup timing failure recorded in entry 149.
+
+#### Outcome:
+
+sys/ascal.vhd's poly_final and poly_sum_bound are reverted to the plain single-adder-plus-clip form that was the last timing-passing baseline at 3a72b70; per-corner setup reports for all three c3549fe seeds identified this exact path, ascal's o_v_poly_t to o_v_poly_pix vertical polyphase sum on the pll_hdmi divider clock, as the sole failing category, with the carry-select rewrite costing more in routing and duplicated clip logic on this 85%-ALM, 99%-M10K device than the shorter logic-level count saved. tools/verify_scaler_poly_sum.py is removed since it validated only the now-reverted poly_sum_bound function, and the CHANGELOG.md Unreleased entry claiming a shortened carry-select polyphase sum is corrected. The XY-256 geometry and the banked-RAM feedback fabric register from c3549fe are both untouched, since neither appeared in any violating path. This entry is written before the commit exists; the hash will be filled in once committed and the three-seed rebuild is launched.
+
+#### Next Steps:
+
+Commit this revert, launch the standard HIGH-packing three-seed rebuild, and confirm all four timing corners pass on at least one seed before offering a hardware candidate.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- sys/ascal.vhd
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 149 COMMIT Unreleased c3549fe 2026-09-15T03:19:34-07:00
+
+#### Coming From:
+
+Unreleased c3549fe
+
+#### Purpose:
+
+Report the three completed c3549fe full-core builds and their per-corner setup timing results.
+
+#### Outcome:
+
+All three HIGH-packing builds (seeds 52/61/87) compiled and fit successfully under supervisor PID 1275015, each landing at roughly 35,600-35,700 placed ALMs (85%), 51,400-51,700 registers, 546 of 553 RAM blocks (99%), 75 DSPs and four PLLs. The build script's timing_exit and stage:complete fields reflect only quartus_sta's process exit code and do not indicate whether timing closed; reading the actual per-corner setup reports shows all three seeds still violate setup on the pll_hdmi divclk path in corners 0 and 1, the same path c3549fe's fabric register was intended to repair. Seed52 shows -0.953 ns and -1.507 ns, seed61 shows -1.020 ns and -1.549 ns, and seed87 shows -0.597 ns and -1.108 ns; corners 2 and 3 pass on all three seeds, and hold, recovery, removal and minimum pulse width pass on every corner for every seed. None of the three seeds close timing, so none qualify as a hardware candidate by the project's own standard; seed87 is the least-bad of the three. At the user's explicit instruction, seed87's RBF is being deployed to the test MiSTer for hardware evaluation despite the open setup violation.
+
+#### Next Steps:
+
+Investigate why the fabric register added in c3549fe did not close setup on the HDMI PLL divider clock in corners 0 and 1, and determine whether the scaler polyphase carry-select change or the banked-RAM feedback break is the remaining contributor. Collect the user's hardware observations from the seed87 RBF and factor them into the next fix attempt.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 148 COMMIT Unreleased c3549fe 2026-09-15T02:45:34-07:00
 
 #### Coming From:
