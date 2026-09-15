@@ -1,3 +1,32 @@
+## 132 COMMIT Unreleased ??? 2026-09-14T22:39:47-07:00
+
+#### Coming From:
+
+Unreleased 64722d0
+
+#### Purpose:
+
+Add an FFT-driven Fire visualizer alongside O-scope with an audio-only selection submenu.
+
+#### Outcome:
+
+The user authorizes a new FFT flame visualizer and the next three-core build. Implement an original bounded 256-point fixed-point FFT over the post-volume native stereo tap, 32 frequency bands, coherent presentation and procedural flame rendering inside the existing audio aspect viewport. Reuse the parallel nine-cycle visual output boundary so the UI and OSD stay above either mode. Add a Visualizers submenu, hidden outside audio playback, with O-scope and Fire choices. Preserve audio transport and use no external DDR; verify FFT arithmetic, tones/stereo behavior, silence/reset, renderer timing/clipping and existing O-scope/movie behavior. Check standalone resource cost against the baseline's 3592 free placed ALMs and 37 free M10Ks before full builds.
+
+#### Next Steps:
+
+Implement and simulate, inspect standalone synthesis and full integration, commit/push, then launch seeds 52, 61 and 87 with HIGH packing for timing and hardware qualification.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 131 COMMIT Unreleased 64722d0 2026-09-14T22:27:22-07:00
 
 #### Coming From:
@@ -1291,56 +1320,6 @@ Await user direction before continuing implementation or restarting builds. Pres
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 92 COMMIT Unreleased 54d64d2 2026-09-14T13:22:12-07:00
-
-#### Coming From:
-
-Unreleased 7eb5088
-
-#### Purpose:
-
-Reduce duplicated IDCT hardware with measured shared transform service.
-
-#### Outcome:
-
-The user authorizes the deferred shared-IDCT reduction while the isolated packing run continues. Source 54d64d2 routes intra/P/B clients to one unchanged arithmetic engine, preserving immediate uncontended strobes and using three M10K coefficient banks, sparse masks and round-robin service for contention. Per-client completion/error state and global reset cancellation preserve ownership. Production selects external service; standalone wrappers retain local engines for offline tests. Simulation-only traces measure 288 intra, 1053 P and 1418 B blocks with no overlap in the mixed sample and 5518 request/completion event cycles identical to dedicated engines. The shared-unit oracle passes 79008 exact samples, independent producers, single-cycle sparse blocks, 220 reset offsets and malformed input recovery. Arithmetic/storage equivalence passes 164020 cycles and 52128 samples. Three-client repeated seeks, paired EOF and 50 Hz cases each retain 423936 pixel comparisons and identical reconstruction/cycle accounting. Adding real intra demand exposed the old stubbed-intra fixed cycle budget in both baseline and shared EOF tests; the variant now requires paired baseline accounting instead. The 16 MiB Pee Strike prefix passes normal opening plus ten-second forward seek with shared DDR and intra demand, then confirms audio/video progress without underrun or timestamp warning at cycle 432419997. This harness models bounded ideal CDC and initialized I reference pixels, not a complete physical intra DDR path; independent transform oracles establish numerical equivalence. Expected savings are 16 DSPs and 13 M10Ks; actual ALM savings await fitting. Source is pushed and clean MEDIUM seeds 52/61/87 run under /tmp/shared-idct-build.log. Fitted checks require exactly one six-bit IDCT index, eight intermediate M10Ks and three staging M10Ks alongside all existing CDC/diagnostic-removal audits. Meanwhile 7eb5088 HIGH seed 61 completes in 767.7 seconds: 36245 actual ALMs, 31461 estimated ALMs, 44768 registers, 525 M10Ks, 75 DSPs, setup -0.021 ns and hold +0.114 ns. Its 799 placed-ALM saving comes with failed setup, so accepted MEDIUM 7eb5088 seed 61 remains baseline. The HIGH RBF is hash-verified and separately packaged under results/hardware-test-7eb5088-packing-high/seed61 with a timing-failure marker; no deployment or further HIGH run is performed.
-
-#### Next Steps:
-
-Audit the three 54d64d2 builds for shared-engine and memory inference, timing and resources using accepted MEDIUM 7eb5088 seed 61 baseline 37044 ALMs/525 M10Ks and all diagnostic-removal requirements. Package the best RBF for four-file hardware acceptance at both refresh settings, including pause/seek/reset/replacement, subtitles/filters and EOF. Keep accepted baseline and failed HIGH experiment distinct. No additional timing-fix batches without user direction.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_03.svh
-- docs/SHARED_IDCT.md
-- docs/TEST_INSTRUCTIONS.md
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_idct.sv
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
-- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
-- rtl/mpeg2_new/mpeg2_h262_shared_idct.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- tools/audit_three_seeds.py
-- tools/phase1p_timing.tcl
-- tools/replay_mpg_seek.py
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_mixed_raster_pixels.sv
-- tools/test_shared_idct.sv
-- tools/verify_decoder_timing.py
-- tools/verify_shared_idct.py
 
 #### Status:
 
