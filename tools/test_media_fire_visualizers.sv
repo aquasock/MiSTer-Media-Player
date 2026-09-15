@@ -16,12 +16,24 @@ reg audio_clk=0;always #22 audio_clk=~audio_clk;
 reg [8:0] sample_phase=0;reg [31:0] random_state=32'h12345678;
 reg sample_tick=0;reg signed [15:0] left_sample=0,right_sample=0;
 integer sample_number=0,fire_mode=1,silent=0,switch_test=0;
+string pcm_path;integer pcm_samples=0;
+reg [31:0] pcm[0:65535];
+initial begin
+ if($value$plusargs("PCM=%s",pcm_path))begin
+  if(!$value$plusargs("PCM_SAMPLES=%d",pcm_samples)||pcm_samples<1||pcm_samples>65536)$fatal(1,"PCM sample count");
+  $readmemh(pcm_path,pcm,0,pcm_samples-1);
+ end
+end
 always @(negedge audio_clk)begin
  sample_phase<=sample_phase+1'b1;sample_tick<=sample_phase==0;
  if(sample_phase==0)begin
   sample_number=sample_number+1;random_state=random_state*32'd1664525+32'd1013904223;
+  if(pcm_samples!=0)begin
+   {left_sample,right_sample}<=pcm[(sample_number-1)%pcm_samples];
+  end else begin
   left_sample<=silent!=0?16'sd0:16'($rtoi(11000*$sin(sample_number*0.09817477)+6500*$sin(sample_number*0.29452431)+4000*$sin(sample_number*0.83448555)))+$signed(random_state[31:18]);
   right_sample<=silent!=0?16'sd0:16'($rtoi(10000*$sin(sample_number*0.19634954)+6000*$sin(sample_number*0.51541754)+4000*$sin(sample_number*1.61988371)))+$signed(random_state[29:16]);
+  end
  end
 end
 wire [26:0] scope_reference;

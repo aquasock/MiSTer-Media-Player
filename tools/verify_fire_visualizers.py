@@ -7,11 +7,14 @@ from PIL import Image
 p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
 root=Path(__file__).resolve().parents[1];out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 sources=['rtl/media_xy_visualizer.sv','rtl/media_audio_fft.sv','rtl/media_fire_renderer.sv','rtl/media_audio_visualizers.sv','rtl/media_audio_viewport.sv','rtl/media_waveform_visualizer.sv','rtl/media_player_overlay.sv','rtl/media_subtitle_cdc.sv','rtl/media_ui_scene.sv','rtl/media_ui_divider.sv','rtl/media_overlay_compositor.sv','rtl/video_config_cdc.sv']
-for top in ['test_media_fft_peaks','test_media_xy_visualizer','test_media_fire_visualizers','test_media_player_overlay']:
+for top in ['test_media_fft_peaks','test_media_xy_visualizer','test_media_xy_raster','test_media_fire_visualizers','test_media_player_overlay']:
  with (out/(top+'-compile.log')).open('w') as log:
   subprocess.run(['verilator','--binary','--timing','-j','4','-Wno-fatal','--top-module',top,'--Mdir',str(out/top),'tools/'+top+'.sv',*sources],cwd=root,stdout=log,stderr=subprocess.STDOUT,check=True)
 r=subprocess.run([str(out/'test_media_xy_visualizer'/'Vtest_media_xy_visualizer')],capture_output=True,text=True,timeout=30)
 (out/'xy-trace.log').write_text(r.stdout+r.stderr);r.check_returncode();assert 'PASS XY' in r.stdout
+for w,h in [(640,480),(720,405),(960,720),(1280,720),(1440,1080),(1920,1080),(480,720)]:
+ r=subprocess.run([str(out/'test_media_xy_raster'/'Vtest_media_xy_raster'),f'+W={w}',f'+H={h}'],capture_output=True,text=True,timeout=30)
+ (out/f'xy-raster-{w}x{h}.log').write_text(r.stdout+r.stderr);r.check_returncode();assert 'PASS XY raster' in r.stdout
 r=subprocess.run([str(out/'test_media_fft_peaks'/'Vtest_media_fft_peaks')],capture_output=True,text=True,timeout=30)
 (out/'fft-peaks.log').write_text(r.stdout+r.stderr);r.check_returncode();assert 'PASS FFT peaks' in r.stdout
 def render(top,name,args):

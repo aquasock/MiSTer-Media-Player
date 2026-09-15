@@ -122,7 +122,9 @@ module media_waveform_visualizer(
  wire signed [13:0] center_r=$signed({2'b0,(height>>1)+(height>>3)});
  wire signed [13:0] delta_l=$signed({2'b0,ypos[6]})-curve_l;
  wire signed [13:0] delta_r=$signed({2'b0,ypos[6]})-curve_r;
- wire [13:0] thickness=height>=900 ? 14'd3 : height>=600 ? 14'd2 : 14'd1;
+ // Resolution-derived threshold is stable before active video.
+ reg [13:0] thickness=14'd1;
+ always @(posedge video_clk)thickness<=height>=900 ? 14'd3 : height>=600 ? 14'd2 : 14'd1;
  integer i;
  always @(posedge video_clk)begin
   pixels[0]<=rgb;ypos[0]<=y;

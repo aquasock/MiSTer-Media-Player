@@ -1,3 +1,23 @@
+# 256 by 256 O-Scope and HDMI timing candidate
+
+Select **Visualizers: / Type: O-Scope** while playing native FLAC. The XY map
+now has 256 positions per axis and eight green intensity levels, with a short
+seven-frame fade. Check the calibration file and N-SPHERES for finer detail,
+correct orientation, square geometry in both aspect modes, and clean fade to
+silence. Test 480p, 720p and 1080p where available.
+
+Recheck Waveforms and FFT (including red peak markers), repeated mode changes,
+OSD and subtitles, FLAC/MPG replacement, seeking, and the four MPG regression
+files with scaler filters enabled. The scaler timing change must preserve
+colors and filter output. Audio load/natural track transitions show track for
+three seconds then album for three; pause and seek show only track feedback.
+
+Build results and the recommended seed are recorded in the hardware-test
+package for the exact source commit. These changes do not alter the native
+44.1 kHz audio rate or add analog scope inputs.
+
+---
+
 # FFT Fire and O-scope build
 
 Load native FLAC and open **Visualizers:**. Select Type: **Fire** or **O-scope**.

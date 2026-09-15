@@ -29,8 +29,11 @@ module media_fire_renderer(
  wire [12:0] next_x=phase_x+13'd32;
  wire [11:0] base_y=height;
  wire [11:0] max_height=(height>>1)+(height>>2);
- wire [11:0] row_pitch=max_height>>5;
- wire [11:0] grid_top=base_y-(row_pitch<<5);
+ // Resolution-derived geometry settles in blanking, not on pixel paths.
+ reg [11:0] row_pitch=0,grid_top=0;
+ always @(posedge clk)begin
+  row_pitch<=max_height>>5;grid_top<=base_y-(row_pitch<<5);
+ end
  wire [11:0] row_gap=row_pitch>>2;
  reg [11:0] row_edge=0;
  reg [5:0] row_needed=32;

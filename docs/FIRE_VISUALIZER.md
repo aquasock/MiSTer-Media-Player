@@ -81,11 +81,12 @@ exactly one orange cap above yellow blocks, plus a thin solid red peak marker wi
 
 Left-channel amplitude sets horizontal position; right-channel amplitude sets
 vertical position (positive upwards). A centered square inside the selected
-aspect viewport displays a 128 by 128 intensity map. Connected sample traces
-use integer Bresenham line drawing and sixteen green phosphor intensity levels.
-An idle-port sweep subtracts two intensity levels per frame, saturating at zero.
-An untouched trace fades out in eight sweeps, roughly 133 ms at 60 Hz (160 ms
-at 50 Hz), reduced from fifteen sweeps to reveal more individual wires. A stationary signal produces a stationary spot;
+aspect viewport displays a 256 by 256 intensity map, using the upper eight bits
+of each sixteen-bit sample. Connected sample traces use integer Bresenham line
+drawing and eight green phosphor intensity levels. An idle-port sweep subtracts
+one level per frame, saturating at zero. An untouched trace fades out in seven
+sweeps, roughly 117 ms at 60 Hz (140 ms at 50 Hz). This trades one brightness bit
+for twice the spatial resolution on both axes while retaining short trails. A stationary signal produces a stationary spot;
 unrelated stereo channels produce a cloud, while correlated channels produce
 lines or loops. This is a stereo vectorscope, not an FFT or time-domain ribbon.
 
@@ -93,14 +94,31 @@ A coherent sample/toggle mailbox crosses from the native PCM clock to video.
 If rendering falls behind, the newest pending point replaces the old pending
 point; audio is never held. The map uses dual-port M10K RAM, one port for drawing,
 clearing and fading and the other for display. Mode entry clears the previous
-trace. Rendering and mode selection retain nine pixel stages. The palette is
+trace. Three one-bit 65536-entry planes use 24 M10K blocks (24 KiB of data),
+versus eight blocks for the former 128 by 128 four-bit map. A fabric register
+breaks the banked RAM read-to-write fade path without extending the existing
+three-cycle operation. Geometry is registered separately from per-pixel work.
+Rendering and mode selection retain nine pixel stages. The palette is
 black to bright green, with a small red/blue component at the brightest levels.
 No new external DDR access, PLL or audio processing is introduced.
 
 `tools/test_media_xy_visualizer.sv` compares line endpoints and all line
 orientations with an independent integer reference and checks every decay level
-and memory clearing. `tools/verify_fire_visualizers.py` runs that bench together
+and memory clearing, plus complete fade deadlines under full-span 44.1 kHz
+traffic at the minimum 25.2 MHz pixel clock. `tools/test_media_xy_raster.sv`
+checks every pixel against an independent coordinate/palette oracle, including
+noninteger scaling and portrait geometry. `tools/verify_fire_visualizers.py` runs those benches together
 with full-frame waveform/FFT/XY and movie-bypass checks and exports PNG previews.
+
+To compare an actual audio segment through the old and new XY renderer:
+
+```sh
+python3 tools/verify_xy_audio_preview.py /path/to/audio.flac --start 2 \
+  --output results/xy-audio-preview
+```
+
+This exports before/after 480p, 720p and 1080p PNGs using identical PCM stimulus.
+These are RTL previews with synthetic bench timing, not hardware screenshots.
 
 ### FFT peak-hold markers
 

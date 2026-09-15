@@ -1106,12 +1106,27 @@ ARCHITECTURE rtl OF ascal IS
 		RETURN t;
 	END FUNCTION;
 
+	-- Discarded fractional bits contribute only a carry. Evaluate both
+	-- upper sums independently, including clipping, then select by that carry.
+	-- This preserves the original 19-bit wrap and truncation without a
+	-- full-width carry chain followed by saturation on the pixel path.
+	FUNCTION poly_sum_bound(a,b : signed(26 DOWNTO 0)) RETURN unsigned IS
+		VARIABLE lo : unsigned(7 DOWNTO 0);
+		VARIABLE hi0,hi1 : unsigned(11 DOWNTO 0);
+	BEGIN
+		lo := ('0' & unsigned(a(14 DOWNTO 8))) + ('0' & unsigned(b(14 DOWNTO 8)));
+		hi0 := unsigned(a(26 DOWNTO 15)) + unsigned(b(26 DOWNTO 15));
+		hi1 := unsigned(a(26 DOWNTO 15)) + unsigned(b(26 DOWNTO 15)) + 1;
+		IF lo(7)='1' THEN RETURN bound(hi1,8);
+		ELSE RETURN bound(hi0,8); END IF;
+	END FUNCTION;
+
 	FUNCTION poly_final(t : type_poly_t) RETURN type_pix IS
 		VARIABLE p : type_pix;
 	BEGIN
-		p.r:=bound(unsigned(t.r0(26 DOWNTO 8)+t.r1(26 DOWNTO 8)),15);
-		p.g:=bound(unsigned(t.g0(26 DOWNTO 8)+t.g1(26 DOWNTO 8)),15);
-		p.b:=bound(unsigned(t.b0(26 DOWNTO 8)+t.b1(26 DOWNTO 8)),15);
+		p.r:=poly_sum_bound(t.r0,t.r1);
+		p.g:=poly_sum_bound(t.g0,t.g1);
+		p.b:=poly_sum_bound(t.b0,t.b1);
 		RETURN p;
 	END FUNCTION;
 
