@@ -19,14 +19,19 @@ subprocess.run(['python3','tools/make_subtitle_menu.py','--check'],check=True)
 import sys,runpy
 sys.argv=['tools/verify_player_overlay.py','--output',str(o/'render')]
 base=runpy.run_path('tools/verify_player_overlay.py');oracle=base['oracle'];glyphs=base['glyphs']
-for w,h,shown,lines,epoch in [(720,480,0,1,1),(720,480,1,2,1),(1280,720,0,2,1),(1920,1080,0,2,1),(720,480,0,2,0)]:
- path=o/f'subtitles-{w}x{h}-hud{shown}-lines{lines}-epoch{epoch}.ppm'
- cmd=[str(o/'render/obj/Vtest_media_player_overlay'),f'+OUT={path}',f'+W={w}',f'+H={h}',f'+SHOWN={shown}',f'+SUBTITLES={lines}',f'+SUBEPOCH={epoch}']
+cases=[(720,480,0,1,1),(720,480,1,2,1),(1280,720,0,2,1),(1920,1080,0,2,1),(720,480,0,2,0),
+       (1280,720,1,2,1),(1920,1080,1,2,1)]
+cases=[(*c,['Hello, world!','Subtitle line two.']) for c in cases]
+long_text=['ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?', '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!?']
+cases += [(w,h,1,2,1,long_text) for w,h in [(720,480),(1280,720),(1920,1080)]]
+for w,h,shown,lines,epoch,texts in cases:
+ path=o/f'subtitles-{w}x{h}-hud{shown}-lines{lines}-epoch{epoch}-len{len(texts[0])}.ppm'
+ cmd=[str(o/'render/obj/Vtest_media_player_overlay'),f'+OUT={path}',f'+W={w}',f'+H={h}',f'+SHOWN={shown}',f'+SUBTITLES={lines}',f'+SUBEPOCH={epoch}',f'+SUB0={texts[0]}',f'+SUB1={texts[1]}']
  r=subprocess.run(cmd,capture_output=True,text=True,timeout=120);r.check_returncode();(path.with_suffix('.log')).write_text(r.stdout)
  expected=oracle(w,h,1,shown,0,0)
  if epoch==1:
-  scale=9 if h>=1000 else 6 if h>=700 else 4
-  for text,y in zip(['Hello, world!','Subtitle line two.'][:lines],[431,445] if lines==2 else [445]):
+  scale=12 if h>=1000 else 8 if h>=700 else 4
+  for text,y in zip(texts[:lines],[431,445] if lines==2 else [445]):
    x0=w//2-len(text)*6*scale//8;y0=h*y//480
    tw=(len(text)*6*scale+3)//4;th=(7*scale+3)//4
    # Existing dark-alpha palette behind the text, using reserved rectangles.

@@ -42,10 +42,13 @@ initial begin
  if($value$plusargs("TOTAL=%d",total)) begin end
  if($value$plusargs("SUBTITLES=%d",subtitles))begin end
  if($value$plusargs("SUBEPOCH=%d",subepoch))begin end
+ if($value$plusargs("SUB0=%s",sub0))begin end
+ if($value$plusargs("SUB1=%s",sub1))begin end
+ if(sub0.len()>64 || sub1.len()>64)$fatal(1,"subtitle fixture too long");
  state_in={16'd1,1'b1,shown[0],paused[0],seeking[0],known[0],total,position};
  if(subtitles!=0)begin
   for(integer i=0;i<128;i=i+1) sub_send(0,{i[7:0],(i<sub0.len()?sub0[i]:(i>=64 && i<64+sub1.len() && subtitles==2?sub1[i-64]:8'd0))});
-  sub_send(1,{(subtitles==2?8'd18:8'd0),8'h8d});
+  sub_send(1,{(subtitles==2?8'(sub1.len()):8'd0),(8'h80|8'(sub0.len()))});
  end
  fd=$fopen(path,"wb");$fwrite(fd,"P6\n%0d %0d\n255\n",w,h);
  repeat(12) @(negedge clk);

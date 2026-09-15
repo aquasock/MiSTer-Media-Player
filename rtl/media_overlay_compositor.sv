@@ -130,31 +130,30 @@ always @(posedge clk) begin
  dx2<=x1-left1;dy2<=y1-top1;
  slot2<=slot1;scale2<=scale1;page2<=page1;hit2<=hit1;tc2<=tc1;rc2<=rc1;
 end
-// Three banks encode (character, column) for quarter-pixel scales 4/6/9.
-(* ramstyle="M10K" *) reg [8:0] coordinates[0:3071];
+// Integer 1x/2x/3x glyph maps; 3x has 2048 entries for 64-character lines.
+(* ramstyle="M10K" *) reg [8:0] coordinates[0:4095];
 initial $readmemb("rtl/media_overlay_coordinates.mem",coordinates);
 reg [8:0] mapped3;
 reg [2:0] slot3,row3;
 reg page3,hit3;
 reg [1:0] tc3,rc3;
 function [2:0] glyph_y;
- input [3:0] d,input_scale;
+ input [4:0] d;
+ input [3:0] input_scale;
  begin
-  if(input_scale==9) case(d)
-   0,1,2:glyph_y=0;3,4:glyph_y=1;5,6:glyph_y=2;7,8:glyph_y=3;
-   9,10,11:glyph_y=4;12,13:glyph_y=5;default:glyph_y=6;
+  if(input_scale==12) case(d)
+   0,1,2:glyph_y=0;3,4,5:glyph_y=1;6,7,8:glyph_y=2;
+   9,10,11:glyph_y=3;12,13,14:glyph_y=4;15,16,17:glyph_y=5;
+   18,19,20:glyph_y=6;default:glyph_y=7;
   endcase
-  else if(input_scale==6) case(d)
-   0,1:glyph_y=0;2:glyph_y=1;3,4:glyph_y=2;5:glyph_y=3;
-   6,7:glyph_y=4;8:glyph_y=5;9,10:glyph_y=6;default:glyph_y=7;
-  endcase
+  else if(input_scale==8) glyph_y=d<14?d[3:1]:3'd7;
   else glyph_y=d<7?d[2:0]:3'd7;
  end
 endfunction
 always @(posedge clk) begin
- mapped3<=coordinates[{(scale2==9?2'd2:scale2==6?2'd1:2'd0),dx2[9:0]}];
- row3<=glyph_y(dy2[3:0],scale2);slot3<=slot2;page3<=page2;
- hit3<=hit2 && dx2<1024 && dy2<16;tc3<=tc2;rc3<=rc2;
+ mapped3<=coordinates[scale2==12?{1'b1,dx2[10:0]}:{1'b0,(scale2==8),dx2[9:0]}];
+ row3<=glyph_y(dy2[4:0],scale2);slot3<=slot2;page3<=page2;
+ hit3<=hit2 && dx2<(scale2==12?2048:1024) && dy2<32;tc3<=tc2;rc3<=rc2;
 end
 reg [7:0] glyph4;
 reg [2:0] column4,row4;

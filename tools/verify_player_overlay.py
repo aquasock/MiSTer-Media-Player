@@ -15,7 +15,7 @@ def oracle(w,h,known,shown,paused,seeking,pos=1340400000,total=2629890000,patter
   ys,xs=np.indices((h,w));im=np.stack((xs%256,(xs+ys)%256,(xs*7+ys)%256),axis=-1).astype(np.uint8)
  background=im.copy()
  if not shown:return im
- scale=9 if h>=1000 else 6 if h>=700 else 4
+ scale=12 if h>=1000 else 8 if h>=700 else 4
  labels=[timestamp(pos//360000),(timestamp((total+359999)//360000) if known else '--:--:--'),(timestamp((max(0,total-pos)+359999)//360000) if known else '--:--:--')]
  im[h*466//480:h*480//480,w*32//720:w*688//720]=colors[2]
  x0=w*34//720;x1=w*686//720;y0=h*469//480;y1=h*477//480

@@ -1,5 +1,22 @@
 # Shared IDCT candidate
 
+## Integer-font simulation preview (not yet built for hardware)
+
+The overlay now uses exact glyph replication: 1x at 480p (5x7 glyphs), 2x at
+720p (10x14), and 3x at 1080p (15x21). UI anchors, progress-bar dimensions,
+colors and subtitle line positions remain the same. The 3x coordinate bank
+covers full 64-character lines; text-height limits now cover all 21 rows.
+
+Run `python3 tools/verify_subtitles.py --output results/ui-integer`, then
+`python3 tools/export_ui_simulation_previews.py` to reproduce lossless PNG
+screenshots at all three resolutions. Both full frames and native-pixel bottom
+crops are exported. These are production-RTL simulations on a solid background,
+not HDMI captures; view at 100% zoom to judge individual font pixels. The 480p
+frame is raw 720x480 output, before external pixel-aspect correction. The suite
+also compares maximum-length subtitle lines at all three resolutions.
+
+This preview change is excluded from the running 3f393c5 RBF builds.
+
 ## Direct subtitle value pages and media picker
 
 The picker displays **Load media *.MPG,FL***. Stock Main generates that suffix

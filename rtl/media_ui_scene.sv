@@ -38,7 +38,8 @@ reg [7:0] multiply_resume=0;
 reg [24:0] product_low=0;
 reg [35:0] remaining_delta=0,time_rounded=0;
 reg [34:0] remaining=0,clamped_position=0,time_operand=0;
-reg [11:0] glyph_span=0,text_span=0;
+reg [11:0] glyph_span=0;
+reg [12:0] text_span=0;
 reg div_start=0;
 reg [47:0] numerator=0;
 reg [34:0] denominator=1;
@@ -63,7 +64,7 @@ wire known=snapshot[70];
 wire [34:0] duration=snapshot[69:35],position=snapshot[34:0];
 
 // Three black clocks share the bar. Slot 3 stays disabled for object stability.
-wire [5:0] length=field<3?8:field==4?aux_length0[5:0]:field==5?aux_length1[5:0]:0;
+wire [6:0] length=field<3?7'd8:field==4?aux_length0:field==5?aux_length1:7'd0;
 function [7:0] time_glyph;
  input [5:0] index;
  begin
@@ -94,13 +95,13 @@ always @(posedge clk) begin
  remaining_delta<={1'b0,duration}-{1'b0,position};
  remaining<=remaining_delta[35]?35'd0:remaining_delta[34:0];
  clamped_position<=remaining_delta[35]?duration:position;
- glyph_span<=({6'd0,length}<<2)+({6'd0,length}<<1);
- text_span<=scale==9 ? (glyph_span<<3)+glyph_span : scale==6 ? (glyph_span<<2)+(glyph_span<<1) : glyph_span<<2;
+ glyph_span<=({5'd0,length}<<2)+({5'd0,length}<<1);
+ text_span<=scale==12 ? ({1'b0,glyph_span}<<3)+({1'b0,glyph_span}<<2) : scale==8 ? {1'b0,glyph_span}<<3 : {1'b0,glyph_span}<<2;
  text_we<=0;object_we<=0;commit<=0;div_start<=0;
  case(state)
   0:if(!pending && !auxiliary_editing && width!=0 && height!=0) begin
    snapshot<=state_in;w<=width;h<=height;revision<=auxiliary_revision;
-   scale<=height>=1000?9:height>=700?6:4;field<=0;state<=1;
+   scale<=height>=1000?12:height>=700?8:4;field<=0;state<=1;
   end
   1:begin
    if(field<3) begin time_operand<=field==0?position:field==1?duration:remaining;state<=40;end
@@ -125,15 +126,15 @@ always @(posedge clk) begin
   63:begin time_digits[7:4]<=quotient[3:0];time_digits[3:0]<=remainder[3:0];state<=5;end
   5:begin
    text_we<=1;text_addr<={field,ch};
-   if(ch>=length) text_data<=0;
+   if({1'b0,ch}>=length) text_data<=0;
    else text_data<=time_glyph(ch);
    if(ch==63) state<=6;else ch<=ch+1'b1;
   end
   6:multiply({36'd0,w},field==0?12'd141:field==2?12'd579:12'd360,46);
   46:divide(product,35'd720,7);
   7:begin
-   tw<=(text_span+12'd3)>>2;th<=scale==9?12'd16:scale==6?12'd11:12'd7;
-   tx<=quotient[11:0]-(text_span>>3);
+   tw<=12'((text_span+13'd3)>>2);th<=scale==12?12'd21:scale==8?12'd14:12'd7;
+   tx<=quotient[11:0]-12'(text_span>>3);
    multiply({36'd0,h},field==4?(aux_length1!=0?12'd431:12'd445):field==5?12'd445:12'd469,47);
   end
   47:divide(product,35'd480,8);
