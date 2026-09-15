@@ -1,3 +1,32 @@
+## 144 COMMIT Unreleased 3a72b70 2026-09-15T01:25:52-07:00
+
+#### Coming From:
+
+Unreleased 3a72b70
+
+#### Purpose:
+
+Qualify the three completed XY O-Scope and FFT peak-hold builds and package the passing candidate.
+
+#### Outcome:
+
+All three HIGH-packing builds compile successfully. Seed61 passes all four timing corners with setup +0.006 ns, hold +0.077 ns, recovery +3.491 ns, removal +0.163 ns and minimum pulse width +0.925 ns; setup margin is narrow. Seed52 fails setup at -0.017 ns with hold +0.047 ns, while seed87 fails setup at -0.194 ns and hold at -0.022 ns. All seeds pass 327 configuration CDC register checks and ten reset-release paths. Recommend seed61, using 39414 placed ALMs, 35757 estimated ALMs, 51568 registers, 4027450 memory data bits, 530 M10Ks, 75 DSPs and four PLLs. This leaves 2496 unoccupied ALMs, 23 M10Ks, 37 DSPs and two PLLs. Against prior e44a72d seed61 the change is -35 placed ALMs, +497 estimated ALMs, +689 registers, +65992 memory bits, eight additional M10Ks and unchanged DSP/PLL use, illustrating variation in packing. Verified packages and full JSON reports are under results/hardware-test-3a72b70; seed61 RBF SHA-256 is e0b925e7b318834ce2423a2653c99deb26220a114b4ebc1c0493a58543110d17. No RBF was deployed, no new builds were started and hardware acceptance remains pending.
+
+#### Next Steps:
+
+Have the user test seed61 for all three visualizers, FFT baseline and peak markers, aspect settings, mode/file switching, album/track UI, seeking and the four MPG regression files.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 143 COMMIT Unreleased 3a72b70 2026-09-15T00:52:10-07:00
 
 #### Coming From:
@@ -1284,61 +1313,6 @@ Finish and report the three combined builds, including resources and timing with
 - tools/test_media_subtitles.sv
 - tools/verify_media_format_handoff.py
 - tools/verify_subtitles.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 104 COMMIT Unreleased b3e4f1d 2026-09-14T15:59:29-07:00
-
-#### Coming From:
-
-Unreleased bfdafe2
-
-#### Purpose:
-
-Integrate standalone native FLAC playback into the production mounted-file and platform paths.
-
-#### Outcome:
-
-Commit b3e4f1d integrates content-based FLAC selection, mutually exclusive drained DDR ownership, a vendor PCM CDC FIFO, native 44.1 kHz clock/output and stock Main HDMI configuration handoffs, source-sample timestamps, Space pause, volume and drained EOF. The common picker uses FL* to accommodate stock Main's three-character extension patterns. Movie decoding and its existing filter/output path remain intact; FLAC seeking and additional music processing remain later gates. Native component tests and production integration pass, including 1024 exact stereo I2S/SPDIF samples, pause, simulated Main register overwrite/reapplication, final-sample drain and movie restoration. Movie audio, pause/seek, mounted-reader duration/FLAC detection and subtitle/overlay regressions pass. Preliminary timing review corrected output-clock exclusivity and native reset release. The vendor automatic switch wrapper starts on unavailable PLL input zero, so production now explicitly gates off, selects PLL input 2/3, then reenables through synchronized requests. The integration bench executes that sequencing RTL and rejects enabled selection changes or short clock pulses. Superseded 95af4d3 and fa041b0 runs were cancelled before hardware handoff. The user requests the usual three builds; clean b3e4f1d seeds 52/61/87 are running in results/build-b3e4f1d-20260914-163106. No new RBF, fitted area, timing acceptance or physical native-HDMI qualification is claimed yet.
-
-#### Next Steps:
-
-Finish the three builds, audit all timing corners and physical resources, and package the best candidate for native-rate hardware and four-movie regression tests. Preserve b639ccc seed 52 as rollback. Qualify real HPS I2C busy behavior and HDMI playback on the board; stock Main, no resampling and a shared boundary for future 44.1 kHz WAV remain mandatory.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_06.svh
-- docs/FLAC_OUTPUT_INTEGRATION.md
-- docs/TEST_INSTRUCTIONS.md
-- files.qip
-- rtl/audio/media_music_time.sv
-- rtl/audio/media_pcm_i2s.sv
-- rtl/media_duration_probe.sv
-- rtl/media_keyboard_control.sv
-- rtl/platform/media_audio_clocks.sv
-- rtl/platform/media_audio_rate_control.sv
-- rtl/platform/media_hdmi_audio_control.sv
-- rtl/platform/media_native_audio.sv
-- sys/emu_ports.vh
-- sys/spdif.v
-- sys/sys_top.v
-- tools/build_three_seeds.py
-- tools/phase1p_timing.tcl
-- tools/test_media_duration_reader.sv
-- tools/test_media_keyboard_control.sv
-- tools/test_media_music_time.sv
-- tools/test_media_native_audio.sv
-- tools/test_media_pcm_i2s.sv
-- tools/verify_flac_integration.py
 
 #### Status:
 
