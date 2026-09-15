@@ -1,3 +1,32 @@
+## 137 COMMIT Unreleased ??? 2026-09-14T23:57:03-07:00
+
+#### Coming From:
+
+Unreleased c0a41cf
+
+#### Purpose:
+
+Provide a standalone Python utility that bundles adjacent CD-format FLAC tracks into a core-compatible album.
+
+#### Outcome:
+
+The user requests a script placed beside already correctly formatted FLAC tracks, with no other input files. Use the script directory, filename ordering and a folder-named output, preserving decoded PCM and embedding CD track markers plus a bounded seek table. Refuse an existing output and leave source files unchanged. This is a host utility and requires no new RBF build.
+
+#### Next Steps:
+
+Check a small generated album for exact PCM concatenation and embedded cue/seek metadata, commit the utility and provide a copy in the specified album folder for the user to run.
+
+#### Files Modified:
+
+- tools/bundle_flac_album.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 136 COMMIT Unreleased c0a41cf 2026-09-14T23:43:41-07:00
 
 #### Coming From:
@@ -1332,35 +1361,6 @@ Review the plan with the user and begin feasibility/output qualification when im
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 97 COMMIT Unreleased b639ccc 2026-09-14T14:26:52-07:00
-
-#### Coming From:
-
-Unreleased db4bc3f
-
-#### Purpose:
-
-Record hardware acceptance of shared-IDCT seed 52.
-
-#### Outcome:
-
-The user reports that the latest build passes everything. Accept the preferred b639ccc MEDIUM seed 52 shared-IDCT candidate as the new hardware baseline, with corrected audit revision db4bc3f, RBF SHA-256 a9244b912ad3acd127366e10d6470fc509ccc3d0c63b29b1a031f6674d7b9f95, 35908 placed ALMs, 512 M10Ks, 59 DSPs, and four-corner setup/hold minima +0.645/+0.081 ns. This supersedes the pending acceptance recorded in entry 96. Retain 7eb5088 MEDIUM seed 61 as the previous rollback. The user also requests a FLAC implementation plan; no FLAC implementation or additional builds are authorized by this planning step.
-
-#### Next Steps:
-
-Draft the standalone 44100 Hz, 16-bit stereo FLAC plan against this accepted baseline, including output-rate handling, bounded on-chip memory, exact sample verification, playback controls and video regression gates.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
