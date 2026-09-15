@@ -8,6 +8,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Re-split the `MediaPlayer_top_00.svh`-`_07.svh` sequential fragments into
+  nine topic-named files (`_ports`, `_music`, `_session`, `_clocks`,
+  `_container`, `_decoder`, `_prediction`, `_framebuffer`, `_output`) with no
+  change to concatenated source text or the MiSTer-facing top entity.
 - Double O-Scope to 256 by 256 positions using eight phosphor levels and 24
   M10Ks. Preserve native stereo mapping, square aspect geometry and short
   seven-sweep trails. Pipeline geometry and RAM fading for HDMI timing.
