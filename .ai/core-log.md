@@ -1,3 +1,32 @@
+## 114 COMMIT Unreleased 6bfcea3 2026-09-14T18:16:48-07:00
+
+#### Coming From:
+
+Unreleased 6bfcea3
+
+#### Purpose:
+
+Run one additional maximum-packing build alongside the approved UI timing batch.
+
+#### Outcome:
+
+The user requests one more Quartus build with the best seed and maximum effort. Seed 87 has the best previous setup margin and uses the same archived 6bfcea3 source as the ongoing three-seed batch. An isolated HIGH ALM_REGISTER_PACKING_EFFORT run is now compiling under results/build-6bfcea3-packing-high-20260914-181622 with six workers and the existing STANDARD FIT and HIGH PERFORMANCE EFFORT settings. The tracked QSF and three MEDIUM build snapshots are unchanged. The experiment helper is copied into the evidence directory; full four-corner timing and CDC/reset-release audits run after compilation. No savings or timing pass is claimed before completion.
+
+#### Next Steps:
+
+Compare actual placed ALMs, RAM, timing and compile time with the MEDIUM seed 87 build, and package the best fully passing candidate for hardware validation.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 113 COMMIT Unreleased 6bfcea3 2026-09-14T18:09:48-07:00
 
 #### Coming From:
@@ -1425,40 +1454,6 @@ Complete the existing lowered-overlay build qualification and retain the revised
 #### Files Modified:
 
 - docs/UI_OVERLAY_PLAN.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 74 COMMIT Unreleased ffafc79 2026-09-14T09:09:57-07:00
-
-#### Coming From:
-
-Unreleased 1d58018
-
-#### Purpose:
-
-Lower the playback progress strip by one bar height and show only clock values in its three fields.
-
-#### Outcome:
-
-Implemented the requested 14-reference-pixel downward shift for track, fill and three centered clocks, removing their static prefixes. Elapsed, total and remaining retain their left-to-right order; unknown fields retain dashes. Separate pause/seek status and retained auxiliary provider behavior are unchanged. Updated the preview, pixel oracle, plan, test instructions and changelog. All nine full-frame cases pass at 480p, 720p and 1080p, totaling 5414400 matching pixels, plus retained-provider lifetime, UI state and 518 enabled-divider cases. Source ffafc79 is pushed and clean seeds 52, 61 and 87 are compiling; supervisor output is /tmp/ui-lower-clocks-build.log. No hardware deployment occurred. The user's statement that everything looks good follows the encoding correction; it is not treated as explicit acceptance of a particular duration RBF.
-
-#### Next Steps:
-
-Audit the completed three-seed timing and resource results, package the best qualified RBF and have the user check clock centering, bottom margin, unknown times and playback controls on hardware.
-
-#### Files Modified:
-
-- rtl/media_ui_scene.sv
-- tools/verify_player_overlay.py
-- docs/ui/overlay-preview.html
-- docs/UI_OVERLAY_PLAN.md
-- docs/TEST_INSTRUCTIONS.md
-- CHANGELOG.md
 
 #### Status:
 
