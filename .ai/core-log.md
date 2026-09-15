@@ -1,3 +1,32 @@
+## 135 COMMIT Unreleased a77a2da 2026-09-14T23:35:48-07:00
+
+#### Coming From:
+
+Unreleased d2487b8
+
+#### Purpose:
+
+Qualify the completed shorter-UI and one-minute-seek build batch and report resources.
+
+#### Outcome:
+
+All three a77a2da HIGH-packing builds complete in approximately sixteen to seventeen minutes. Independent four-corner checks qualify seeds 61 and 87; seed 52 fails setup at -0.187 ns. Recommend seed 61 with worst setup +0.460 ns, hold +0.114 ns, recovery +2.808 ns, removal +0.172 ns and minimum pulse width +0.925 ns. Seed 87 has setup +0.011 ns and hold +0.109 ns. All pass 321 configuration CDC register checks and ten reset-release paths. Seed 61 uses 39128 placed ALMs, 34950 estimated ALMs, 51051 total registers, 3961810 block-memory data bits, 522 M10Ks, 76 DSP blocks and four PLLs, leaving 2782 physical ALMs, 31 M10Ks, 36 DSPs and two PLLs. Hash-verified RBFs and reports are packaged under results/hardware-test-a77a2da; seed61 SHA-256 is 05dfcd392a7e20270e94e10fd0be981d0abfda4917676c0807ddc7ca164d6484. The queued d2487b8 batch with F1-F8 shortcuts automatically started at 23:32:42 in results/build-d2487b8-20260914-233242 and is still compiling. Nothing was deployed and hardware acceptance remains pending.
+
+#### Next Steps:
+
+Finish and qualify the d2487b8 batch, then offer its best candidate for combined Fire, UI timeout, relative seek and F-key hardware tests.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 134 COMMIT Unreleased d2487b8 2026-09-14T23:21:00-07:00
 
 #### Coming From:
@@ -1326,35 +1355,6 @@ Test results/hardware-test-b639ccc/seed52/MediaPlayer_20260914.rbf on Fellow, Gr
 - tools/phase1p_timing.tcl
 - tools/audit_three_seeds.py
 - docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 95 COMMIT Unreleased b639ccc 2026-09-14T14:03:21-07:00
-
-#### Coming From:
-
-Unreleased b639ccc
-
-#### Purpose:
-
-Record the standalone CD-quality FLAC music playback target.
-
-#### Outcome:
-
-The user clarifies that FLAC restores the music-player side for the user's own standalone files, not movie audio, and sets the acceptance target: a CD-ripped WAV converted to FLAC should play perfectly. The initial profile is 44100 Hz, 16-bit stereo PCM, reconstructed sample-for-sample with the original WAV before optional output filters or volume processing, with correct playback rate and no dropped/repeated samples or buffer underruns. Ordinary compatible FLAC encoder compression settings must work without a special encoding recipe; a fixed-predictor-only demonstration is insufficient. Validate lossless decoding, channel reconstruction and continuous playback against original WAV samples, plus pause/seek/EOF behavior. High-resolution and multichannel FLAC are outside this initial target. The xavieran/fLaCPGA reference was inspected at a724a18b6205b192bd42977186b669d467b0aa9b: its integrated frame path is restricted to mono and hardcoded 4096-sample blocks, with LPC code separate from the subframe path. It is an architectural reference, not a complete compatible decoder or measured Cyclone V resource estimate. No FLAC RTL is implemented by this scope update; shared-IDCT builds remain independent and the accepted video baseline stays 7eb5088 MEDIUM seed 61.
-
-#### Next Steps:
-
-Use this CD-quality profile for the FLAC design and test corpus, covering ordinary compression settings, metadata, channel coding, block sizes and final short blocks within the target. Measure a standalone decoder implementation before claiming it fits alongside the video player; preserve current video functionality and existing shared-IDCT build work.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
