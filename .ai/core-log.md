@@ -1,3 +1,32 @@
+## 123 COMMIT Unreleased 2498125 2026-09-14T20:22:02-07:00
+
+#### Coming From:
+
+Unreleased 2498125
+
+#### Purpose:
+
+Run an additional HIGH-packing visualizer build to reduce placed logic usage.
+
+#### Outcome:
+
+The user requests one more build using resource-reduction settings. Launch source 2498125 with seed 87 and HIGH ALM_REGISTER_PACKING_EFFORT, retaining STANDARD FIT and HIGH PERFORMANCE EFFORT plus the existing area-oriented physical-synthesis settings. This is the packing configuration that previously saved 936 placed ALMs; savings for the new visualizer must be measured. The three standard MEDIUM-packing seeds continue in their isolated archives. The extra run also performs timing and CDC audits, with explicit corner-slack inspection required afterward.
+
+#### Next Steps:
+
+Compare all four builds on actual placed ALMs, RAM/DSP usage and complete timing qualification, and package the best hardware candidate.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 122 COMMIT Unreleased 2498125 2026-09-14T20:19:12-07:00
 
 #### Coming From:
@@ -1386,35 +1415,6 @@ Audit all corners, profiler absence, remaining CDC and resource usage; package t
 - tools/audit_three_seeds.py
 - tools/phase1p_timing.tcl
 - tools/verify_player_overlay.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 83 COMMIT Unreleased e9f9bfb 2026-09-14T11:40:39-07:00
-
-#### Coming From:
-
-Unreleased 6688db2
-
-#### Purpose:
-
-Record hardware acceptance of the EOF core and plan safe production diagnostic removal.
-
-#### Outcome:
-
-The user reports the latest EOF core passes, accepting b05b76f seed 87's startup return, session clearing and layout as the new rollback baseline. Its package metadata is marked accepted. Source e9f9bfb adds a proposed removal plan only; no RTL is changed and no new builds start. The inventory identifies the cadence snapshot/overlay, 256-bit telemetry mailbox, reporting-only counters and CDC, profiler-only seconds clock and Audio test generator/transport/menu. Seek and EOF consume scheduler debug bits 26 and 0, so named functional outputs must replace them before debug cleanup. Decoder modules named probe/diagnostic, fatal checks, timeouts, byte positions, generations, FIFO flow control, PCM finished synchronization and the 90 kHz timebase must remain. Proposed implementation is two reviewable commits followed by one three-seed batch, with pixel/PCM/control/subtitle regressions and post-fit proof of removal. Simulation tooling remains; the unbuilt audio warning tolerance becomes unnecessary in production when its reporting consumer is removed. Baseline is 37410 actual ALMs, 527 M10Ks and 75 DSPs; savings must be measured rather than promised.
-
-#### Next Steps:
-
-Present the plan for implementation approval, then remove reporting hardware while preserving functional safety and qualify seeds 52, 61 and 87 against accepted b05b76f.
-
-#### Files Modified:
-
-- docs/DIAGNOSTIC_REMOVAL_PLAN.md
 
 #### Status:
 
