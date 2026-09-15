@@ -1,3 +1,32 @@
+## 108 COMMIT Unreleased da59ce0 2026-09-14T17:26:11-07:00
+
+#### Coming From:
+
+Unreleased 78c919f
+
+#### Purpose:
+
+Record completed subtitle-control and FLAC-to-MPG handoff builds for hardware testing.
+
+#### Outcome:
+
+All three clean da59ce0 seeds compiled and completed timing audits, with verified RBF hashes packaged under results/hardware-test-da59ce0. Preferred seed 61 uses 38024 placed ALMs, 509 M10Ks, 62 DSPs, four PLLs and 46034 registers; free capacity is 3886 ALMs, 44 M10Ks, 50 DSPs and two PLLs. Its worst four-corner setup is +0.283 ns, hold +0.103 ns, recovery -11.027 ns, removal +0.124 ns and pulse width +0.925 ns. Seed 87 uses 38138 ALMs with setup +0.195 ns, hold +0.104 ns and recovery -11.163 ns. Seed 52 uses 38031 ALMs with setup -0.246 ns, hold +0.093 ns and recovery -11.490 ns. No seed fully passes timing; fixes remain deferred by user instruction. The same-seed 61 resource delta versus b3e4f1d is +45 placed ALMs, +2 M10Ks and +1 DSP. These RBFs include subtitle controls and the memory handoff fix but not the later 78c919f picker label. Hardware acceptance is pending.
+
+#### Next Steps:
+
+Test seed 61 with active and paused FLAC-to-MPG replacement, reverse switching, subtitle visibility/offset/speed and the four movie regressions. Preserve accepted b639ccc seed 52 as rollback and carry the queued Load media label into the next build.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 107 COMMIT Unreleased 78c919f 2026-09-14T17:11:12-07:00
 
 #### Coming From:
@@ -1419,35 +1448,6 @@ The user confirms pause/resume, forward/backward seeking and ten-second overlay 
 #### Next Steps:
 
 Continue user hardware testing and retain the conservative unknown-duration behavior unless a separate improvement to timestamp association and endpoint qualification is requested.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 68 COMMIT Unreleased b00920a 2026-09-14T07:53:13-07:00
-
-#### Coming From:
-
-Unreleased aa8d067
-
-#### Purpose:
-
-Record the first successful hardware playback and time-field test of the shared overlay.
-
-#### Outcome:
-
-The user is testing the supplied overlay core and reports that Star Wars - EPISODE IV - A New Hope - Despecialized - LOWER.mpg from the GIT HDD works perfectly and the time fields update properly. This records a successful file-specific hardware test of the supplied b00920a seed 52 candidate. The user has not yet reported completion of the remaining pause/seek, unknown-duration, file-switch and HDMI-mode checks; overall candidate acceptance remains pending. No source or binary changes were made.
-
-#### Next Steps:
-
-Continue the current hardware test, especially pause/resume and seeking with time-field updates, automatic hiding, OSD/filter coexistence and switching files without retaining the previous duration.
 
 #### Files Modified:
 
