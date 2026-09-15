@@ -1,3 +1,42 @@
+## 152 COMMIT Unreleased 143d2a5 2026-09-15T04:40:30-07:00
+
+#### Coming From:
+
+Unreleased 68f32c7
+
+#### Purpose:
+
+Re-split the sequentially-numbered MediaPlayer_top_00-07.svh fragments into topic-named files for a user repo audit ahead of release.
+
+#### Outcome:
+
+The eight numbered .svh fragments, split purely by line count with no module boundary of their own, are replaced by nine files named for their actual content: MediaPlayer_top_ports, _music, _session, _clocks, _container, _decoder, _prediction, _framebuffer and _output. MediaPlayer.sv's `include order is updated to match, and two stale in-comment filename references to the old numbering are corrected. A byte-for-byte diff of the full concatenation against the original eight files matched exactly (identical SHA-256) before the two comment corrections, confirming no code was lost, duplicated or reordered; `include is pure text substitution and files.qip lists only MediaPlayer.sv, so the split is invisible to the compiler. A synthesis-only quartus_map sanity check against the live repo (not a seed build) completed with 0 errors and the same resource scale as prior full builds (88,474 logic cells, 2,343 RAM segments, 5 PLLs, 75 DSPs); no RBF was produced or is authorized by this entry, and no timing-corner analysis was run. Source 143d2a5 is committed. A quartus_map side effect briefly wrote ~330 lines of sys.qip-sourced pin/device assignments directly into MediaPlayer.qsf; this was reverted with git checkout before committing and is not part of 143d2a5.
+
+#### Next Steps:
+
+Commit and push this restructuring, then include it in the next authorized three-seed rebuild alongside any other pending source changes rather than building it alone.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer.sv
+- MediaPlayer_top_clocks.svh
+- MediaPlayer_top_container.svh
+- MediaPlayer_top_decoder.svh
+- MediaPlayer_top_framebuffer.svh
+- MediaPlayer_top_music.svh
+- MediaPlayer_top_output.svh
+- MediaPlayer_top_ports.svh
+- MediaPlayer_top_prediction.svh
+- MediaPlayer_top_session.svh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 151 COMMIT Unreleased 68f32c7 2026-09-15T04:10:20-07:00
 
 #### Coming From:
