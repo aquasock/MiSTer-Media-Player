@@ -1,3 +1,44 @@
+## 143 COMMIT Unreleased ??? 2026-09-15T00:52:10-07:00
+
+#### Coming From:
+
+Unreleased e44a72d
+
+#### Purpose:
+
+Add a green phosphor stereo XY O-Scope and move the renamed FFT bars to the bottom edge.
+
+#### Outcome:
+
+The user authorizes a new stereo XY visualizer, with left audio controlling X and right audio controlling Y, under the name O-Scope. Rename the existing mirrored ribbons Waveforms and Fire to FFT. Keep all three in the audio-only Visualizers menu. Use a small on-chip phosphor intensity buffer with connected sample traces and frame-based decay, without audio backpressure or external DDR. Retain matched video latency, aspect viewport and UI layering. Place FFT blocks against the viewport bottom with no bottom gap.
+
+#### Next Steps:
+
+Implement and simulate the renderer, menu selection and FFT baseline, generate previews and measure resources before launching the next three-core build.
+
+#### Files Modified:
+
+- rtl/media_xy_visualizer.sv
+- rtl/media_audio_visualizers.sv
+- rtl/media_fire_renderer.sv
+- MediaPlayer_top_00.svh
+- sys/emu_ports.vh
+- sys/sys_top.v
+- files.qip
+- tools/phase1p_timing.tcl
+- tools/test_media_fire_visualizers.sv
+- tools/verify_fire_visualizers.py
+- docs/FIRE_VISUALIZER.md
+- CHANGELOG.md
+- README.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 142 COMMIT Unreleased e44a72d 2026-09-15T00:32:27-07:00
 
 #### Coming From:
@@ -1295,57 +1336,6 @@ Finish the three builds, audit all timing corners and physical resources, and pa
 - tools/test_media_native_audio.sv
 - tools/test_media_pcm_i2s.sv
 - tools/verify_flac_integration.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 103 COMMIT Unreleased bfdafe2 2026-09-14T15:29:03-07:00
-
-#### Coming From:
-
-Unreleased 7c197c9
-
-#### Purpose:
-
-Connect CRC-admitted FLAC frames to bounded DDR ownership and develop native output integration.
-
-#### Outcome:
-
-Commit bfdafe2 connects the FLAC parser to two external provisional/committed DDR frame banks and exact stereo PCM tokens, using 1 MiB within the inactive video FIFO region. Cancellation retains held requests and drains old responses before reuse. All 55 complete corpus files pass through modeled DDR to original PCM; the 63-case suite also covers five cancellation phases, zero-latency reads, shared-sink EOF/position and CRC failure. Native I2S tests verify 1024 exact stereo samples, 512-clock cadence, pause and last-bit drain. Connected HDMI control tests prove exclusive register access, read-modify-write/readback of 44.1/48/inherited 96 kHz output settings, simulated Main overwrite/reapplication and fault recovery. A clock-stretch timeout now generates STOP after recovery rather than leaving ownership stuck. Native PLL and vendor selector fit after using Cyclone V PLL inputs 2/3. Isolated fits use 1953 placed ALMs, two M10Ks and one DSP for decoder/store/stereo; 225 ALMs for connected HDMI control; and 78 ALMs for PCM/I2S, totaling 2256 before production integration. The clock probe uses two PLLs including the existing movie PLL. Strict lint and five native component/connected tests pass. Evidence is results/flac/ddr, results/flac/native-audio and their documented isolated fit directories. No files.qip or production top-level changes, full-core build or playable FLAC RBF are claimed; accepted b639ccc seed 52 remains unchanged.
-
-#### Next Steps:
-
-Wire mounted-file content selection, shared DDR ownership and PCM CDC into production; connect real drain/clock acknowledgements and the native clock/output/filter path. Then build a hardware candidate to qualify actual HPS I2C busy behavior, native HDMI clock/rate and clean movie/music transitions. Preserve existing 48 kHz MP2 and inherited platform 96 kHz output; retain the format-independent PCM boundary for future 44.1 kHz WAV. Do not equate isolated fits or simulated HPS traffic with whole-core timing or hardware acceptance.
-
-#### Files Modified:
-
-- docs/FLAC_FEASIBILITY.md
-- docs/FLAC_OUTPUT_INTEGRATION.md
-- docs/FLAC_PLAN.md
-- rtl/audio/flac/flac_ddr_decoder.sv
-- rtl/audio/flac/flac_frame_store.sv
-- rtl/audio/media_pcm_i2s.sv
-- rtl/platform/hdmi_audio_config.sv
-- rtl/platform/hdmi_i2c_write_watch.sv
-- rtl/platform/i2c_register_master.sv
-- rtl/platform/media_audio_clocks.sv
-- rtl/platform/media_audio_rate_control.sv
-- rtl/platform/media_hdmi_audio_control.sv
-- tools/i2c_register_model.svh
-- tools/synth_flac_clock.py
-- tools/synth_flac_predict.py
-- tools/test_flac_ddr.sv
-- tools/test_hdmi_audio_config.sv
-- tools/test_hdmi_i2c_write_watch.sv
-- tools/test_media_audio_rate_control.sv
-- tools/test_media_hdmi_audio_control.sv
-- tools/test_media_pcm_i2s.sv
-- tools/verify_flac_ddr.py
-- tools/verify_native_audio.py
 
 #### Status:
 
