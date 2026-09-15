@@ -1,3 +1,32 @@
+## 128 COMMIT Unreleased 36085f6 2026-09-14T22:01:28-07:00
+
+#### Coming From:
+
+Unreleased d3c416a
+
+#### Purpose:
+
+Qualify and package the completed CD navigation and FLAC seeking builds.
+
+#### Outcome:
+
+All three HIGH-packing 36085f6 builds compile successfully. Independent four-corner setup, hold, recovery, removal and pulse-width checks pass for seeds 61 and 87; seed 52 fails HDMI setup at -0.083 ns. Recommend seed 87 with worst setup +0.322 ns, hold +0.110 ns, recovery +3.369 ns, removal +0.167 ns and pulse width +0.925 ns. It uses 37911 placed ALMs (33879 estimated), 48480 registers, 516 M10Ks, 68 DSPs and four PLLs, leaving 3999 physical ALMs, 37 M10Ks, 44 DSPs and two PLLs. Seed 61 uses 38072 placed ALMs and has setup +0.319 ns and hold +0.057 ns. All seeds pass 297 configuration CDC register checks and ten reset-release paths. Hash-verified RBF packages and resource/timing JSON are in results/hardware-test-36085f6. Recommended seed 87 SHA-256 is 820bdd7fecf7c4d3dab232b93929f9fc5c87b56f28a889d601a327ae40880757. Hardware acceptance remains pending; no RBF was deployed. These builds do not include the later d3c416a audio graphics aspect correction, which remains ready for the next build cycle.
+
+#### Next Steps:
+
+Have the user test seed 87 with completed CD FLAC N/P navigation, ordinary FLAC timed seeks, paused landing, EOF, MPG/FLAC replacement and the four MPG regression files; include d3c416a in the next build cycle.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 127 COMMIT Unreleased d3c416a 2026-09-14T21:47:29-07:00
 
 #### Coming From:
@@ -1313,48 +1342,6 @@ Qualification is documented and pushed; have the user repeat Fellow, Groove, Jig
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 88 COMMIT Unreleased 7eb5088 2026-09-14T12:45:21-07:00
-
-#### Coming From:
-
-Unreleased 0ad4b1b
-
-#### Purpose:
-
-Remove gate-three Audio test hardware and consolidate playback clocks onto the progress bar.
-
-#### Outcome:
-
-The user reports all gate-two hardware tests pass and authorizes gate three plus compact UI changes. Source 7eb5088 removes the Audio test menu, tone generator, test PCM FIFO, mode/restart mailboxes, reset/control state, adapter and output mux; movie PCM connects directly to MiSTer outputs. Old status bits 1–3 stay reserved. Black elapsed/total/remaining clocks share the bar; Paused/Seeking character generation and status payload bits are removed. The bar and subtitles move down one 14-pixel logical line, preserving activity visibility, seek previews, subtitles and functional pause/seek. Twelve player and five subtitle full-frame cases pass at 480p/720p/1080p. Controls, reader-error seek retirement, subtitle transport/lifetime and EOF pass; mixed and seek-EOF oracles each check 423936 pixels without mismatches. Audio checks 48384 stereo pairs within one PCM unit of FFmpeg, exact pause/seek sequences and 30 PTS records without warning or underrun. Static bindings prove old Audio test bits cannot override movie PCM. Fitted audits require 11 test-hardware patterns absent and three functional PCM groups present, plus the existing 183 CDC checks. Source is pushed and clean seeds 52/61/87 run under /tmp/gate3-build.log. Gate-two 100ab07 seed 87 is hardware accepted and retained as rollback; no core is deployed.
-
-#### Next Steps:
-
-Audit all three builds for timing, retained PCM and CDC, test-hardware absence and resources; package the preferred RBF for the user's four-file hardware acceptance. Use audit_three_seeds.py with --require-no-profiler --require-no-reporting --require-no-audio-test and gate-two baseline 37326 ALMs/527 M10Ks. Do not launch extra timing-fix builds without direction.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer_av.svh
-- MediaPlayer_top_00.svh
-- docs/DIAGNOSTIC_REMOVAL_PLAN.md
-- docs/TEST_INSTRUCTIONS.md
-- docs/ui/overlay-preview.html
-- files.qip
-- rtl/media_ui_scene.sv
-- rtl/media_ui_state.sv
-- tools/audit_three_seeds.py
-- tools/phase1p_timing.tcl
-- tools/test_media_ui_state.sv
-- tools/verify_player_overlay.py
-- tools/verify_subtitles.py
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
