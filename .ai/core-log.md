@@ -10,7 +10,7 @@ Add a green phosphor stereo XY O-Scope and move the renamed FFT bars to the bott
 
 #### Outcome:
 
-The user authorizes a new stereo XY visualizer, with left audio controlling X and right audio controlling Y, under the name O-Scope. Rename the existing mirrored ribbons Waveforms and Fire to FFT. Keep all three in the audio-only Visualizers menu. Use a small on-chip phosphor intensity buffer with connected sample traces and frame-based decay, without audio backpressure or external DDR. Retain matched video latency, aspect viewport and UI layering. Place FFT blocks against the viewport bottom with no bottom gap.
+The user authorizes a new stereo XY visualizer, with left audio controlling X and right audio controlling Y, under the name O-Scope. Rename the existing mirrored ribbons Waveforms and Fire to FFT. Keep all three in the audio-only Visualizers menu. Use a small on-chip phosphor intensity buffer with connected sample traces and frame-based decay, without audio backpressure or external DDR. Retain matched video latency, aspect viewport and UI layering. Place FFT blocks against the viewport bottom with no bottom gap. The user additionally authorizes thin red peak-hold caps with a long decay; pack per-band peak and age into the existing band RAM and verify attack, hold, decay and clearing before the same build.
 
 #### Next Steps:
 
