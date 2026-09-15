@@ -1,3 +1,32 @@
+## 126 COMMIT Unreleased ??? 2026-09-14T21:24:58-07:00
+
+#### Coming From:
+
+Unreleased d24abc0
+
+#### Purpose:
+
+Add embedded CD cue-sheet navigation to single-file FLAC albums.
+
+#### Outcome:
+
+The user clarifies that the requested feature is whole-disc FLAC playback with N/P track navigation, not damaged-file handling. The active abcde rip is in /run/media/vash/GIT/test1 and its cue sheet lists 17 tracks. A three-second excerpt encoded at FLAC level 8 with an embedded cue sheet already decodes through the existing DDR pipeline to all 132300 original stereo pairs. Implement a bounded metadata index for CD INDEX 01 positions and FLAC seek points, use the mounted reader and existing drained-session restart for track changes, and preserve pause. Nearest preceding seek points permit exact sample landing with short discarded preroll; absent seek points fall back to decoding from the first audio frame. New media must clear the index and pending navigation. RFC 9639 sections 8.5 and 8.7 in the existing reference catalog define offsets and metadata structures.
+
+#### Next Steps:
+
+Verify cue/seek parsing, N/P key lifetime, sample-exact frame restart and preroll, pause and file replacement, then run the next three HIGH-packing builds and inspect all timing corners before hardware testing.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 125 COMMIT Unreleased d24abc0 2026-09-14T21:04:30-07:00
 
 #### Coming From:
@@ -1299,117 +1328,6 @@ Have the user test Fellow, Groove, Jiggler and Star Wars with playback, pause/se
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 86 COMMIT Unreleased 100ab07 2026-09-14T12:09:09-07:00
-
-#### Coming From:
-
-Unreleased a406feb
-
-#### Purpose:
-
-Implement gate-two reporting removal and frozen MPEG2FPGA repository cleanup.
-
-#### Outcome:
-
-The user authorizes gate two after the gate-one candidate handoff. Source 100ab07 removes the reporting mailbox, minimum-reservoir tracking, audio warning/sample-count crossings, whole-second reporting, dead LED-success expressions and 70 unconsumed decoder observation connections. Standalone module observation ports remain for simulation; a 17-pattern fitted audit requires their selected reporting registers absent in production. Seek/EOF now use identical named pending-frame/reorder state outputs. A dependency review found reader failure also traveled through the old telemetry bus into seek control; a dedicated one-bit reader_error_config mailbox preserves that function and the mandatory CDC total stays 183. Live timeout quarantine, fatal checks, PCM-finished crossing, generation/byte position, 90 kHz ticks and Audio test remain. The inactive 57-file MPEG2FPGA tree and two wrappers are deleted, with provenance and retained licensing documented. Mixed I/P/B EOF and seek-to-EOF/ownership oracles each pass 423936 pixels with no mismatch; controls, reader fault/quarantine, raster/refresh, subtitle/UI and independent reader-error CDC/seek retirement pass. Audio checks 48384 sample pairs within one PCM unit of FFmpeg, exact pause/seek output and 30 PTS records without underrun or timestamp warning. Evidence is under results/gate2-*. Source is pushed and clean seeds 52/61/87 run under /tmp/gate2-build.log. No core is deployed and no gate-three work starts. Timing will be reported without extra closure builds per the user's preference.
-
-#### Next Steps:
-
-Audit and package gate-two timing, remaining CDC, reporting-register absence and resources; provide the preferred RBF for Fellow, Groove, Jiggler and Star Wars. Retain gate-one seed 52 and explicitly hardware-accepted b05b76f seed 87; wait for user authorization before gate three.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- CONTRIBUTING.md
-- MediaPlayer_av.svh
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_03.svh
-- MediaPlayer_top_04.svh
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_06.svh
-- MediaPlayer_top_07.svh
-- README.md
-- docs/DIAGNOSTIC_REMOVAL_PLAN.md
-- docs/LEGACY_MPEG2FPGA.md
-- docs/MPEG2_NEW_DECODER.md
-- docs/TEST_INSTRUCTIONS.md
-- files.qip
-- rtl/mpeg2_ddram_bridge.sv
-- rtl/mpeg2_decoder.sv
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- rtl/mpeg2fpga/README.md
-- rtl/mpeg2fpga/compat/generic_dpram.v
-- rtl/mpeg2fpga/compat/generic_fifo_dc.v
-- rtl/mpeg2fpga/compat/generic_fifo_sc_b.v
-- rtl/mpeg2fpga/compat/wrappers.v
-- rtl/mpeg2fpga/mpeg2/fifo_size.v
-- rtl/mpeg2fpga/mpeg2/framestore.v
-- rtl/mpeg2fpga/mpeg2/framestore_request.v
-- rtl/mpeg2fpga/mpeg2/framestore_response.v
-- rtl/mpeg2fpga/mpeg2/fwft.v
-- rtl/mpeg2fpga/mpeg2/getbits.v
-- rtl/mpeg2fpga/mpeg2/idct.v
-- rtl/mpeg2fpga/mpeg2/iquant.v
-- rtl/mpeg2fpga/mpeg2/mem_addr.v
-- rtl/mpeg2fpga/mpeg2/mem_codes.v
-- rtl/mpeg2fpga/mpeg2/mixer.v
-- rtl/mpeg2fpga/mpeg2/modeline.v
-- rtl/mpeg2fpga/mpeg2/motcomp.v
-- rtl/mpeg2fpga/mpeg2/motcomp_addrgen.v
-- rtl/mpeg2fpga/mpeg2/motcomp_dctcodes.v
-- rtl/mpeg2fpga/mpeg2/motcomp_dcttype.v
-- rtl/mpeg2fpga/mpeg2/motcomp_motvec.v
-- rtl/mpeg2fpga/mpeg2/motcomp_picbuf.v
-- rtl/mpeg2fpga/mpeg2/motcomp_recon.v
-- rtl/mpeg2fpga/mpeg2/mpeg2video.v
-- rtl/mpeg2fpga/mpeg2/osd.v
-- rtl/mpeg2fpga/mpeg2/pixel_queue.v
-- rtl/mpeg2fpga/mpeg2/probe.v
-- rtl/mpeg2fpga/mpeg2/read_write.v
-- rtl/mpeg2fpga/mpeg2/regfile.v
-- rtl/mpeg2fpga/mpeg2/regfile_codes.v
-- rtl/mpeg2fpga/mpeg2/resample.v
-- rtl/mpeg2fpga/mpeg2/resample_addrgen.v
-- rtl/mpeg2fpga/mpeg2/resample_bilinear.v
-- rtl/mpeg2fpga/mpeg2/resample_codes.v
-- rtl/mpeg2fpga/mpeg2/resample_dta.v
-- rtl/mpeg2fpga/mpeg2/reset.v
-- rtl/mpeg2fpga/mpeg2/rld.v
-- rtl/mpeg2fpga/mpeg2/syncgen.v
-- rtl/mpeg2fpga/mpeg2/syncgen_intf.v
-- rtl/mpeg2fpga/mpeg2/synchronizer.v
-- rtl/mpeg2fpga/mpeg2/timescale.v
-- rtl/mpeg2fpga/mpeg2/vbuf.v
-- rtl/mpeg2fpga/mpeg2/vlc_tables.v
-- rtl/mpeg2fpga/mpeg2/vld.v
-- rtl/mpeg2fpga/mpeg2/vld_codes.v
-- rtl/mpeg2fpga/mpeg2/watchdog.v
-- rtl/mpeg2fpga/mpeg2/wrappers.v
-- rtl/mpeg2fpga/mpeg2/xfifo_sc.v
-- rtl/mpeg2fpga/mpeg2/xilinx_fifo.v
-- rtl/mpeg2fpga/mpeg2/xilinx_fifo144.v
-- rtl/mpeg2fpga/mpeg2/xilinx_fifo216.v
-- rtl/mpeg2fpga/mpeg2/xilinx_fifo_dc.v
-- rtl/mpeg2fpga/mpeg2/xilinx_fifo_sc.v
-- rtl/mpeg2fpga/mpeg2/yuv2rgb.v
-- rtl/mpeg2fpga/mpeg2/zigzag_table.v
-- rtl/mpeg2fpga/mpeg2fpga.qip
-- tools/audit_three_seeds.py
-- tools/phase1p_timing.tcl
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/test_reader_error_seek.sv
-- tools/verify_playback_controls.py
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
