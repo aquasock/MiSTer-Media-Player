@@ -9,6 +9,24 @@ module test_media_waveform_visualizer;
  reg hs=0,vs=0,de=0;
  wire [23:0] rgb_out;wire hs_out,vs_out,de_out;
  media_waveform_visualizer dut(.*);
+`ifdef WAVEFORM_BASELINE
+ wire [23:0] baseline_rgb;
+ wire baseline_hs,baseline_vs,baseline_de;
+ media_waveform_visualizer_baseline baseline(
+  .audio_clk(audio_clk),.video_clk(video_clk),.audio_active(audio_active),.sample_tick(sample_tick),
+  .sample_left(sample_left),.sample_right(sample_right),.rgb(rgb),.hs(hs),.vs(vs),.de(de),
+  .rgb_out(baseline_rgb),.hs_out(baseline_hs),.vs_out(baseline_vs),.de_out(baseline_de));
+ reg [26:0] baseline_delay0=0,baseline_delay1=0;
+ integer compared=0;
+ always @(posedge video_clk)begin
+  baseline_delay0<={baseline_hs,baseline_vs,baseline_de,baseline_rgb};baseline_delay1<=baseline_delay0;
+  #1;
+  if(cycles>12)begin
+   if({hs_out,vs_out,de_out,rgb_out}!==baseline_delay1)$fatal(1,"original waveform mismatch at cycle %0d",cycles);
+   compared=compared+1;
+  end
+ end
+`endif
  integer mode=0,n=0,phase=0;
  always @(negedge audio_clk)begin
   sample_tick=phase==0;phase=(phase+1)%512;
@@ -22,15 +40,15 @@ module test_media_waveform_visualizer;
    end
   end
  end
- reg [26:0] expected[0:6];integer p;integer cycles=0;
+ reg [26:0] expected[0:8];integer p;integer cycles=0;
  reg check_bypass=1;
  always @(posedge video_clk)begin
-  for(p=6;p>0;p=p-1)expected[p]=expected[p-1];
+  for(p=8;p>0;p=p-1)expected[p]=expected[p-1];
   expected[0]={hs,vs,de,rgb};cycles=cycles+1;
   #1;
   if(cycles>8)begin
-   if({hs_out,vs_out,de_out}!==expected[6][26:24])$fatal(1,"sync latency");
-   if(check_bypass&&rgb_out!==expected[6][23:0])$fatal(1,"bypass pixel");
+   if({hs_out,vs_out,de_out}!==expected[8][26:24])$fatal(1,"sync latency");
+   if(check_bypass&&rgb_out!==expected[8][23:0])$fatal(1,"bypass pixel");
   end
  end
  integer width=720,height=480,fd=0,pixels=0,bright=0;

@@ -39,9 +39,9 @@ module media_waveform_visualizer(
  wire active=snapshot[32];
  reg seen_epoch=0;reg [7:0] seen_sequence=0,head=0;
  reg [8:0] count=0;
- (* ramstyle="M10K" *) reg [31:0] history[0:255];
+ (* ramstyle="M10K, no_rw_check" *) reg [31:0] history[0:255];
  reg [15:0] previous_pair=0;
- (* ramstyle="M10K" *) reg [31:0] frame_history[0:255];
+ (* ramstyle="M10K, no_rw_check" *) reg [31:0] frame_history[0:255];
  reg [31:0] history_q=0,copy_q=0;
  reg copying=0;
  reg [8:0] copy_index=0,frame_count=0;
@@ -96,50 +96,63 @@ module media_waveform_visualizer(
   if(de_d&&!de)begin width<=x;y<=y+1'b1;end
   if(vs&&!vs_d)begin height<=y;y<=0;end
  end
- // Seven stages, including synchronous history read. The same delay is applied
+ // Reads concurrent with writes are never consumed: history writes stop
+ // during copying, and display pixels are masked throughout frame copying.
+ // no_rw_check avoids a RAM write-forwarding mux on the interpolation path.
+ // Nine stages, including registered RAM output and a separate subtraction. The same delay is applied
  // to bypass pixels and all syncs; geometry uses the measured HDMI raster.
- reg [23:0] pixels[0:5];
- reg [5:0] hpipe=0,vpipe=0,dpipe=0,enable_pipe=0;
- reg [11:0] ypos[0:4];
- reg [7:0] fraction_q=0;
+ reg [23:0] pixels[0:7];
+ reg [7:0] hpipe=0,vpipe=0,dpipe=0,enable_pipe=0;
+ reg [11:0] ypos[0:6];
+ reg [7:0] fraction_q=0,fraction_ram=0,fraction_difference=0;
+ (* preserve *) reg [31:0] history_pixels=0;
+ reg signed [8:0] difference_l=0,difference_r=0;
+ reg signed [7:0] previous_source_l=0,previous_source_r=0;
+ reg [7:0] glow_delay0=0,glow_delay1=0;
  reg signed [7:0] previous_l=0,previous_r=0,interpolated_l=0,interpolated_r=0;
  reg signed [17:0] blend_l=0,blend_r=0;
- wire signed [8:0] difference_l=$signed({history_q[15],history_q[15:8]})-$signed({history_q[31],history_q[31:24]});
- wire signed [8:0] difference_r=$signed({history_q[7],history_q[7:0]})-$signed({history_q[23],history_q[23:16]});
+
+
  reg signed [20:0] product_l=0,product_r=0;
  reg signed [13:0] curve_l=0,curve_r=0;
  reg [13:0] distance_l=0,distance_r=0;
  wire signed [12:0] amplitude=$signed({1'b0,height>>3});
  wire signed [13:0] center_l=$signed({2'b0,(height>>2)+(height>>3)});
  wire signed [13:0] center_r=$signed({2'b0,(height>>1)+(height>>3)});
- wire signed [13:0] delta_l=$signed({2'b0,ypos[4]})-curve_l;
- wire signed [13:0] delta_r=$signed({2'b0,ypos[4]})-curve_r;
+ wire signed [13:0] delta_l=$signed({2'b0,ypos[6]})-curve_l;
+ wire signed [13:0] delta_r=$signed({2'b0,ypos[6]})-curve_r;
  wire [13:0] thickness=height>=900 ? 14'd3 : height>=600 ? 14'd2 : 14'd1;
  integer i;
  always @(posedge video_clk)begin
   pixels[0]<=rgb;ypos[0]<=y;
-  for(i=1;i<6;i=i+1)pixels[i]<=pixels[i-1];
-  for(i=1;i<5;i=i+1)ypos[i]<=ypos[i-1];
-  hpipe<={hpipe[4:0],hs};vpipe<={vpipe[4:0],vs};dpipe<={dpipe[4:0],de};
-  enable_pipe<={enable_pipe[4:0],active&&!copying&&valid_history&&width>=256&&height>=240};
+  for(i=1;i<8;i=i+1)pixels[i]<=pixels[i-1];
+  for(i=1;i<7;i=i+1)ypos[i]<=ypos[i-1];
+  hpipe<={hpipe[6:0],hs};vpipe<={vpipe[6:0],vs};dpipe<={dpipe[6:0],de};
+  enable_pipe<={enable_pipe[6:0],active&&!copying&&valid_history&&width>=256&&height>=240};
   fraction_q<=position_x[7:0];
-  previous_l<=$signed(history_q[31:24]);previous_r<=$signed(history_q[23:16]);
-  blend_l<=difference_l*$signed({1'b0,fraction_q});blend_r<=difference_r*$signed({1'b0,fraction_q});
+  history_pixels<=history_q;fraction_ram<=fraction_q;
+  difference_l<=$signed({history_pixels[15],history_pixels[15:8]})-$signed({history_pixels[31],history_pixels[31:24]});
+  difference_r<=$signed({history_pixels[7],history_pixels[7:0]})-$signed({history_pixels[23],history_pixels[23:16]});
+  previous_source_l<=$signed(history_pixels[31:24]);previous_source_r<=$signed(history_pixels[23:16]);
+  fraction_difference<=fraction_ram;
+  previous_l<=previous_source_l;previous_r<=previous_source_r;
+  glow_delay0<=snapshot[7:0];glow_delay1<=glow_delay0;
+  blend_l<=difference_l*$signed({1'b0,fraction_difference});blend_r<=difference_r*$signed({1'b0,fraction_difference});
   interpolated_l<=previous_l+8'(blend_l>>>8);interpolated_r<=previous_r+8'(blend_r>>>8);
   product_l<=interpolated_l*amplitude;product_r<=interpolated_r*amplitude;
   curve_l<=center_l-14'(product_l>>>7);curve_r<=center_r+14'(product_r>>>7);
   distance_l<=delta_l[13] ? -delta_l : delta_l;
   distance_r<=delta_r[13] ? -delta_r : delta_r;
-  hs_out<=hpipe[5];vs_out<=vpipe[5];de_out<=dpipe[5];
-  rgb_out<=pixels[5];
-  if(enable_pipe[5]&&dpipe[5])begin
+  hs_out<=hpipe[7];vs_out<=vpipe[7];de_out<=dpipe[7];
+  rgb_out<=pixels[7];
+  if(enable_pipe[7]&&dpipe[7])begin
    rgb_out<=24'h030810;
    if(distance_l<=thickness*4)rgb_out<=24'h083340;
    if(distance_r<=thickness*4)rgb_out<=24'h402010;
    if(distance_l<=thickness*2)rgb_out<=24'h127a90;
    if(distance_r<=thickness*2)rgb_out<=24'h904020;
-   if(distance_l<=thickness)rgb_out<={8'h60,8'h7f+snapshot[7:0],8'hff};
-   if(distance_r<=thickness)rgb_out<={8'hff,8'h60+snapshot[7:0],8'h50};
+   if(distance_l<=thickness)rgb_out<={8'h60,8'h7f+glow_delay1,8'hff};
+   if(distance_r<=thickness)rgb_out<={8'hff,8'h60+glow_delay1,8'h50};
   end
  end
 endmodule

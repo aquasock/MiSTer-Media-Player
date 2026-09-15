@@ -1,3 +1,21 @@
+# Waveform timing rebuild — HIGH packing default
+
+All builds now use HIGH ALM register packing. The waveform pipeline separates
+registered history data, stereo sample differences and interpolation products.
+RGB, syncs, coordinates and glow have matching delays, preserving the original
+rendered output after two additional pixel clocks. The RAMs do not require
+read-during-write forwarding because overlapping reads are discarded.
+
+The original 2498125 HIGH seed 87 can be used for functional testing but fails
+setup by 2.053 ns. Keep accepted punctuation 6d460d2 seed 87 as the rollback.
+Cycle-by-cycle equivalence against 2498125 passes at 480p, 720p and 1080p,
+including stereo waveforms, silence, replacement and movie bypass:
+`python3 tools/verify_waveform_visualizer.py --output results/waveform-timing-equivalence --baseline 2498125`.
+The new three-seed batch must pass explicit four-corner timing checks; a zero
+exit from the timing script alone is not a timing pass.
+
+---
+
 # Native stereo waveform — source and simulation only
 
 The new waveform is enabled automatically for native FLAC playback. Cyan is
@@ -7,13 +25,13 @@ post-volume PCM, not decoder read-ahead. Four samples are averaged per point;
 so visible response is limited by refresh/scanout and the connected display.
 This is a waveform visualization, not a spectrum or calibrated measurement.
 
-Standalone Quartus synthesis estimates 455 ALMs and 730 registers, with four
+Standalone Quartus synthesis of the pipelined version estimates 541 ALMs and 908 registers, with four
 DSP blocks and 16,384 block-memory bits (two M10Ks). These are module estimates,
 not a full-core placement or timing result.
 
 The two histories use 256x32-bit M10K arrays. They never access stream DDR or
 apply backpressure to audio. Only visual history writes briefly wait during a
-frame copy. Seven pixel-clock stages delay RGB and syncs equally before the
+frame copy. Nine pixel-clock stages delay RGB and syncs equally before the
 existing UI and OSD. The visualizer currently appears on HDMI only.
 
 Run `python3 tools/verify_waveform_visualizer.py --output results/waveform --synthesize`

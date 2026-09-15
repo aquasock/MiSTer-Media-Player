@@ -5,12 +5,19 @@ from pathlib import Path
 from PIL import Image
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--output',type=Path,required=True)
+p.add_argument('--baseline',help='git revision of the seven-stage renderer for cycle-by-cycle equivalence')
 p.add_argument('--synthesize',action='store_true',help='run standalone Quartus mapping, not a full RBF build')
 a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=True)
 root=Path(__file__).resolve().parents[1]
 sources=['tools/test_media_waveform_visualizer.sv','rtl/media_waveform_visualizer.sv','rtl/video_config_cdc.sv']
+extra=[]
+if a.baseline:
+ old=subprocess.check_output(['git','show',a.baseline+':rtl/media_waveform_visualizer.sv'],cwd=root,text=True)
+ old=old.replace('module media_waveform_visualizer(', 'module media_waveform_visualizer_baseline(',1)
+ old_path=out/'baseline.sv';old_path.write_text(old)
+ extra=['-DWAVEFORM_BASELINE',str(old_path)]
 with (out/'compile.log').open('w') as log:
- subprocess.run(['verilator','--binary','--timing','-Wno-fatal','--top-module','test_media_waveform_visualizer','--Mdir',str(out/'obj'),'-j','4',*sources],cwd=root,stdout=log,stderr=subprocess.STDOUT,check=True)
+ subprocess.run(['verilator','--binary','--timing','-Wno-fatal','--top-module','test_media_waveform_visualizer','--Mdir',str(out/'obj'),'-j','4',*sources,*extra],cwd=root,stdout=log,stderr=subprocess.STDOUT,check=True)
 results={}
 for w,h in [(720,480),(1280,720),(1920,1080)]:
  stem=f'waveform-{w}x{h}';ppm=out/(stem+'.ppm')
