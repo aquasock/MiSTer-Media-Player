@@ -1,4 +1,4 @@
-## 142 COMMIT Unreleased ??? 2026-09-15T00:32:27-07:00
+## 142 COMMIT Unreleased e44a72d 2026-09-15T00:32:27-07:00
 
 #### Coming From:
 
@@ -10,24 +10,31 @@ Show album progress followed by track progress for six seconds on audio activity
 
 #### Outcome:
 
-The user authorizes three seconds of album progress followed by three seconds of current-track progress for every audio UI activation, including natural cue-boundary transitions. Reuse the existing cue RAM read port during navigation idle and the serial music-time converter for track-relative values. Preserve three-second movie behavior, active seek visibility and whole-album F-key targeting, separating keyboard duration from display duration. Cue-less FLAC is treated as a single track.
+Implemented audio progress as three seconds of album values followed by three seconds of current-track values, including automatic activation on natural track transitions. The user corrected the initial F-key plan: F1-F8 must always divide the current audio track, regardless of display phase; video remains whole-file. A background observer shares the existing cue RAM read port only while navigation is idle, publishing current start/end and one change pulse per transition without stalling playback. Cue-less FLAC uses the whole file as one track. Extended the shared serial sample-time converter to five album/track values using the exact 400/49 ratio with appropriate rounding; F1 maps back to the exact track-start sample, and shortcuts wait for refreshed track times. No second divider or cue RAM was added. Audio UI activity restarts the six-second sequence; active seeks retain the album preview and landing starts six seconds again. Movie UI remains three seconds. Exact timer checks, all sample-time rounding/saturation cases, modifier/bounds/OSD/held-key tests, four direct-video-seek tests, eight playback tests and all 28 FLAC album tests pass. A new integration bench verifies natural transitions and current-track F-keys during both album and track display, pause and replacement. Evidence is under results/audio-track-ui. Source e44a72d is pushed and three HIGH-packing builds are launched for seeds 52/61/87, supervisor PID 1122432. Full fit, timing and hardware acceptance remain pending.
 
 #### Next Steps:
 
-Implement boundary monitoring and the two UI phases, verify track transitions and seek/navigation priority alongside time conversion and video regressions, then run the next three HIGH-packing builds.
+Qualify all build corners and CDC audits, report resource use, and have the user test album/track progress phases, automatic track transitions, current-track F-keys and all prior video/audio behavior.
 
 #### Files Modified:
 
 - CHANGELOG.md
+- MediaPlayer_top_00.svh
 - README.md
 - docs/TEST_INSTRUCTIONS.md
-- MediaPlayer_top_00.svh
 - rtl/audio/flac/flac_album_control.sv
 - rtl/audio/media_music_time.sv
+- rtl/media_keyboard_control.sv
 - rtl/media_ui_state.sv
+- tools/test_audio_track_ui.sv
+- tools/test_direct_seek_restart.sv
 - tools/test_flac_album_control.sv
+- tools/test_flac_seek_keyboard.sv
+- tools/test_media_keyboard_control.sv
 - tools/test_media_music_time.sv
 - tools/test_media_ui_state.sv
+- tools/test_playback_restart.sv
+- tools/verify_flac_album.py
 
 #### Status:
 
