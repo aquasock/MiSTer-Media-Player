@@ -1,3 +1,32 @@
+## 113 COMMIT Unreleased ??? 2026-09-14T18:09:48-07:00
+
+#### Coming From:
+
+Unreleased df2d7a6
+
+#### Purpose:
+
+Build the approved integer-font and centered-bar UI with complete timing qualification.
+
+#### Outcome:
+
+The user approves the UI preview and requests all changes in the next three builds with timing closure pursued. Carry forward direct subtitle pages, Load media and the FLAC-to-MPG fix. Previous recovery reports identify sysmem init_reset_n and its fitted duplicate driving native audio reset-release chains; the existing scoped reset exceptions omitted this asynchronous source. Add only that source-to-chain exception and require stage-to-stage setup paths to remain timed. Include the new same-enable bar-layout registers in the existing four-cycle scene formatter constraint. Validate constraints against an existing fit, then perform clean integrated builds and inspect all timing corners.
+
+#### Next Steps:
+
+Audit reset release and scoped formatter timing, run relevant verification, build seeds 52/61/87 and package timing-qualified candidates or investigate any remaining failures.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 112 COMMIT Unreleased df2d7a6 2026-09-14T17:55:26-07:00
 
 #### Coming From:
@@ -1427,37 +1456,6 @@ Audit the completed three-seed timing and resource results, package the best qua
 - docs/UI_OVERLAY_PLAN.md
 - docs/TEST_INSTRUCTIONS.md
 - CHANGELOG.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 73 COMMIT Unreleased 1d58018 2026-09-14T08:49:53-07:00
-
-#### Coming From:
-
-Unreleased 9076405
-
-#### Purpose:
-
-Document revised duration build qualification and reproduce the reported conversion cadence failure.
-
-#### Outcome:
-
-All 3d48cc5 builds completed. Seeds 61 and 87 pass all four timing corners, 159 CDC registers and scene-enable audits; seed 52 fails setup at -0.381 ns. Preferred seed 87 has setup +0.427 ns, hold +0.107 ns, 37715 actual ALMs, 520 M10Ks and 69 DSPs, leaving 4195 ALMs and 33 M10Ks. Its packaged RBF is results/hardware-test-3d48cc5/seed87/MediaPlayer_20260914.rbf with verified SHA-256 d6f66b6870113e53e46f8d229b11c90b0d0f8870e5c6cb621cc99cf1991a80e7. Hardware acceptance remains pending. Separately, full-start 68-second fellow conversion reproduces 477 dropped and 475 duplicated frames inside the fps filter; millisecond timestamps near a half-frame phase explain the failure. Removing that filter and using output -r:v 24000/1001 -fps_mode:v cfr eliminates reported synchronization drops/duplicates. Groove's corrected moving sample advances through every source frame; fellow's dark opening makes low-resolution image matching ambiguous, so no exact pixel-oracle claim is made for it. Thread count variants do not explain the failure; one encoder thread accounts for approximately 3.6 percent of 28 logical CPUs. The committed bounded reproduction tool was run successfully on fellow and reproduced both outcomes. Full movie originals remain unchanged; no hardware deployment or additional builds occurred.
-
-#### Next Steps:
-
-Have the user test the corrected short encoding and timing-qualified seed 87, including Groove duration and existing playback controls; retain tested b00920a seed 52 as rollback. Select encoding frame rate to match each source and keep unknown duration when bounded evidence is unavailable.
-
-#### Files Modified:
-
-- docs/TEST_INSTRUCTIONS.md
-- docs/ENCODING_CADENCE.md
-- tools/reproduce_encode_cadence.py
 
 #### Status:
 
