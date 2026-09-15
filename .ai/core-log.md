@@ -1,3 +1,32 @@
+## 141 COMMIT Unreleased c0a41cf 2026-09-15T00:16:20-07:00
+
+#### Coming From:
+
+Unreleased 8298662
+
+#### Purpose:
+
+Qualify the completed F-key and quantized Fire batches and report full-core resources.
+
+#### Outcome:
+
+Both batches complete. All d2487b8 seeds pass four-corner timing; setup/hold minima are +0.361/+0.069 ns for 52, +0.530/+0.045 ns for 61 and +0.121/+0.093 ns for 87. For the newer c0a41cf block Fire batch, seeds 52 and 87 pass all four corners while 61 fails setup at -0.064 ns. Recommend c0a41cf seed87: setup +0.261 ns, hold +0.064 ns, recovery +3.844 ns, removal +0.224 ns and minimum pulse width +0.925 ns. Seed52 has setup +0.089 ns and hold +0.095 ns. Every build passes 321 configuration CDC register checks and ten reset-release paths. Latest seed87 uses 39064 placed ALMs (34834 estimated), 50655 registers, 3961458 memory data bits, 522 M10Ks, 74 DSPs and four PLLs, leaving 2846 physical ALMs, 31 M10Ks, 38 DSPs and two PLLs. Compared with d2487b8 seed87, quantized Fire saves 67 placed ALMs, 144 estimated ALMs, 262 registers, 352 memory bits and two DSPs with no additional M10K. Packages with hash verification and JSON reports are under results/hardware-test-d2487b8 and results/hardware-test-c0a41cf. Recommended seed87 RBF SHA-256 is 58ffeb0830986ad291dcdb30bec1d494728b0b3069dbf2422c8c0830442016cb. All latest player changes are included; no RBF was deployed and hardware acceptance remains pending.
+
+#### Next Steps:
+
+Have the user test c0a41cf seed87 for discrete Fire and O-scope, all keyboard seeks and pause states, duration gating, CD tracks, aspect, EOF, file replacement and the four MPG regression files.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 140 COMMIT Unreleased 8298662 2026-09-15T00:12:47-07:00
 
 #### Coming From:
@@ -1307,40 +1336,6 @@ Implement bounded DDR provisional/committed frame ownership and connect admitted
 - tools/synth_flac_predict.py
 - tools/test_flac_stream.sv
 - tools/verify_flac_stream.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 101 COMMIT Unreleased 36587f6 2026-09-14T15:01:56-07:00
-
-#### Coming From:
-
-Unreleased 09a4d66
-
-#### Purpose:
-
-Implement streamed FLAC subframe parsing and reconstruction against independent test vectors.
-
-#### Outcome:
-
-Commit 36587f6 implements streamed RFC 9639 subframe decoding for coded 16/17-bit CD channels: constant/verbatim, fixed orders 0–4, LPC orders 1–32, wasted bits, both Rice widths, escaped residuals including zero width, partition constraints and signed range checks. It reuses the serial MAC with synchronous 32x16 coefficient and 32x17 history M10Ks. Constructed vectors first pass 83 cases; real first-frame corpus testing passes 193 cases. Full-corpus Verilator regression passes 3173 cases covering every frame of all 55 files, original PCM lengths, short final blocks, input/output stalls and 3160 midstream reset/replays. There are 7777824 complete-subframe expected samples and 7964966 provisional transfers including replayed prefixes; malformed cases may emit provisional samples before rejection. The independent offline parser validates header/frame CRCs and stereo reconstruction against original PCM before supplying coded-channel expectations. Outer framing/CRC commit and stereo joining remain software responsibilities in this harness, not implemented FPGA behavior. Isolated Quartus fitting includes the MAC and uses 1160 placed ALMs, 1154 estimated ALMs, 396 registers, two M10Ks and one DSP; no need to add the standalone MAC cost again. Strict RTL lint passes with the intentional unconnected status port excluded. Evidence is results/flac/subframe-full-corpus and results/flac/subframe-fit. No production files.qip change, integrated core build or playable FLAC RBF is claimed.
-
-#### Next Steps:
-
-Implement FPGA outer metadata/frame headers, CRC admission and DDR-backed stereo/frame ownership, then connect validated PCM to the shared sink. Continue native HDMI transaction and HPS interface integration before hardware handoff. Preserve native 44.1 kHz FLAC, future WAV adapter compatibility, 48 kHz movie input and the existing platform output option without claiming 96 kHz input decoding. Accepted b639ccc seed 52 remains the hardware baseline.
-
-#### Files Modified:
-
-- docs/FLAC_FEASIBILITY.md
-- rtl/audio/flac/flac_subframe.sv
-- tools/flac_reference.py
-- tools/test_flac_subframe.sv
-- tools/verify_flac_subframe.py
-- tools/synth_flac_predict.py
 
 #### Status:
 
