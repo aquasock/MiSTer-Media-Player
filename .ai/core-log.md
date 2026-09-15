@@ -1,4 +1,4 @@
-## 132 COMMIT Unreleased ??? 2026-09-14T22:39:47-07:00
+## 132 COMMIT Unreleased e481f40 2026-09-14T22:39:47-07:00
 
 #### Coming From:
 
@@ -10,15 +10,34 @@ Add an FFT-driven Fire visualizer alongside O-scope with an audio-only selection
 
 #### Outcome:
 
-The user authorizes a new FFT flame visualizer and the next three-core build. Implement an original bounded 256-point fixed-point FFT over the post-volume native stereo tap, 32 frequency bands, coherent presentation and procedural flame rendering inside the existing audio aspect viewport. Reuse the parallel nine-cycle visual output boundary so the UI and OSD stay above either mode. Add a Visualizers submenu, hidden outside audio playback, with O-scope and Fire choices. Preserve audio transport and use no external DDR; verify FFT arithmetic, tones/stereo behavior, silence/reset, renderer timing/clipping and existing O-scope/movie behavior. Check standalone resource cost against the baseline's 3592 free placed ALMs and 37 free M10Ks before full builds.
+Implemented the audio-only Visualizers submenu with Type choices O-scope and Fire; the user clarified that O-scope names the existing two ribbons, which remain pixel-identical. Fire uses an original 256-point Hann-windowed fixed-point radix-2 FFT, L+jR stereo packing and mirrored-bin absolute magnitudes, 32 frequency bands and a logarithmic flame intensity. The analyzer only observes the post-volume native PCM tap and has no ready output or stream DDR access. Complete spectra cross through a coalescing mailbox and publish during vertical blank; both renderers have nine matched pixel stages, retain the audio aspect viewport and remain below the existing UI/OSD. Mode changes commit at frame boundaries. Ten FFT cases match every complex bin and display level against an independent integer oracle, including opposite-phase stereo, noise and cancellation during analysis. Twelve complete-render cases pass both aspect modes at 480p/720p/1080p, exact movie and O-scope bypass, silence and live mode switching. Final RTL previews are in results/fire/final-render; an earlier flat-palette preview was shown to the user before the final gradient. Standalone final fit uses 1216 estimated ALMs (1381 placed), 2517 registers, six M10Ks and twelve DSPs for both visualizers together: approximately 675 estimated ALMs, four M10Ks and eight DSPs beyond the prior standalone O-scope. Short delay pipes stay in registers. Full-core Analysis and Elaboration passes; full fit/timing and hardware remain pending. Commit e481f40 is the source for the authorized three HIGH-packing builds, seeds 52/61/87.
 
 #### Next Steps:
 
-Implement and simulate, inspect standalone synthesis and full integration, commit/push, then launch seeds 52, 61 and 87 with HIGH packing for timing and hardware qualification.
+Inspect the three build results, all four timing corners and CDC audits, package the best candidate, and have the user test Fire/O-scope selection, audio-only menu visibility, aspect, silence/pause, seeks, EOF and MPG regression files.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer_top_00.svh
+- README.md
+- docs/FIRE_VISUALIZER.md
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/media_audio_fft.sv
+- rtl/media_audio_visualizers.sv
+- rtl/media_fft_band_end.hex
+- rtl/media_fft_twiddle.hex
+- rtl/media_fft_window.hex
+- rtl/media_fire_renderer.sv
+- sys/emu_ports.vh
+- sys/sys_top.v
+- tools/make_fire_tables.py
+- tools/phase1p_timing.tcl
+- tools/test_media_audio_fft.sv
+- tools/test_media_fire_visualizers.sv
+- tools/verify_fire_fft.py
+- tools/verify_fire_visualizers.py
 
 #### Status:
 
