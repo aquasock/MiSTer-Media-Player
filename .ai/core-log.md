@@ -1,4 +1,4 @@
-## 126 COMMIT Unreleased ??? 2026-09-14T21:24:58-07:00
+## 126 COMMIT Unreleased 36085f6 2026-09-14T21:24:58-07:00
 
 #### Coming From:
 
@@ -6,19 +6,33 @@ Unreleased d24abc0
 
 #### Purpose:
 
-Add embedded CD cue-sheet navigation to single-file FLAC albums.
+Add embedded CD track navigation and video-style keyboard seeking to native FLAC playback.
 
 #### Outcome:
 
-The user clarifies that the requested feature is whole-disc FLAC playback with N/P track navigation, not damaged-file handling. The active abcde rip is in /run/media/vash/GIT/test1 and its cue sheet lists 17 tracks. A three-second excerpt encoded at FLAC level 8 with an embedded cue sheet already decodes through the existing DDR pipeline to all 132300 original stereo pairs. Implement a bounded metadata index for CD INDEX 01 positions and FLAC seek points, use the mounted reader and existing drained-session restart for track changes, and preserve pause. Nearest preceding seek points permit exact sample landing with short discarded preroll; absent seek points fall back to decoding from the first audio frame. New media must clear the index and pending navigation. RFC 9639 sections 8.5 and 8.7 in the existing reference catalog define offsets and metadata structures.
+Implemented optional CD CUESHEET INDEX 01 and SEEKTABLE parsing into bounded block-RAM tables (99 tracks and 512 seek points), N/P track selection, and Left/Right 10-second, Ctrl 30-second and Ctrl+Alt five-minute jumps for both albums and ordinary FLAC. Cached STREAMINFO and preceding frame offsets drive the existing drained session restart; CRC-admitted PCM preroll is discarded to the exact sample target without resampling. Pause survives navigation, progress stays album-relative, new media clears pending state, and seek configuration is acknowledged across clocks before reader start. Missing seek points fall back to the first audio frame; unknown total samples disable navigation/seeking. The active abcde rip in /run/media/vash/GIT/test1 has 17 tracks; an encoded three-second excerpt previously matched all 132300 original stereo pairs. Reproducible simulation now passes 27 album/navigation/landing cases, 63 DDR corpus/cancellation cases, 73 stream-decoder cases, native audio integration and movie direct-seek regression. Full-core Quartus Analysis and Elaboration passes. Evidence is under results/flac-album and adjacent flac-album-*-regression folders. No damaged-file recovery was added. Three HIGH-packing seeds 52/61/87 are the next build batch; full fit/timing and hardware validation remain pending.
 
 #### Next Steps:
 
-Verify cue/seek parsing, N/P key lifetime, sample-exact frame restart and preroll, pause and file replacement, then run the next three HIGH-packing builds and inspect all timing corners before hardware testing.
+Inspect all three build resource and four-corner timing reports, then package the best candidate for user testing of completed CD FLAC tracks, ordinary FLAC seeking, paused landing, EOF and MPG/FLAC replacement. Retain d24abc0 waveform and accepted 6d460d2 punctuation candidates as rollback.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer_top_00.svh
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/audio/flac/flac_album_control.sv
+- rtl/audio/flac/flac_ddr_decoder.sv
+- rtl/audio/flac/flac_pcm_landing.sv
+- rtl/audio/flac/flac_stream_decoder.sv
+- tools/phase1p_timing.tcl
+- tools/test_flac_album_control.sv
+- tools/test_flac_ddr.sv
+- tools/test_flac_seek_keyboard.sv
+- tools/test_flac_stream.sv
+- tools/verify_flac_album.py
 
 #### Status:
 
