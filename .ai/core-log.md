@@ -1,3 +1,35 @@
+## 145 COMMIT Unreleased ??? 2026-09-15T01:46:18-07:00
+
+#### Coming From:
+
+Unreleased 3a72b70
+
+#### Purpose:
+
+Shorten XY O-Scope persistence to expose individual traces while preserving stereo geometry.
+
+#### Outcome:
+
+The user likes the 128 by 128 pixelated style and authorizes a shorter persistence implementation without Quartus builds. Keep native stereo X/Y mapping and natural amplitude shrinkage, and increase decay from one to two intensity levels per frame with saturation at zero. This reduces untouched trace lifetime from fifteen to eight decay sweeps, about 250 to 133 milliseconds at 60 Hz. Retain the existing memory, palette and line renderer. The phone recording shows a dense diagonal oval shrinking during the song fade; native Main screenshots cannot capture the post-scaler visualizer. Circular artistic mapping remains a separate unimplemented idea.
+
+#### Next Steps:
+
+Update the decay regression for eight sweeps and saturation across all sixteen starting intensities, run simulation and lint, commit the implementation and await user authorization before any Quartus build.
+
+#### Files Modified:
+
+- rtl/media_xy_visualizer.sv
+- tools/test_media_xy_visualizer.sv
+- docs/FIRE_VISUALIZER.md
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 144 COMMIT Unreleased 3a72b70 2026-09-15T01:25:52-07:00
 
 #### Coming From:
@@ -1273,50 +1305,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 105 COMMIT Unreleased da59ce0 2026-09-14T16:40:32-07:00
-
-#### Coming From:
-
-Unreleased b3e4f1d
-
-#### Purpose:
-
-Move subtitles into a stock Main submenu with visibility, offset and speed controls.
-
-#### Outcome:
-
-Commit da59ce0 implements the stock Main subtitle submenu with SRT loading, visibility, offset -5.0 to +5.0 seconds in 0.1-second steps and the final speed range 0.50x to 1.50x in 0.01x steps. Absolute serial timing arithmetic and streaming-reader restart preserve video/audio behavior; menu text uses block RAM. All 10,201 setting pairs plus boundary cases, reader retiming, actual HPS menu readback, strict timing-module lint and full-frame rendering pass. The FLAC-to-MPG fix feeds physical DDR busy to the quiesced movie arbiter so it can report idle and release music mode. The production-wiring handoff regression passes four round trips with delayed responses, music drain, physical busy and inactive grant exclusion; the original wiring reproduces the reported stall. Native audio regression passes 1024 exact I2S/SPDIF pairs, pause, position, EOF and HDMI restoration. Clean seeds 52/61/87 are building under results/build-da59ce0-20260914-170543. Prior seed 87 audio was accepted by the user, but its replacement deadlock prevented full acceptance. Timing fixes are deferred by explicit user instruction.
-
-#### Next Steps:
-
-Finish and report the three combined builds, including resources and timing without claiming closure. Have the user test subtitle controls and active/paused FLAC-to-MPG replacement plus the four movie regressions. Preserve b639ccc seed 52 rollback.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer_subtitle_menu.svh
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_06.svh
-- docs/TEST_INSTRUCTIONS.md
-- files.qip
-- rtl/media_subtitle_time.sv
-- rtl/media_subtitles.sv
-- sys/hps_io.sv
-- tools/make_subtitle_menu.py
-- tools/test_media_format_handoff.sv
-- tools/test_media_subtitle_hps_io.sv
-- tools/test_media_subtitle_time.sv
-- tools/test_media_subtitles.sv
-- tools/verify_media_format_handoff.py
-- tools/verify_subtitles.py
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
