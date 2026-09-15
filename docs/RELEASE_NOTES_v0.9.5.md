@@ -117,7 +117,7 @@ audio graphics, and the standing MPG/FLAC regression set.
 
 ## Packaging
 
-`MiSTer_Media_Player_v0.9.5.zip` contains the RBF, `tools/` (the ffmpeg
+`MiSTer-Phosphor_v0.9.5.zip` contains the RBF, `tools/` (the ffmpeg
 recipe and FLAC album pack/unpack scripts), `INSTALL.md`, `SOURCE.txt`
 (build provenance), `SHA256SUMS`, and the project license.
 

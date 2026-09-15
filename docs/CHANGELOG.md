@@ -14,7 +14,7 @@ audio, standalone/album FLAC with CUESHEET track navigation, SRT subtitles,
 a transport UI, and three native audio visualizers (Waveforms, FFT, O-Scope).
 No HPS software or soft CPU is involved in the playback path.
 
-- Release package: `MiSTer_Media_Player_v0.9.5.zip`, 2,098,997 bytes,
+- Release package: `MiSTer-Phosphor_v0.9.5.zip`, 2,098,997 bytes,
   SHA-256 `da1c8766d79b8184b467213e6e125a1a45c41c28ad3d5c2f9e98b2396fae02fa`.
 - Source commit `1720960`, reorganized without RTL changes by the preceding
   Project Refresh; the qualified RBF reproduces byte-for-byte identical to
