@@ -1,4 +1,4 @@
-## 138 COMMIT Unreleased ??? 2026-09-15T00:04:19-07:00
+## 138 COMMIT Unreleased f874dcd 2026-09-15T00:04:19-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add a standalone companion that splits embedded-cue album FLACs into adjacent tr
 
 #### Outcome:
 
-The user authorizes reversing the album bundler into the script directory. Detect a single album containing embedded CD track markers, decode once and split at exact sample boundaries, then verify each re-encoding. The original bundler did not retain song titles or filenames, so use numbered generic names and preserve the source album. Refuse existing output tracks and ambiguous input selection.
+Added tools/split_flac_album.py. Without arguments it locates exactly one adjacent FLAC containing an embedded CUESHEET; an optional explicit album path resolves ambiguity. It validates CD-format track boundaries, decodes once to a temporary WAV and re-encodes sample-exact track slices with verification and seek points into the script directory. Generic names such as 01 - Track 01.flac are necessary because the bundler did not retain original song titles or filenames. Existing outputs are refused and the album is preserved. A three-track generated bundle/split round trip confirms every original PCM sample and track length, unchanged source hash, automatic selection among loose tracks, overwrite refusal and explicit-path use from a different working directory; evidence is under results/flac-splitter. A copy is placed at /run/media/vash/ROCKBOX/Audio/Artists/Groovehouse – Elmúlt A Nyár/split_flac_album.py. The user's album has not been split automatically. This host utility requires no new RBF build.
 
 #### Next Steps:
 
-Test a generated bundle/split round trip for exact PCM and track lengths, verify overwrite refusal, and copy the script beside the user's album files without running their conversion.
+The user can run python3 split_flac_album.py beside the album, or supply an explicit album path; continue monitoring the independently queued hardware builds.
 
 #### Files Modified:
 
