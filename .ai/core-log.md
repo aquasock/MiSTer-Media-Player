@@ -1,4 +1,4 @@
-## 113 COMMIT Unreleased ??? 2026-09-14T18:09:48-07:00
+## 113 COMMIT Unreleased 6bfcea3 2026-09-14T18:09:48-07:00
 
 #### Coming From:
 
@@ -10,15 +10,18 @@ Build the approved integer-font and centered-bar UI with complete timing qualifi
 
 #### Outcome:
 
-The user approves the UI preview and requests all changes in the next three builds with timing closure pursued. Carry forward direct subtitle pages, Load media and the FLAC-to-MPG fix. Previous recovery reports identify sysmem init_reset_n and its fitted duplicate driving native audio reset-release chains; the existing scoped reset exceptions omitted this asynchronous source. Add only that source-to-chain exception and require stage-to-stage setup paths to remain timed. Include the new same-enable bar-layout registers in the existing four-cycle scene formatter constraint. Validate constraints against an existing fit, then perform clean integrated builds and inspect all timing corners.
+Commit 6bfcea3 combines the approved integer-font and centered-bar UI with scoped native power-up reset constraints. Previous recovery failures were from sysmem init_reset_n and its fitted duplicates to async-assert/sync-release chains. The additional source-to-chain exception leaves ordinary datapaths and all ten reset-release stage transitions timed, now enforced by the audit. New bar-layout registers join the existing same-enable four-cycle scene constraint. Reanalysis of the earlier seed 87 fit passes all four corners: setup +0.335 ns, hold +0.104 ns, recovery +2.529 ns, removal +0.186 ns and pulse width +0.925 ns; proof reports are isolated under results/timing-native-reset-proof. Native audio simulation again passes 1024 exact I2S/SPDIF pairs, pause, position, drained EOF and HDMI restoration. The prior full UI/subtitle simulation passed all pixel and maximum-length cases. Clean integrated seeds 52/61/87 are running in results/build-6bfcea3-20260914-181205; fitted area, final timing and hardware acceptance for this source remain pending.
 
 #### Next Steps:
 
-Audit reset release and scoped formatter timing, run relevant verification, build seeds 52/61/87 and package timing-qualified candidates or investigate any remaining failures.
+Finish all three clean builds and check every timing corner and CDC audit. Package the best passing seed for UI, native audio, subtitles and movie replacement regressions; investigate remaining violations if necessary.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer.sdc
+- docs/TEST_INSTRUCTIONS.md
+- tools/phase1p_timing.tcl
 
 #### Status:
 
