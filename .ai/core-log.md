@@ -1,4 +1,4 @@
-## 139 COMMIT Unreleased ??? 2026-09-15T00:08:18-07:00
+## 139 COMMIT Unreleased 1da2774 2026-09-15T00:08:18-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Require an explicit album filename operand for the FLAC splitter.
 
 #### Outcome:
 
-The user requests a CD-independent command taking its input FLAC as an operand. Remove automatic adjacent-album discovery and require the album path through argparse, preserving script-directory output and the existing lossless splitting behavior.
+Updated split_flac_album.py to require an album path operand and removed automatic folder scanning. Input can name any compatible embedded-cue CD FLAC; output still goes beside the script. Added a clear missing-file error and refreshed usage text. Help, missing-operand rejection and missing-file checks pass; the unchanged explicit-input split path was already sample-exact in the preceding round-trip validation. The user's companion copy in the Groovehouse album folder is updated. Source 1da2774 is pushed; no album conversion or RBF build was started.
 
 #### Next Steps:
 
-Check the command-line interface, update the companion copy in the user's album folder and document the generic invocation.
+Use python3 split_flac_album.py followed by the quoted input FLAC path; continue the existing hardware build qualification independently.
 
 #### Files Modified:
 
