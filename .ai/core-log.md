@@ -1,4 +1,4 @@
-## 150 COMMIT Unreleased ??? 2026-09-15T03:44:48-07:00
+## 150 COMMIT Unreleased 68f32c7 2026-09-15T03:44:48-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Revert the c3549fe carry-select scaler rewrite that caused the setup timing fail
 
 #### Outcome:
 
-sys/ascal.vhd's poly_final and poly_sum_bound are reverted to the plain single-adder-plus-clip form that was the last timing-passing baseline at 3a72b70; per-corner setup reports for all three c3549fe seeds identified this exact path, ascal's o_v_poly_t to o_v_poly_pix vertical polyphase sum on the pll_hdmi divider clock, as the sole failing category, with the carry-select rewrite costing more in routing and duplicated clip logic on this 85%-ALM, 99%-M10K device than the shorter logic-level count saved. tools/verify_scaler_poly_sum.py is removed since it validated only the now-reverted poly_sum_bound function, and the CHANGELOG.md Unreleased entry claiming a shortened carry-select polyphase sum is corrected. The XY-256 geometry and the banked-RAM feedback fabric register from c3549fe are both untouched, since neither appeared in any violating path. This entry is written before the commit exists; the hash will be filled in once committed and the three-seed rebuild is launched.
+sys/ascal.vhd's poly_final and poly_sum_bound are reverted to the plain single-adder-plus-clip form that was the last timing-passing baseline at 3a72b70; per-corner setup reports for all three c3549fe seeds identified this exact path, ascal's o_v_poly_t to o_v_poly_pix vertical polyphase sum on the pll_hdmi divider clock, as the sole failing category, with the carry-select rewrite costing more in routing and duplicated clip logic on this 85%-ALM, 99%-M10K device than the shorter logic-level count saved. tools/verify_scaler_poly_sum.py is removed since it validated only the now-reverted poly_sum_bound function, and the CHANGELOG.md Unreleased entry claiming a shortened carry-select polyphase sum is corrected. The XY-256 geometry and the banked-RAM feedback fabric register from c3549fe are both untouched, since neither appeared in any violating path. Source 68f32c7 is committed; the standard three-seed rebuild has not yet been launched.
 
 #### Next Steps:
 
-Commit this revert, launch the standard HIGH-packing three-seed rebuild, and confirm all four timing corners pass on at least one seed before offering a hardware candidate.
+Launch the standard HIGH-packing three-seed rebuild of 68f32c7 and confirm all four timing corners pass on at least one seed before offering a hardware candidate.
 
 #### Files Modified:
 
