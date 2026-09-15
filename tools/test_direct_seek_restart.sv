@@ -15,7 +15,7 @@ wire [123:0] response;
 reg reader_idle=1,ddr_idle=1;
 media_keyboard_control #(.RESTART_BOTH_DIRECTIONS(1)) keyboard(
  .clk(sys),.reset(reset),.new_file(new_file),.enabled(1'b1),.osd_open(1'b0),.key(key),
- .elapsed_q(elapsed_sys),.seek_done(done_sys&&!busy),.restart_complete(start&&!probing),
+ .duration_valid(1'b1),.duration_q(35'd288000000),.elapsed_q(elapsed_sys),.seek_done(done_sys&&!busy),.restart_complete(start&&!probing),
  .paused(paused),.seek_active(seeking),.seek_target_q(target),.restart(keyboard_request));
 media_seek_search search(
  .clk(sys),.reset(reset),.new_file(new_file),.request(keyboard_request),
@@ -71,6 +71,9 @@ task jump(input [8:0] code);
  integer old_final;
  begin
   expected=code==9'h174 ? elapsed_sys+3600000 : (elapsed_sys<3600000?0:elapsed_sys-3600000);
+  if(code==9'h003)expected=35'd144000000;
+  if(code==9'h005)expected=0;
+  if(code==9'h00a)expected=35'd252000000;
   old_final=final_starts;reader_idle=0;ddr_idle=0;
   key_event(code,1);key_event(code,0);
   wait(quiesce);repeat(40)@(negedge sys);
@@ -87,6 +90,7 @@ initial begin
  repeat(5)@(negedge sys);reset=0;wait(final_starts==1);
  key_event(9'h029,1);key_event(9'h029,0);repeat(30)@(negedge sys);
  jump(9'h174);jump(9'h174);jump(9'h16b);jump(9'h174);jump(9'h16b);
+ jump(9'h003);jump(9'h005);jump(9'h00a);
  @(negedge sys);new_file=1;@(negedge sys);new_file=0;
  wait(!flush);wait(start);repeat(20)@(negedge sys);
  if(paused || seeking || busy || offset!=0)$fatal(1,"new file retained seek state");

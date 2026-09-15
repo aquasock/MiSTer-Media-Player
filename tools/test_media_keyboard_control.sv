@@ -4,7 +4,8 @@ reg clk=0;always #5 clk=~clk;
 reg reset=1,new_file=0,enabled=1,osd_open=0,seek_done=0,restart_complete=0;
 reg [10:0] key=0;
 reg [34:0] elapsed_q=35'd36000000;
-reg seek_enabled=1;
+reg seek_enabled=1,duration_valid=1;
+reg [34:0] duration_q=35'd288000000;
 wire paused,seek_active,restart;
 integer restarts=0;
 always @(posedge clk) if(restart) restarts<=restarts+1;
@@ -24,6 +25,28 @@ task check_jump(input [8:0] code,input [34:0] expected);
  if(restarts-before_restarts!=(code==9'h16b ? 1 : 0)) $fatal(1,"wrong restart direction");
  finish_seek();end
 endtask
+function [8:0] fkey(input integer n);
+ case(n)
+  0:fkey=9'h005;1:fkey=9'h006;2:fkey=9'h004;3:fkey=9'h00c;
+  4:fkey=9'h003;5:fkey=9'h00b;6:fkey=9'h083;7:fkey=9'h00a;
+ endcase
+endfunction
+task section_jump(input integer n);
+ reg [63:0] expected;
+ integer before_restarts;
+ begin
+  expected=({29'd0,duration_q}*n)/8;before_restarts=restarts;
+  event_key(fkey(n),1);
+  if(!seek_active||seek_target_q!=expected[34:0]) $fatal(1,"section %d target %d expected %d",n,seek_target_q,expected);
+  if(restarts-before_restarts!=(expected<elapsed_q?1:0)) $fatal(1,"section restart direction");
+  event_key(fkey((n+1)%8),1);event_key(fkey((n+1)%8),0);
+  if(seek_target_q!=expected[34:0]) $fatal(1,"busy section replaced target");
+  finish_seek();event_key(fkey(n),1);
+  if(seek_active) $fatal(1,"held function key repeated");
+  event_key(fkey(n),0);
+ end
+endtask
+integer i,j;
 initial begin
  repeat(3) @(negedge clk);reset=0;
  event_key(9'h029,1);if(!paused) $fatal(1,"space pause");
@@ -53,6 +76,29 @@ initial begin
  if(seek_active||restart)$fatal(1,"music seek gate");
  event_key(9'h029,1);event_key(9'h029,0);if(!paused)$fatal(1,"music pause blocked");
  new_file=1;@(negedge clk);new_file=0;
+ seek_enabled=1;
+ // All targets, including very short, uneven and maximum durations.
+ for(j=0;j<4;j=j+1) begin
+  case(j) 0:duration_q=288000000;1:duration_q=7;2:duration_q=288000003;3:duration_q={35{1'b1}};endcase
+  for(i=0;i<8;i=i+1)section_jump(i);
+ end
+ if(paused)$fatal(1,"section seek changed playing state");
+ event_key(9'h029,1);event_key(9'h029,0);section_jump(4);
+ if(!paused)$fatal(1,"section seek lost pause");
+ duration_valid=0;event_key(fkey(2),1);
+ if(seek_active)$fatal(1,"unknown duration accepted");
+ duration_valid=1;event_key(fkey(2),1);
+ if(seek_active)$fatal(1,"held unknown key accepted");event_key(fkey(2),0);
+ duration_q=0;event_key(fkey(2),1);event_key(fkey(2),0);
+ if(seek_active)$fatal(1,"zero duration accepted");duration_q=288000000;
+ osd_open=1;event_key(fkey(3),1);osd_open=0;event_key(fkey(3),1);
+ if(seek_active)$fatal(1,"OSD function key leaked");event_key(fkey(3),0);
+ seek_enabled=0;event_key(fkey(4),1);event_key(fkey(4),0);
+ if(seek_active)$fatal(1,"section seek gate ignored");seek_enabled=1;
+ new_file=1;event_key(fkey(5),1);new_file=0;event_key(fkey(5),1);
+ if(seek_active||paused)$fatal(1,"replacement function key leaked");event_key(fkey(5),0);
+ enabled=0;event_key(fkey(6),1);event_key(fkey(6),0);
+ if(seek_active)$fatal(1,"empty section seek accepted");
  enabled=0;event_key(9'h029,1);event_key(9'h174,1);
  if(paused||seek_active) $fatal(1,"empty player accepted control");
  $display("PASS: keyboard modifiers, direction, bounds, typematic, OSD, busy and pause retention");$finish;

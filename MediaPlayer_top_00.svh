@@ -232,6 +232,7 @@ media_keyboard_control #(.RESTART_BOTH_DIRECTIONS(1),.ENABLE_SEEK_GATE(1)) media
  .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.enabled(media_file_size!=0 && !media_duration_busy),
  .seek_enabled(!media_music_hint||(album_seek_available&&!album_busy)),.osd_open(media_osd_sync[2]),.key(ps2_key),.elapsed_q(media_music_hint?media_music_elapsed:media_elapsed_sys),
  .seek_done(media_music_hint ? (media_seek_sys&&album_landed_sys&&!album_busy) : (media_seek_done_sys && !media_search_busy)),.restart_complete(media_reader_start && !media_probe_sys),
+ .duration_q(PLAYER_UI_STATE[69:35]),.duration_valid(PLAYER_UI_STATE[70]),
  .paused(media_paused_sys),.seek_active(media_seek_sys),
  .seek_target_q(media_target_sys),.restart(media_seek_restart));
 video_config_cdc #(.WIDTH(37)) playback_control_config(

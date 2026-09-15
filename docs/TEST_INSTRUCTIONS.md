@@ -894,6 +894,7 @@ No additional ini change is needed specifically for keyboard playback controls.
 | Left / Right | Backward / forward 10 seconds |
 | Ctrl + Left / Right | Backward / forward 30 seconds |
 | Ctrl + Alt + Left / Right | Backward / forward 1 minute |
+| F1–F8 | Jump to 0%, 12.5%, 25%, 37.5%, 50%, 62.5%, 75%, 87.5% of total runtime |
 
 Both left/right modifier keys work. Up/Down remain unassigned. Commands operate
 with the OSD closed; arrows and Space used in the OSD do not change playback.
@@ -1069,3 +1070,13 @@ cost; qualify that build separately. The normal three-seed builds are compact.
 Run `python3 tools/verify_compact_telemetry.py --output /tmp/compact-telemetry`
 to compare retained fields against the detailed RTL and round-trip actual compact
 overlay pixels through the screenshot decoder, including corruption rejection.
+
+### Runtime section shortcuts
+
+With known-duration MPG and FLAC files, press F1 through F8 and verify landings
+at successive eighths from zero through 87.5%, allowing normal MPEG GOP rounding.
+Repeat while paused; playback must stay paused. Hold a key through completion,
+press another key during seeking, and hold one while closing the OSD: none should
+trigger another seek until released and pressed again. Unknown-duration files
+must ignore these shortcuts. The progress bar stays visible during seeking and
+hides three seconds after landing. Check both indexed and unindexed FLAC files.

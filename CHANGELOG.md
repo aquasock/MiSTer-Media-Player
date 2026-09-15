@@ -8,6 +8,8 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Add F1–F8 shortcuts to eight equal runtime section starts for known-duration video and audio, retaining pause and existing seek behavior.
+
 - Audio and video playback controls now hide after three seconds of inactivity; Ctrl+Alt+Left/Right seeks backward/forward one minute.
 
 ### FFT Fire visualizer

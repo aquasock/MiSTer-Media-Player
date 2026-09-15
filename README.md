@@ -52,7 +52,12 @@ change the encoded playback speed or the audio sample rate.
 | Left / Right | Backward / forward 10 seconds |
 | Ctrl + Left / Right | Backward / forward 30 seconds |
 | Ctrl + Alt + Left / Right | Backward / forward 1 minute |
+| F1–F8 | Jump to 0%, 12.5%, 25%, 37.5%, 50%, 62.5%, 75%, 87.5% of total runtime |
 | N / P | Next / previous embedded CD track (FLAC albums) |
+
+F1–F8 require a known nonzero total duration and use the existing seek mechanism
+without scanning the whole file first. Pause is retained; presses during an
+active seek are ignored. FLAC without a seek table uses its existing slower fallback.
 
 Controls operate with the OSD closed, once per physical press. Pause retains
 the displayed frame and queued samples while silencing movie audio. Seeking
