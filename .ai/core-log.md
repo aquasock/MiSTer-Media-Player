@@ -39,11 +39,11 @@ Move subtitles into a stock Main submenu with visibility, offset and speed contr
 
 #### Outcome:
 
-The user requests Subtitles with Load SRT, Visible Yes/No, offset from -5.0 to +5.0 seconds in 0.1-second steps, and confirms speed limits 0.50x to 2.00x in 0.01x steps. Defaults remain visible, zero offset and 1.00x. Positive offset delays display; speed scales the subtitle timeline so 2.00x runs it twice as fast. Use absolute video elapsed time rather than an accumulating clock, reload the streaming SRT reader when timing settings change, and preserve video/audio/pause/seek behavior. Put extended menu strings in the existing block-RAM configuration ROM and use bounded serial arithmetic. Prepare this for the next build while the three b3e4f1d FLAC candidates continue unchanged.
+The final requested subtitle speed range is 0.50x to 1.50x in 0.01x steps, with Load SRT, Visible Yes/No and offset -5.0 to +5.0 seconds in 0.1-second steps. Defaults remain visible, zero offset and 1.00x. Positive offset delays subtitles. Use absolute video time, bounded serial arithmetic, streaming-reader reload on timing changes and block-RAM menu storage. The user tested b3e4f1d seed 87 audio successfully but FLAC-to-MPG replacement stalls while OSD remains responsive. Source review identifies a circular wait: music mode forces movie DDR busy, while mode release requires movie idle. The user authorizes fixing this handoff and bundling subtitle controls in the next usual three builds, deferring timing fixes.
 
 #### Next Steps:
 
-Implement and simulate the submenu, exact timing transform, offset/speed boundaries, backward retiming and in-flight SRT reload handling. Finish and report the separate in-progress FLAC builds. Do not silently replace their source snapshots or launch another build batch for these subtitle changes.
+Remove the artificial movie DDR busy condition while retaining quiesce gating, drain-before-switch ownership and physical DDR busy handling. Regress both handoff directions and held responses along with subtitle controls, then build clean seeds 52/61/87. Report timing without pursuing fixes this cycle.
 
 #### Files Modified:
 
