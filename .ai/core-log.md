@@ -1,3 +1,32 @@
+## 116 COMMIT Unreleased ??? 2026-09-14T18:53:35-07:00
+
+#### Coming From:
+
+Unreleased 6bfcea3
+
+#### Purpose:
+
+Display common typographic apostrophes using the existing subtitle apostrophe glyph.
+
+#### Outcome:
+
+The user reports apostrophes rendering as question marks. The font contains the straight ASCII apostrophe, but the streaming parser replaces non-ASCII UTF-8 sequences with a question mark. No offending SRT was available in the GIT HDD root, so its exact encoding is not confirmed. Normalize UTF-8 left/right single quotation marks and standalone Windows-1252 0x91/0x92 to ASCII apostrophe, preserving fallback behavior for unsupported characters and the current bounded text buffers.
+
+#### Next Steps:
+
+Test ASCII and smart apostrophes, malformed/truncated UTF-8, line boundaries and the 63-character limit; run subtitle regressions and commit the fix for the next build without launching an unrequested batch.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 115 COMMIT Unreleased 6bfcea3 2026-09-14T18:35:03-07:00
 
 #### Coming From:
@@ -1429,35 +1458,6 @@ Plan and implement the revised target using existing seek, duration and shared-o
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 76 COMMIT Unreleased 304e4dc 2026-09-14T09:45:46-07:00
-
-#### Coming From:
-
-Unreleased 0d13908
-
-#### Purpose:
-
-Record completed lowered-overlay build qualification and provide the preferred hardware candidate.
-
-#### Outcome:
-
-All ffafc79 seeds compile and pass four-corner timing, 159 CDC registers and scene-enable audits. Seeds 52, 61 and 87 have minimum setup +0.196, +0.224 and +0.371 ns and hold +0.097, +0.103 and +0.110 ns. Preferred seed 87 uses 37713 actual ALMs, 520 M10Ks, 69 DSPs and 47317 registers, leaving 4197 ALMs and 33 M10Ks. This is two fewer placed ALMs than 3d48cc5 seed 87, effectively unchanged resource usage. Its verified RBF is results/hardware-test-ffafc79/seed87/MediaPlayer_20260914.rbf with SHA-256 3d229f28cb7e12b0cde1f2da716754f6c307a80f94678e5668303f9896c93f0d. Per-seed testing notes and top-level instructions are ready; no deployment or hardware acceptance occurred. Subsequent user release requirements are M3U playlists with N/P navigation, automatic advance and final return to idle; session-only resume while the core stays loaded; predictable EOF; and matching-name separate SRT subtitles. Automatic filesystem access through stock Main remains unresolved. Image/package loading and manual subtitle selection were discussed as RBF-only alternatives, not approved replacements for the requested loose-file workflow. No feature implementation or shared-IDCT optimization was started.
-
-#### Next Steps:
-
-Have the user validate the lower bar and clock-only fields on seed 87; resolve the file-access workflow before implementing playlist and automatic subtitle loading.
-
-#### Files Modified:
-
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
