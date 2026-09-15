@@ -1,4 +1,4 @@
-## 136 COMMIT Unreleased ??? 2026-09-14T23:43:41-07:00
+## 136 COMMIT Unreleased c0a41cf 2026-09-14T23:43:41-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Replace continuous Fire flames with quantized spectrum blocks and two solid colo
 
 #### Outcome:
 
-The user requests a discrete bar spectrum following the supplied reference, retaining yellow at the bottom and orange at the top, and explicitly removes band and color blending. Preserve the 32-band FFT, aspect viewport, UI placement and nine-cycle renderer latency. Remove interpolation, turbulence and continuous shading, and compare standalone resource use against the prior Fire implementation.
+Replaced interpolated procedural flames with 32 independent columns of discrete spectrum blocks, with only the highest lit block in each band orange and every lower block yellow as the user clarified. Removed band blending, continuous shading, animation turbulence and renderer multipliers. A remainder accumulator maps all 32 columns across the viewport and integer scanline counters form the block grid. The unchanged FFT supplies quantized heights; the renderer retains nine-cycle latency, frame snapshots, aspect clipping and the existing UI. All twelve full-render cases pass at 480p, 720p and 1080p, including exact original O-scope and movie bypass, silence and live mode switching. Added assertions require exactly one orange cap per nonempty column and yellow below, with no blended colors. Final previews are in results/fire-blocks/final-render. Standalone Fire drops from 305.2 to 209.8 estimated ALMs, 846 to 528 registers and two to zero DSPs, retaining one M10K. Combined standalone visualizers use 1129 estimated ALMs, 1268 placed ALMs, 2177 registers, seven M10Ks and ten DSPs versus 1216/1381/2517/six/twelve previously. The extra combined M10K is a short ypos pipe inferred in the unchanged O-scope, not additional Fire storage; full-core inference remains to be measured. Source c0a41cf is pushed. Three HIGH-packing builds are queued after d2487b8 through results/fire-blocks/queue-build.py, PID 1031607. Full-core fit, timing and hardware remain pending.
 
 #### Next Steps:
 
-Implement the block renderer, verify HDMI timing, viewport and UI behavior across supported resolutions, inspect RTL-generated previews and measure standalone resource changes before the next hardware build.
+Inspect and qualify the queued c0a41cf batch, report actual full-core resource differences, and have the user test the orange-cap block Fire together with all playback shortcuts.
 
 #### Files Modified:
 
