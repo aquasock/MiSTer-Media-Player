@@ -1,3 +1,32 @@
+## 131 COMMIT Unreleased 64722d0 2026-09-14T22:27:22-07:00
+
+#### Coming From:
+
+Unreleased 64722d0
+
+#### Purpose:
+
+Qualify and package the combined audio graphics and menu correction builds.
+
+#### Outcome:
+
+All three HIGH-packing 64722d0 builds compile and pass independent four-corner setup, hold, recovery, removal and minimum pulse-width checks. All also pass 309 configuration CDC register checks and ten reset-release paths. Recommend seed 52 for strongest setup margin: setup +0.536 ns, hold +0.056 ns, recovery +3.962 ns, removal +0.214 ns and pulse width +0.925 ns. It uses 38318 placed ALMs (34100 estimated), 48646 registers, 516 M10Ks, 68 DSPs and four PLLs, leaving 3592 physical ALMs and 37 M10Ks. Seed 61 has setup +0.187 ns and hold +0.110 ns with 38180 placed ALMs; seed 87 has +0.190/+0.114 ns with 38166 placed ALMs. Hash-verified packages and JSON reports are under results/hardware-test-64722d0. Recommended seed 52 SHA-256 is d4ed65e484ec12bd5bd69eb559bea8226ee1bad032fc09ed2e3963f4c25f6344. These RBFs include the aspect and menu fixes plus earlier CD navigation and FLAC seeking. Hardware acceptance remains pending; nothing was automatically deployed. During the preceding discussion, metadata inspection confirmed the GIT HDD Beethoven Symphony No.6 (1st movement).flac contains STREAMINFO, comments and padding but no seek table, so current FLAC seeking uses beginning-of-file fallback for that file.
+
+#### Next Steps:
+
+Have the user test seed 52 for audio aspect switching, video-only menu disabling, paused playback, CD N/P navigation, FLAC seek jumps, EOF and MPG/FLAC replacement, then rerun the four MPG hardware regression files.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 130 COMMIT Unreleased 64722d0 2026-09-14T22:07:33-07:00
 
 #### Coming From:
@@ -1312,35 +1341,6 @@ Audit the three 54d64d2 builds for shared-engine and memory inference, timing an
 - tools/test_shared_idct.sv
 - tools/verify_decoder_timing.py
 - tools/verify_shared_idct.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 91 COMMIT Unreleased 7eb5088 2026-09-14T13:19:19-07:00
-
-#### Coming From:
-
-Unreleased 78c82f1
-
-#### Purpose:
-
-Run one isolated maximum-register-packing comparison of the accepted seed 61 core.
-
-#### Outcome:
-
-The user requests a dense packing run. Reuse the previous single-seed packing build helper against clean archived source 7eb5088, with seed 61, six workers and ALM_REGISTER_PACKING_EFFORT HIGH instead of MEDIUM. Keep source RTL and the tracked QSF unchanged. The accepted MEDIUM baseline uses 37044 actual ALMs, 31325 estimated ALMs, 44804 registers, 525 M10Ks and 75 DSPs with setup +0.334 ns and hold +0.074 ns. The prior bcddb20 HIGH experiment saved no ALMs, but the current design differs substantially; measure again without promising savings. Run compilation and all existing four-corner, CDC and diagnostic-removal audits. Evidence will use a distinct results/build-7eb5088-packing-high directory and /tmp/gate3-packing-high.log. This is an experimental build request, not acceptance of its eventual RBF.
-
-#### Next Steps:
-
-Compare final placed and estimated ALMs, RAM, DSP, registers and timing against accepted 7eb5088 MEDIUM seed 61. Package the experiment separately: do not run the normal packaging helper unmodified because its source/seed destination would overwrite the accepted RBF. Keep the accepted MEDIUM artifact and hardware acceptance intact. Report results before any additional build or default-setting change. The previous displayed timing table had a transcription error: fast -40 C recovery is +4.898 ns in the audit JSON, not +4.950 ns; the reported minimum recovery +3.668 ns is unchanged.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
