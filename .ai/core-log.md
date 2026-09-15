@@ -1,3 +1,32 @@
+## 124 COMMIT Unreleased ??? 2026-09-14T20:44:36-07:00
+
+#### Coming From:
+
+Unreleased 2498125
+
+#### Purpose:
+
+Pipeline the waveform interpolation timing path and adopt HIGH packing for subsequent builds.
+
+#### Outcome:
+
+The user authorizes fixing timing and rebuilding three seeds with HIGH packing as the new default. All four original waveform candidates compile but fail setup: MEDIUM 52/61/87 minima are -2.795/-1.885/-2.783 ns and HIGH 87 is -2.053 ns. Other timing categories and 289 CDC/reset audit checks pass. HIGH 87 uses 37379 ALMs versus MEDIUM 87 at 38609, saving 1230. The user receives the HIGH 87 binary for functional testing with its timing failure disclosed. The fix will separate RAM output, sample subtraction and interpolation multiplication, preserve matching pixel/sync latency, and remove unnecessary read-during-write forwarding only where overlapping reads are unused. Local source and build snapshots will retain reproducible evidence.
+
+#### Next Steps:
+
+Run waveform pixel and bypass regressions, check equivalence against the original renderer with latency compensation, and launch clean HIGH seeds 52, 61 and 87.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 123 COMMIT Unreleased 2498125 2026-09-14T20:22:02-07:00
 
 #### Coming From:
@@ -1377,48 +1406,6 @@ Have the user test Fellow, Groove, Jiggler and Star Wars including no telemetry,
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 84 COMMIT Unreleased 8e418b3 2026-09-14T11:46:01-07:00
-
-#### Coming From:
-
-Unreleased e9f9bfb
-
-#### Purpose:
-
-Implement diagnostic-removal gate one and transparent black playback status text.
-
-#### Outcome:
-
-Source 8e418b3 implements gate one of the user-approved three hardware gates: removes the cadence profiler instance, frozen snapshot/telemetry rendering, unused RGB declarations, production QIP inclusion and obsolete snapshot CDC exceptions. Framebuffer RGB now passes directly to the existing video outputs with unchanged sync/DE; seek/EOF scheduler debug bits, reporting-source RTL, functional errors and Audio test remain. The fitted audit requires zero profiler registers; the telemetry-only mailbox may be naturally pruned, but every surviving stage and all functional mailboxes remain checked. The user's additional status change renders Paused/Seeking in opaque black with transparent glyph gaps instead of a white inset, preserving progress fill, coordinates and subtitle backdrops. Twelve player frame cases and five subtitle frame cases pass with zero pixel mismatches at 480p/720p/1080p; parser, transport, subtitle lifecycle, UI lifetime/divider, playback/audio and 64-check EOF/session regressions pass. Mixed I/P/B EOF qualification passes with 423936 pixel comparisons and zero mismatches. Generated empty/full status previews were inspected. The source and updated three-gate plan are pushed; clean seeds 52/61/87 are running under /tmp/gate1-build.log. No core is deployed. Gate two and gate three remain blocked on separate user hardware acceptance, with accepted b05b76f seed 87 retained as rollback.
-
-#### Next Steps:
-
-Audit all corners, profiler absence, remaining CDC and resource usage; package the strongest passing RBF for Fellow, Groove, Jiggler and Star Wars tests. Wait for gate-one hardware acceptance before removing reporting sources or Audio test.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_07.svh
-- docs/DIAGNOSTIC_REMOVAL_PLAN.md
-- docs/SUBTITLES.md
-- docs/TEST_INSTRUCTIONS.md
-- docs/UI_OVERLAY_PLAN.md
-- docs/ui/overlay-preview.html
-- files.qip
-- rtl/media_overlay_compositor.sv
-- tools/audit_three_seeds.py
-- tools/phase1p_timing.tcl
-- tools/verify_player_overlay.py
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
