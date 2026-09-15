@@ -30,6 +30,19 @@ for w,h in [(720,480),(1280,720),(1920,1080)]:
   local=im[y:y+vh,x:x+vw];assert np.array_equal(local[vh*9//10:],ref[vh*9//10:]),'UI placement/scale mismatch'
   changed=np.any(local[:vh*4//5]!=[3,8,16],axis=2)
   assert changed.sum()>vw,'waveform absent'
+  # Independent hard-block contract: only two solid colors, with exactly
+  # one orange cap above yellow blocks in each nonempty spectrum column.
+  picture=local[:vh*7//8]
+  palette=np.unique(picture.reshape(-1,3),axis=0)
+  assert all(tuple(c) in ((3,8,16),(255,136,0),(255,221,0)) for c in palette),'blended color'
+  for band in range(32):
+   col=picture[:,((2*band+1)*vw)//64]
+   lit=np.any(col!=[3,8,16],axis=1)
+   ys=np.flatnonzero(lit)
+   if not len(ys):continue
+   groups=np.split(ys,np.where(np.diff(ys)>1)[0]+1)
+   assert np.all(col[groups[0]]==[255,136,0]),'missing orange cap'
+   for group in groups[1:]:assert np.all(col[group]==[255,221,0]),'non-yellow lower block'
   results[name]={'viewport':[x,y,vw,vh],'checks':'full HDMI sync/DE, renderer dimensions, border clipping, local UI pixels and waveform presence'}
   print('PASS '+name+' viewport='+str([x,y,vw,vh]),flush=True)
  # Audio viewport must be completely bypassed for movies, including UI geometry.
