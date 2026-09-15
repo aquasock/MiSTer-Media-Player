@@ -1,3 +1,32 @@
+## 119 COMMIT Unreleased ??? 2026-09-14T20:01:26-07:00
+
+#### Coming From:
+
+Unreleased 6d460d2
+
+#### Purpose:
+
+Implement a new stereo waveform visualizer for native music playback.
+
+#### Outcome:
+
+The user selects the original mirrored-waveform concept rather than a spectrum. The implementation will tap actual post-volume native output samples without feeding back into playback, transfer decimated stereo samples through a coherent mailbox and retain a short history in block RAM. Cyan and orange traces will render behind the existing player overlay during music only. Pause and mute must settle to silence, replacement must discard old history, and movie pixels must bypass unchanged. The separately archived punctuation builds continue unchanged.
+
+#### Next Steps:
+
+Verify audio-tap ordering against serialized samples, waveform history and bypass behavior, asynchronous clock transfer and rendered frames at supported HDMI resolutions; then commit source and prepare previews before another hardware build.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 118 COMMIT Unreleased 6d460d2 2026-09-14T19:57:08-07:00
 
 #### Coming From:
@@ -1408,36 +1437,6 @@ Audit completed timing and resources, package the preferred qualified RBF, then 
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 79 COMMIT Unreleased 47630c7 2026-09-14T10:30:19-07:00
-
-#### Coming From:
-
-Unreleased ec56250
-
-#### Purpose:
-
-Qualify and package the manually loaded subtitle builds for hardware testing.
-
-#### Outcome:
-
-All ec56250 seeds compile and pass all four timing corners, 171 CDC registers and scene-enable checks. Seeds 52/61/87 have setup +0.116/+0.136/+0.338 ns, hold +0.115/+0.108/+0.110 ns and actual placed ALMs 37536/38678/38773. All use 527 M10Ks and 75 DSPs, adding seven RAM blocks and six DSPs and leaving 26 M10Ks free. Fitter confirms four subtitle-reader RAM blocks and two parser buffers, with the overlay hierarchy rising from 15 to 16. Estimated ALMs 33032/32933/32936 exceed baseline ffafc79 seed 87's 31987; seed 52's lower physical occupancy reflects packing rather than a functional logic reduction. Preferred seed 87 has the strongest setup margin; seed 52 is a passing lower-occupancy alternative. Hash-verified RBFs and testing notes are under results/hardware-test-ec56250, including Subtitle Test.srt. Preferred seed87/MediaPlayer_20260914.rbf SHA-256 is 765fc4eea7ec7e5a4d2701a3ac470d0f6e4dacadfaef4acd5f771b517bb59752. The audit tool now accepts a scope string instead of incorrectly describing subtitle builds as framework-only. No hardware deployment or acceptance occurred.
-
-#### Next Steps:
-
-Have the user test manual SRT selection, cue timing, pause and all seek sizes/directions, Off/On, file changes, controls hiding and subtitle placement at supported HDMI resolutions. Retain ffafc79 seed 87 as rollback; session resume and EOF policy remain separate release tasks.
-
-#### Files Modified:
-
-- docs/TEST_INSTRUCTIONS.md
-- tools/audit_three_seeds.py
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
