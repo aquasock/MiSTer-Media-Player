@@ -52,6 +52,7 @@ change the encoded playback speed or the audio sample rate.
 | Left / Right | Backward / forward 10 seconds |
 | Ctrl + Left / Right | Backward / forward 30 seconds |
 | Ctrl + Alt + Left / Right | Backward / forward 5 minutes |
+| N / P | Next / previous embedded CD track (FLAC albums) |
 
 Controls operate with the OSD closed, once per physical press. Pause retains
 the displayed frame and queued samples while silencing movie audio. Seeking
@@ -64,6 +65,20 @@ visible during a seek, and hides ten seconds afterward. Opening a file first
 performs a bounded timestamp probe; when duration cannot be qualified, Total
 and Remaining show `--:--:--`. The MiSTer menu remains above the player overlay.
 This overlay awaits hardware qualification; subtitle playback is not included.
+
+The same arrow controls work for native FLAC, including whole-CD FLAC files.
+N/P selects embedded CUESHEET INDEX 01 track starts; a separate `.cue` file is
+not read. P selects the previous track (clamped at the first), and N on the
+last track does nothing. Playback continues between tracks without interruption.
+Both track changes and timed seeks preserve pause and land at the exact target
+sample after CRC-checked preroll. The progress times refer to the whole album.
+
+The core caches up to 99 CD tracks and 512 FLAC seek points in block RAM.
+Missing seek points fall back to decoding from the first audio frame, which
+can make long jumps slow. Invalid or non-CD cue metadata disables N/P without
+blocking ordinary playback or timed seeking. Seeking requires a known, nonzero
+STREAMINFO sample count. Loading another file clears all navigation state.
+To make one CD image with an embedded cue sheet: `abcde -d /dev/sr0 -1 -o 'flac:-8 -V' -a default,cue`.
 
 MPG seeks in either direction probe file positions for timestamped sequence
 headers and I-pictures, then restart nearby and decode the short lead-in.

@@ -6,6 +6,16 @@ This project is still in active pre-release development. Published milestone rel
 
 ## [Unreleased]
 
+### FLAC album navigation and seeking
+
+- Add N/P navigation through embedded CD CUESHEET INDEX 01 positions and video-style
+  arrow seeks (+/-10 seconds, Ctrl +/-30 seconds, Ctrl+Alt +/-5 minutes) to FLAC.
+  Track changes and seeks preserve pause, restart at a preceding FLAC seek point,
+  and discard CRC-checked preroll to the exact target sample. Without a seek table,
+  decoding starts from the first frame; unknown total sample counts disable seeking.
+- Keep album-relative progress times and clear navigation state on media replacement.
+  Bound the optional block-RAM index to 99 CD tracks and 512 seek points.
+
 ### Native music waveform visualizer
 
 - Split waveform RAM reads, sample differences and interpolation products into separate pipeline stages, retaining aligned RGB/sync timing. Use HIGH ALM register packing by default for subsequent builds.

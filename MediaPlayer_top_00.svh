@@ -138,13 +138,43 @@ video_config_cdc #(.WIDTH(36)) music_total_cdc(.src_clk(clk_mpeg2),.dst_clk(clk_
 video_config_cdc #(.WIDTH(38)) music_position_cdc(.src_clk(CLK_AUDIO_CD),.dst_clk(clk_sys),
  .src_data({PLAYER_MUSIC_FINISHED,PLAYER_MUSIC_ERROR,PLAYER_MUSIC_POSITION}),.dst_data(media_music_status_sys));
 media_music_time music_time(.clk(clk_sys),.reset(RESET||media_new_file),
- .position(media_music_status_sys[35:0]),.total(media_music_total_sys),.elapsed_q(media_music_elapsed),.total_q(media_music_duration));
+ .position(album_position),.total(media_music_total_sys),.elapsed_q(media_music_elapsed),.total_q(media_music_duration));
 // The bus mode changes only while both previous clients have drained and
 // the session is holding decoder reset. It stays fixed for all live requests.
 always @(posedge clk_mpeg2)begin
  if(reset_mpeg2_base)media_music_mode<=0;
  else if(media_decoder_reset && media_music_idle && media_movie_ddr_idle)media_music_mode<=media_music_hint_mpeg;
 end
+
+// Album cue/seek indexing observes only bytes accepted into the music stream.
+wire album_restart,album_busy,album_resume,album_available,album_seek_available,album_landed_sys;
+wire [40:0] album_offset;
+wire [35:0] album_start,album_target,album_total;
+wire [15:0] album_min,album_max;
+wire [7:0] album_tag,album_echo;
+wire [148:0] album_config;
+wire [36:0] album_absolute_position={1'b0,album_target}+{1'b0,media_music_status_sys[35:0]};
+wire [35:0] album_position=album_absolute_position[36]?{36{1'b1}}:album_absolute_position[35:0];
+flac_album_control album_control(.clk(clk_sys),.reset(RESET),.new_file(media_new_file),
+ .enabled(music_play_request&&!media_duration_busy),.osd_open(media_osd_sync[2]),.key(ps2_key),
+ .byte_valid(media_stream_valid&&!media_stream_data[8]&&!media_duration_busy&&!mpeg2_stream_full&&!media_fifo_reset),
+ .byte_data(media_stream_data[7:0]),.position(album_position),.file_size(media_file_size),
+ .reader_start(media_reader_start),.landed(album_landed_sys),
+ .seek_request(media_seek_restart&&music_play_request),.seek_target_q(media_target_sys),
+ .restart(album_restart),.busy(album_busy),.resume_frame(album_resume),.start_offset(album_offset),
+ .start_sample(album_start),.target_sample(album_target),.total_samples(album_total),.min_block(album_min),.max_block(album_max),.tag(album_tag),.available(album_available),.seek_available(album_seek_available));
+video_config_cdc #(.WIDTH(149)) album_config_cdc(.src_clk(clk_sys),.dst_clk(clk_mpeg2),
+ .src_data({album_tag,album_resume,album_total,album_min,album_max,album_start,album_target}),.dst_data(album_config));
+video_config_cdc #(.WIDTH(8)) album_echo_cdc(.src_clk(clk_mpeg2),.dst_clk(clk_sys),.src_data(album_config[148:141]),.dst_data(album_echo));
+wire music_raw_valid,music_raw_eof,music_raw_ready;
+wire [31:0] music_raw_pcm;
+wire music_landed;
+flac_pcm_landing album_landing(.clk(clk_mpeg2),.reset(reset_mpeg2),
+ .start_sample(album_config[71:36]),.target_sample(album_config[35:0]),
+ .input_valid(music_raw_valid),.input_eof(music_raw_eof),.input_pcm(music_raw_pcm),.input_ready(music_raw_ready),
+ .output_valid(PLAYER_PCM_VALID),.output_eof(PLAYER_PCM_DATA[32]),.output_pcm(PLAYER_PCM_DATA[31:0]),
+ .output_ready(PLAYER_PCM_READY),.landed(music_landed));
+video_config_cdc #(.WIDTH(1)) album_landed_cdc(.src_clk(clk_mpeg2),.dst_clk(clk_sys),.src_data(music_landed),.dst_data(album_landed_sys));
 
 wire media_external_new_file=(media_img_mounted[0] && !media_mount_d) ||
                             (media_user_reset && !media_user_reset_d);
@@ -170,7 +200,7 @@ wire media_point_found;
 wire [32:0] media_point_pts;
 wire [40:0] media_point_pack,media_point_sequence;
 wire [159:0] media_probe_response_sys;
-wire media_restart=media_new_file||media_search_restart;
+wire media_restart=media_new_file||media_search_restart||album_restart;
 video_config_cdc #(.WIDTH(91)) seek_file_config(
  .src_clk(clk_sys),.dst_clk(clk_mpeg2),
  .src_data({media_search_tag,media_probe_sys,media_start_offset,media_video_start}),
@@ -183,7 +213,7 @@ video_config_cdc #(.WIDTH(160)) seek_probe_config(
             media_point_found,av_raw_end,media_point_pts,media_point_pack,media_point_sequence}),
  .dst_data(media_probe_response_sys));
 media_seek_search media_seek_search(
- .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.request(media_seek_restart),
+ .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.request(media_seek_restart&&!media_music_hint),
  .program_stream(media_probe_response_sys[151]),.origin_valid(media_probe_response_sys[150]),
  .origin(media_probe_response_sys[149:117]),.target_q(media_target_sys),.file_size(media_file_size),
  .reader_start(media_reader_start),.reader_position(media_byte_position),
@@ -197,8 +227,8 @@ reg [2:0] media_osd_sync=0;
 always @(posedge clk_sys) media_osd_sync<={media_osd_sync[1:0],OSD_STATUS};
 media_keyboard_control #(.RESTART_BOTH_DIRECTIONS(1),.ENABLE_SEEK_GATE(1)) media_keyboard_control(
  .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.enabled(media_file_size!=0 && !media_duration_busy),
- .seek_enabled(!media_music_hint),.osd_open(media_osd_sync[2]),.key(ps2_key),.elapsed_q(media_elapsed_sys),
- .seek_done(media_seek_done_sys && !media_search_busy),.restart_complete(media_reader_start && !media_probe_sys),
+ .seek_enabled(!media_music_hint||(album_seek_available&&!album_busy)),.osd_open(media_osd_sync[2]),.key(ps2_key),.elapsed_q(media_music_hint?media_music_elapsed:media_elapsed_sys),
+ .seek_done(media_music_hint ? (media_seek_sys&&album_landed_sys&&!album_busy) : (media_seek_done_sys && !media_search_busy)),.restart_complete(media_reader_start && !media_probe_sys),
  .paused(media_paused_sys),.seek_active(media_seek_sys),
  .seek_target_q(media_target_sys),.restart(media_seek_restart));
 video_config_cdc #(.WIDTH(37)) playback_control_config(
@@ -229,13 +259,13 @@ assign PLAYER_UI_CLOCK=clk_sys;
 media_ui_state player_ui_state(
  .clk(clk_sys),.reset(RESET),.new_file(media_new_file),
  .loaded(media_file_size!=0 && !media_duration_busy && !media_fifo_reset),
- .paused(media_paused_sys),.seeking(media_seek_sys),
+ .paused(media_paused_sys),.seeking(media_seek_sys||album_busy),
  .elapsed_q(media_music_hint?media_music_elapsed:media_elapsed_sys),.target_q(media_target_sys),
  .duration_q(media_music_hint?media_music_duration:media_duration_q),.duration_valid(media_music_hint?(media_music_total_sys!=0):media_duration_valid),.scene_state(PLAYER_UI_STATE));
 media_session_control #(.ENABLE_START_READY(1)) media_session_control (
  .clk_sys(clk_sys),.clk_mpeg2(clk_mpeg2),.reset(RESET),.restart(media_restart),
  .reader_idle(media_reader_idle),.ddr_idle(media_ddr_idle),
- .start_ready(media_search_echo==media_search_tag && !media_duration_busy),
+ .start_ready(media_search_echo==media_search_tag && album_echo==album_tag && !media_duration_busy),
  .reader_cancel(media_reader_cancel),.fifo_reset(media_fifo_reset),
  .reader_start(media_reader_start),.quiesce(media_quiesce),
  .decoder_reset(media_decoder_reset),.generation(media_generation)
@@ -244,7 +274,7 @@ media_file_reader media_file_reader (
  .clk(clk_sys),.reset(RESET),.start(media_duration_busy ? media_duration_start : (media_reader_start && media_file_size!=0)),
  .cancel(media_duration_busy ? media_duration_cancel : (media_reader_cancel || media_fatal_sys)),.suspend(1'b0),
  .file_size(media_duration_busy ? media_duration_size : media_file_size),
- .start_offset(media_duration_busy ? media_duration_offset : {23'd0,media_start_offset}),
+ .start_offset(media_duration_busy ? media_duration_offset : (music_play_request?{23'd0,album_offset}:{23'd0,media_start_offset})),
  .sd_lba(media_sd_lba[0]),.sd_blk_cnt(media_sd_blocks[0]),.sd_rd(media_sd_rd[0]),
  .sd_ack(media_sd_ack[0]),.sd_buff_wr(media_reader_wr[0]),
  .sd_buff_addr(media_sd_addr),.sd_buff_dout(media_sd_data),
@@ -579,12 +609,14 @@ always @(posedge clk_mpeg2)begin
  if(reset_mpeg2)music_started<=0;
  else if(media_music_mode&&!media_quiesce)music_started<=1;
 end
-flac_ddr_decoder music_decoder(.clk(clk_mpeg2),.reset(reset_mpeg2),.cancel(media_quiesce),
+flac_ddr_decoder #(.ENABLE_RESUME(1)) music_decoder(
+ .resume_frame(album_config[140]),.resume_total(album_config[139:104]),.resume_min_block(album_config[103:88]),
+ .resume_max_block(album_config[87:72]),.resume_sample(album_config[71:36]),.clk(clk_mpeg2),.reset(reset_mpeg2),.cancel(media_quiesce),
  .start(media_music_mode&&!media_quiesce&&!music_started),.start_ready(),.quiescent(media_music_idle),
  .input_data(media_fifo_data[7:0]),.input_valid(media_music_mode&&media_prefill_mpeg&&!mpeg2_stream_empty&&!media_eof_at_head),
  .input_end(media_eof_seen),.input_ready(media_music_input_ready),.metadata_valid(media_music_metadata),.total_samples(media_music_total),
- .pcm_valid(PLAYER_PCM_VALID),.pcm_ready(PLAYER_PCM_READY),.pcm_eof(PLAYER_PCM_DATA[32]),
- .pcm_left(PLAYER_PCM_DATA[31:16]),.pcm_right(PLAYER_PCM_DATA[15:0]),.error(media_music_decode_error),
+ .pcm_valid(music_raw_valid),.pcm_ready(music_raw_ready),.pcm_eof(music_raw_eof),
+ .pcm_left(music_raw_pcm[31:16]),.pcm_right(music_raw_pcm[15:0]),.error(media_music_decode_error),
  .mem_addr(music_mem_addr),.mem_data(music_mem_data),.mem_be(music_mem_be),.mem_read(music_mem_read),.mem_write(music_mem_write),
  .mem_busy(DDRAM_BUSY||!media_music_mode),.mem_q(DDRAM_DOUT),.mem_q_valid(DDRAM_DOUT_READY&&media_music_mode));
 

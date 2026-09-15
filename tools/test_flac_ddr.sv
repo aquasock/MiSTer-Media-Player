@@ -1,5 +1,8 @@
 `timescale 1ns/1ps
 module test_flac_ddr;
+ reg resume_frame=0;
+ reg [35:0] resume_sample=0,resume_total=0,landing_target=0;
+ reg [15:0] resume_min_block=0,resume_max_block=0;
  reg clk=0;always #5 clk=~clk;
  reg reset=1,cancel=0,start=0;
  byte unsigned bytes[0:2000000],pcm[0:1000000];
@@ -23,7 +26,13 @@ module test_flac_ddr;
  wire sink_ready,sink_active,sink_finished,sink_error;
  wire signed[15:0] audio_left,audio_right;wire[35:0] position;
  wire pcm_ready=sink_mode!=0?sink_ready:cycle%13!=0;
- flac_ddr_decoder dut(.*,.input_data(bytes[ptr]),.input_end(ptr==length));
+ wire raw_valid,raw_eof,raw_ready;
+ wire signed [15:0] raw_left,raw_right;
+ flac_pcm_landing landing(.clk(clk),.reset(reset||cancel||(start&&start_ready)),
+  .start_sample(resume_sample),.target_sample(landing_target),
+  .input_valid(raw_valid),.input_eof(raw_eof),.input_pcm({raw_left,raw_right}),.input_ready(raw_ready),
+  .output_valid(pcm_valid),.output_eof(pcm_eof),.output_pcm({pcm_left,pcm_right}),.output_ready(pcm_ready),.landed());
+ flac_ddr_decoder #(.ENABLE_RESUME(1)) dut(.pcm_valid(raw_valid),.pcm_eof(raw_eof),.pcm_ready(raw_ready),.pcm_left(raw_left),.pcm_right(raw_right),.*,.input_data(bytes[ptr]),.input_end(ptr==length));
  media_pcm_sink sink(.clk(clk),.reset(reset),.cancel(cancel),.start(start&&start_ready),.start_position(36'd0),
   .paused(1'b0),.sample_tick(tick),.input_valid(pcm_valid),.input_eof(pcm_eof),
   .input_left(pcm_left),.input_right(pcm_right),.input_ready(sink_ready),.audio_left(audio_left),.audio_right(audio_right),
@@ -32,6 +41,8 @@ module test_flac_ddr;
  reg check_sink=0,check_eof=0;reg signed[15:0] check_left,check_right;
  initial begin
   if(!$value$plusargs("input=%s",input_path)||!$value$plusargs("pcm=%s",pcm_path))$fatal(1,"paths required");
+  n=$value$plusargs("resume=%d",resume_frame);n=$value$plusargs("resume_sample=%d",resume_sample);
+  n=$value$plusargs("resume_total=%d",resume_total);n=$value$plusargs("target=%d",landing_target);n=$value$plusargs("resume_min=%d",resume_min_block);n=$value$plusargs("resume_max=%d",resume_max_block);
   n=$value$plusargs("immediate=%d",immediate);n=$value$plusargs("error=%d",expected_error);n=$value$plusargs("cancel=%d",cancel_mode);n=$value$plusargs("sink=%d",sink_mode);
   fd=$fopen(input_path,"rb");if(fd==0)$fatal(1,"input open");length=$fread(bytes,fd);$fclose(fd);
   fd=$fopen(pcm_path,"rb");if(fd==0)$fatal(1,"PCM open");pcm_length=$fread(pcm,fd);$fclose(fd);

@@ -1,3 +1,33 @@
+# FLAC CD albums and keyboard seeking
+
+Run `python3 tools/verify_flac_album.py --output results/flac-album` to generate
+reproducible album fixtures and exercise metadata parsing, N/P, plain FLAC keyboard
+controls, restart CDC, pause retention and exact PCM landing through the DDR decoder.
+The ordinary FLAC corpus, CRC rejection, cancellation and native output checks
+remain separate regressions. Hardware validation is pending.
+
+For this build, load a completed CD rip with an embedded CUESHEET (the abcde
+single-file FLAC workflow). Verify:
+
+1. Native playback, waveform, pause and OSD still work. The times cover the album.
+2. N selects the next track; P selects the previous track. First-track P clamps
+   to the first INDEX 01, and last-track N does nothing. Held keys do not repeat.
+3. Left/Right jumps 10 seconds, Ctrl+Left/Right 30 seconds, and Ctrl+Alt+Left/Right
+   five minutes, across track boundaries. Test both while playing and paused.
+4. Test the same arrow controls on a normal FLAC without an embedded cue sheet.
+   Track keys should have no effect. Seek tables make landing faster; without
+   one, reaching a late target requires discarded decode from the beginning.
+5. Seek to the beginning and beyond the end. The latter lands on the final sample
+   and then follows normal EOF behavior when unpaused. Replace FLAC with MPG and
+   MPG with FLAC, including during a seek, and confirm no old pause/index survives.
+6. Recheck the four MPG regression files, video seeking, subtitles and EOF.
+
+Unknown STREAMINFO total samples disable navigation/seeking. Optional cue parsing
+is bounded to 99 tracks; 512 seek points are retained. No external CUE loading,
+track titles, damaged-rip recovery or playlist loading is added.
+
+---
+
 # Waveform timing rebuild — HIGH packing default
 
 All builds now use HIGH ALM register packing. The waveform pipeline separates

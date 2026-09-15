@@ -1,8 +1,11 @@
 // Native FLAC file framing for the project's 44100 Hz / 16-bit stereo profile.
 // Coded channel samples go to a provisional frame store, never directly to PCM.
 // The store owns CRC-admitted frames after commit_valid && commit_ready.
-module flac_stream_decoder (
+module flac_stream_decoder #(parameter ENABLE_RESUME=0) (
  input wire clk,reset,
+ input wire resume_frame,
+ input wire [35:0] resume_sample,resume_total,
+ input wire [15:0] resume_min_block,resume_max_block,
  input wire [7:0] input_data,
  input wire input_valid,input_end,
  output wire input_ready,
@@ -29,6 +32,7 @@ module flac_stream_decoder (
   RATE_START=15,RATE_CHECK=16,HEADER_CRC=17,BEGIN_FRAME=18,
   START_SUB=19,SUB=20,PADDING=21,FRAME_CRC=22,COMMIT=23,FAILED=24;
  reg [4:0] state,return_state,skip_return;
+ reg first_resume;
  reg [6:0] bits_left;
  reg [63:0] field;reg [62:0] accumulator;
  reg [7:0] byte_buffer;reg [3:0] byte_bits;
@@ -75,12 +79,12 @@ module flac_stream_decoder (
  wire[36:0] next_position={1'b0,frame_position}+{21'd0,frame_size};
  always @(posedge clk)begin
   if(reset)begin
-   state<=MAGIC;return_state<=MAGIC;skip_return<=MAGIC;bits_left<=0;field<=0;accumulator<=0;
+   state<=(ENABLE_RESUME&&resume_frame)?WAIT_FRAME:MAGIC;first_resume<=ENABLE_RESUME&&resume_frame;return_state<=MAGIC;skip_return<=MAGIC;bits_left<=0;field<=0;accumulator<=0;
    byte_buffer<=0;byte_bits<=0;skip_left<=0;seen_info<=0;meta_last<=0;
-   crc_active<=0;header_active<=0;min_block<=0;max_block<=0;crc16<=0;crc8<=0;
+   crc_active<=0;header_active<=0;min_block<=(ENABLE_RESUME&&resume_frame)?resume_min_block:16'd0;max_block<=(ENABLE_RESUME&&resume_frame)?resume_max_block:16'd0;crc16<=0;crc8<=0;
    block_code<=0;rate_code<=0;variable_block<=0;blocking_known<=0;blocking_mode<=0;
    short_frame<=0;fixed_size<=0;frame_number<=0;coded_number<=0;number_min<=0;continuation<=0;
-   metadata_valid<=0;total_samples<=0;frame_size<=0;channel_assignment<=0;frame_position<=0;
+   metadata_valid<=ENABLE_RESUME&&resume_frame;total_samples<=(ENABLE_RESUME&&resume_frame)?resume_total:36'd0;frame_size<=0;channel_assignment<=0;frame_position<=(ENABLE_RESUME&&resume_frame)?resume_sample:36'd0;
    sample_channel<=0;sample_index<=0;finished<=0;error<=0;
   end else if(store_error)fail(8);
   else begin
@@ -153,12 +157,15 @@ module flac_stream_decoder (
      coded_number<={coded_number[29:0],nb[5:0]};continuation<=continuation-1'b1;
      if(continuation==1)state<=NUMBER_CHECK;else read_bits(8,NUMBER_MORE);
     end
-    NUMBER_CHECK:if(coded_number<number_min||(!variable_block&&coded_number[35:28]!=0)||
-      (variable_block?coded_number!=frame_position:coded_number!=frame_number)||
+    NUMBER_CHECK:begin
+     if(first_resume&&!variable_block)frame_number<=coded_number;
+     if(coded_number<number_min||(!variable_block&&coded_number[35:28]!=0)||
+      (variable_block?coded_number!=frame_position:(!first_resume&&coded_number!=frame_number))||
       (blocking_known&&variable_block!=blocking_mode))fail(7);
      else if(block_code==6)read_bits(8,BLOCK_EXTRA);
      else if(block_code==7)read_bits(16,BLOCK_EXTRA);
      else state<=RATE_START;
+    end
     BLOCK_EXTRA:if(field[15:0]==65535)fail(3);else begin frame_size<=field[15:0]+1'b1;state<=RATE_START;end
     RATE_START:begin
      if(frame_size==0||frame_size>max_block||(!variable_block&&blocking_known&&frame_size>fixed_size))fail(3);
@@ -167,7 +174,7 @@ module flac_stream_decoder (
     end
     RATE_CHECK:if(!((rate_code==13&&field==44100)||(rate_code==14&&field==4410)))fail(3);else read_bits(8,HEADER_CRC);
     HEADER_CRC:if(crc8!=0)fail(4);else begin
-     header_active<=0;sample_channel<=0;sample_index<=0;state<=BEGIN_FRAME;
+     header_active<=0;first_resume<=0;sample_channel<=0;sample_index<=0;state<=BEGIN_FRAME;
      short_frame<=frame_size<min_block||(!variable_block&&blocking_known&&frame_size!=fixed_size);
      if(!blocking_known)begin blocking_known<=1;blocking_mode<=variable_block;fixed_size<=frame_size;end
     end

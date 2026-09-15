@@ -1,9 +1,13 @@
 // Native file decoder plus external frame storage. This block emits the
 // format-independent PCM/EOF token stream; it does not generate an audio clock.
 module flac_ddr_decoder #(
+ parameter ENABLE_RESUME=0,
  parameter[28:0] BASE=29'h06080000
 )(
  input wire clk,reset,cancel,start,
+ input wire resume_frame,
+ input wire [35:0] resume_sample,resume_total,
+ input wire [15:0] resume_min_block,resume_max_block,
  output wire start_ready,quiescent,
  input wire[7:0] input_data,
  input wire input_valid,input_end,
@@ -35,7 +39,9 @@ module flac_ddr_decoder #(
   if(reset||cancel)decoder_active<=0;
   else if(start&&start_ready)decoder_active<=1;
  end
- flac_stream_decoder decoder(.clk(clk),.reset(decoder_reset),
+ flac_stream_decoder #(.ENABLE_RESUME(ENABLE_RESUME)) decoder(.clk(clk),.reset(decoder_reset),
+  .resume_frame(resume_frame),.resume_sample(resume_sample),.resume_total(resume_total),
+  .resume_min_block(resume_min_block),.resume_max_block(resume_max_block),
   .input_data(input_data),.input_valid(input_valid),.input_end(input_end),.input_ready(internal_input_ready),
   .metadata_valid(metadata_valid),.total_samples(total_samples),
   .begin_valid(begin_valid),.begin_ready(begin_ready),.frame_size(frame_size),.channel_assignment(channel_assignment),.frame_position(),

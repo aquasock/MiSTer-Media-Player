@@ -134,3 +134,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_subtitle_time.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_subtitle_select.sv
 
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_waveform_visualizer.sv
+
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/flac/flac_album_control.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/flac/flac_pcm_landing.sv

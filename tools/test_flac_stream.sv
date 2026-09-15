@@ -17,7 +17,7 @@ module test_flac_stream;
  wire signed[15:0] left_sample,right_sample;wire stereo_error;
  flac_stereo stereo(.assignment_code(channel_assignment),.channel0(first_channel[sample_index]),
   .channel1(sample_data),.left(left_sample),.right(right_sample),.error(stereo_error));
- flac_stream_decoder dut(.clk(clk),.reset(reset),.input_data(bytes[ptr]),.input_valid(input_valid),
+ flac_stream_decoder dut(.resume_frame(1'b0),.resume_sample(36'd0),.resume_total(36'd0),.resume_min_block(16'd0),.resume_max_block(16'd0),.clk(clk),.reset(reset),.input_data(bytes[ptr]),.input_valid(input_valid),
   .input_end(ptr==length),.input_ready(input_ready),.metadata_valid(metadata_valid),.total_samples(total_samples),
   .begin_valid(begin_valid),.begin_ready(begin_ready),.frame_size(frame_size),.channel_assignment(channel_assignment),
   .frame_position(frame_position),.sample_valid(sample_valid),.sample_ready(sample_ready),
