@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Split a CD-format album FLAC into the directory containing this script.
 
-Run without arguments to find one adjacent FLAC with an embedded CUESHEET,
-or pass the album filename explicitly. Requires flac and metaflac. Original
+Usage: python3 split_flac_album.py "path/to/album.flac"
+The album must contain an embedded CUESHEET. Requires flac and metaflac. Original
 filenames/titles were not retained by bundle_flac_album.py; numbered names
 are used instead. The album and existing files are never overwritten.
 """
@@ -51,29 +51,19 @@ def track_starts(cue):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("album", nargs="?", type=Path)
+    parser.add_argument("album", type=Path, help="input album FLAC containing embedded track markers")
     args = parser.parse_args()
     folder = Path(__file__).resolve().parent
     for tool in ("flac", "metaflac"):
         if shutil.which(tool) is None:
             raise RuntimeError(f"Required command not found: {tool}")
 
-    if args.album:
-        album = args.album.resolve()
-        cue = export_cue(album)
-        if not cue:
-            raise RuntimeError(f"No readable embedded CUESHEET: {album}")
-    else:
-        candidates = []
-        for path in sorted(folder.iterdir()):
-            if path.is_file() and path.suffix.lower() == ".flac":
-                cue = export_cue(path)
-                if cue:
-                    candidates.append((path, cue))
-        if len(candidates) != 1:
-            raise RuntimeError("Expected exactly one adjacent album with an embedded CUESHEET; "
-                               "pass its filename explicitly if there are several.")
-        album, cue = candidates[0]
+    album = args.album.resolve()
+    if not album.is_file():
+        raise RuntimeError(f"Input file not found: {album}")
+    cue = export_cue(album)
+    if not cue:
+        raise RuntimeError(f"No readable embedded CUESHEET: {album}")
 
     starts = track_starts(cue)
     outputs = [folder / f"{number:02d} - Track {number:02d}.flac" for number, _ in starts]
