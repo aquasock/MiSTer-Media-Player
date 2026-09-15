@@ -1,4 +1,4 @@
-## 119 COMMIT Unreleased ??? 2026-09-14T20:01:26-07:00
+## 119 COMMIT Unreleased 2498125 2026-09-14T20:01:26-07:00
 
 #### Coming From:
 
@@ -10,15 +10,25 @@ Implement a new stereo waveform visualizer for native music playback.
 
 #### Outcome:
 
-The user selects the original mirrored-waveform concept rather than a spectrum. The implementation will tap actual post-volume native output samples without feeding back into playback, transfer decimated stereo samples through a coherent mailbox and retain a short history in block RAM. Cyan and orange traces will render behind the existing player overlay during music only. Pause and mute must settle to silence, replacement must discard old history, and movie pixels must bypass unchanged. The separately archived punctuation builds continue unchanged.
+Implemented a read-only post-volume native PCM tap and cyan/orange mirrored stereo waveform behind the HDMI player overlay and OSD. Four-sample averaging feeds a 256-point history, with a separate vertical-blank snapshot and interpolated traces to avoid tearing and gaps. Source epoch changes discard old history; silence flattens traces and movie RGB/sync bypass carries an equal seven-cycle delay. Standalone Quartus mapping succeeds with zero warnings, estimating 455 ALMs, 730 registers, two M10Ks and four DSPs; this is not full-core placement or timing. Simulations pass asynchronous stereo history, silence, replacement, complete-frame constant-signal pixel oracles and RGB/sync bypass at 480p, 720p and 1080p. Native integration verifies 1024 ordered tap pairs alongside I2S/SPDIF, pause, EOF and HDMI restoration. Evidence and PNG previews are in results/waveform and results/waveform-native. Spectrum remains deferred until waveform hardware acceptance; the punctuation batch is unchanged.
 
 #### Next Steps:
 
-Verify audio-tap ordering against serialized samples, waveform history and bypass behavior, asynchronous clock transfer and rendered frames at supported HDMI resolutions; then commit source and prepare previews before another hardware build.
+Review the RTL previews, then include this source in the next hardware build and qualify full-core timing, resource use and music/movie replacement on 10.10.0.33.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/media_waveform_visualizer.sv
+- rtl/platform/media_native_audio.sv
+- sys/sys_top.v
+- tools/phase1p_timing.tcl
+- tools/test_media_native_audio.sv
+- tools/test_media_waveform_visualizer.sv
+- tools/verify_waveform_visualizer.py
 
 #### Status:
 
