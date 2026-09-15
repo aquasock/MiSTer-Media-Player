@@ -10,6 +10,8 @@ module media_native_audio(
  output wire cd_clock,
  output wire[35:0] position,
  output wire finished,error,
+ output wire visual_active,visual_tick,
+ output wire signed [15:0] visual_left,visual_right,
  input wire movie_bclk,movie_lrclk,movie_data,movie_spdif,movie_dac_l,movie_dac_r,
  output wire output_mclk,output_bclk,output_lrclk,output_data,output_spdif,output_dac_l,output_dac_r,
  input wire pad_scl,pad_sda,hps_scl_low,hps_sda_low,
@@ -88,6 +90,12 @@ module media_native_audio(
   .input_valid(!fifo_empty),.input_eof(fifo_q[32]),.input_left(scaled_left),.input_right(scaled_right),.input_ready(sink_ready),
   .i2s_bclk(cd_bclk),.i2s_lrclk(cd_lrclk),.i2s_data(cd_data),.position(position),.finished(sink_finished),.error(sink_error),
   .pcm_output_left(cd_left),.pcm_output_right(cd_right),.idle(cd_idle));
+ // Read-only observation at the output sample boundary, after volume/mute.
+ reg visual_lr=1;
+ always @(posedge cd_clock)visual_lr<=cd_lrclk;
+ assign visual_active=cfg_cd[7]&&!rd_reset_sync[2];
+ assign visual_tick=visual_lr&&!cd_lrclk&&!rd_reset_sync[2];
+ assign visual_left=cd_left;assign visual_right=cd_right;
  reg[1:0] spdif_div=0;
  always @(posedge cd_clock)if(rd_reset_sync[2])spdif_div<=0;else spdif_div<=spdif_div+1'b1;
  spdif #(.SAMPLE_RATE(44100)) music_spdif(.clk_i(cd_clock),.rst_i(rd_reset_sync[2]),.bit_out_en_i(spdif_div==0),.sample_i({cd_right,cd_left}),.spdif_o(cd_spdif),.sample_req_o());

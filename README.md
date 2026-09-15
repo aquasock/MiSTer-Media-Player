@@ -102,3 +102,19 @@ the startup screen, clearing times, playback controls and loaded subtitles.
 Select a movie to start again; playback positions are not remembered. Paused
 playback stays paused at the endpoint until resumed. Opening another movie
 replaces the previous session immediately through the safe restart path.
+
+## Native music waveform (pending hardware validation)
+
+The next waveform candidate draws cyan left-channel and orange right-channel
+traces during native FLAC playback, behind the player UI and stock OSD. It uses
+post-volume output samples, a roughly 23 ms history and a coherent snapshot per
+HDMI frame. Pause and mute settle the traces to silence; replacing the file
+clears the history. This is HDMI-only and does not add a spectrum analyzer.
+
+Generate RTL previews and run verification with:
+
+```sh
+python3 tools/verify_waveform_visualizer.py --output results/waveform --synthesize
+```
+
+The separate punctuation build `6d460d2` does not include the visualizer.

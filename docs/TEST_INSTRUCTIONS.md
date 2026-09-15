@@ -1,3 +1,39 @@
+# Native stereo waveform — source and simulation only
+
+The new waveform is enabled automatically for native FLAC playback. Cyan is
+left; orange is right, drawn with opposite vertical polarity. It uses actual
+post-volume PCM, not decoder read-ahead. Four samples are averaged per point;
+256 points span about 23.2 ms. The display snapshots history at vertical blank,
+so visible response is limited by refresh/scanout and the connected display.
+This is a waveform visualization, not a spectrum or calibrated measurement.
+
+Standalone Quartus synthesis estimates 455 ALMs and 730 registers, with four
+DSP blocks and 16,384 block-memory bits (two M10Ks). These are module estimates,
+not a full-core placement or timing result.
+
+The two histories use 256x32-bit M10K arrays. They never access stream DDR or
+apply backpressure to audio. Only visual history writes briefly wait during a
+frame copy. Seven pixel-clock stages delay RGB and syncs equally before the
+existing UI and OSD. The visualizer currently appears on HDMI only.
+
+Run `python3 tools/verify_waveform_visualizer.py --output results/waveform --synthesize`
+for asynchronous stereo/silence/replacement/bypass checks, full-frame constant
+pixel oracles, three RTL PNG previews and standalone Quartus resource estimates.
+Run `python3 tools/verify_flac_integration.py --output results/waveform-native`
+for the output tap checked against 1024 ordered pairs alongside I2S/SPDIF,
+pause, EOF and HDMI ownership restoration. Functional models do not establish
+physical HDMI latency or full-core timing.
+
+In the next waveform RBF, check music with distinct left/right signals, quiet
+and loud passages, pause, mute/volume, short-file EOF and FLAC/MPG replacement
+while active and paused. The progress bar and OSD must remain above the traces.
+Verify no traces or changed movie pixels remain after switching back to MPG,
+and test all supported HDMI resolutions and 50/59.94 Hz. A spectrum is deferred
+until the user accepts this visualizer. The running 6d460d2 punctuation builds
+do not contain the waveform.
+
+---
+
 # Shared IDCT candidate
 
 ## Subtitle punctuation fix queued for the next build

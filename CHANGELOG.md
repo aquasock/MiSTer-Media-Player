@@ -6,6 +6,12 @@ This project is still in active pre-release development. Published milestone rel
 
 ## [Unreleased]
 
+### Native music waveform visualizer
+
+- Add cyan/orange stereo waveforms from post-volume native PCM, behind the player UI and OSD. A four-sample average and 256-point history provide a roughly 23 ms window; a frame snapshot prevents tearing. Silence and pause flatten the traces, and media replacement clears history. Movie pixels retain an aligned bypass path.
+- Add asynchronous waveform simulation, complete-frame constant-signal pixel checks and 480p/720p/1080p previews, plus native-output tap ordering checks. Full-core fit/timing and hardware validation remain pending.
+
+
 ### Added
 
 - Subtitles submenu with SRT loading, Yes/No visibility and directly selectable

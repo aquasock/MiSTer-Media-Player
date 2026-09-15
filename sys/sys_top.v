@@ -1240,10 +1240,17 @@ cyclonev_hps_interface_peripheral_i2c hdmi_i2c
 
 	wire [23:0] hdmi_data_player;
 	wire hdmi_hs_player,hdmi_vs_player,hdmi_de_player;
+	wire [23:0] visual_rgb;
+	wire visual_hs,visual_vs,visual_de;
+	media_waveform_visualizer visualizer(
+	 .audio_clk(music_clock),.video_clk(clk_hdmi),.audio_active(visual_active),.sample_tick(visual_tick),
+	 .sample_left(visual_left),.sample_right(visual_right),
+	 .rgb(hdmi_data_mask),.hs(hdmi_hs_mask),.vs(hdmi_vs_mask),.de(hdmi_de_mask),
+	 .rgb_out(visual_rgb),.hs_out(visual_hs),.vs_out(visual_vs),.de_out(visual_de));
 	media_player_overlay player_overlay(
 	 .control_clk(player_ui_clock),.video_clk(clk_hdmi),.control_state(player_ui_state),
 	 .subtitle_command(player_subtitle_command),.subtitle_ack(player_subtitle_ack),
-	 .rgb(hdmi_data_mask),.hs(hdmi_hs_mask),.vs(hdmi_vs_mask),.de(hdmi_de_mask),
+	 .rgb(visual_rgb),.hs(visual_hs),.vs(visual_vs),.de(visual_de),
 	 .rgb_out(hdmi_data_player),.hs_out(hdmi_hs_player),.vs_out(hdmi_vs_player),.de_out(hdmi_de_player));
 
 	osd hdmi_osd
@@ -1643,12 +1650,15 @@ wire native_scl_low,native_sda_low,native_hps_scl,native_hps_sda;
 wire music_request,music_paused,music_pcm_reset,music_pcm_valid,music_pcm_ready;
 wire [32:0] music_pcm_data;
 wire music_clock,music_finished,music_error;
+wire visual_active,visual_tick;
+wire signed [15:0] visual_left,visual_right;
 wire [35:0] music_position;
 wire analog_l,analog_r;
 wire movie_bclk,movie_lrclk,movie_i2s,movie_spdif,movie_analog_l,movie_analog_r;
 media_native_audio native_audio(.refclk(FPGA_CLK3_50),.config_clk(clk_sys),.wr_clk(ram_clk),.reset(reset),.movie_clock(clk_audio),
  .want_cd(music_request),.paused(music_paused),.movie_96k(audio_96k),.attenuation(vol_att),
  .pcm_reset(music_pcm_reset),.pcm_valid(music_pcm_valid),.pcm_data(music_pcm_data),.pcm_ready(music_pcm_ready),
+ .visual_active(visual_active),.visual_tick(visual_tick),.visual_left(visual_left),.visual_right(visual_right),
  .cd_clock(music_clock),.position(music_position),.finished(music_finished),.error(music_error),
  .movie_bclk(movie_bclk),.movie_lrclk(movie_lrclk),.movie_data(movie_i2s),.movie_spdif(movie_spdif),.movie_dac_l(movie_analog_l),.movie_dac_r(movie_analog_r),
  .output_mclk(HDMI_MCLK),.output_bclk(HDMI_SCLK),.output_lrclk(HDMI_LRCLK),.output_data(HDMI_I2S),.output_spdif(spdif),

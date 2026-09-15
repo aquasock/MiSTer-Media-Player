@@ -32,6 +32,13 @@ module test_media_native_audio;
  wire pcm_valid=sending&&sent<=1024;
  wire[32:0] pcm_data={sent==1024,16'(sent+1),16'(65535-sent)};
  wire pcm_ready,cd_clock,finished,error;
+ wire visual_active,visual_tick;
+ wire signed [15:0] visual_left,visual_right;
+ integer visual_received=0;
+ always @(posedge cd_clock)if(visual_active&&visual_tick&&(visual_left!=0||visual_right!=0))begin
+  if(visual_left!==16'(visual_received+1)||visual_right!==16'(65535-visual_received))$fatal(1,"visual tap sample order");
+  visual_received=visual_received+1;
+ end
  wire[35:0] position;
  reg[8:0] movie_phase=0;
  always @(posedge movie_clock)movie_phase<=movie_phase+1'b1;
@@ -97,6 +104,7 @@ module test_media_native_audio;
   wait(received==200);paused=1;
   #200000;paused=0;
   wait(finished);#1;
+  if(visual_received!=1024)$fatal(1,"visual tap count");
   if(error||received!=1024||spdif_received!=1024||position!=1024)$fatal(1,"native EOF received=%0d SPDIF=%0d pos=%0d err=%b",received,spdif_received,position,error);
   want_cd=0;pcm_reset=1;
   wait(!dut.select_cd&&!dut.mute);#100000;
