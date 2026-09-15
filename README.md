@@ -55,6 +55,15 @@ than committing to a single seed in advance. Full details, including the
 dedicated multi-corner timing validation pass beyond Quartus's default flow
 check, are in the build document.
 
+## Preparing media
+
+`tools/create_mpg.txt` documents the project's ffmpeg recipe for encoding an
+MPEG-2 Program Stream this core accepts, with quality/frame-rate/aspect
+variants. `tools/pack_flac_album.py` bundles adjacent numbered tracks beside
+it into a single CD-format embedded-CUESHEET album FLAC (N/P navigation in
+the core); `tools/unpack_flac_album.py` splits one back into numbered tracks.
+Both scripts require `ffmpeg`/`flac` and are run directly with Python 3.
+
 ## Documentation
 
 - **Architecture** — the system map: top-level module structure, the

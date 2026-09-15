@@ -6,7 +6,48 @@ This project is still in active pre-release development. Published milestone rel
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-09-15 — Native-FPGA playback, visualizers and FLAC album milestone
+
+Replaces the ARM-helper/DVD-navigation path from v0.7.0-v0.9.0 with playback
+implemented entirely in FPGA logic: MPEG-2 Program Stream video with MP2
+audio, standalone/album FLAC with CUESHEET track navigation, SRT subtitles,
+a transport UI, and three native audio visualizers (Waveforms, FFT, O-Scope).
+No HPS software or soft CPU is involved in the playback path.
+
+- Release package: `MiSTer_Media_Player_v0.9.5.zip`, 2,098,997 bytes,
+  SHA-256 `da1c8766d79b8184b467213e6e125a1a45c41c28ad3d5c2f9e98b2396fae02fa`.
+- Source commit `1720960`, reorganized without RTL changes by the preceding
+  Project Refresh; the qualified RBF reproduces byte-for-byte identical to
+  the pre-reorganization `68f32c7` seed61 build.
+- Clean Quartus Prime 17.0.2 build, fitter seed 61, HIGH ALM register
+  packing: 35,817 / 41,910 ALMs (85%), 51,622 registers, 546 / 553 RAM
+  blocks (99%), 75 DSP blocks, 4 PLLs. RBF: `MediaPlayer_20260915.rbf`,
+  4,520,032 bytes, SHA-256
+  `7ca9345347c88f689860a6fd6a0d13cdbc43019cbe678dfee4c73508fa3393fc`.
+- All four TimeQuest sign-off corners pass with zero total negative slack:
+  Slow 1100mV 100C +0.236/+0.237/+3.468/+0.561 ns, Slow 1100mV -40C
+  +0.127/+0.166/+3.574/+0.482 ns, Fast 1100mV 100C +2.926/+0.133/+4.848/
+  +0.262 ns, Fast 1100mV -40C +3.526/+0.045/+5.105/+0.179 ns (setup/hold/
+  recovery/removal); minimum pulse width +0.925 ns on every corner. Two
+  exploratory seeds (11, 12) were also swept and both fail setup on at
+  least one slow corner; seed 61 remains the qualified candidate.
+- The project owner accepted this exact RBF on the test MiSTer, covering
+  the XY O-Scope, FFT peak-hold, Fire-block rendering, track-first audio
+  UI, FLAC album navigation/seeking, aspect-correct audio graphics and the
+  standing MPG/FLAC regression set.
+
 ### Changed
+
+- **DVD-authored navigation and ARM-helper decode are no longer part of
+  this core.** v0.9.0's disc/ISO menu navigation (libdvdnav), and its
+  helper-decoded WAV/FLAC/Ogg Vorbis playback, are replaced outright by the
+  native FPGA MPEG-2 Program Stream/MP2 path and native FLAC/album decode
+  above. There is no helper binary, patched Main, or DVD launcher in this
+  release.
+- Add `tools/create_mpg.txt` (the project's ffmpeg Program Stream recipe,
+  with quality/frame-rate/aspect variants) and `tools/pack_flac_album.py` /
+  `tools/unpack_flac_album.py` (bundle adjacent tracks into a CD-format
+  embedded-CUESHEET album FLAC, and split one back into numbered tracks).
 
 - Double O-Scope to 256 by 256 positions using eight phosphor levels and 24
   M10Ks. Preserve native stereo mapping, square aspect geometry and short
@@ -42,7 +83,7 @@ This project is still in active pre-release development. Published milestone rel
 - Share the native post-volume tap, selected aspect rectangle and nine-cycle
   renderer boundary. Keep audio transport, player UI and stock OSD independent.
 - Add reproducible coefficient generation, exact FFT oracles, full-frame
-  renderer checks and RTL previews. Hardware validation is pending.
+  renderer checks and RTL previews. Hardware-accepted with this release.
 
 ### Audio-mode menu controls
 
@@ -71,7 +112,7 @@ This project is still in active pre-release development. Published milestone rel
 - Split waveform RAM reads, sample differences and interpolation products into separate pipeline stages, retaining aligned RGB/sync timing. Use HIGH ALM register packing by default for subsequent builds.
 
 - Add cyan/orange stereo waveforms from post-volume native PCM, behind the player UI and OSD. A four-sample average and 256-point history provide a roughly 23 ms window; a frame snapshot prevents tearing. Silence and pause flatten the traces, and media replacement clears history. Movie pixels retain an aligned bypass path.
-- Add asynchronous waveform simulation, complete-frame constant-signal pixel checks and 480p/720p/1080p previews, plus native-output tap ordering checks. Full-core fit/timing and hardware validation remain pending.
+- Add asynchronous waveform simulation, complete-frame constant-signal pixel checks and 480p/720p/1080p previews, plus native-output tap ordering checks. Hardware-accepted with this release.
 
 
 ### Added
@@ -170,7 +211,7 @@ This project is still in active pre-release development. Published milestone rel
 - Seeking now retires the stopped display reader's retained DDR bank protection
   after outstanding reads drain. This allows reconstruction to reuse the bank
   instead of stalling until its watchdog expires. Normal display and pause
-  protection remain active. Simulation verified; hardware validation pending.
+  protection remain active. Hardware-accepted with this release.
 
 ### Added
 
