@@ -1,3 +1,61 @@
+## 122 COMMIT Unreleased 2498125 2026-09-14T20:19:12-07:00
+
+#### Coming From:
+
+Unreleased 6d460d2
+
+#### Purpose:
+
+Build the native stereo waveform visualizer for hardware validation.
+
+#### Outcome:
+
+The user authorizes the next visualizer hardware cycle. Launch clean source 2498125 with the usual seeds 52, 61 and 87 and standard MEDIUM packing. This includes the accepted punctuation corrections and the HDMI-only post-volume stereo waveform. Standalone waveform mapping and three-resolution pixel simulations already pass, as does the native serializer/tap regression. The build helper runs compilation and timing/CDC audits; explicit corner-slack inspection is required because a zero timing-script exit alone does not guarantee nonnegative slack.
+
+#### Next Steps:
+
+Inspect every timing corner and resource report, package the best passing candidate and test FLAC visualization, pause/mute, EOF and active/paused MPG/FLAC replacement on 10.10.0.33.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 121 COMMIT Unreleased 6d460d2 2026-09-14T20:19:12-07:00
+
+#### Coming From:
+
+Unreleased 6d460d2
+
+#### Purpose:
+
+Record hardware acceptance of the subtitle punctuation candidate.
+
+#### Outcome:
+
+The user reports that the recommended punctuation build passes on the fresh MiSTer at 10.10.0.33 and authorizes proceeding to the visualizer. The accepted candidate is results/hardware-test-6d460d2/seed87/MediaPlayer_20260914.rbf, SHA-256 79f474395e08709b540431ed477ac1feaceed2f3a9222b2c326b5011ee34d362. It becomes the rollback for the waveform cycle.
+
+#### Next Steps:
+
+Preserve the accepted punctuation RBF and build the separately simulated waveform source.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 120 COMMIT Unreleased 6d460d2 2026-09-14T20:16:11-07:00
 
 #### Coming From:
@@ -1357,84 +1415,6 @@ Present the plan for implementation approval, then remove reporting hardware whi
 #### Files Modified:
 
 - docs/DIAGNOSTIC_REMOVAL_PLAN.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 82 COMMIT Unreleased 6688db2 2026-09-14T11:22:33-07:00
-
-#### Coming From:
-
-Unreleased b05b76f
-
-#### Purpose:
-
-Reproduce and correct the startup audio timestamp warning observed on Fellow and Groove.
-
-#### Outcome:
-
-Source 6688db2 changes only the audio timestamp warning tolerance from two to 90 ticks (1 ms); sample scheduling and underrun detection are unchanged. Exact first-MiB replays reproduce Fellow and Groove at sample 4608 before consumption (hardware count 4609): second audio PES PTS is 56477 instead of the continuous sample-grid value 56492, a 15-tick/167-us backward step. Jiggler and Star Wars have the aligned timestamp and no warning. Before/after replays of all four files preserve identical PCM, video bytes and PTS output and now have no warning or underrun. Seven directed cases cover zero/two/15/90-tick tolerance, retained warnings at 91/900 ticks, timestamp wrap, exact 512-clock cadence and 6912 sample pairs each. Playback, EOF/session and generated-MPG PCM/PTS, pause and seek regressions pass. The timed MPG bench now uses production 60/24.576 MHz clocks rather than 100/40.96 MHz. Evidence is in results/audio-startup-before, results/audio-startup-after, results/audio-tolerance-controls.json and results/audio-tolerance-mpg.json. The unchanged EOF source b05b76f finished all builds: seeds 52 and 87 pass four corners, 183 CDC registers and scene-enable checks; seed 61 misses setup by 0.009 ns. Preferred EOF seed 87 has setup +0.358 ns, hold +0.099 ns, 37410 actual ALMs, 527 M10Ks and 75 DSPs, leaving 4500 ALMs and 26 M10Ks. Packaged results/hardware-test-b05b76f/seed87/MediaPlayer_20260914.rbf has SHA-256 e9ac8007db6a50877ea9ebc7b666b7879f0c30954bf168beefe3569fff08b093. It does not include the audio warning fix. No new Quartus batch or hardware deployment was started for 6688db2.
-
-#### Next Steps:
-
-Have the user validate EOF and layout with b05b76f seed 87, retain accepted ec56250 seed 87 as rollback, and include 6688db2 in the next hardware build to confirm startup telemetry stays absent on Fellow/Groove.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- docs/TEST_INSTRUCTIONS.md
-- rtl/audio/mp2_pcm_output.sv
-- tools/replay_audio_startup.py
-- tools/test_mp2_timestamp_tolerance.sv
-- tools/test_mpg_audio_playback.sv
-- tools/verify_playback_controls.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 81 COMMIT Unreleased b05b76f 2026-09-14T10:59:57-07:00
-
-#### Coming From:
-
-Unreleased b5a17cf
-
-#### Purpose:
-
-Return completed playback to the startup state after safely draining audio and video.
-
-#### Outcome:
-
-Source b05b76f implements EOF-only closure; resume is dropped. Physical EOF, completed ingress, drained presentation and finished audio gate a final source-frame interval, then a generation-tagged mailbox closes the logical file through the existing safe restart path. This clears subtitle association, times, controls and startup-message suppression; pause, seek and preflight block closure, and new mounts take priority over stale completion. The 64-check EOF/session test passes for five source frame rates, longer audio, pause/seek/probe inhibition, activity restart, stale completion, simultaneous replacement and delayed host/DDR retirement. The real mixed I/P/B pipeline completes EOF with 423936 pixel comparisons and zero mismatches. Existing playback/audio, reader/session and subtitle lifecycle regressions pass. Source is pushed and clean seeds 52/61/87 are running under /tmp/eof-build.log. The preceding b5a17cf layout batch is also qualified: all seeds pass four corners and 171 CDC checks; setup is +0.508/+0.436/+0.313 ns, hold +0.113/+0.098/+0.076 ns and actual ALMs 38593/38727/38559, with unchanged 527 M10Ks and 75 DSPs. Layout-only candidates are packaged under results/hardware-test-b5a17cf, preferred seed 52; layout hardware acceptance remains pending. No core was deployed.
-
-#### Next Steps:
-
-Audit and package the EOF build timing/resources, then test clean completion, subtitle clearing, longer audio tails, paused EOF, seek endpoints and replacement movies at both output rates. Retain hardware-accepted ec56250 seed 87 as rollback.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_05.svh
-- README.md
-- docs/TEST_INSTRUCTIONS.md
-- docs/UI_OVERLAY_PLAN.md
-- files.qip
-- rtl/media_eof_control.sv
-- tools/audit_three_seeds.py
-- tools/phase1p_timing.tcl
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_mixed_raster_pixels.sv
-- tools/test_media_eof_control.sv
-- tools/verify_decoder_timing.py
-- tools/verify_playback_controls.py
 
 #### Status:
 
