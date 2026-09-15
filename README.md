@@ -52,10 +52,10 @@ change the encoded playback speed or the audio sample rate.
 | Left / Right | Backward / forward 10 seconds |
 | Ctrl + Left / Right | Backward / forward 30 seconds |
 | Ctrl + Alt + Left / Right | Backward / forward 1 minute |
-| F1–F8 | Jump to 0%, 12.5%, 25%, 37.5%, 50%, 62.5%, 75%, 87.5% of total runtime |
+| F1–F8 | Jump to 0%, 12.5%, 25%, 37.5%, 50%, 62.5%, 75%, 87.5% of the current audio track or whole video |
 | N / P | Next / previous embedded CD track (FLAC albums) |
 
-F1–F8 require a known nonzero total duration and use the existing seek mechanism
+F1–F8 require a known nonzero duration and use the existing seek mechanism
 without scanning the whole file first. Pause is retained; presses during an
 active seek are ignored. FLAC without a seek table uses its existing slower fallback.
 
@@ -64,19 +64,23 @@ the displayed frame and queued samples while silencing movie audio. Seeking
 while paused leaves the destination paused. Additional seek commands are
 ignored while a seek is in progress; Space still controls the final pause state.
 
-The scaled HDMI player overlay shows Elapsed, Total and Remaining above a
+The scaled HDMI player overlay shows elapsed, total and remaining times on the
 progress bar. It appears at startup and on play/pause or seek activity, remains
-visible during a seek, and hides three seconds afterward. Opening a file first
+visible during a seek, and for video hides three seconds afterward. Opening a file first
 performs a bounded timestamp probe; when duration cannot be qualified, Total
 and Remaining show `--:--:--`. The MiSTer menu remains above the player overlay.
-This overlay awaits hardware qualification; subtitle playback is not included.
 
 The same arrow controls work for native FLAC, including whole-CD FLAC files.
 N/P selects embedded CUESHEET INDEX 01 track starts; a separate `.cue` file is
 not read. P selects the previous track (clamped at the first), and N on the
 last track does nothing. Playback continues between tracks without interruption.
 Both track changes and timed seeks preserve pause and land at the exact target
-sample after CRC-checked preroll. The progress times refer to the whole album.
+sample after CRC-checked preroll. Audio progress first shows the album for three
+seconds, then the current track
+for three seconds. Natural track changes also trigger this sequence. F1–F8
+always target the current audio track, regardless of which progress view is
+visible. A FLAC without cue markers is treated as one track. During a seek the
+bar remains visible; the six-second sequence starts again after landing.
 
 The core caches up to 99 CD tracks and 512 FLAC seek points in block RAM.
 Missing seek points fall back to decoding from the first audio frame, which

@@ -8,6 +8,11 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Changed
 
+- Audio progress shows the album for three seconds followed by the current
+  track for three seconds; natural track changes also reopen the bar. Audio
+  F1–F8 shortcuts now divide the current track, independent of the display
+  phase. Video retains its three-second UI and whole-video section shortcuts.
+
 - Quantize Fire into separate spectrum blocks: one solid orange cap per band, yellow below, with no band or color blending.
 
 - Add F1–F8 shortcuts to eight equal runtime section starts for known-duration video and audio, retaining pause and existing seek behavior.

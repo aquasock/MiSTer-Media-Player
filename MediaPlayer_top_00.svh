@@ -121,7 +121,9 @@ wire media_music_input_ready,media_music_metadata;
 wire [35:0] media_music_total,media_music_total_sys;
 wire [3:0] media_music_decode_error;
 wire [37:0] media_music_status_sys;
-wire [34:0] media_music_elapsed,media_music_duration;
+wire [34:0] media_music_elapsed,media_music_duration,media_track_elapsed,media_track_duration,media_track_origin;
+wire media_track_times_valid;
+wire media_album_duration_known;
 wire [28:0] music_mem_addr,movie_mem_addr;
 wire [63:0] music_mem_data,movie_mem_data;
 wire [7:0] music_mem_be,movie_mem_be,movie_mem_burst;
@@ -141,7 +143,13 @@ video_config_cdc #(.WIDTH(36)) music_total_cdc(.src_clk(clk_mpeg2),.dst_clk(clk_
 video_config_cdc #(.WIDTH(38)) music_position_cdc(.src_clk(CLK_AUDIO_CD),.dst_clk(clk_sys),
  .src_data({PLAYER_MUSIC_FINISHED,PLAYER_MUSIC_ERROR,PLAYER_MUSIC_POSITION}),.dst_data(media_music_status_sys));
 media_music_time music_time(.clk(clk_sys),.reset(RESET||media_new_file),
- .position(album_position),.total(media_music_total_sys),.elapsed_q(media_music_elapsed),.total_q(media_music_duration));
+ .track_changed(album_track_changed),.track_start(album_track_start),
+ .position(album_position),.total(media_music_total_sys),
+ .track_position(album_position>=album_track_start?album_position-album_track_start:36'd0),
+ .track_total(album_track_end>=album_track_start?album_track_end-album_track_start:36'd0),
+ .elapsed_q(media_music_elapsed),.total_q(media_music_duration),
+ .track_elapsed_q(media_track_elapsed),.track_total_q(media_track_duration),
+ .track_start_q(media_track_origin),.track_times_valid(media_track_times_valid));
 // The bus mode changes only while both previous clients have drained and
 // the session is holding decoder reset. It stays fixed for all live requests.
 always @(posedge clk_mpeg2)begin
@@ -152,6 +160,8 @@ end
 // Album cue/seek indexing observes only bytes accepted into the music stream.
 wire album_restart,album_busy,album_resume,album_available,album_seek_available,album_landed_sys;
 wire [40:0] album_offset;
+wire album_track_valid,album_track_changed;
+wire [35:0] album_track_start,album_track_end;
 wire [35:0] album_start,album_target,album_total;
 wire [15:0] album_min,album_max;
 wire [7:0] album_tag,album_echo;
@@ -165,6 +175,8 @@ flac_album_control album_control(.clk(clk_sys),.reset(RESET),.new_file(media_new
  .reader_start(media_reader_start),.landed(album_landed_sys),
  .seek_request(media_seek_restart&&music_play_request),.seek_target_q(media_target_sys),
  .restart(album_restart),.busy(album_busy),.resume_frame(album_resume),.start_offset(album_offset),
+ .current_track_valid(album_track_valid),.track_changed(album_track_changed),.current_track_number(),
+ .current_track_start(album_track_start),.current_track_end(album_track_end),
  .start_sample(album_start),.target_sample(album_target),.total_samples(album_total),.min_block(album_min),.max_block(album_max),.tag(album_tag),.available(album_available),.seek_available(album_seek_available));
 video_config_cdc #(.WIDTH(149)) album_config_cdc(.src_clk(clk_sys),.dst_clk(clk_mpeg2),
  .src_data({album_tag,album_resume,album_total,album_min,album_max,album_start,album_target}),.dst_data(album_config));
@@ -232,7 +244,9 @@ media_keyboard_control #(.RESTART_BOTH_DIRECTIONS(1),.ENABLE_SEEK_GATE(1)) media
  .clk(clk_sys),.reset(RESET),.new_file(media_new_file),.enabled(media_file_size!=0 && !media_duration_busy),
  .seek_enabled(!media_music_hint||(album_seek_available&&!album_busy)),.osd_open(media_osd_sync[2]),.key(ps2_key),.elapsed_q(media_music_hint?media_music_elapsed:media_elapsed_sys),
  .seek_done(media_music_hint ? (media_seek_sys&&album_landed_sys&&!album_busy) : (media_seek_done_sys && !media_search_busy)),.restart_complete(media_reader_start && !media_probe_sys),
- .duration_q(PLAYER_UI_STATE[69:35]),.duration_valid(PLAYER_UI_STATE[70]),
+ .duration_q(media_music_hint?media_track_duration:media_duration_q),
+ .seek_origin_q(media_music_hint?media_track_origin:35'd0),
+ .duration_valid(media_album_duration_known&&(!media_music_hint||(album_track_valid&&media_track_times_valid&&!album_track_changed))),
  .paused(media_paused_sys),.seek_active(media_seek_sys),
  .seek_target_q(media_target_sys),.restart(media_seek_restart));
 video_config_cdc #(.WIDTH(37)) playback_control_config(
@@ -263,6 +277,8 @@ assign PLAYER_UI_CLOCK=clk_sys;
 media_ui_state player_ui_state(
  .clk(clk_sys),.reset(RESET),.new_file(media_new_file),
  .loaded(media_file_size!=0 && !media_duration_busy && !media_fifo_reset),
+ .music_mode(media_music_hint),.track_changed(album_track_changed),.track_valid(album_track_valid&&media_track_times_valid),
+ .track_elapsed_q(media_track_elapsed),.track_duration_q(media_track_duration),.album_duration_known(media_album_duration_known),
  .paused(media_paused_sys),.seeking(media_seek_sys||album_busy),
  .elapsed_q(media_music_hint?media_music_elapsed:media_elapsed_sys),.target_q(media_target_sys),
  .duration_q(media_music_hint?media_music_duration:media_duration_q),.duration_valid(media_music_hint?(media_music_total_sys!=0):media_duration_valid),.scene_state(PLAYER_UI_STATE));

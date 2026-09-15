@@ -894,7 +894,7 @@ No additional ini change is needed specifically for keyboard playback controls.
 | Left / Right | Backward / forward 10 seconds |
 | Ctrl + Left / Right | Backward / forward 30 seconds |
 | Ctrl + Alt + Left / Right | Backward / forward 1 minute |
-| F1–F8 | Jump to 0%, 12.5%, 25%, 37.5%, 50%, 62.5%, 75%, 87.5% of total runtime |
+| F1–F8 | Eighths of the current audio track or whole video, from 0% through 87.5% |
 
 Both left/right modifier keys work. Up/Down remain unassigned. Commands operate
 with the OSD closed; arrows and Space used in the OSD do not change playback.
@@ -1080,3 +1080,17 @@ press another key during seeking, and hold one while closing the OSD: none shoul
 trigger another seek until released and pressed again. Unknown-duration files
 must ignore these shortcuts. The progress bar stays visible during seeking and
 hides three seconds after landing. Check both indexed and unindexed FLAC files.
+
+### Album then track progress
+
+Load an embedded-cue FLAC album. Each UI activation shows album elapsed/total/
+remaining and progress for three seconds, then current-track values for three
+seconds before hiding. Verify that natural transitions trigger the sequence,
+including the final track; stationary playback must not repeatedly reopen it.
+Test Space, relative seeks, N/P, and F1–F8 while paused and playing. F1 must
+return to the current track's beginning and F8 near its end, both during the
+album view and during the track view. Arrow seeks remain relative to playback
+and can cross tracks. While actively seeking the bar remains visible; landing
+starts a fresh six-second sequence. A plain FLAC uses the whole file as its
+single track. Replacing media/EOF must clear old track state. MPG retains its
+three-second timeout and whole-video F-key targets.

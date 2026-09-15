@@ -17,7 +17,7 @@ def metadata(data):
 base=(out/'album.flac').read_bytes();blocks,first=metadata(base)
 info=blocks[0][1];total=int.from_bytes(info[10:18],'big')&((1<<36)-1);minimum=int.from_bytes(info[:2],'big');maximum=int.from_bytes(info[2:4],'big')
 variants={'indexed':blocks,'no-seek':[(t,b) for t,b in blocks if t!=3], 'cue-first':[blocks[0]]+sorted(blocks[1:],key=lambda x:x[0]!=5)}
-for top,sources in [('test_flac_album_control',['rtl/audio/flac/flac_album_control.sv','rtl/media_ui_divider.sv','tools/test_flac_album_control.sv']),('test_flac_seek_keyboard',['rtl/audio/flac/flac_album_control.sv','rtl/media_ui_divider.sv','rtl/media_keyboard_control.sv','rtl/media_session_control.sv','rtl/video_config_cdc.sv','tools/test_flac_seek_keyboard.sv']),('test_flac_ddr',[*map(str,Path('rtl/audio/flac').glob('*.sv')),'rtl/audio/media_pcm_sink.sv','rtl/media_ui_divider.sv','tools/test_flac_ddr.sv'])]:
+for top,sources in [('test_audio_track_ui',['rtl/audio/flac/flac_album_control.sv','rtl/audio/media_music_time.sv','rtl/media_ui_state.sv','rtl/media_keyboard_control.sv','rtl/media_ui_divider.sv','tools/test_audio_track_ui.sv']),('test_flac_album_control',['rtl/audio/flac/flac_album_control.sv','rtl/media_ui_divider.sv','tools/test_flac_album_control.sv']),('test_flac_seek_keyboard',['rtl/audio/flac/flac_album_control.sv','rtl/media_ui_divider.sv','rtl/media_keyboard_control.sv','rtl/media_session_control.sv','rtl/video_config_cdc.sv','tools/test_flac_seek_keyboard.sv']),('test_flac_ddr',[*map(str,Path('rtl/audio/flac').glob('*.sv')),'rtl/audio/media_pcm_sink.sv','rtl/media_ui_divider.sv','tools/test_flac_ddr.sv'])]:
  with (out/(top+'-compile.log')).open('w') as log:
   subprocess.run(['verilator','--binary','--timing','-Wno-CASEINCOMPLETE','-Wno-TIMESCALEMOD','-j','4','--top-module',top,'--Mdir',str(out/top),*sources],cwd=root,stdout=log,stderr=subprocess.STDOUT,check=True)
 results={}
@@ -44,6 +44,7 @@ for name,bs in variants.items():
   sample,offset=max((s,o) for s,o in points if s<=target)
   raw=out/f'{name}-{target}.frames';raw.write_bytes(data[frame_offset+offset:]);ref=out/f'{name}-{target}.pcm';ref.write_bytes(pcm[target*4:])
   run(name+f'-landing-{target}','test_flac_ddr',[f'+input={raw}',f'+pcm={ref}','+resume=1',f'+resume_sample={sample}',f'+resume_total={total}',f'+resume_min={minimum}',f'+resume_max={maximum}',f'+target={target}'])
+run('track-ui','test_audio_track_ui',[f'+input={out/"indexed.flac"}'])
 run('ordinary-album','test_flac_ddr',[f'+input={out/"album.flac"}',f'+pcm={out/"album.pcm"}'])
 for top,sources in [('flac_album_control',['rtl/audio/flac/flac_album_control.sv','rtl/media_ui_divider.sv']),('flac_pcm_landing',['rtl/audio/flac/flac_pcm_landing.sv']),('flac_stream_decoder',[*map(str,Path('rtl/audio/flac').glob('*.sv'))])]:
  with (out/(top+'-lint.log')).open('w') as log:

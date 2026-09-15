@@ -8,6 +8,21 @@ module test_flac_album_control;
  reg [63:0] file_size=0;
  reg seek_request=0;reg [34:0] seek_target_q=0;
  wire restart,busy,resume_frame,available,seek_available;
+ wire current_track_valid,track_changed;
+ wire [6:0] current_track_number;
+ wire [35:0] current_track_start,current_track_end;
+ integer changes=0;
+ always @(posedge clk)if(track_changed)changes<=changes+1;
+ task check_track(input [35:0] p,start_value,end_value,input [6:0] number);
+ integer before_changes;
+ begin
+  before_changes=changes;position=p;repeat(220)@(negedge clk);
+  if(!current_track_valid||current_track_start!=start_value||current_track_end!=end_value||current_track_number!=number)
+   $fatal(1,"track observer p=%d n=%d start=%d end=%d",p,current_track_number,current_track_start,current_track_end);
+  if(changes-before_changes>1)$fatal(1,"repeated natural transition");
+  before_changes=changes;repeat(220)@(negedge clk);
+  if(changes!=before_changes)$fatal(1,"stationary track retriggers UI");
+ end endtask
  wire [40:0] start_offset;
  wire [35:0] start_sample,target_sample,total_samples;
  wire [15:0] min_block,max_block;
@@ -46,6 +61,12 @@ module test_flac_album_control;
   settle;
   if(count_expected!=0)begin
   if(!available||int'(dut.track_count)!=count_expected)$fatal(1,"cue unavailable count=%d bad=%b",dut.track_count,dut.cue_bad);
+  check_track(0,0,44100,1);
+  check_track(44099,0,44100,1);
+  check_track(44100,44100,88200,2);
+  check_track(88200,88200,total_samples,3);
+  check_track(total_samples-1,88200,total_samples,3);
+  check_track(0,0,44100,1);
   osd_open=1;key_event(1,9'h031);osd_open=0;
   key_event(1,9'h031);if(busy)$fatal(1,"OSD key leaked");key_event(0,9'h031);
   next_jump();
@@ -55,6 +76,7 @@ module test_flac_album_control;
   position=total_samples-1;key_event(1,9'h031);repeat(1500)@(negedge clk);
   if(busy||restart)$fatal(1,"last track should not wrap");key_event(0,9'h031);
   end else begin
+   check_track(0,0,total_samples,1);
    if(available||!seek_available)$fatal(1,"optional cue blocked normal seek");
    key_event(1,9'h031);settle;if(busy)$fatal(1,"invalid cue navigation");key_event(0,9'h031);
   end
@@ -65,7 +87,7 @@ module test_flac_album_control;
   seek_target_q=0;seek_request=1;settle;seek_request=0;wait(restart);@(negedge clk);
   if(target_sample!=0||start_sample!=0)$fatal(1,"backward seek zero");finish_jump();
   position=0;key_event(1,9'h031);new_file=1;settle;new_file=0;settle;
-  if(available||busy||resume_frame||target_sample!=0||start_offset!=0)$fatal(1,"replacement retained album state");
+  if(available||busy||resume_frame||target_sample!=0||start_offset!=0||current_track_valid)$fatal(1,"replacement retained album state");
   $display("PASS embedded CD cues, exact seek-point selection, N/P, OSD/held keys, last-track clamp and replacement");$finish;
  end
  initial begin #100000000;$fatal(1,"timeout nav=%d",dut.nav_state);end

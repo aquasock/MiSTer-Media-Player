@@ -3,7 +3,7 @@
 module media_keyboard_control #(parameter RESTART_BOTH_DIRECTIONS=0,parameter ENABLE_SEEK_GATE=0)(
  input wire clk,reset,new_file,enabled,osd_open,
  input wire [10:0] key,
- input wire [34:0] elapsed_q,duration_q,
+ input wire [34:0] elapsed_q,duration_q,seek_origin_q,
  input wire duration_valid,
  input wire seek_done,restart_complete,seek_enabled,
  output reg paused=0,seek_active=0,
@@ -28,7 +28,8 @@ end
 wire [37:0] section_product=(section[0]?{3'b0,duration_q}:38'd0)
                          +(section[1]?{2'b0,duration_q,1'b0}:38'd0)
                          +(section[2]?{1'b0,duration_q,2'b0}:38'd0);
-wire [34:0] section_target=section_product[37:3];
+wire [35:0] section_absolute={1'b0,section_product[37:3]}+{1'b0,seek_origin_q};
+wire [34:0] section_target=section_absolute[35]?{35{1'b1}}:section_absolute[34:0];
 wire ctrl=|ctrl_down;
 wire alt=|alt_down;
 wire [34:0] jump_q=ctrl ? (alt ? 35'd21600000 : 35'd10800000) : 35'd3600000;

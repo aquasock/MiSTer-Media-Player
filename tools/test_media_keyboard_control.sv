@@ -5,7 +5,7 @@ reg reset=1,new_file=0,enabled=1,osd_open=0,seek_done=0,restart_complete=0;
 reg [10:0] key=0;
 reg [34:0] elapsed_q=35'd36000000;
 reg seek_enabled=1,duration_valid=1;
-reg [34:0] duration_q=35'd288000000;
+reg [34:0] duration_q=35'd288000000,seek_origin_q=0;
 wire paused,seek_active,restart;
 integer restarts=0;
 always @(posedge clk) if(restart) restarts<=restarts+1;
@@ -35,7 +35,8 @@ task section_jump(input integer n);
  reg [63:0] expected;
  integer before_restarts;
  begin
-  expected=({29'd0,duration_q}*n)/8;before_restarts=restarts;
+  expected=({29'd0,duration_q}*n)/8+seek_origin_q;
+  if(expected>34359738367)expected=34359738367;before_restarts=restarts;
   event_key(fkey(n),1);
   if(!seek_active||seek_target_q!=expected[34:0]) $fatal(1,"section %d target %d expected %d",n,seek_target_q,expected);
   if(restarts-before_restarts!=(expected<elapsed_q?1:0)) $fatal(1,"section restart direction");
@@ -82,6 +83,9 @@ initial begin
   case(j) 0:duration_q=288000000;1:duration_q=7;2:duration_q=288000003;3:duration_q={35{1'b1}};endcase
   for(i=0;i<8;i=i+1)section_jump(i);
  end
+ seek_origin_q=35'd3600000;duration_q=35'd7200000;
+ for(i=0;i<8;i=i+1)section_jump(i);
+ seek_origin_q={35{1'b1}};section_jump(7);seek_origin_q=0;
  if(paused)$fatal(1,"section seek changed playing state");
  event_key(9'h029,1);event_key(9'h029,0);section_jump(4);
  if(!paused)$fatal(1,"section seek lost pause");

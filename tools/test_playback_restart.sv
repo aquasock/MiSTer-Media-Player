@@ -15,7 +15,7 @@ wire cancel,flush,start,quiesce,decoder_reset;
 wire [31:0] generation;
 media_keyboard_control keyboard(
  .clk(clk_sys),.reset(reset),.new_file(new_file),.enabled(1'b1),.osd_open(1'b0),
- .duration_q(35'd0),.duration_valid(1'b0),.key(key),.elapsed_q(elapsed_sys),.seek_done(done_sys),.restart_complete(start),.paused(paused_sys),
+ .duration_q(35'd0),.seek_origin_q(35'd0),.duration_valid(1'b0),.key(key),.elapsed_q(elapsed_sys),.seek_done(done_sys),.restart_complete(start),.paused(paused_sys),
  .seek_active(seeking_sys),.seek_target_q(target_sys),.restart(restart));
 video_config_cdc #(.WIDTH(37)) command_cdc(
  .src_clk(clk_sys),.dst_clk(clk_mpeg2),.src_data({paused_sys,seeking_sys,target_sys}),.dst_data(command));

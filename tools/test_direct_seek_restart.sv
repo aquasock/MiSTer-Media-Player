@@ -15,7 +15,7 @@ wire [123:0] response;
 reg reader_idle=1,ddr_idle=1;
 media_keyboard_control #(.RESTART_BOTH_DIRECTIONS(1)) keyboard(
  .clk(sys),.reset(reset),.new_file(new_file),.enabled(1'b1),.osd_open(1'b0),.key(key),
- .duration_valid(1'b1),.duration_q(35'd288000000),.elapsed_q(elapsed_sys),.seek_done(done_sys&&!busy),.restart_complete(start&&!probing),
+ .seek_origin_q(35'd0),.duration_valid(1'b1),.duration_q(35'd288000000),.elapsed_q(elapsed_sys),.seek_done(done_sys&&!busy),.restart_complete(start&&!probing),
  .paused(paused),.seek_active(seeking),.seek_target_q(target),.restart(keyboard_request));
 media_seek_search search(
  .clk(sys),.reset(reset),.new_file(new_file),.request(keyboard_request),

@@ -14,7 +14,10 @@ module flac_album_control(
  output reg [35:0] total_samples=0,
  output reg [15:0] min_block=0,max_block=0,
  output reg [7:0] tag=0,
- output wire available,seek_available
+ output wire available,seek_available,
+ output reg current_track_valid=0,track_changed=0,
+ output reg [6:0] current_track_number=0,
+ output reg [35:0] current_track_start=0,current_track_end=0
 );
  localparam MAGIC=0,HEADER=1,BODY=2,DONE=3;
  reg [1:0] parse_state=MAGIC;
@@ -148,9 +151,45 @@ module flac_album_control(
  reg [8:0] seek_address=0;
  reg [35:0] track_q=0;
  reg [76:0] seek_q=0;
- always @(posedge clk)begin track_q<=tracks[track_address];seek_q<=seeks[seek_address];end
  localparam IDLE=0,TRACK_WAIT=1,TRACK_READ=2,CHOOSE=3,SEEK_WAIT=4,SEEK_READ=5,ISSUE=6,WAIT_START=7,WAIT_LAND=8,CONVERT=9,CONVERT_START=10;
  reg [3:0] nav_state=IDLE;
+ // Idle observer shares the existing cue RAM port; navigation always wins.
+ reg [6:0] monitor_address=0;
+ reg [1:0] monitor_state=0;
+ reg [35:0] monitor_position=0,monitor_start=0;
+ wire [6:0] read_track_address=nav_state==IDLE?monitor_address:track_address;
+ always @(posedge clk)begin track_q<=tracks[read_track_address];seek_q<=seeks[seek_address];end
+ task publish_track(input [6:0] number,input [35:0] start_value,end_value);
+ begin
+  current_track_valid<=end_value>start_value;
+  current_track_number<=number;current_track_start<=start_value;current_track_end<=end_value;
+  track_changed<=end_value>start_value&&(!current_track_valid||number!=current_track_number);
+  monitor_state<=0;
+ end
+ endtask
+ always @(posedge clk)begin
+  track_changed<=0;
+  if(reset||new_file)begin
+   current_track_valid<=0;current_track_number<=0;current_track_start<=0;current_track_end<=0;
+   monitor_state<=0;monitor_address<=0;monitor_position<=0;monitor_start<=0;
+  end else if(!enabled||!seek_available||nav_state!=IDLE||seek_request)begin
+   monitor_state<=0;current_track_valid<=0;
+  end else if(!available)begin
+   publish_track(7'd1,36'd0,total_samples);
+  end else case(monitor_state)
+   0:begin monitor_position<=position;monitor_address<=0;monitor_start<=0;monitor_state<=1;end
+   1:monitor_state<=2;
+   2:begin
+    if(track_q>monitor_position)begin
+     if(monitor_address==0)publish_track(7'd1,36'd0,track_q);
+     else publish_track(monitor_address,monitor_start,track_q<total_samples?track_q:total_samples);
+    end else if(monitor_address+1'b1==track_count)begin
+     publish_track(track_count,track_q,total_samples);
+    end else begin monitor_start<=track_q;monitor_address<=monitor_address+1'b1;monitor_state<=1;end
+   end
+   default:monitor_state<=0;
+  endcase
+ end
  reg convert_start=0;
  wire convert_done,convert_busy;
  reg [34:0] requested_time=0;

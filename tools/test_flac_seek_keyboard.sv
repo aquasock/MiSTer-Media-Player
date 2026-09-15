@@ -5,7 +5,7 @@ module test_flac_seek_keyboard;
  reg clk=0,mpeg=0;always #5 clk=~clk;always #7 mpeg=~mpeg;
  reg reset=1,new_file=0,osd_open=0,byte_valid=0;
  reg [10:0] key=0;reg [7:0] byte_data=0;
- reg [34:0] elapsed_q=360000000;
+ reg [34:0] elapsed_q=360000000,section_origin=0,section_duration=720000000;
  wire restart,busy,resume_frame,available,seek_available,reader_start,landed;
  wire [40:0] start_offset;wire [35:0] start_sample,target_sample,total_samples;
  wire [15:0] min_block,max_block;wire [7:0] tag;
@@ -13,14 +13,15 @@ module test_flac_seek_keyboard;
  wire decoder_reset,quiesce,fifo_reset,reader_cancel;wire [31:0] generation;
  wire [148:0] config_mpeg;wire [7:0] echo;
  reg landed_mpeg=0;integer delay_count=0;
- flac_album_control dut(.clk(clk),.reset(reset),.new_file(new_file),.enabled(1'b1),.osd_open(osd_open),.key(key),
+ flac_album_control dut(.current_track_valid(),.track_changed(),.current_track_number(),.current_track_start(),.current_track_end(),
+  .clk(clk),.reset(reset),.new_file(new_file),.enabled(1'b1),.osd_open(osd_open),.key(key),
   .byte_valid(byte_valid),.byte_data(byte_data),.position(36'd44100000),.file_size(64'd2000000),
   .reader_start(reader_start),.landed(landed),.seek_request(seek_request),.seek_target_q(seek_target_q),
   .restart(restart),.busy(busy),.resume_frame(resume_frame),.start_offset(start_offset),.start_sample(start_sample),
   .target_sample(target_sample),.total_samples(total_samples),.min_block(min_block),.max_block(max_block),.tag(tag),.available(available),.seek_available(seek_available));
  media_keyboard_control #(.RESTART_BOTH_DIRECTIONS(1),.ENABLE_SEEK_GATE(1)) keyboard(
   .clk(clk),.reset(reset),.new_file(new_file),.enabled(1'b1),.seek_enabled(seek_available&&!busy),.osd_open(osd_open),.key(key),.elapsed_q(elapsed_q),
-  .duration_valid(seek_available),.duration_q(35'd720000000),
+  .duration_valid(seek_available),.duration_q(section_duration),.seek_origin_q(section_origin),
   .seek_done(seek_active&&landed&&!busy),.restart_complete(reader_start),.paused(paused),.seek_active(seek_active),.seek_target_q(seek_target_q),.restart(seek_request));
  video_config_cdc #(.WIDTH(149)) config_cdc(.src_clk(clk),.dst_clk(mpeg),.src_data({tag,resume_frame,total_samples,min_block,max_block,start_sample,target_sample}),.dst_data(config_mpeg));
  video_config_cdc #(.WIDTH(8)) echo_cdc(.src_clk(mpeg),.dst_clk(clk),.src_data(config_mpeg[148:141]),.dst_data(echo));
@@ -45,7 +46,7 @@ module test_flac_seek_keyboard;
  end endtask
  task section_jump(input [8:0] code,input integer eighth);begin
   event_key(1,code);wait(restart);@(negedge clk);
-  if(target_sample!=36'(eighth)*36'd11025000)$fatal(1,"section PCM target %d",target_sample);
+  if(target_sample!=36'(((64'(section_origin)+(64'(section_duration)*64'(eighth))/8)*49)/400))$fatal(1,"section PCM target %d",target_sample);
   wait(!busy&&!seek_active);repeat(10)@(negedge clk);
   if(!paused)$fatal(1,"section seek lost pause");event_key(0,code);
  end endtask
@@ -64,6 +65,8 @@ module test_flac_seek_keyboard;
   event_key(0,9'h011);event_key(0,9'h014);
   section_jump(9'h005,0);section_jump(9'h006,1);section_jump(9'h004,2);section_jump(9'h00c,3);
   section_jump(9'h003,4);section_jump(9'h00b,5);section_jump(9'h083,6);section_jump(9'h00a,7);
+  section_origin=360000000;section_duration=36000000;
+  section_jump(9'h005,0);section_jump(9'h003,4);section_jump(9'h00a,7);
   osd_open=1;event_key(1,9'h174);osd_open=0;event_key(1,9'h174);
   if(busy||seek_active)$fatal(1,"OSD key leaked");event_key(0,9'h174);
   event_key(1,9'h174);wait(busy);new_file=1;repeat(4)@(negedge clk);new_file=0;
