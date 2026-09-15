@@ -1,4 +1,4 @@
-## 145 COMMIT Unreleased ??? 2026-09-15T01:46:18-07:00
+## 145 COMMIT Unreleased faf37ec 2026-09-15T01:46:18-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Shorten XY O-Scope persistence to expose individual traces while preserving ster
 
 #### Outcome:
 
-The user likes the 128 by 128 pixelated style and authorizes a shorter persistence implementation without Quartus builds. Keep native stereo X/Y mapping and natural amplitude shrinkage, and increase decay from one to two intensity levels per frame with saturation at zero. This reduces untouched trace lifetime from fifteen to eight decay sweeps, about 250 to 133 milliseconds at 60 Hz. Retain the existing memory, palette and line renderer. The phone recording shows a dense diagonal oval shrinking during the song fade; native Main screenshots cannot capture the post-scaler visualizer. Circular artistic mapping remains a separate unimplemented idea.
+Implemented two-level saturating phosphor decay in the existing XY buffer, reducing untouched trace lifetime from fifteen to eight sweeps, approximately 250 to 133 ms at 60 Hz. Native stereo mapping, amplitude response, 128 by 128 resolution, palette and memory dimensions remain unchanged. The updated simulation passes exact connected-line geometry, stationary samples, eight-sweep disappearance, saturation for all sixteen stored intensities and replacement clearing. Strict renderer lint and diff checks pass. Evidence is under results/xy-short-persistence. Source is committed and pushed; no Quartus build or deployment was performed as explicitly requested. Actual visual preference remains for the next hardware test. Circular artistic mapping remains unimplemented.
 
 #### Next Steps:
 
-Update the decay regression for eight sweeps and saturation across all sixteen starting intensities, run simulation and lint, commit the implementation and await user authorization before any Quartus build.
+Wait for user authorization to include this change in a Quartus build, then assess whether the shorter trail makes individual wires clearer on hardware.
 
 #### Files Modified:
 
