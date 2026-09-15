@@ -3,8 +3,9 @@
 ## Integer-font simulation preview (not yet built for hardware)
 
 The overlay now uses exact glyph replication: 1x at 480p (5x7 glyphs), 2x at
-720p (10x14), and 3x at 1080p (15x21). UI anchors, progress-bar dimensions,
-colors and subtitle line positions remain the same. The 3x coordinate bank
+720p (10x14), and 3x at 1080p (15x21). Subtitle anchors and colors remain the same. The progress bar is now taller
+and centered in the reserved gap below the subtitle block, with its clocks
+vertically centered. Its position is stable when subtitles are hidden. The 3x coordinate bank
 covers full 64-character lines; text-height limits now cover all 21 rows.
 
 Run `python3 tools/verify_subtitles.py --output results/ui-integer`, then
@@ -16,6 +17,25 @@ frame is raw 720x480 output, before external pixel-aspect correction. The suite
 also compares maximum-length subtitle lines at all three resolutions.
 
 This preview change is excluded from the running 3f393c5 RBF builds.
+
+## Centered progress-bar simulation preview
+
+The bar grows from 14 to 18 logical pixels tall. Its outer rectangle is centered
+between the lower subtitle background edge and the screen bottom, allowing a
+one-pixel rounding difference. All three clocks are centered vertically inside
+it; the fill has enough vertical padding for the larger integer-scaled glyphs.
+The reserved subtitle area remains fixed even when cues are absent or hidden.
+Horizontal margins, time centers and subtitle positions are unchanged.
+
+| Frame | Bar top | Bar height | Bottom margin | Time top |
+|---|---:|---:|---:|---:|
+| 720x480 | 458 | 18 | 4 | 463 |
+| 1280x720 | 688 | 27 | 5 | 694 |
+| 1920x1080 | 1032 | 40 | 8 | 1041 |
+
+Reproduce with `python3 tools/verify_subtitles.py --output results/ui-centered-bar`
+and `python3 tools/export_ui_simulation_previews.py --render-dir results/ui-centered-bar`.
+This layout and integer fonts are not in the completed 3f393c5 RBF candidates.
 
 ## Direct subtitle value pages and media picker
 

@@ -28,6 +28,9 @@ reg [2:0] field=0;
 reg [5:0] ch=0;
 reg [6:0] hours=0,minutes=0,seconds=0;
 reg [11:0] tx=0,ty=0,tw=0,th=0,track_x0=0,track_x1=0,fill_x0=0,fill_x1=0;
+reg [11:0] subtitle_bottom=0,bar_height=0,time_y=0;
+wire [11:0] font_height=scale==12?12'd21:scale==8?12'd14:12'd7;
+wire [11:0] bar_inset=scale==12?12'd6:scale==8?12'd4:12'd2;
 reg [11:0] track_y0=0,track_y1=0,fill_y0=0,fill_y1=0;
 reg [55:0] subtitle_rect0=0,subtitle_rect1=0;
 reg [11:0] fraction=0;
@@ -101,7 +104,19 @@ always @(posedge clk) begin
  case(state)
   0:if(!pending && !auxiliary_editing && width!=0 && height!=0) begin
    snapshot<=state_in;w<=width;h<=height;revision<=auxiliary_revision;
-   scale<=height>=1000?12:height>=700?8:4;field<=0;state<=1;
+   scale<=height>=1000?12:height>=700?8:4;field<=0;state<=70;
+  end
+  // Center a taller bar in the reserved gap below the lower subtitle line.
+  // Reserve that same area even when no subtitle is currently visible.
+  70:multiply({36'd0,h},12'd445,71);
+  71:divide(product,35'd480,72);
+  72:begin subtitle_bottom<=quotient[11:0]+font_height+12'd2;multiply({36'd0,h},12'd18,73);end
+  73:divide(product,35'd480,74);
+  74:begin bar_height<=quotient[11:0];state<=75;end
+  75:begin track_y0<=subtitle_bottom+((h-subtitle_bottom-bar_height)>>1);state<=76;end
+  76:begin
+   track_y1<=track_y0+bar_height;time_y<=track_y0+((bar_height-font_height)>>1);
+   fill_y0<=track_y0+bar_inset;fill_y1<=track_y0+bar_height-bar_inset;state<=1;
   end
   1:begin
    if(field<3) begin time_operand<=field==0?position:field==1?duration:remaining;state<=40;end
@@ -133,9 +148,10 @@ always @(posedge clk) begin
   6:multiply({36'd0,w},field==0?12'd141:field==2?12'd579:12'd360,46);
   46:divide(product,35'd720,7);
   7:begin
-   tw<=12'((text_span+13'd3)>>2);th<=scale==12?12'd21:scale==8?12'd14:12'd7;
+   tw<=12'((text_span+13'd3)>>2);th<=font_height;
    tx<=quotient[11:0]-12'(text_span>>3);
-   multiply({36'd0,h},field==4?(aux_length1!=0?12'd431:12'd445):field==5?12'd445:12'd469,47);
+   if(field<3)begin ty<=time_y;state<=9;end
+   else multiply({36'd0,h},field==4?(aux_length1!=0?12'd431:12'd445):12'd445,47);
   end
   47:divide(product,35'd480,8);
   8:begin ty<=quotient[11:0];state<=9;end
@@ -168,16 +184,8 @@ always @(posedge clk) begin
   52:divide(product,35'd720,23);
   23:begin fill_x0<=quotient[11:0];multiply({36'd0,w},12'd686,53);end
   53:divide(product,35'd720,24);
-  24:begin fill_x1<=quotient[11:0];multiply({36'd0,h},12'd466,54);end
-  54:divide(product,35'd480,25);
-  25:begin track_y0<=quotient[11:0];multiply({36'd0,h},12'd480,55);end
-  55:divide(product,35'd480,26);
-  26:begin track_y1<=quotient[11:0];multiply({36'd0,h},12'd469,56);end
-  56:divide(product,35'd480,27);
-  27:begin fill_y0<=quotient[11:0];multiply({36'd0,h},12'd477,57);end
-  57:divide(product,35'd480,28);
+  24:begin fill_x1<=quotient[11:0];state<=28;end
   28:begin
-   fill_y1<=quotient[11:0];
    if(known && duration!=0) multiply({13'd0,clamped_position},fill_x1-fill_x0,37);
    else begin fraction<=fill_x1-fill_x0;state<=30;end
   end
