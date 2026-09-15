@@ -1,4 +1,4 @@
-## 112 COMMIT Unreleased ??? 2026-09-14T17:55:26-07:00
+## 112 COMMIT Unreleased df2d7a6 2026-09-14T17:55:26-07:00
 
 #### Coming From:
 
@@ -10,15 +10,17 @@ Center a taller progress bar below the subtitle area in simulation.
 
 #### Outcome:
 
-The user requests a slightly taller bar centered between the subtitle bottom and screen bottom, with better room for the time text. Set height to 18 logical pixels instead of 14, center it in the reserved gap below the lower subtitle glyph and its background padding, and center all three clocks vertically inside it. Keep horizontal placement and subtitle positions; avoid bar movement when subtitles disappear. Update simulated previews at 480p/720p/1080p without starting an RBF batch.
+Implemented an 18-logical-pixel progress bar centered between the reserved lower subtitle background edge and screen bottom, with centered black clocks and scaled fill padding. At 480p the bar is 18 pixels high at y=458, at 720p 27 pixels at y=688, and at 1080p 40 pixels at y=1032; lower margins are 4, 5 and 8 pixels respectively. Position remains fixed when subtitles are hidden. Layout uses existing sequential arithmetic. All full-frame UI/subtitle comparisons pass with zero mismatched pixels, including maximum-length lines at all resolutions, and RTL lint has no warnings. Full PNG frames and native detail crops are under results/ui-centered-bar/screenshots. The completed 3f393c5 candidates were packaged and seed 87 handed off separately; neither this bar change nor integer fonts is included in those RBFs. No new FPGA build was started.
 
 #### Next Steps:
 
-Implement layout arithmetic using the existing sequential units, compare full-frame pixels and spacing at all three resolutions, and export updated PNG previews.
+Have the user review the updated simulated layout and test the separate seed 87 value-page candidate. Include the font/bar changes only in the next authorized RBF build.
 
 #### Files Modified:
 
-None.
+- docs/TEST_INSTRUCTIONS.md
+- rtl/media_ui_scene.sv
+- tools/verify_player_overlay.py
 
 #### Status:
 
