@@ -1,5 +1,11 @@
 # Shared IDCT candidate
 
+## Media picker label queued for the next build
+
+The picker displays **Load media *.MPG,FL***: stock Main generates the suffix
+from three-character filters, and `FL*` includes `.flac`. M2V is no longer listed
+in this picker. The running da59ce0 builds retain the earlier label.
+
 ## Subtitle controls and FLAC replacement follow-up
 
 Open **Subtitles** for **Load SRT**, **Visible Yes/No**, **Offset**, and **Speed**.
@@ -31,7 +37,7 @@ and confirms the previous wiring stalls. `tools/verify_subtitles.py` covers all
 ## Native FLAC first hardware gate
 
 The new candidate adds standalone native **44.1 kHz, 16-bit stereo FLAC** to
-**Open video or FLAC**. Keep accepted b639ccc seed 52 available for rollback.
+**Load media**. Keep accepted b639ccc seed 52 available for rollback.
 Hardware acceptance of native HDMI and real stock Main I2C behavior is pending.
 
 1. Open a CD-quality FLAC made from an original WAV. Check continuous playback,

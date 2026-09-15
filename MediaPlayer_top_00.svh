@@ -65,7 +65,7 @@ assign VIDEO_ARY = ar ? 13'd9 : 13'd3;
 // Status bits 3:1 remain reserved after removal of Audio test.
 localparam CONF_STR = {
 	"MediaPlayer;;",
-	"S0,M2VMPGFL*,Open video or FLAC;",
+	"S0,MPGFL*,Load media;",
 `include "MediaPlayer_subtitle_menu.svh"
 	"-;",
 	"-;",

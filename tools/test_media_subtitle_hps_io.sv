@@ -9,7 +9,7 @@ assign ext[32]=0;
 wire [1:0] host_rd,reader_wr;
 wire [31:0] lba[2];wire [5:0] blocks[2];wire [1:0] rd,ack;
 wire [12:0] addr;wire [15:0] data;wire wr;wire [15:0] unused_data[2];assign unused_data[0]=0;assign unused_data[1]=0;
-localparam CONF={"MediaPlayer;;S0,M2VMPGFL*,Open video or FLAC;",
+localparam CONF={"MediaPlayer;;S0,MPGFL*,Load media;",
 `include "MediaPlayer_subtitle_menu.svh"
 "v,2;"};
 localparam CONF_LEN=$bits(CONF)/8;
