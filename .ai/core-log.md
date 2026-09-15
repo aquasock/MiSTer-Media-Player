@@ -1,3 +1,32 @@
+## 115 COMMIT Unreleased 6bfcea3 2026-09-14T18:35:03-07:00
+
+#### Coming From:
+
+Unreleased 6bfcea3
+
+#### Purpose:
+
+Qualify and package all four approved UI and native FLAC builds.
+
+#### Outcome:
+
+All MEDIUM seeds 52/61/87 and HIGH seed 87 compile and pass setup, hold, recovery, removal and pulse-width checks at all four corners, plus CDC audits with all ten native reset-release stage paths still timed. Recommended HIGH seed 87 uses 37220 placed ALMs, 32652 estimated ALMs, 46210 registers, 509 M10Ks, 62 DSPs and four PLLs. Worst margins are setup +0.349 ns, hold +0.098 ns, recovery +2.891 ns, removal +0.186 ns and pulse width +0.925 ns. It saves 936 placed ALMs versus MEDIUM seed 87 (38156), with unchanged RAM/DSP/PLL counts, and leaves 4690 ALMs, 44 M10Ks, 50 DSPs and two PLLs. MEDIUM seed 52 uses 38134 ALMs with setup +0.431 ns and hold +0.075 ns; seed 61 uses 38174 with +0.292/+0.113 ns; seed 87 has +0.285/+0.116 ns. Compile times are 916.3/921.7/928.9 seconds for MEDIUM 87/61/52 and 902.5 seconds for HIGH 87. Hash-verified packages are results/hardware-test-6bfcea3 and results/hardware-test-6bfcea3-packing-high, with the combined comparison in the normal package. Recommended HIGH RBF SHA-256 is 912ed6a148869d34960bff3796ddf511746cdd850bfff0e708c6db10c0f867c8. Integer fonts, centered taller bar, direct subtitle pages, Load media and media handoff repair are all included. Hardware acceptance is pending; no core was deployed automatically.
+
+#### Next Steps:
+
+Have the user test HIGH seed 87 with all four MPG files, subtitles and direct controls, UI at supported resolutions, native FLAC and active/paused MPG/FLAC replacement. Preserve b639ccc seed 52 rollback and compare any reported regressions against the normal timing-qualified candidates.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 114 COMMIT Unreleased 6bfcea3 2026-09-14T18:16:48-07:00
 
 #### Coming From:
@@ -1429,35 +1458,6 @@ Have the user validate the lower bar and clock-only fields on seed 87; resolve t
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 75 COMMIT Unreleased 0d13908 2026-09-14T09:25:00-07:00
-
-#### Coming From:
-
-Unreleased ffafc79
-
-#### Purpose:
-
-Remove audio-track selection from planned player scope at the user's request.
-
-#### Outcome:
-
-The user explicitly declines audio-track selection after its purpose is explained. The UI plan now excludes a soundtrack selector and resource reservations for track switching, retaining the other six original features. Subtitle playback remains deferred. This documentation-only change does not alter RTL, running builds or hardware. The preceding read-only shared-IDCT investigation remains under results/shared-idct-audit/findings.md; no sharing implementation is authorized by this scope decision.
-
-#### Next Steps:
-
-Complete the existing lowered-overlay build qualification and retain the revised feature scope for future planning.
-
-#### Files Modified:
-
-- docs/UI_OVERLAY_PLAN.md
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
