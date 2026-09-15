@@ -1,4 +1,4 @@
-## 143 COMMIT Unreleased ??? 2026-09-15T00:52:10-07:00
+## 143 COMMIT Unreleased 3a72b70 2026-09-15T00:52:10-07:00
 
 #### Coming From:
 
@@ -6,31 +6,34 @@ Unreleased e44a72d
 
 #### Purpose:
 
-Add a green phosphor stereo XY O-Scope and move the renamed FFT bars to the bottom edge.
+Add a green stereo XY O-Scope, rename the other visualizers and align FFT bars to the bottom with red peak-hold markers.
 
 #### Outcome:
 
-The user authorizes a new stereo XY visualizer, with left audio controlling X and right audio controlling Y, under the name O-Scope. Rename the existing mirrored ribbons Waveforms and Fire to FFT. Keep all three in the audio-only Visualizers menu. Use a small on-chip phosphor intensity buffer with connected sample traces and frame-based decay, without audio backpressure or external DDR. Retain matched video latency, aspect viewport and UI layering. Place FFT blocks against the viewport bottom with no bottom gap. The user additionally authorizes thin red peak-hold caps with a long decay; pack per-band peak and age into the existing band RAM and verify attack, hold, decay and clearing before the same build.
+Implemented Waveforms, FFT and O-Scope selections with frame-boundary mode changes and matched nine-pixel latency. The new stereo XY renderer connects native PCM samples into a 128 by 128 four-bit phosphor map, with sixteen green intensity levels and frame-based fading. Its mailbox never backpressures audio and a new mandatory CDC audit covers the crossing. FFT bands now reach the viewport bottom, and thin red peak markers share the existing band RAM: immediate attack, 30-frame hold, then one block down every four frames, with clearing on inactive file transitions. All nineteen renderer cases pass at 480p, 720p and 1080p for both aspect settings, including unchanged Waveforms/movie pixels, mode switching, cap geometry and UI previews. Independent benches pass all XY line directions and decay levels and FFT peak attack/hold/decay/replacement. Standalone fitting uses 1440 estimated ALMs, 1613 placed, 2511 registers, 99924 memory bits, fifteen M10Ks and ten DSPs. Against the prior two-mode fit this adds 311 estimated ALMs, 345 placed and eight M10Ks with no DSP increase; the markers alone add 29 estimated ALMs and no RAM blocks or DSPs. Evidence is under results/xy-scope/peaks-render and results/xy-scope/synthesis. Source 3a72b70 is pushed and three HIGH-packing builds are running for seeds 52/61/87, supervisor PID 1146514. The earlier e44a72d album/track UI batch completed: seeds 52 and 87 pass all corners, seed61 fails setup at -0.019 ns, and every CDC audit passes. Seed52 uses 39114 placed ALMs, 522 M10Ks and 75 DSPs, with setup/hold +0.243/+0.055 ns; its verified package is under results/hardware-test-e44a72d. No RBF was deployed and neither cycle has hardware acceptance.
 
 #### Next Steps:
 
-Implement and simulate the renderer, menu selection and FFT baseline, generate previews and measure resources before launching the next three-core build.
+Qualify full-core resource use, all timing corners and CDC audits when these three builds finish, then have the user test the three visualizers, FFT peaks and baseline, both aspect settings and existing playback/UI behavior.
 
 #### Files Modified:
 
-- rtl/media_xy_visualizer.sv
+- CHANGELOG.md
+- MediaPlayer_top_00.svh
+- README.md
+- docs/FIRE_VISUALIZER.md
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
 - rtl/media_audio_visualizers.sv
 - rtl/media_fire_renderer.sv
-- MediaPlayer_top_00.svh
+- rtl/media_xy_visualizer.sv
 - sys/emu_ports.vh
 - sys/sys_top.v
-- files.qip
 - tools/phase1p_timing.tcl
+- tools/test_media_fft_peaks.sv
 - tools/test_media_fire_visualizers.sv
+- tools/test_media_xy_visualizer.sv
 - tools/verify_fire_visualizers.py
-- docs/FIRE_VISUALIZER.md
-- CHANGELOG.md
-- README.md
 
 #### Status:
 
