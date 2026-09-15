@@ -1,4 +1,4 @@
-## 133 COMMIT Unreleased ??? 2026-09-14T23:13:32-07:00
+## 133 COMMIT Unreleased a77a2da 2026-09-14T23:13:32-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Shorten playback UI visibility to three seconds and the largest keyboard seek to
 
 #### Outcome:
 
-The user authorizes changing the shared audio/video UI inactivity timeout from ten to three seconds and Ctrl+Alt+Arrow jumps from five minutes to one minute. Keep controls visible during active seeking and preserve the existing ten-second and thirty-second jumps. Update the existing control regressions and current usage documentation.
+Implemented the shared audio/video UI inactivity timeout of three seconds and Ctrl+Alt+Arrow jumps of one minute. Active seeking keeps the controls visible; ordinary arrows remain ten seconds and Ctrl+Arrow remains thirty seconds. Exact timeout boundary checks pass while paused and after seek completion. Keyboard checks cover both modifier sides, backward clamping, OSD and held-key suppression. All eight playback-control regressions and the complete FLAC album/navigation/PCM landing suite pass, including the updated sixty-second keyboard targets. Source a77a2da is pushed and the standard three HIGH-packing builds are launched with Fire included. Full fit, timing and hardware validation remain pending.
 
 #### Next Steps:
 
-Check exact timeout boundaries, keyboard modifier behavior and FLAC target translation, then commit the change for the next hardware build.
+Inspect seeds 52, 61 and 87, qualify timing and package the best RBF for hardware checks of the shorter UI timeout and one-minute seeks in both media modes.
 
 #### Files Modified:
 
