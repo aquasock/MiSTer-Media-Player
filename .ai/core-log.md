@@ -1,3 +1,35 @@
+## 136 COMMIT Unreleased ??? 2026-09-14T23:43:41-07:00
+
+#### Coming From:
+
+Unreleased a77a2da
+
+#### Purpose:
+
+Replace continuous Fire flames with quantized spectrum blocks and two solid colors.
+
+#### Outcome:
+
+The user requests a discrete bar spectrum following the supplied reference, retaining yellow at the bottom and orange at the top, and explicitly removes band and color blending. Preserve the 32-band FFT, aspect viewport, UI placement and nine-cycle renderer latency. Remove interpolation, turbulence and continuous shading, and compare standalone resource use against the prior Fire implementation.
+
+#### Next Steps:
+
+Implement the block renderer, verify HDMI timing, viewport and UI behavior across supported resolutions, inspect RTL-generated previews and measure standalone resource changes before the next hardware build.
+
+#### Files Modified:
+
+- rtl/media_fire_renderer.sv
+- tools/verify_fire_visualizers.py
+- docs/FIRE_VISUALIZER.md
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 135 COMMIT Unreleased a77a2da 2026-09-14T23:35:48-07:00
 
 #### Coming From:
@@ -1329,37 +1361,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 96 COMMIT Unreleased db4bc3f 2026-09-14T14:12:56-07:00
-
-#### Coming From:
-
-Unreleased b639ccc
-
-#### Purpose:
-
-Correct shared-IDCT physical-register auditing and qualify the existing three fitted builds.
-
-#### Outcome:
-
-Audit-only commit db4bc3f corrects the false failure: Quartus replicated transform_index bits with ~DUPLICATE suffixes inside the sole shared engine. All three fitted b639ccc designs have six logical bits, with 11/12/10 physical registers for seeds 52/61/87. The revised check requires exactly the expected engine hierarchy and six logical indices, records physical names and rejects missing bits, additional engines and unknown suffixes in mutation checks. Existing fitted databases were re-audited without RTL, constraint or RBF changes; hashes match the original compilation outputs. All seeds retain eight intermediate and three staging M10Ks, 183 CDC stages, scene enable and diagnostic-removal checks. Four-corner minima (setup/hold/recovery/removal/pulse width ns) are seed 52 +0.645/+0.081/+3.337/+0.214/+0.925, seed 61 +0.458/+0.048/+2.565/+0.182/+0.925, seed 87 -0.102/+0.105/+3.330/+0.235/+0.925. Thus 52/61 pass and 87 fails cold-corner setup. Preferred seed 52 uses 35908 placed ALMs, 512 M10Ks and 59 DSPs, saving 1136/13/16 versus accepted 7eb5088 MEDIUM seed 61 and leaving 6002/41/53 free. Packaged original b639ccc RBFs and build-info.json identify db4bc3f separately as timing_audit_revision. Evidence is results/build-b639ccc-20260914-135047; original failed timing logs and status are preserved. No full compilation of this audit-only commit was necessary; b639ccc compiled successfully and hardware acceptance remains pending.
-
-#### Next Steps:
-
-Test results/hardware-test-b639ccc/seed52/MediaPlayer_20260914.rbf on Fellow, Groove, Jiggler and Star Wars at both refresh rates, covering opening, motion, audio, pause/seek, reset/file replacement, subtitles/filters and EOF. Preserve accepted 7eb5088 MEDIUM seed 61 as rollback; do not start extra timing-fix builds without direction.
-
-#### Files Modified:
-
-- tools/phase1p_timing.tcl
-- tools/audit_three_seeds.py
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
 
 ---
 
