@@ -1,3 +1,32 @@
+## 129 COMMIT Unreleased ??? 2026-09-14T22:03:44-07:00
+
+#### Coming From:
+
+Unreleased 36085f6
+
+#### Purpose:
+
+Disable video-only menu settings while native audio playback is active.
+
+#### Outcome:
+
+The user requests grayed-out Color matrix, Refresh rate and Subtitles entries during audio playback. Use stock Main's D0 disable prefix with menu-mask bit zero driven by music_play_request. Apply the same prefix to generated subtitle controls so flattened menus and existing subtitle pages also remain disabled. Keep the user settings intact and automatically restore access when audio playback ends or a video is loaded; Aspect ratio remains selectable.
+
+#### Next Steps:
+
+Update the menu generator and configuration, verify generated output and full-core elaboration, and include the correction with the pending audio aspect fix in the next build cycle.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 128 COMMIT Unreleased 36085f6 2026-09-14T22:01:28-07:00
 
 #### Coming From:
@@ -1314,34 +1343,5 @@ Use 7eb5088 seed 61 as the accepted baseline for future authorized work and reta
 
 - [x] Built
 - [x] Passed
-
----
-
-## 89 COMMIT Unreleased a206435 2026-09-14T13:07:28-07:00
-
-#### Coming From:
-
-Unreleased 7eb5088
-
-#### Purpose:
-
-Document and package gate-three build qualification for hardware testing.
-
-#### Outcome:
-
-All three 7eb5088 builds complete in 15.1-15.2 minutes. Seeds 61 and 87 pass all four timing corners; seed 52 fails setup at -0.191 ns. All pass 183 CDC stages, formatter enables, profiler/reporting absence and eleven test-audio removal checks with movie PCM, FIFO and finished synchronization retained. Preferred seed 61 has setup +0.334 ns and hold +0.074 ns, uses 37044 actual ALMs, 31325 estimated ALMs, 44804 registers, 525 M10Ks, 75 DSPs and three PLLs. This saves 282 placed ALMs, 495 estimated ALMs and two M10Ks against accepted gate-two seed 87, leaving 4866 ALMs and 28 M10Ks. Seed 87 uses 36916 actual/31285 estimated ALMs with setup +0.083 ns and hold +0.115 ns. Seed 52 uses 37029 actual/31287 estimated ALMs with hold +0.114 ns. Hash-verified RBFs are packaged under results/hardware-test-7eb5088; seed 52 is marked timing failed. Preferred seed61/MediaPlayer_20260914.rbf SHA-256 is bbd4c36588e5db22343e5e688ef177ed1f54ce24cb4206b8d76332e1d74b84fc. Hardware acceptance is pending; no deployment or additional timing-fix builds are performed.
-
-#### Next Steps:
-
-Qualification is documented and pushed; have the user repeat Fellow, Groove, Jiggler and Star Wars at both refresh rates, checking black clocks on the lowered bar, lowered subtitles, absent status labels and Audio test menu, audio/filters, pause/seek, replacement and EOF. Retain accepted gate-two 100ab07 seed 87 as rollback.
-
-#### Files Modified:
-
-- docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
