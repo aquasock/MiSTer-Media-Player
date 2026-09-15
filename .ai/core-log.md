@@ -1,4 +1,4 @@
-## 127 COMMIT Unreleased ??? 2026-09-14T21:47:29-07:00
+## 127 COMMIT Unreleased d3c416a 2026-09-14T21:47:29-07:00
 
 #### Coming From:
 
@@ -10,15 +10,28 @@ Make the audio waveform and player UI respect the selected aspect ratio.
 
 #### Outcome:
 
-The user reports that native audio visualizer and UI ignore aspect selection. Both post-scaler renderers measure the full HDMI DE raster rather than the selected picture rectangle. Add a coherent frame-boundary audio viewport from the platform scaler bounds, use it for local renderer geometry and clipping while preserving full HDMI DE and integer font scaling, and keep movie rendering unchanged. Existing 36085f6 seed builds continue from their immutable source snapshots.
+Corrected the post-scaler audio renderers to measure and clip against the scaler's selected picture rectangle rather than the entire HDMI raster. Coherent bounds and music enable cross to HDMI through audited mailboxes and commit at vertical sync. A separate layout enable follows the existing waveform pipeline; full HDMI RGB/sync/DE stay aligned, integer font scaling is retained, and movie layout is unchanged. Complete viewport/waveform/UI simulation passes both 4:3 and 16:9 at 480p, 720p and 1080p, including geometry, border clipping, local UI pixels and waveform presence. All three movie frames compare pixel-exactly with the previous renderer layout. Existing waveform equivalence, full overlay pixel oracle, lifetime/control/divider tests and Quartus full-core Analysis and Elaboration pass. Previews and evidence are under results/audio-aspect. Source is ready for the next build cycle; the existing 36085f6 seed builds continue unchanged and do not contain this correction. Full fit/timing and hardware acceptance remain pending.
 
 #### Next Steps:
 
-Simulate audio viewport layout and clipping at standard resolutions and both aspect selections, verify unchanged movie bypass and HDMI timing, then commit the correction for the next build cycle.
+Include this correction in the next RBF build cycle and verify live 4:3/16:9 changes during FLAC playback, OSD, pause and subsequent MPG playback on hardware; inspect timing and resources before packaging.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/media_audio_viewport.sv
+- rtl/media_overlay_compositor.sv
+- rtl/media_player_overlay.sv
+- rtl/media_waveform_visualizer.sv
+- sys/sys_top.v
+- tools/phase1p_timing.tcl
+- tools/test_media_audio_viewport.sv
+- tools/test_media_player_overlay.sv
+- tools/test_media_ui_lifetime.sv
+- tools/test_media_waveform_visualizer.sv
+- tools/verify_audio_viewport.py
 
 #### Status:
 
