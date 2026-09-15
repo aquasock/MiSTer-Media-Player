@@ -1,3 +1,38 @@
+## 148 COMMIT Unreleased ??? 2026-09-15T02:45:34-07:00
+
+#### Coming From:
+
+Unreleased 06256f8
+
+#### Purpose:
+
+Double XY rendering resolution within available RAM and repair the observed HDMI timing paths.
+
+#### Outcome:
+
+The user approves a 256 by 256 scope with three-bit phosphor storage, preserving stereo mapping and approximately the shorter persistence, bundled with timing fixes and three HIGH-packing builds. Prior source 06256f8 builds all compiled but failed setup at -0.374, -0.347 and -0.407 ns for seeds 52, 61 and 87; all other timing categories and configuration CDC audits passed. Seed61 uses 39369 placed ALMs and 530 M10Ks. The failures include XY geometry, Waveforms thickness selection and scaler arithmetic or routing. Plan to register slow geometry calculations, optimize scaler arithmetic with equivalence checks, and verify memory inference before full builds. The user also confirms flawless playback of all five converted N-SPHERES FLAC files; this does not establish acceptance of the latest progress and persistence build.
+
+#### Next Steps:
+
+Implement and test the larger coordinate map, line octants and boundaries, clearing and fading under continuous samples, palette and aspect mapping at all supported resolutions, and exact scaler arithmetic. Generate comparative previews, synthesize resource usage, commit the verified source and build seeds 52, 61 and 87, inspecting every timing corner before packaging.
+
+#### Files Modified:
+
+- rtl/media_xy_visualizer.sv
+- rtl/media_waveform_visualizer.sv
+- sys/ascal.vhd
+- tools/test_media_xy_visualizer.sv
+- tools/verify_fire_visualizers.py
+- docs/FIRE_VISUALIZER.md
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 147 COMMIT Unreleased 06256f8 2026-09-15T02:02:31-07:00
 
 #### Coming From:
@@ -1280,35 +1315,6 @@ Finish and report three builds with resource and timing results. Test direct val
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 108 COMMIT Unreleased da59ce0 2026-09-14T17:26:11-07:00
-
-#### Coming From:
-
-Unreleased 78c919f
-
-#### Purpose:
-
-Record completed subtitle-control and FLAC-to-MPG handoff builds for hardware testing.
-
-#### Outcome:
-
-All three clean da59ce0 seeds compiled and completed timing audits, with verified RBF hashes packaged under results/hardware-test-da59ce0. Preferred seed 61 uses 38024 placed ALMs, 509 M10Ks, 62 DSPs, four PLLs and 46034 registers; free capacity is 3886 ALMs, 44 M10Ks, 50 DSPs and two PLLs. Its worst four-corner setup is +0.283 ns, hold +0.103 ns, recovery -11.027 ns, removal +0.124 ns and pulse width +0.925 ns. Seed 87 uses 38138 ALMs with setup +0.195 ns, hold +0.104 ns and recovery -11.163 ns. Seed 52 uses 38031 ALMs with setup -0.246 ns, hold +0.093 ns and recovery -11.490 ns. No seed fully passes timing; fixes remain deferred by user instruction. The same-seed 61 resource delta versus b3e4f1d is +45 placed ALMs, +2 M10Ks and +1 DSP. These RBFs include subtitle controls and the memory handoff fix but not the later 78c919f picker label. Hardware acceptance is pending.
-
-#### Next Steps:
-
-Test seed 61 with active and paused FLAC-to-MPG replacement, reverse switching, subtitle visibility/offset/speed and the four movie regressions. Preserve accepted b639ccc seed 52 as rollback and carry the queued Load media label into the next build.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
