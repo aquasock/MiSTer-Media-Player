@@ -1,3 +1,41 @@
+## 142 COMMIT Unreleased ??? 2026-09-15T00:32:27-07:00
+
+#### Coming From:
+
+Unreleased c0a41cf
+
+#### Purpose:
+
+Show album progress followed by track progress for six seconds on audio activity and natural track changes.
+
+#### Outcome:
+
+The user authorizes three seconds of album progress followed by three seconds of current-track progress for every audio UI activation, including natural cue-boundary transitions. Reuse the existing cue RAM read port during navigation idle and the serial music-time converter for track-relative values. Preserve three-second movie behavior, active seek visibility and whole-album F-key targeting, separating keyboard duration from display duration. Cue-less FLAC is treated as a single track.
+
+#### Next Steps:
+
+Implement boundary monitoring and the two UI phases, verify track transitions and seek/navigation priority alongside time conversion and video regressions, then run the next three HIGH-packing builds.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- MediaPlayer_top_00.svh
+- rtl/audio/flac/flac_album_control.sv
+- rtl/audio/media_music_time.sv
+- rtl/media_ui_state.sv
+- tools/test_flac_album_control.sv
+- tools/test_media_music_time.sv
+- tools/test_media_ui_state.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 141 COMMIT Unreleased c0a41cf 2026-09-15T00:16:20-07:00
 
 #### Coming From:
@@ -1301,41 +1339,6 @@ Wire mounted-file content selection, shared DDR ownership and PCM CDC into produ
 - tools/test_media_pcm_i2s.sv
 - tools/verify_flac_ddr.py
 - tools/verify_native_audio.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 102 COMMIT Unreleased 7c197c9 2026-09-14T15:14:08-07:00
-
-#### Coming From:
-
-Unreleased 36587f6
-
-#### Purpose:
-
-Implement complete native FLAC framing with hardware CRC admission and stereo reconstruction.
-
-#### Outcome:
-
-Commit 7c197c9 adds native FLAC metadata/frame parsing, canonical coded numbering, header CRC-8, frame CRC-16, padding and length validation, plus exact independent/left-side/right-side/mid-side stereo reconstruction. Samples remain provisional until an explicit whole-frame commit; store faults suppress handshakes on the same cycle. Complete-file RTL tests pass 73 cases: all 55 corpus files plus eight constructed stereo/numbering streams and ten fault cases. The 63 valid streams compare 3890965 stereo sample pairs directly with original PCM, with stalls and reset/replay in each; damaged frames are not admitted. The isolated framing/subframe/MAC fit uses 1746 placed ALMs, 1753 estimated ALMs, 859 registers, two M10Ks and one DSP, including prior decoder resources. The separate stereo unit and memory/output integration are excluded from this figure. RTL lint and test compilation pass; evidence is results/flac/stream and results/flac/stream-fit. No production files.qip integration, full-core build or playable FLAC RBF is claimed; b639ccc seed 52 remains accepted. STREAMINFO MD5 is not checked.
-
-#### Next Steps:
-
-Implement bounded DDR provisional/committed frame ownership and connect admitted samples to the shared PCM sink. Complete native 44.1 kHz clock and HDMI control integration before hardware handoff. Preserve existing movie behavior and the common PCM boundary for future WAV without implementing WAV parsing in this cycle.
-
-#### Files Modified:
-
-- docs/FLAC_FEASIBILITY.md
-- docs/FLAC_FRAME_CONTRACT.md
-- rtl/audio/flac/flac_stereo.sv
-- rtl/audio/flac/flac_stream_decoder.sv
-- tools/synth_flac_predict.py
-- tools/test_flac_stream.sv
-- tools/verify_flac_stream.py
 
 #### Status:
 
