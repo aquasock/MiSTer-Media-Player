@@ -13,8 +13,14 @@ localparam CONF={"MediaPlayer;;S0,MPGFL*,Load media;",
 `include "MediaPlayer_subtitle_menu.svh"
 "v,2;"};
 localparam CONF_LEN=$bits(CONF)/8;
+wire [127:0] status;
+wire [6:0] offset_code,speed_code;
+wire [36:0] adjusted_time;
+wire before_start,retime;
+media_subtitle_select selection(.clk(clk),.reset(reset),.offset_select(status[57:7]),.speed_select(status[108:58]),.offset_code(offset_code),.speed_code(speed_code));
+media_subtitle_time timeline(.clk(clk),.reset(reset),.elapsed_q(35'd36000000),.offset_code(offset_code),.speed_code(speed_code),.subtitle_q(adjusted_time),.before_start(before_start),.restart(retime));
 hps_io #(.CONF_STR(CONF),.CONF_STR_BRAM(1),.WIDE(1),.VDNUM(2)) hps(
- .clk_sys(clk),.HPS_BUS(bus),.EXT_BUS(ext),.ioctl_wait(1'b0),
+ .status(status),.clk_sys(clk),.HPS_BUS(bus),.EXT_BUS(ext),.ioctl_wait(1'b0),
  .sd_lba(lba),.sd_blk_cnt(blocks),.sd_rd(host_rd),.sd_wr(2'b0),.sd_ack(ack),
  .sd_buff_addr(addr),.sd_buff_dout(data),.sd_buff_wr(wr),.sd_buff_din(unused_data));
 reg reset=1,start=0;wire [8:0] stream;wire valid,idle;wire [3:0] error;
@@ -45,6 +51,23 @@ begin
  @(negedge clk);strobe=0;
  repeat(3) @(negedge clk);
 end endtask
+task send_status(input [127:0] value);integer word_index;begin
+ @(negedge clk);enable=1;send(16'h001e);
+ for(word_index=0;word_index<8;word_index=word_index+1)send(value[word_index*16+:16]);
+ @(negedge clk);enable=0;repeat(120)@(negedge clk);
+end endtask
+integer choice,axis,v,expected_offset=0,expected_speed=100;
+reg [127:0] command_status;
+reg [63:0] expected_time;
+task select_value(input integer bit_index);begin
+ command_status=0;command_status[120]=1;command_status[121]=1;command_status[6]=1;
+ command_status[bit_index]=1;send_status(command_status);
+ command_status[bit_index]=0;send_status(command_status);
+ expected_time=(64'd36000000-64'(expected_offset)*64'd36000)*64'(expected_speed)/100;
+ if(retime||before_start||adjusted_time!==expected_time[36:0])
+  $fatal(1,"direct selection bit=%d time=%d expected=%d",bit_index,adjusted_time,expected_time);
+ if(status!==command_status)$fatal(1,"status transport contaminated other controls");
+end endtask
 initial begin
  repeat(8) @(negedge clk);reset=0;
  enable=1;send(16'h0014);
@@ -53,6 +76,21 @@ initial begin
   if(bus[7:0]!==CONF[(CONF_LEN-k)*8-1 -:8])$fatal(1,"block-RAM menu byte %0d got %h",k,bus[7:0]);
  end
  @(negedge clk);enable=0;repeat(5)@(negedge clk);
+ // Main selects T entries with a full status-set followed by status-clear.
+ for(axis=0;axis<2;axis=axis+1)begin
+  for(choice=0;choice<51;choice=choice+1)begin
+   if(axis==0)begin
+    v=choice==0?0:choice<=25?-52+2*choice:2*(choice-25);
+    expected_offset=v;select_value(7+choice);
+   end else begin
+    v=choice==0?100:choice<=25?48+2*choice:50+2*choice;
+    expected_speed=v;select_value(58+choice);
+   end
+  end
+ end
+ // Default actions can be selected repeatedly and preserve the other setting.
+ expected_offset=0;select_value(7);select_value(7);
+ expected_speed=100;select_value(58);select_value(58);
  start=1;@(negedge clk);start=0;
  while(ends==0 || sub_ends==0) begin
   wait(|host_rd || (ends && sub_ends));if(|host_rd) begin
@@ -67,7 +105,7 @@ initial begin
   end
  end
  if(error || sub_error) $fatal(1,"reader error %0d",error);
- $display("SUBTITLE_HPS_PASS complete block-RAM menu readback, simultaneous movie/SRT requests, actual hps_io drive isolation, trailing writes, byte order and EOF");$finish;
+ $display("SUBTITLE_HPS_PASS complete block-RAM menu readback, all 102 direct timing actions and default reselection, simultaneous movie/SRT requests, actual hps_io drive isolation, trailing writes, byte order and EOF");$finish;
 end
 initial begin #10000000;$fatal(1,"timeout error=%d count=%d",error,count);end
 endmodule

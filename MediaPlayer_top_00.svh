@@ -286,8 +286,12 @@ media_sd_owner mounted_file_owner(.clk(clk_sys),.reset(RESET),.request(media_sd_
  .buff_wr(media_sd_wr),.host_request(media_host_rd),.reader_wr(media_reader_wr));
 wire[36:0] subtitle_elapsed_q;
 wire subtitle_before_start,subtitle_retime;
+wire [6:0] subtitle_offset_code,subtitle_speed_code;
+media_subtitle_select subtitle_select(.clk(clk_sys),.reset(RESET),
+ .offset_select(status[57:7]),.speed_select(status[108:58]),
+ .offset_code(subtitle_offset_code),.speed_code(subtitle_speed_code));
 media_subtitle_time subtitle_time(.clk(clk_sys),.reset(RESET||media_new_file),
- .elapsed_q(media_elapsed_sys),.offset_code(status[119:113]),.speed_code(status[112:106]),
+ .elapsed_q(media_elapsed_sys),.offset_code(subtitle_offset_code),.speed_code(subtitle_speed_code),
  .subtitle_q(subtitle_elapsed_q),.before_start(subtitle_before_start),.restart(subtitle_retime));
 media_subtitles subtitles(.clk(clk_sys),.reset(RESET),.new_movie(media_new_file),
  .mount(media_img_mounted[1]),.mount_size(media_img_size),

@@ -8,7 +8,7 @@ tests={
  'test_media_subtitle_time':['rtl/media_subtitle_time.sv'],
  'test_media_srt_parser':['rtl/media_srt_parser.sv'],
  'test_media_subtitles':['rtl/media_subtitle_time.sv','rtl/media_subtitles.sv','rtl/media_srt_parser.sv','rtl/media_subtitle_cdc.sv','rtl/video_config_cdc.sv','rtl/media_file_reader.sv'],
- 'test_media_subtitle_hps_io':['sys/hps_io.sv','rtl/media_file_reader.sv','rtl/media_sd_owner.sv'],
+ 'test_media_subtitle_hps_io':['rtl/media_subtitle_select.sv','rtl/media_subtitle_time.sv','sys/hps_io.sv','rtl/media_file_reader.sv','rtl/media_sd_owner.sv'],
 }
 for top,sources in tests.items():
  with (o/(top+'-compile.log')).open('w') as f:subprocess.run(['iverilog','-g2012','-s',top,'-o',str(o/top),'tools/'+top+'.sv',*sources],stdout=f,stderr=subprocess.STDOUT,check=True)

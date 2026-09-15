@@ -8,8 +8,9 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
-- Subtitles submenu with SRT loading, Yes/No visibility, -5.0 to +5.0 second
-  offset in 0.1-second steps and 0.50x to 1.50x speed in 0.01x steps.
+- Subtitles submenu with SRT loading, Yes/No visibility and directly selectable
+  Offset/Speed pages: -5.0 to +5.0 seconds in 0.2-second steps and 0.50x to
+  1.50x in 0.02x steps. Each page offers 51 values with the default first.
   Timing changes reload the subtitle reader without changing movie playback.
 
 - First standalone native 44.1 kHz/16-bit stereo FLAC hardware candidate:
@@ -33,6 +34,9 @@ This project is still in active pre-release development. Published milestone rel
   music ownership to return to video.
 
 ### Changed
+
+- Rename the picker to Load media with MPG and FL* filters; stock Main displays
+  Load media *.MPG,FL* while retaining normal .flac filename support.
 
 - Share one unchanged IDCT arithmetic engine across intra/P/B clients, using
   immediate uncontended capture and bounded per-client coefficient staging

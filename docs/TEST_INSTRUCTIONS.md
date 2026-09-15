@@ -1,38 +1,48 @@
 # Shared IDCT candidate
 
-## Media picker label queued for the next build
+## Direct subtitle value pages and media picker
 
-The picker displays **Load media *.MPG,FL***: stock Main generates the suffix
-from three-character filters, and `FL*` includes `.flac`. M2V is no longer listed
-in this picker. The running da59ce0 builds retain the earlier label.
-
-## Subtitle controls and FLAC replacement follow-up
+The picker displays **Load media *.MPG,FL***. Stock Main generates that suffix
+from three-character filters; `FL*` includes normal `.flac` filenames.
 
 Open **Subtitles** for **Load SRT**, **Visible Yes/No**, **Offset**, and **Speed**.
-Defaults are Yes, 0.0 seconds and 1.00x. Offset ranges from -5.0 to +5.0 seconds
-in 0.1-second steps; positive values delay display. Speed ranges from 0.50x to
-1.50x in 0.01x steps and scales the subtitle clock, not video or audio. Menus
-cycle through their values. Timing uses `(video elapsed - offset) * speed`.
-Changing settings restarts the SRT reader and may briefly hide cues while it
-catches up. Settings stay selected across file replacement; old cues are cleared.
+Offset and Speed now open pages of directly selectable values. Move up/down to
+a row and press Select/Enter to apply it; the page stays open. The first row
+restores the default, followed by the other values in ascending order:
 
-1. Load a movie and matching SRT through the submenu. Toggle visibility and
-   confirm the movie, audio and overlay continue normally.
-2. Check positive/negative offsets, both limits and zero. Check 0.50x, 1.00x,
-   1.50x and intermediate speed values. Restore defaults after testing.
+- Offset: **-5.0 to +5.0 seconds**, **0.2-second steps**, default **0.0 s**.
+- Speed: **0.50x to 1.50x**, **0.02x steps**, default **1.00x**.
+
+Each page has 51 value actions, an explicit **Subtitles** return link, and Main's
+**Back** entry (53 selectable rows total). Main's Back returns to the root menu;
+use the Subtitles link to return directly to the parent settings page. Selecting
+a value applies it immediately. These are action rows, not cycling options or
+persistent checkboxes. Visibility is still a Yes/No option.
+
+Positive offset delays display. Timing uses `(video elapsed - offset) * speed`;
+speed changes the subtitle clock only. Changing values restarts the streaming
+SRT reader and may briefly hide cues while it catches up. Movie replacement
+preserves the selected settings while clearing old cues. Reloading the core
+restores timing defaults.
+
+1. Load a movie and matching SRT. Toggle visibility and confirm movie/audio
+   playback and the overlay continue normally.
+2. Select offset/speed defaults, both extremes and several intermediate rows.
+   Use values above and below the previous selection. Hold the navigation key
+   to scroll a long list, then apply the desired row with Select/Enter.
 3. Change timing while paused, after seeking backward and after the final cue.
-   Resume and seek again; cues should follow the adjusted movie timeline.
+   Resume and seek again; cues should follow the adjusted timeline. Select the
+   same value twice and verify it remains applied. Restore defaults afterward.
 4. Replace actively playing and paused FLAC with MPG repeatedly, then reverse
    direction. Include a large FLAC, short FLAC and each of the four movie tests.
    Confirm movie frames and sound resume, with OSD, subtitles and seeking intact.
 
-The previous b3e4f1d seed 87 passed the user's audio checks but stalled on
-FLAC-to-MPG replacement. This follow-up fixes that handoff. Reset-recovery timing
-failures are deferred at the user's request; compilation does not imply timing
-qualification. Regressions: `tools/verify_media_format_handoff.py` exercises the
-production mode and arbiter connections with delayed responses and cancellation,
-and confirms the previous wiring stalls. `tools/verify_subtitles.py` covers all
-10,201 timing combinations, streaming retiming, HPS menu readback and rendering.
+The FLAC-to-MPG deadlock fix is retained. Reset-recovery timing fixes remain
+deferred at the user's request; compilation does not imply timing qualification.
+`tools/verify_subtitles.py` checks all 102 direct actions through actual HPS
+status transport, complete generated menu readback, subtitle arithmetic,
+streaming retiming and rendering. `tools/verify_media_format_handoff.py` checks
+production mode switching with delayed memory responses and cancellation.
 
 ## Native FLAC first hardware gate
 
