@@ -1,69 +1,112 @@
-# Manual SRT subtitles
+# Subtitle support
 
-Open the movie first, then use **Load subtitles** to select its separate SRT.
-The filenames need not match. **Subtitles: On/Off** hides or restores the loaded
-track. Loading a different movie or resetting clears the association; select
-its SRT again. There is no automatic discovery, playlist loader or custom Main.
+SRT only, one track at a time, rendered as plain text on a shared generic
+overlay compositor (the same one that draws the transport/track UI).
+Implemented across a control/timing module (`media_subtitles`), a format
+parser (`media_srt_parser`), offset/speed modules (`media_subtitle_time`/
+`media_subtitle_select`), and the shared on-screen renderer
+(`media_overlay_compositor`, also used by the UI — see the architecture and
+visualizers documents for where that sits in the video chain).
 
-Subtitles appear above the progress bar and remain visible when
-playback controls hide. Pausing retains the current cue. Seeking hides it and
-rescans the SRT from its beginning after landing; larger SRT files can therefore
-have a brief subtitle recovery delay. Movie playback does not wait for the
-subtitle scan. Cue intervals include their start and exclude their end.
+## Format: streaming SRT, no cue database
 
-## Initial format coverage and limits
+The format parser is a bounded, single-pass streaming parser — it does
+**not** build an index of the whole file. It searches incoming lines for a
+`HH:MM:SS,mmm --> HH:MM:SS,mmm` timestamp header, and once found, buffers
+exactly the following text as one cue:
 
-- Normal `HH:MM:SS,mmm --> HH:MM:SS,mmm` timing lines, CRLF or LF endings,
-  numeric cue labels and an optional UTF-8 BOM on the first numeric label.
-- The last text line/cue can end at EOF without a trailing blank line.
-- Printable ASCII, including all lowercase letters and punctuation. UTF-8
-  characters outside that set display `?` once per codepoint; this is not full
-  Unicode font support. Tabs become spaces. Use UTF-8 or ASCII, not UTF-16.
-- Two text lines, at most 63 displayed characters per line. Additional lines
-  and characters are discarded. Long lines are not automatically word-wrapped.
-  Angle-bracket tags are removed; italic/bold/color styling is not rendered.
-- A 256-byte input-line buffer; oversized timing lines are rejected. Ordinary
-  cue bodies are streamed with bounded storage. Malformed headers are skipped.
-- Cues should be in chronological order and nonoverlapping. One cue is retained
-  at a time; overlapping or out-of-order cues are not combined.
-- Text and a small translucent dark backdrop use the existing scaled-HDMI
-  compositor. Analog/direct-video subtitle output is not added.
+- **Two display lines maximum, 63 characters each** (`length0`/`length1`,
+  7-bit fields). Text beyond that is dropped with a warning flag, not
+  wrapped or truncated silently — extra source lines within one cue are
+  parsed but discarded once both display slots are full.
+- **Plain text only**: any `<...>` tag is stripped (angle-bracket state
+  machine, `tag` flag) — nothing between `<` and `>` reaches the display,
+  so there's no bold/italic/color rendering, just the stripped text.
+- **Printable ASCII plus normalized "smart" punctuation**: UTF-8 lead/continuation
+  byte sequences for curly single/double quotes and en/em dashes
+  (`‘’’“”–—` etc.) are recognized and folded
+  down to plain ASCII `'`, `"`, `-`. Any other non-printable or
+  unrecognized-UTF-8 codepoint becomes `?`. Tabs become spaces.
+- **Malformed cues are skipped, not fatal**: an invalid timestamp header,
+  an end time that isn't after the start time, or a cue with two empty
+  lines just sets a `warning` flag and the parser resumes scanning for the
+  next cue — one bad entry in a file doesn't stop the rest of the track
+  from working.
+- Sequence numbers, blank separator lines, and any BOM/whitespace around
+  them aren't validated against a specific format — the parser only cares
+  about finding the timestamp line and the text that follows it.
 
-These are implementation limits, not limits of the SRT format. Predictable
-movie EOF/idle behavior and session resume remain separate release tasks.
+Timestamps are converted once, with fixed-point constant multiplication
+(`start_ms/end_ms * 360`, no runtime division) into the same internal time
+unit playback position is tracked in.
 
-## Implementation and verification
+## No whole-file index — re-scan from zero after any seek
 
-`S1` is a second stock Main mounted-file slot. A serialized request owner tags
-all response writes, including the delayed final words, before routing them to
-the movie or subtitle reader. Movie slot `S0` remains its existing byte stream. New subtitle reads wait
-during duration probing/seeking or when the active movie reader has less than
-8 KiB buffered, giving movie delivery priority.
-Subtitle storage is a 4-KiB reader staging buffer, a 256-byte line buffer and a
-128-byte cue buffer; actual physical RAM and logic are established by fitting.
-No whole-file cue database is allocated. Seeking cancels and drains outstanding
-subtitle reads before restarting. A new movie also invalidates association.
+The control module deliberately doesn't maintain a seek table into the
+`.srt` file. On a seek (or a new file mount), it cancels the current reader
+session and restarts the SRT parse **from byte zero**, relying on the
+parser's low per-cue cost to catch back up to the new playback position
+rather than tracking file offsets per cue. This keeps the design simple at
+the cost of a brief re-scan window after every seek, during which the
+subtitle display is suppressed until a matching cue is found (`invalidate`
+forces the compositor to clear rather than show stale text).
 
-The system-clock parser/publisher sends acknowledged text/commit commands
-through two audited configuration mailboxes. The HDMI provider commits complete
-text with the current player epoch. Scene assembly and frame publication keep
-text changes atomic; old seek/file epochs cannot become visible. Subtitle and
-controls visibility groups are independent.
+The `.srt` file is read through the same shared SD-card reader arbiter movie
+data uses — subtitle reads never get priority over, or starve, primary
+playback reads; they're just another client on the same bus.
 
-On the 480p reference layout, Paused/Seeking sits at y=455 inside the progress
-bar with black lettering and no text background. The subtitle bottom line is y=431;
-a two-line cue begins at y=417. Clock fields are below the bar at y=469; the
-progress track remains [452,466). Coordinates scale with the HDMI output.
-The font has 94 visible printable ASCII glyphs plus space in its existing ROM.
+## Timing controls: offset and speed
 
-Run `python3 tools/verify_subtitles.py`. It checks parser bounds and syntax,
-actual hps_io two-drive isolation, cue timing and cancellation through unrelated
-clocks, existing overlay regressions and full subtitle pixel comparisons at
-480p, 720p and 1080p, including controls hidden and stale epochs.
+Two independently adjustable, in-menu controls, applied to whatever cue
+timestamps the parser already computed — this doesn't touch the `.srt` file,
+it adjusts playback-side comparison:
 
-Generate test subtitles with `python3 tools/make_subtitle_test.py`; load the
-result beside any movie. Each five-second interval has four seconds of text
-and one second without text. Test pause, all seek sizes/directions, Off/On,
-OSD/filter access, replacement SRTs and movie changes. The generator refuses to
-overwrite an existing file. FPGA timing/resource qualification and user hardware
-acceptance must be recorded separately from simulation results.
+- **Offset**: ±5.0 seconds, in 0.2 s menu steps (51 selectable values). The
+  underlying arithmetic actually supports 0.1 s code granularity (101
+  possible internal codes), but the generated menu only exposes every other
+  code. A positive offset delays subtitles; a large enough positive offset
+  can push a cue that starts at time zero past the "not shown yet"
+  (`before_start`) boundary.
+- **Speed**: 0.50x–1.50x, in 0.02x menu steps (51 selectable values), applied
+  as `(elapsed - offset) * speed / 100` via a serial shift-add
+  multiply/divide (no drift accumulation — computed fresh from absolute
+  elapsed time every update, not integrated frame-to-frame).
+
+Both controls use stock Main "T" pulse actions — selecting a menu row sets a
+stored code rather than acting as a momentary trigger, and changing files
+doesn't reset the user's chosen offset/speed (only `reset` clears them).
+
+## Rendering: merged into the shared transport UI scene
+
+Subtitles don't get their own dedicated text renderer or a direct path to
+the screen. The control module sends parsed cue text over a small
+coalescing single-in-flight command "mailbox" (toggle-bit handshake) to a
+bridge that hands it to the same scene assembler that builds the transport
+UI — see the UI document for the full merge/commit mechanics and the shared
+renderer's double-buffering, glyph pipeline, and epoch-tagged staleness
+check (a seek or file change reliably clears old subtitle text through that
+same mechanism, not a subtitle-specific one). Characters are written one at
+a time (up to 128: two 64-character display lines) and then finalized with
+a commit carrying both line lengths and a visibility flag.
+
+Subtitle visibility is tracked independently of the transport UI's own
+show/hide timer — the two can be on screen at completely different times
+within one rendered scene (see "independent visibility groups" in the UI
+document). Visibility can also be toggled off entirely regardless of cue
+timing via the OSD's `Visible` option, which suppresses display without
+stopping the parser or timing logic underneath.
+
+## What's not supported
+
+- Only `.srt` — no ASS/SSA, WebVTT, VobSub, PGS, or any other subtitle
+  format or embedded-in-container subtitle stream.
+- No styling beyond stripped plain text: no font color, bold/italic,
+  positioning cues, or karaoke-style timing within a line — all `<...>` tags
+  are discarded, not interpreted.
+- Hard cap of two lines / 63 characters each per cue; nothing wraps
+  automatically, and overflow is dropped, not scrolled or shrunk.
+- One subtitle track at a time — there's no track selection menu, just
+  "load an `.srt`" for whatever's currently mounted.
+- No persistent cue index, so extremely dense subtitle files pay a
+  (bounded, low-cost) re-scan cost on every seek rather than an instant
+  jump to the right cue.
