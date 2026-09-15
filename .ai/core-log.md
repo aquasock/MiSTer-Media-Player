@@ -1,3 +1,32 @@
+## 109 COMMIT Unreleased ??? 2026-09-14T17:34:06-07:00
+
+#### Coming From:
+
+Unreleased da59ce0
+
+#### Purpose:
+
+Replace cycling subtitle timing options with directly selectable value pages in the next combined build.
+
+#### Outcome:
+
+The user authorizes fewer values near the existing ranges, separate Offset and Speed pages, the already queued Load media picker label, and the next build. Use 51 offset values from -5.0 to +5.0 seconds in 0.2-second steps and 51 speed values from 0.50x to 1.50x in 0.02x steps, default first. Stock Main T actions on unused status bits select stored timing codes without cycling. Keep reset/file behavior and the existing absolute timing arithmetic. Provide links back to Subtitles and leave room below the 64-bit page-selection limit for Main navigation. The picker retains MPGFL* for normal .flac filenames. Timing fixes remain deferred.
+
+#### Next Steps:
+
+Generate the value pages and action mapping, simulate direct selection through the real HPS interface plus timing/subtitle regressions, then build clean seeds 52/61/87 and report results for hardware testing.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 108 COMMIT Unreleased da59ce0 2026-09-14T17:26:11-07:00
 
 #### Coming From:
@@ -1427,35 +1456,6 @@ Build clean seeds 52, 61 and 87, audit all four corners and 159 CDC registers pl
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 69 COMMIT Unreleased b00920a 2026-09-14T07:58:54-07:00
-
-#### Coming From:
-
-Unreleased b00920a
-
-#### Purpose:
-
-Record successful playback-control tests and explain Groove's unknown duration.
-
-#### Outcome:
-
-The user confirms pause/resume, forward/backward seeking and ten-second overlay hiding including while paused all work properly. Groove.mpg on the GIT HDD shows dashes for Total and Remaining. Exact 64 KiB head and 4 MiB tail replay through the current duration-window RTL reproduces the fallback: head origin 48754, healthy matching stream 224, no parser or syntax error, complete final packet boundary, but unqualified_tail remains set because a picture after the maximum observed presentation timestamp has no independently associated PTS. A later timestamped reordered picture does not exceed that maximum and cannot clear this conservative guard. This is expected behavior of the current probe, not evidence that the file cannot play; ffprobe obtains a duration using its broader stream analysis. Evidence is retained under results/ui-overlay/groove-duration. No RTL, RBF or media changes were made; overall acceptance remains pending while testing continues.
-
-#### Next Steps:
-
-Continue user hardware testing and retain the conservative unknown-duration behavior unless a separate improvement to timestamp association and endpoint qualification is requested.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
