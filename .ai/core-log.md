@@ -1,4 +1,4 @@
-## 140 COMMIT Unreleased ??? 2026-09-15T00:12:47-07:00
+## 140 COMMIT Unreleased 8298662 2026-09-15T00:12:47-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Extend album creation to convert mixed audio formats into the core's native CD p
 
 #### Outcome:
 
-The user authorizes FFmpeg conversion in the creation script. Accept common audio extensions beside the script, decode to 44100 Hz sixteen-bit stereo in filename order, preserve compatible CD PCM, and append fewer than 588 silent samples per unaligned track for legal embedded CD boundaries. Keep source files intact, retain output overwrite refusal, verification and bounded seek points, and update the user's script copy.
+Extended bundle_flac_album.py to accept common audio formats including FLAC, WAV, AIFF, MP3, AAC/M4A, Ogg, Opus, WMA, APE and WavPack in filename order. FFmpeg replaces the FLAC-only decoder and produces 44100 Hz sixteen-bit stereo using its native resampler with a 64-tap filter and triangular dithering when conversion requires it. Already-compatible CD FLAC and WAV samples remain exact in regression. Each unaligned track gets at most 587 zero samples appended for valid embedded CD boundaries, reported to the user; no source samples are removed. Existing sources and outputs remain protected, and verified album encoding retains the bounded seek table. Added tools/verify_flac_bundler.py with seven source fixtures covering lossless CD data, 48/96 kHz high-depth inputs, MP3, mono AAC and an unaligned WAV. It checks sample-exact CD segments, all track offsets and padding, metadata, source hashes and overwrite refusal; all pass with evidence in results/flac-bundler-mixed. The script copy beside the user's Groovehouse album tracks is updated after checking it matched the prior version. No user conversion was run and no RBF build is needed.
 
 #### Next Steps:
 
-Verify lossless CD-format preservation and mixed WAV, FLAC, MP3 and AAC conversion with embedded cues, then commit and distribute the revised script without running the user's album conversion.
+Run python3 bundle_flac_album.py in a track folder as before; the installed script now requires ffmpeg and flac. Continue the independent hardware build qualification.
 
 #### Files Modified:
 
