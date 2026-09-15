@@ -1,3 +1,61 @@
+## 112 COMMIT Unreleased ??? 2026-09-14T17:55:26-07:00
+
+#### Coming From:
+
+Unreleased bbc3e8a
+
+#### Purpose:
+
+Center a taller progress bar below the subtitle area in simulation.
+
+#### Outcome:
+
+The user requests a slightly taller bar centered between the subtitle bottom and screen bottom, with better room for the time text. Set height to 18 logical pixels instead of 14, center it in the reserved gap below the lower subtitle glyph and its background padding, and center all three clocks vertically inside it. Keep horizontal placement and subtitle positions; avoid bar movement when subtitles disappear. Update simulated previews at 480p/720p/1080p without starting an RBF batch.
+
+#### Next Steps:
+
+Implement layout arithmetic using the existing sequential units, compare full-frame pixels and spacing at all three resolutions, and export updated PNG previews.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 111 COMMIT Unreleased 3f393c5 2026-09-14T17:55:26-07:00
+
+#### Coming From:
+
+Unreleased bbc3e8a
+
+#### Purpose:
+
+Record the completed direct subtitle value-page builds.
+
+#### Outcome:
+
+All three seeds compiled and produced RBFs under results/hardware-test-3f393c5. Preferred seed 87 uses 37969 placed ALMs, 509 M10Ks, 62 DSPs and four PLLs; worst setup +0.335 ns, hold +0.104 ns and recovery -11.237 ns. Seed 52 has setup +0.068 ns, hold +0.078 ns and recovery -11.746 ns with 38111 ALMs. Seed 61 has setup -0.350 ns, hold +0.098 ns and recovery -11.205 ns with 38094 ALMs. No seed fully passes timing; fixes remain deferred. These builds include direct timing pages, Load media and FLAC-to-MPG handoff repair, but exclude bbc3e8a integer font previews. Hardware acceptance is pending.
+
+#### Next Steps:
+
+Test seed 87 with direct subtitle actions, picker and FLAC/MPG replacement; retain b639ccc seed 52 rollback.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 110 COMMIT Unreleased bbc3e8a 2026-09-14T17:44:28-07:00
 
 #### Coming From:
@@ -1398,70 +1456,6 @@ Have the user test the corrected short encoding and timing-qualified seed 87, in
 - docs/TEST_INSTRUCTIONS.md
 - docs/ENCODING_CADENCE.md
 - tools/reproduce_encode_cadence.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 72 COMMIT Unreleased 9076405 2026-09-14T08:31:24-07:00
-
-#### Coming From:
-
-Unreleased 3d48cc5
-
-#### Purpose:
-
-Provide the best completed duration candidate for the user's requested early hardware test.
-
-#### Outcome:
-
-After being informed that all 9076405 seeds fail setup, the user requests the best completed RBF to test. Seed 87 has the least negative setup at -0.184 ns and hold +0.115 ns. Its verified binary is results/hardware-test-9076405/seed87/MediaPlayer_20260914.rbf with SHA-256 d2bb095a9bd33018f0519aeb0f1c80c989de929a70536ad8fa7d75f8678d509c. Per-seed TESTING.md identifies this as timing-unqualified exploratory testing and asks the user to check Groove's approximately 01:18:25 total and remaining time, pause/seeks and file changes. The revised 3d48cc5 seeds continue compiling under results/build-3d48cc5-20260914-082959. No automatic deployment or hardware acceptance occurred.
-
-#### Next Steps:
-
-Review the user's early hardware results and finish corrected 3d48cc5 build qualification before recommending a timing-qualified replacement; retain tested b00920a seed 52 as rollback.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 71 COMMIT Unreleased 3d48cc5 2026-09-14T08:14:32-07:00
-
-#### Coming From:
-
-Unreleased 9076405
-
-#### Purpose:
-
-Qualify the duration correction and remove the decimal formatter timing bottleneck.
-
-#### Outcome:
-
-Clean 9076405 seeds 52, 61 and 87 have passed synthesis and are fitting. Additional media checks expose an oracle limitation: ffprobe leaves the final reference picture of test_progressive_mpg.mpg untimestamped despite decoding it. Extend the test-only comparison to count decoded display frames after the last available timestamp, independently of the RTL temporal-reference arithmetic. The updated comparison confirms 30.03 seconds for both test_progressive_mpg.mpg and test_av_sync.mpg; fellow_fixed.mpg also passes its bounded-tail comparison. No RTL change or new build is needed for this test-tool correction. All three completed builds pass CDC and scene-enable audits but fail setup by -0.335, -0.295 and -0.184 ns; actual ALMs are 37721, 37686 and 37677 with unchanged 520 M10Ks and 69 DSPs. Seed 52 fails an existing scaler path; seeds 61 and 87 fail retimed combinational decimal divisions inside the UI formatter. The corrected formatter reuses the existing enabled sequential divider for decimal digit conversion, eliminating the combinational /10 and %10 networks. All 5,414,400 pixel comparisons, provider lifetime/state checks and 518 divider cases pass; the duration RTL remains unchanged from its eight successful real-file comparisons. Clean three-seed qualification follows. In response to the user font question, a standalone character sheet is generated directly from the unchanged font ROM; it contains 54 visible glyphs.
-
-#### Next Steps:
-
-Complete corrected build qualification, then record the preferred RBF hash, resources and hardware instructions without changing the MiSTer automatically.
-
-#### Files Modified:
-
-- MediaPlayer.sdc
-- docs/TEST_INSTRUCTIONS.md
-- docs/UI_OVERLAY_PLAN.md
-- docs/ui/font-sheet.html
-- rtl/media_ui_scene.sv
-- tools/make_font_sheet.py
-- tools/verify_ui_duration.py
 
 #### Status:
 
