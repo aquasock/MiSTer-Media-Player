@@ -1,3 +1,33 @@
+## 140 COMMIT Unreleased ??? 2026-09-15T00:12:47-07:00
+
+#### Coming From:
+
+Unreleased 1da2774
+
+#### Purpose:
+
+Extend album creation to convert mixed audio formats into the core's native CD profile.
+
+#### Outcome:
+
+The user authorizes FFmpeg conversion in the creation script. Accept common audio extensions beside the script, decode to 44100 Hz sixteen-bit stereo in filename order, preserve compatible CD PCM, and append fewer than 588 silent samples per unaligned track for legal embedded CD boundaries. Keep source files intact, retain output overwrite refusal, verification and bounded seek points, and update the user's script copy.
+
+#### Next Steps:
+
+Verify lossless CD-format preservation and mixed WAV, FLAC, MP3 and AAC conversion with embedded cues, then commit and distribute the revised script without running the user's album conversion.
+
+#### Files Modified:
+
+- tools/bundle_flac_album.py
+- tools/verify_flac_bundler.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 139 COMMIT Unreleased 1da2774 2026-09-15T00:08:18-07:00
 
 #### Coming From:
@@ -1311,43 +1341,6 @@ Implement FPGA outer metadata/frame headers, CRC admission and DDR-backed stereo
 - tools/test_flac_subframe.sv
 - tools/verify_flac_subframe.py
 - tools/synth_flac_predict.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 100 COMMIT Unreleased 09a4d66 2026-09-14T14:54:34-07:00
-
-#### Coming From:
-
-Unreleased 6d564e9
-
-#### Purpose:
-
-Establish a codec-independent native PCM playback boundary for FLAC and future WAV.
-
-#### Outcome:
-
-The user authorizes continuing and requires that future native 44100 Hz WAV share the playback framework. Commit 09a4d66 adds a standalone codec-independent signed stereo PCM sink with source-sample position, serializer fetch timing, initial prefill, pause, EOF drain, restart/cancel and functional starvation handling. Simulation passes 202 exact samples plus empty EOF, replacement/seek offset and cancellation; Verilator lint passes. FLAC and future WAV use the same sample/EOF token contract, with format parsing and file seeking upstream; WAV parsing is deliberately not implemented yet. A separate HDMI I2C ownership prototype passes active/repeated-START, slave ACK/stretching, driver isolation, STOP release and reset tests. The prototype is not a real Cyclone V HPS controller model or a complete native-audio register writer; real bus-busy/timeout behavior, reset recovery and register shadow/reapply remain integration gates. Three-stage bus-input synchronizers carry recognition attributes. Both prototypes remain outside files.qip, so the accepted production movie core is unchanged. Documentation corrects the 96 kHz ambiguity: input support is 48 kHz MP2, with native 44.1 kHz FLAC planned; the inherited 96 kHz platform output option is not a 96 kHz media decoder and is not removed. Evidence is results/flac/pcm-sink and results/flac/i2c-owner; interfaces and limitations are recorded in docs/PCM_PLAYBACK_CONTRACT.md and docs/FLAC_FEASIBILITY.md. No new playable FLAC RBF or production build was generated.
-
-#### Next Steps:
-
-Continue full FLAC byte/bit parsing and validated frame delivery through the shared PCM boundary, together with the native HDMI transaction controller and actual HPS interface validation. Keep future WAV limited to a later adapter using this same PCM contract. Preserve accepted b639ccc seed 52 and do not claim native HDMI playback until integration and hardware checks pass.
-
-#### Files Modified:
-
-- docs/FLAC_PLAN.md
-- docs/FLAC_FEASIBILITY.md
-- docs/PCM_PLAYBACK_CONTRACT.md
-- rtl/audio/media_pcm_sink.sv
-- rtl/platform/hdmi_i2c_owner.sv
-- tools/test_media_pcm_sink.sv
-- tools/verify_media_pcm_sink.py
-- tools/test_hdmi_i2c_owner.sv
-- tools/verify_hdmi_i2c_owner.py
 
 #### Status:
 
