@@ -1,4 +1,4 @@
-## 110 COMMIT Unreleased ??? 2026-09-14T17:44:28-07:00
+## 110 COMMIT Unreleased bbc3e8a 2026-09-14T17:44:28-07:00
 
 #### Coming From:
 
@@ -10,15 +10,23 @@ Simulate integer font scaling and produce exact-resolution UI previews for revie
 
 #### Outcome:
 
-The user requests implementation in simulation and screenshots at 480p, 720p and 1080p. Use integer glyph scaling 1x, 2x and 3x respectively, replacing the fractional 1.5x and 2.25x modes. Preserve overlay layout anchors and colors, and expand coordinate/height bounds for full 64-character subtitle lines at 3x. Render the production RTL and compare pixels against an independent oracle before exporting PNG previews. This is simulation and review work only; do not start another RBF batch or change the running 3f393c5 snapshots.
+Implemented integer glyph replication at 480p/720p/1080p using 1x/2x/3x scales, with unchanged overlay anchors and colors. Expanded the 3x coordinate bank to 2048 entries and glyph height to 21 pixels; widened text span and fixed the existing six-bit subtitle length truncation at 64 characters. All full-frame UI and subtitle oracle comparisons pass with zero mismatched pixels, including 64-character lines at all three resolutions. HPS transport, subtitle timing/controller and overlay lifetime regressions pass; RTL lint has no warnings. Native-resolution PNG frames and detail crops are exported under results/ui-integer-final/screenshots by tools/export_ui_simulation_previews.py from production-RTL renders on a solid background. These are simulations, not HDMI captures. The running 3f393c5 RBF builds are unchanged; no additional build batch or fitted-resource claim is made.
 
 #### Next Steps:
 
-Update RTL, deterministic coordinate ROM generation and pixel oracles; test all supported resolutions including maximum-length subtitles, then provide full-resolution screenshots.
+Have the user review full-resolution screenshots and integer font sizing before including this preview change in an authorized hardware build. Continue reporting the separate 3f393c5 value-menu builds when requested.
 
 #### Files Modified:
 
-None.
+- docs/TEST_INSTRUCTIONS.md
+- rtl/media_overlay_compositor.sv
+- rtl/media_overlay_coordinates.mem
+- rtl/media_ui_scene.sv
+- tools/export_ui_simulation_previews.py
+- tools/make_overlay_roms.py
+- tools/test_media_player_overlay.sv
+- tools/verify_player_overlay.py
+- tools/verify_subtitles.py
 
 #### Status:
 
