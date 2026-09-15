@@ -1,3 +1,32 @@
+## 151 COMMIT Unreleased 68f32c7 2026-09-15T04:10:20-07:00
+
+#### Coming From:
+
+Unreleased 68f32c7
+
+#### Purpose:
+
+Qualify the three 68f32c7 timing-fix builds and identify the passing candidate.
+
+#### Outcome:
+
+All three HIGH-packing builds compile and fit successfully. Seed61 passes all four timing corners cleanly, with setup +0.127 ns to +3.526 ns, hold +0.045 ns to +0.237 ns, recovery +3.468 ns to +5.105 ns, removal +0.179 ns to +0.561 ns and minimum pulse width +0.925 ns; it is the qualified hardware candidate. Seed52 still fails setup on the ascal scaler's horizontal polyphase sum at -0.155 ns and -0.553 ns. Seed87 nearly closes setup, at +0.159 ns and only -0.056 ns, but shows a new -0.012 ns hold violation on the same clock relationship. All three use 35,700-35,800 placed ALMs (85%), 546 of 553 RAM blocks (99%), 75 DSPs and four PLLs, matching entry 149's resource profile. The plain-adder revert in 68f32c7 closes timing on at least one seed of three, confirming the carry-select rewrite reported in entry 149 was the actual regression rather than general congestion from the XY-256 change. Seed61 RBF SHA-256 is 7ca9345347c88f689860a6fd6a0d13cdbc43019cbe678dfee4c73508fa3393fc, under results/build-68f32c7-20260915-034757/seed61. No RBF from this batch has been deployed; the earlier c3549fe seed87 RBF remains on the test MiSTer from entry 149.
+
+#### Next Steps:
+
+Have the user swap the test MiSTer onto 68f32c7 seed61 and validate the XY-256 visualizer, fading, track-first progress behavior, filters and the MPG/FLAC regression set.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 150 COMMIT Unreleased 68f32c7 2026-09-15T03:44:48-07:00
 
 #### Coming From:
