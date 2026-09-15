@@ -1,4 +1,4 @@
-## 107 COMMIT Unreleased ??? 2026-09-14T17:11:12-07:00
+## 107 COMMIT Unreleased 78c919f 2026-09-14T17:11:12-07:00
 
 #### Coming From:
 
@@ -14,7 +14,7 @@ The user requests Load media *.MPG,FLAC. Stock Main automatically appends extens
 
 #### Next Steps:
 
-Update the production menu, matching HPS transport fixture and user instructions; verify menu readback and queue the label change for the next build.
+The production menu, matching fixture and instructions are updated; full block-RAM HPS menu readback and file-slot isolation pass. Include this change in the next build after the running da59ce0 batch.
 
 #### Files Modified:
 
