@@ -27,7 +27,7 @@ None.
 
 ---
 
-## 105 COMMIT Unreleased ??? 2026-09-14T16:40:32-07:00
+## 105 COMMIT Unreleased da59ce0 2026-09-14T16:40:32-07:00
 
 #### Coming From:
 
@@ -39,15 +39,30 @@ Move subtitles into a stock Main submenu with visibility, offset and speed contr
 
 #### Outcome:
 
-The final requested subtitle speed range is 0.50x to 1.50x in 0.01x steps, with Load SRT, Visible Yes/No and offset -5.0 to +5.0 seconds in 0.1-second steps. Defaults remain visible, zero offset and 1.00x. Positive offset delays subtitles. Use absolute video time, bounded serial arithmetic, streaming-reader reload on timing changes and block-RAM menu storage. The user tested b3e4f1d seed 87 audio successfully but FLAC-to-MPG replacement stalls while OSD remains responsive. Source review identifies a circular wait: music mode forces movie DDR busy, while mode release requires movie idle. The user authorizes fixing this handoff and bundling subtitle controls in the next usual three builds, deferring timing fixes.
+Commit da59ce0 implements the stock Main subtitle submenu with SRT loading, visibility, offset -5.0 to +5.0 seconds in 0.1-second steps and the final speed range 0.50x to 1.50x in 0.01x steps. Absolute serial timing arithmetic and streaming-reader restart preserve video/audio behavior; menu text uses block RAM. All 10,201 setting pairs plus boundary cases, reader retiming, actual HPS menu readback, strict timing-module lint and full-frame rendering pass. The FLAC-to-MPG fix feeds physical DDR busy to the quiesced movie arbiter so it can report idle and release music mode. The production-wiring handoff regression passes four round trips with delayed responses, music drain, physical busy and inactive grant exclusion; the original wiring reproduces the reported stall. Native audio regression passes 1024 exact I2S/SPDIF pairs, pause, position, EOF and HDMI restoration. Clean seeds 52/61/87 are building under results/build-da59ce0-20260914-170543. Prior seed 87 audio was accepted by the user, but its replacement deadlock prevented full acceptance. Timing fixes are deferred by explicit user instruction.
 
 #### Next Steps:
 
-Remove the artificial movie DDR busy condition while retaining quiesce gating, drain-before-switch ownership and physical DDR busy handling. Regress both handoff directions and held responses along with subtitle controls, then build clean seeds 52/61/87. Report timing without pursuing fixes this cycle.
+Finish and report the three combined builds, including resources and timing without claiming closure. Have the user test subtitle controls and active/paused FLAC-to-MPG replacement plus the four movie regressions. Preserve b639ccc seed 52 rollback.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- MediaPlayer_subtitle_menu.svh
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_06.svh
+- docs/TEST_INSTRUCTIONS.md
+- files.qip
+- rtl/media_subtitle_time.sv
+- rtl/media_subtitles.sv
+- sys/hps_io.sv
+- tools/make_subtitle_menu.py
+- tools/test_media_format_handoff.sv
+- tools/test_media_subtitle_hps_io.sv
+- tools/test_media_subtitle_time.sv
+- tools/test_media_subtitles.sv
+- tools/verify_media_format_handoff.py
+- tools/verify_subtitles.py
 
 #### Status:
 
