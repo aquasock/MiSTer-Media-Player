@@ -1,3 +1,40 @@
+## 134 COMMIT Unreleased ??? 2026-09-14T23:21:00-07:00
+
+#### Coming From:
+
+Unreleased a77a2da
+
+#### Purpose:
+
+Add F1 through F8 absolute seeks to eight equal runtime section starts for audio and video.
+
+#### Outcome:
+
+The user authorizes F1 at zero through F8 at seven eighths of the known duration using the existing seek path. Use the duration and validity already supplied to the UI, suppress shortcuts during OSD interaction or active seeks, retain pause and handle held keys once per press. No extra file scan is required. Include the three-second UI timeout and one-minute modified arrow jumps in the next build.
+
+#### Next Steps:
+
+Implement and test all eight targets, duration bounds and unknown duration, key release suppression and FLAC sample-target translation, then prepare the next three HIGH-packing builds.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/TEST_INSTRUCTIONS.md
+- MediaPlayer_top_00.svh
+- rtl/media_keyboard_control.sv
+- tools/test_media_keyboard_control.sv
+- tools/test_flac_seek_keyboard.sv
+- tools/test_playback_restart.sv
+- tools/test_direct_seek_restart.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 133 COMMIT Unreleased a77a2da 2026-09-14T23:13:32-07:00
 
 #### Coming From:
@@ -1318,35 +1355,6 @@ Use this CD-quality profile for the FLAC design and test corpus, covering ordina
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 94 COMMIT Unreleased b639ccc 2026-09-14T13:49:03-07:00
-
-#### Coming From:
-
-Unreleased 54d64d2
-
-#### Purpose:
-
-Correct shared-IDCT Quartus syntax compatibility and restart the authorized three-seed batch.
-
-#### Outcome:
-
-The user explicitly authorizes building again, superseding the previous stop. Source b639ccc adds an explicit generate/endgenerate region and separately declared genvar around the shared coefficient banks; no arithmetic, arbitration or memory behavior changes. The existing differential suite again passes 79008 exact samples. Isolated full-design Quartus 17 analysis/elaboration succeeds with zero errors in 41 seconds after supplying the normal generated build_id.v header; evidence is under results/shared-idct-quartus-preflight and /tmp/shared-idct-quartus-preflight.log. Source is committed and pushed; clean MEDIUM seeds 52/61/87 restart under /tmp/shared-idct-build-restart.log. Full compilation, timing and hardware acceptance remain pending. The accepted 7eb5088 MEDIUM seed 61 and failed 54d64d2 batch are preserved.
-
-#### Next Steps:
-
-Monitor the b639ccc batch and audit all corners, placed/estimated ALMs, RAM/DSP savings, one shared IDCT engine with eight intermediate and three staging M10Ks, and existing 183-stage CDC/removal checks. Package the preferred RBF for four-file hardware acceptance at both refresh settings. Retain 7eb5088 MEDIUM seed 61 as rollback; do not launch extra timing-fix batches without direction.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_shared_idct.sv
 
 #### Status:
 
