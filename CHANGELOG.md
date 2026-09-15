@@ -29,11 +29,19 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Fixed
 
+- Scope native audio power-up reset timing exceptions to the asynchronous
+  reset-release chains, including fitted reset-source duplicates; verify that
+  every synchronizer release stage remains timed.
+
 - FLAC-to-MPG replacement deadlock: inactive movie memory requests remain
   quiesced while the handoff checks physical DDR readiness, allowing drained
   music ownership to return to video.
 
 ### Changed
+
+- Scale overlay glyphs by exact 1x/2x/3x factors at 480p/720p/1080p, retain
+  full 64-character subtitle lines, and center a taller progress bar beneath
+  the subtitle area with its black time text centered vertically.
 
 - Rename the picker to Load media with MPG and FL* filters; stock Main displays
   Load media *.MPG,FL* while retaining normal .flac filename support.

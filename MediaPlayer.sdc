@@ -141,7 +141,7 @@ set_false_path -from [get_keepers {*video_config_cdc:playback_control_config|dst
 # cycles. Snapshot inputs, provider writes, publication, pixel processing and
 # all output-to-compositor paths retain ordinary single-cycle timing.
 set player_scene_ce_regs [get_registers {*media_ui_scene:scene|media_ui_divider:divider|*}]
-foreach player_scene_name {snapshot w h scale revision state resume_state field ch hours minutes seconds time_digits subtitle_rect0 subtitle_rect1 tx ty tw th track_x0 track_x1 fill_x0 fill_x1 track_y0 track_y1 fill_y0 fill_y1 fraction product multiplicand multiplier multiply_count multiply_resume product_low remaining_delta time_rounded remaining clamped_position time_operand glyph_span text_span numerator denominator div_start text_we text_addr text_data object_we object_addr object_data commit commit_epoch commit_groups commit_scale} {
+foreach player_scene_name {snapshot w h scale revision state resume_state field ch hours minutes seconds time_digits subtitle_rect0 subtitle_rect1 tx ty tw th track_x0 track_x1 fill_x0 fill_x1 track_y0 track_y1 fill_y0 fill_y1 subtitle_bottom bar_height time_y fraction product multiplicand multiplier multiply_count multiply_resume product_low remaining_delta time_rounded remaining clamped_position time_operand glyph_span text_span numerator denominator div_start text_we text_addr text_data object_we object_addr object_data commit commit_epoch commit_groups commit_scale} {
     set player_scene_ce_regs [add_to_collection $player_scene_ce_regs [get_registers -nowarn "*media_ui_scene:scene|${player_scene_name}*"]]
 }
 set_multicycle_path -setup -end 4 -from $player_scene_ce_regs -to $player_scene_ce_regs
@@ -154,8 +154,14 @@ set_false_path -to [get_keepers {*media_native_audio:*|lock_sync[0]}]
 set_false_path -to [get_keepers {*media_native_audio:*|mute_movie_sync[0]}]
 # Async assertions target only reset-release chains. Stage-to-stage release
 # paths remain timed, including those on the selected output clock.
+# The HPS power-up reset is another asynchronous source, including fitter
+# duplicates. It enters only these async-assert/sync-release chains. Do not
+# exempt their stage-to-stage shifts or any ordinary native-audio datapaths.
+set native_powerup_reset_regs [get_keepers {*sysmem|init_reset_n*}]
+if {[get_collection_size $native_powerup_reset_regs] < 1} {error "Missing platform power-up reset source"}
 foreach chain {wr_reset_sync rd_reset_sync ref_reset_sync movie_reset_sync out_reset_sync} {
     set target [format {*media_native_audio:*|%s[*]} $chain]
+    set_false_path -from $native_powerup_reset_regs -to [get_keepers $target]
     set_false_path -from [get_keepers {reset_req *|media_music_mode *|media_session_control:*|decoder_reset *|reset_mpeg2_sync[2]}] -to [get_keepers $target]
 }
 

@@ -191,6 +191,18 @@ foreach chain {select_sync lock_sync mute_movie_sync wr_reset_sync rd_reset_sync
         if {$count != 1} {error "Missing native audio synchronizer: $pattern"}
     }
 }
+# A broad reset-chain cut would hide release timing. Require both ordinary
+# register-to-register setup paths in every native reset release synchronizer.
+foreach chain {wr_reset_sync rd_reset_sync ref_reset_sync movie_reset_sync out_reset_sync} {
+    for {set stage 0} {$stage < 2} {incr stage} {
+        set source [get_registers [format {*media_native_audio:*|%s[%d]} $chain $stage]]
+        set sink [get_registers [format {*media_native_audio:*|%s[%d]} $chain [expr {$stage+1}]]]
+        set paths [get_timing_paths -setup -from $source -to $sink -npaths 1]
+        set count [get_collection_size $paths]
+        puts $cdc_audit "$chain release $stage -> [expr {$stage+1}]: $count timed paths"
+        if {$count < 1} {error "Untimed native reset release path: $chain stage $stage"}
+    }
+}
 close $cdc_audit
 
 # The formatter's multicycle exception is backed by a real modulo-four

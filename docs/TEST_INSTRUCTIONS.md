@@ -1,6 +1,23 @@
 # Shared IDCT candidate
 
-## Integer-font simulation preview (not yet built for hardware)
+## Combined UI and timing build qualification
+
+The next candidate combines integer fonts, the taller centered bar, direct
+subtitle value pages, Load media and the FLAC-to-MPG handoff fix. Validate all
+three HDMI output resolutions if available: glyph pixels should be uniform,
+clocks centered within the bar, and the bar centered between the reserved
+subtitle bottom and screen edge. Check two-line and long subtitles, hidden cues,
+pause/seek, EOF, and active/paused replacement in both media directions.
+
+The timing correction adds the platform power-up reset source and its fitted
+duplicates to the existing native reset-release input exceptions. Ordinary
+stage-to-stage synchronizer paths stay timed and are now required by the audit.
+The new bar-layout registers share the same modulo-four formatter enable and
+are included in its existing scoped multicycle constraint. Timing qualification
+requires nonnegative setup, hold, recovery, removal and pulse-width margins at
+all four corners, with clean CDC audits; wait for the actual build report.
+
+## Integer-font simulation preview
 
 The overlay now uses exact glyph replication: 1x at 480p (5x7 glyphs), 2x at
 720p (10x14), and 3x at 1080p (15x21). Subtitle anchors and colors remain the same. The progress bar is now taller
