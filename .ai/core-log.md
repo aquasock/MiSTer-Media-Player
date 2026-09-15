@@ -1,4 +1,4 @@
-## 116 COMMIT Unreleased ??? 2026-09-14T18:53:35-07:00
+## 116 COMMIT Unreleased 3aff0f9 2026-09-14T18:53:35-07:00
 
 #### Coming From:
 
@@ -10,15 +10,18 @@ Display common typographic apostrophes using the existing subtitle apostrophe gl
 
 #### Outcome:
 
-The user reports apostrophes rendering as question marks. The font contains the straight ASCII apostrophe, but the streaming parser replaces non-ASCII UTF-8 sequences with a question mark. No offending SRT was available in the GIT HDD root, so its exact encoding is not confirmed. Normalize UTF-8 left/right single quotation marks and standalone Windows-1252 0x91/0x92 to ASCII apostrophe, preserving fallback behavior for unsupported characters and the current bounded text buffers.
+Confirmed the existing font includes ASCII apostrophe while the parser replaces non-ASCII UTF-8 with a question mark. The exact reported SRT encoding remains unconfirmed. The parser now normalizes UTF-8 U+2018/U+2019 and standalone Windows-1252 0x91/0x92 to ASCII apostrophe. It replaces only the allocated fallback cell after a complete matching UTF-8 sequence and clears partial decoding at line/tag boundaries, preserving unsupported-character fallback and preventing next-line consumption. Parser tests pass ASCII, both curly encodings, unsupported sequences, truncation, tag boundaries, the final available column and overflow without corrupting existing text. Streaming subtitle controller regressions also pass with cue boundaries, pause/visibility, seeking, EOF, retiming and replacement. Evidence is results/subtitle-apostrophes. No RBF was built; the completed timing-qualified 6bfcea3 candidates are unchanged.
 
 #### Next Steps:
 
-Test ASCII and smart apostrophes, malformed/truncated UTF-8, line boundaries and the 63-character limit; run subtitle regressions and commit the fix for the next build without launching an unrequested batch.
+Include the parser correction in the next authorized build and confirm the reported subtitle file displays its apostrophes correctly on hardware.
 
 #### Files Modified:
 
-None.
+- CHANGELOG.md
+- docs/TEST_INSTRUCTIONS.md
+- rtl/media_srt_parser.sv
+- tools/test_media_srt_parser.sv
 
 #### Status:
 
