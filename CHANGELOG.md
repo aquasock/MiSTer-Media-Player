@@ -6,6 +6,16 @@ This project is still in active pre-release development. Published milestone rel
 
 ## [Unreleased]
 
+### FFT Fire visualizer
+
+- Add the audio-only Visualizers submenu with O-scope (the existing two ribbons)
+  and Fire. Fire uses an original 256-point stereo FFT with a Hann window, 32
+  frequency bands, logarithmic intensity and procedural flame rendering.
+- Share the native post-volume tap, selected aspect rectangle and nine-cycle
+  renderer boundary. Keep audio transport, player UI and stock OSD independent.
+- Add reproducible coefficient generation, exact FFT oracles, full-frame
+  renderer checks and RTL previews. Hardware validation is pending.
+
 ### Audio-mode menu controls
 
 - Gray out Color matrix, Refresh rate and all Subtitles controls while native

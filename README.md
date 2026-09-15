@@ -133,3 +133,10 @@ python3 tools/verify_waveform_visualizer.py --output results/waveform --synthesi
 ```
 
 The separate punctuation build `6d460d2` does not include the visualizer.
+
+## Visualizer selection
+
+During FLAC playback, open **Visualizers:** and select **Type: O-scope** for the
+existing mirrored ribbons or **Type: Fire** for the FFT flame display. The submenu
+is hidden outside audio playback. Both use the selected aspect ratio and retain
+the existing progress UI and OSD. See [Fire design and tests](docs/FIRE_VISUALIZER.md).

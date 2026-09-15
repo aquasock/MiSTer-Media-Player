@@ -1,3 +1,21 @@
+# FFT Fire and O-scope build
+
+Load native FLAC and open **Visualizers:**. Select Type: **Fire** or **O-scope**.
+O-scope is the existing two-ribbon effect. Check that the submenu is hidden while
+MPG plays and returns during audio playback. Selection should not affect playback.
+
+Test Fire with bass, vocals and higher-frequency content; energy should move
+across the display by frequency. Silence/mute/pause should extinguish the flames
+after the short analysis window. Check both aspect settings, the progress bar,
+OSD, repeated live visualizer switches, FLAC seeks, N/P album changes, EOF and
+MPG/FLAC replacement. Recheck the four MPG regression files and O-scope behavior.
+
+This is a 256-point/32-band display, with approximately 172 Hz FFT bin spacing.
+It is a visualizer, not a calibrated spectrum analyzer. See docs/FIRE_VISUALIZER.md
+for deterministic FFT tests and 480p/720p/1080p RTL previews.
+
+---
+
 # Audio-mode menu controls
 
 While FLAC is playing or paused, Color matrix, Refresh rate and Subtitles must

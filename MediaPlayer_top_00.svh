@@ -67,6 +67,8 @@ localparam CONF_STR = {
 	"MediaPlayer;;",
 	"S0,MPGFL*,Load media;",
 `include "MediaPlayer_subtitle_menu.svh"
+	"h0P4,Visualizers:;",
+	"h0P4O[122],Type,O-scope,Fire;",
 	"-;",
 	"-;",
 	"O[121],Aspect ratio,4:3,16:9;",
@@ -126,6 +128,7 @@ wire [7:0] music_mem_be,movie_mem_be,movie_mem_burst;
 wire music_mem_read,music_mem_write,movie_mem_read,movie_mem_write;
 wire music_play_request=media_music_hint && media_file_size!=0;
 assign PLAYER_MUSIC=music_play_request;
+assign PLAYER_VISUALIZER=status[122];
 assign PLAYER_MUSIC_PAUSED=media_paused_sys;
 assign PLAYER_PCM_RESET=reset_mpeg2 || !media_music_mode;
 assign media_ddr_idle=media_music_mode?media_music_idle:media_movie_ddr_idle;
