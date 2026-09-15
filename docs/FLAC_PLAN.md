@@ -15,7 +15,7 @@ reconstruct exactly the original PCM before output conversion, volume and
 filters. Validate reference encoder compression levels 0 through 8 and
 FFmpeg-generated files. Do not require a special encode command.
 
-Retain Space pause and existing 10-second, 30-second and five-minute seeks
+Retain Space pause and existing 10-second, 30-second and one-minute seeks
 in both directions. Reuse the progress bar and three time fields. File
 replacement forgets the previous session; EOF drains the last sample and
 returns to startup. Video playback remains fully supported in the same RBF.

@@ -63,7 +63,7 @@ single-file FLAC workflow). Verify:
 2. N selects the next track; P selects the previous track. First-track P clamps
    to the first INDEX 01, and last-track N does nothing. Held keys do not repeat.
 3. Left/Right jumps 10 seconds, Ctrl+Left/Right 30 seconds, and Ctrl+Alt+Left/Right
-   five minutes, across track boundaries. Test both while playing and paused.
+   one minute, across track boundaries. Test both while playing and paused.
 4. Test the same arrow controls on a normal FLAC without an embedded cue sheet.
    Track keys should have no effect. Seek tables make landing faster; without
    one, reaching a late target requires discarded decode from the beginning.
@@ -634,7 +634,7 @@ Check the following on this RBF:
    track and fill. Change 4:3/16:9 and video filters: the UI should stay fixed
    and retain its colors. Open the MiSTer OSD over the player UI.
 3. Pause with Space. Confirm elapsed position freezes, Paused appears and the
-   controls hide after ten seconds even while paused. Resume and confirm the
+   controls hide after three seconds even while paused. Resume and confirm the
    controls reappear briefly.
 4. Seek both directions with all three jump sizes, including while paused.
    Seeking should remain visible over the existing black picture, then show
@@ -773,7 +773,7 @@ retained across seeks. Raw M2V uses reconstruction fallback in both directions.
 Compact playback-health telemetry remains; the separate persistent seek-fault
 snapshot is removed from this candidate.
 
-Test 10-second, 30-second and five-minute jumps both ways in Pee Strike and
+Test 10-second, 30-second and one-minute jumps both ways in Pee Strike and
 fellow.mpg, including a first-time jump far ahead and a backward jump late in
 the movie. Allow approximate GOP landing initially. Repeat while paused, resume,
 open the OSD during a search, and check audio synchronization. Test near zero,
@@ -893,7 +893,7 @@ No additional ini change is needed specifically for keyboard playback controls.
 | Space | Toggle play/pause |
 | Left / Right | Backward / forward 10 seconds |
 | Ctrl + Left / Right | Backward / forward 30 seconds |
-| Ctrl + Alt + Left / Right | Backward / forward 5 minutes |
+| Ctrl + Alt + Left / Right | Backward / forward 1 minute |
 
 Both left/right modifier keys work. Up/Down remain unassigned. Commands operate
 with the OSD closed; arrows and Space used in the OSD do not change playback.
@@ -923,7 +923,7 @@ Leading B-pictures requiring a reference from before the restart are discarded.
    silence, sample continuity and A/V alignment. Repeat several times.
 2. With a burned-in time/frame counter, compare the shown time before and after
    all three jump sizes in both directions. Allow approximate GOP landing in this initial direct-seek build.
-   Use a file longer than six minutes for the five-minute forward jump.
+   Use a file longer than two minutes for the one-minute forward jump.
 3. Repeat while paused. Verify the requested destination appears and stays still
    until Space resumes. During a seek, toggle Space and check the resulting state.
 4. Seek backward near the start, forward near EOF, then reload after clean EOF has returned to startup.

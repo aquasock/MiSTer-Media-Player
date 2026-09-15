@@ -23,7 +23,7 @@ always @(posedge clk) begin
  else if(new_file) begin session<=session+1'b1;hide_count<=0;invalid_duration<=0;end
  else begin
   if(seeking && (!seeking_d || target_q!=target_d)) session<=session+1'b1;
-  if(activity || seeking) hide_count<=CLOCK_HZ*10;
+  if(activity || seeking) hide_count<=CLOCK_HZ*3;
   else if(hide_count!=0) hide_count<=hide_count-1'b1;
   // A presented timestamp beyond the qualified endpoint contradicts the
   // continuous-timeline probe. Seek previews are not evidence of discontinuity.

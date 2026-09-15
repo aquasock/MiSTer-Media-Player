@@ -51,7 +51,7 @@ change the encoded playback speed or the audio sample rate.
 | Space | Play/pause |
 | Left / Right | Backward / forward 10 seconds |
 | Ctrl + Left / Right | Backward / forward 30 seconds |
-| Ctrl + Alt + Left / Right | Backward / forward 5 minutes |
+| Ctrl + Alt + Left / Right | Backward / forward 1 minute |
 | N / P | Next / previous embedded CD track (FLAC albums) |
 
 Controls operate with the OSD closed, once per physical press. Pause retains
@@ -61,7 +61,7 @@ ignored while a seek is in progress; Space still controls the final pause state.
 
 The scaled HDMI player overlay shows Elapsed, Total and Remaining above a
 progress bar. It appears at startup and on play/pause or seek activity, remains
-visible during a seek, and hides ten seconds afterward. Opening a file first
+visible during a seek, and hides three seconds afterward. Opening a file first
 performs a bounded timestamp probe; when duration cannot be qualified, Total
 and Remaining show `--:--:--`. The MiSTer menu remains above the player overlay.
 This overlay awaits hardware qualification; subtitle playback is not included.

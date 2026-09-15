@@ -15,7 +15,7 @@ reg [1:0] ctrl_down=0,alt_down=0;
 reg wait_restart=0;
 wire ctrl=|ctrl_down;
 wire alt=|alt_down;
-wire [34:0] jump_q=ctrl ? (alt ? 35'd108000000 : 35'd10800000) : 35'd3600000;
+wire [34:0] jump_q=ctrl ? (alt ? 35'd21600000 : 35'd10800000) : 35'd3600000;
 wire [35:0] forward_q={1'b0,elapsed_q}+{1'b0,jump_q};
 always @(posedge clk) begin
  restart<=0;

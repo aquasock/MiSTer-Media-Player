@@ -6,6 +6,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ## [Unreleased]
 
+### Changed
+
+- Audio and video playback controls now hide after three seconds of inactivity; Ctrl+Alt+Left/Right seeks backward/forward one minute.
+
 ### FFT Fire visualizer
 
 - Add the audio-only Visualizers submenu with O-scope (the existing two ribbons)

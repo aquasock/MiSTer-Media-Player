@@ -13,14 +13,16 @@ initial begin
  @(negedge clk);if(!state_out[73]) $fatal(1,"first playback hidden");
  elapsed=3600000;paused=1;@(negedge clk);
  if(state_out[72:71]!=0 || state_out[34:0]!=elapsed) $fatal(1,"pause state");
- repeat(41) @(negedge clk);if(state_out[73]) $fatal(1,"paused wall-clock timeout");
+ repeat(11) @(negedge clk);if(!state_out[73]) $fatal(1,"UI hid before three seconds");
+ @(negedge clk);if(state_out[73]) $fatal(1,"paused wall-clock timeout");
  target=7200000;seeking=1;@(negedge clk);
  if(!state_out[73] || state_out[34:0]!=target || state_out[90:75]!=2) $fatal(1,"seek preview/epoch");
  repeat(80) @(negedge clk);if(!state_out[73]) $fatal(1,"seek hid early");
  target=10800000;@(negedge clk);if(state_out[90:75]!=3) $fatal(1,"repeat seek epoch");
  seeking=0;elapsed=10780000;@(negedge clk);
  if(state_out[34:0]!=elapsed || !state_out[73]) $fatal(1,"actual landing");
- repeat(41) @(negedge clk);if(state_out[73]) $fatal(1,"landing timeout");
+ repeat(11) @(negedge clk);if(!state_out[73]) $fatal(1,"UI hid before three seconds");
+ @(negedge clk);if(state_out[73]) $fatal(1,"landing timeout");
  elapsed=37000000;repeat(2) @(negedge clk);if(state_out[70]) $fatal(1,"contradictory endpoint retained");
  new_file=1;@(negedge clk);new_file=0;elapsed=0;
  if(!state_out[70] || state_out[90:75]!=4) $fatal(1,"session invalidation reset");

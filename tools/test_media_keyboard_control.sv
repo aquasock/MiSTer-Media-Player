@@ -32,11 +32,12 @@ initial begin
  event_key(9'h029,0);
  check_jump(9'h174,35'd39600000);check_jump(9'h16b,35'd32400000);
  event_key(9'h014,1);check_jump(9'h174,35'd46800000);check_jump(9'h16b,35'd25200000);
- event_key(9'h111,1);check_jump(9'h174,35'd144000000);check_jump(9'h16b,0);
+ event_key(9'h111,1);check_jump(9'h174,35'd57600000);check_jump(9'h16b,35'd14400000);
+ elapsed_q=35'd3600000;check_jump(9'h16b,0);elapsed_q=35'd36000000;
  event_key(9'h014,0);event_key(9'h111,0);
  // Both sides of each modifier; releasing one Ctrl must retain the other.
  event_key(9'h014,1);event_key(9'h114,1);event_key(9'h014,0);
- event_key(9'h011,1);check_jump(9'h174,35'd144000000);
+ event_key(9'h011,1);check_jump(9'h174,35'd57600000);
  event_key(9'h114,0);event_key(9'h011,0);
  osd_open=1;event_key(9'h029,1);event_key(9'h174,1);
  if(paused||seek_active) $fatal(1,"OSD command leaked");

@@ -53,14 +53,14 @@ module test_flac_seek_keyboard;
   event_key(1,9'h029);event_key(0,9'h029);if(!paused)$fatal(1,"pause");
   jump(1,10);jump(0,10);
   event_key(1,9'h014);jump(1,30);jump(0,30);
-  event_key(1,9'h011);jump(1,300);jump(0,300);
+  event_key(1,9'h011);jump(1,60);jump(0,60);
   event_key(0,9'h011);event_key(0,9'h014);
   osd_open=1;event_key(1,9'h174);osd_open=0;event_key(1,9'h174);
   if(busy||seek_active)$fatal(1,"OSD key leaked");event_key(0,9'h174);
   event_key(1,9'h174);wait(busy);new_file=1;repeat(4)@(negedge clk);new_file=0;
   repeat(500)@(negedge clk);
   if(busy||seek_active||paused||resume_frame||seek_available)$fatal(1,"replacement did not cancel seek");
-  $display("PASS ordinary FLAC keyboard +/-10/30/300s, pause, restart CDC, OSD and replacement");$finish;
+  $display("PASS ordinary FLAC keyboard +/-10/30/60s, pause, restart CDC, OSD and replacement");$finish;
  end
  initial begin #100000000;$fatal(1,"timeout nav=%d seek=%b",dut.nav_state,seek_active);end
 endmodule
