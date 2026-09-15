@@ -1,13 +1,20 @@
 # Shared IDCT candidate
 
-## Apostrophe fix queued for the next build
+## Subtitle punctuation fix queued for the next build
 
 Straight ASCII apostrophes already have a font glyph. The new parser also maps
 UTF-8 U+2018/U+2019 and standalone Windows-1252 bytes 0x91/0x92 to that glyph.
+UTF-8 en/em dashes U+2013/U+2014 become `-`, and double quotation marks
+U+201C/U+201D become `"`; Windows-1252 0x96/0x97 and 0x93/0x94 also map
+to those existing glyphs.
 Other unsupported Unicode still becomes `?`. Test contractions and quoted text
 in a matching SRT; the completed 6bfcea3 candidates do not include this fix.
 Parser regressions cover both encodings, ordinary ASCII, unsupported characters,
 truncated sequences, tag boundaries and the 63-character line limit.
+`python3 tools/verify_srt_files.py file.srt [more.srt ...]` replays complete UTF-8
+SRT files against an independent normalized-text/timestamp oracle. All 3,130
+cues across the user's A New Hope, Empire Strikes Back and Return of the Jedi
+SRT files pass, with zero parser warnings.
 
 ## Combined UI and timing build qualification
 

@@ -1,6 +1,6 @@
 // Bounded streaming SRT parser. Two 63-character display lines, no cue database.
 // Header lines are searched for HH:MM:SS,mmm --> HH:MM:SS,mmm. Text is plain
-// Printable ASCII plus normalized smart apostrophes; tags are removed and
+// Printable ASCII plus normalized smart punctuation; tags are removed and
 // unsupported UTF-8 codepoints become '?'.
 module media_srt_parser(
  input wire clk,reset,
@@ -92,17 +92,24 @@ always @(posedge clk) begin
   else if(!tag) begin
    if(utf_left!=0 && line_q[7:6]==2'b10)begin
     utf_left<=utf_left-1'b1;
-    // E2 80 98/99 (left/right single quotation marks). Replace the one
+    // E2 80 punctuation: single/double quotes and en/em dashes. Replace the one
     // fallback cell allocated by the lead byte only after the full match.
-    if(utf_left==1 && utf_smart && utf_replace && (line_q==8'h98 || line_q==8'h99))
-     text[{line_number[0],(column[5:0]-6'd1)}]<=8'h27;
+    if(utf_left==1 && utf_smart && utf_replace)begin
+     case(line_q)
+      8'h98,8'h99:text[{line_number[0],(column[5:0]-6'd1)}]<=8'h27;
+      8'h93,8'h94:text[{line_number[0],(column[5:0]-6'd1)}]<=8'h2d;
+      8'h9c,8'h9d:text[{line_number[0],(column[5:0]-6'd1)}]<=8'h22;
+      default:;
+     endcase
+    end
     utf_smart<=utf_smart && utf_left==2 && line_q==8'h80;
    end
    else begin
     utf_smart<=line_q==8'he2;utf_replace<=line_number<2 && column<63;
     utf_left<=line_q[7:5]==3'b110 ? 2'd1:line_q[7:4]==4'b1110 ? 2'd2:line_q[7:3]==5'b11110 ? 2'd3 : 2'd0;
     if(line_number<2 && column<63) begin
-     text[{line_number[0],column[5:0]}]<=line_q==9?8'd32:(line_q==8'h91 || line_q==8'h92)?8'h27:(line_q>=32 && line_q<=126?line_q:8'd63);
+     text[{line_number[0],column[5:0]}]<=line_q==9?8'd32:(line_q==8'h91 || line_q==8'h92)?8'h27:
+      (line_q==8'h93 || line_q==8'h94)?8'h22:(line_q==8'h96 || line_q==8'h97)?8'h2d:(line_q>=32 && line_q<=126?line_q:8'd63);
      column<=column+1'b1;
      if(line_number==0)length0<=column+1'b1;else length1<=column+1'b1;
     end else warning<=1;

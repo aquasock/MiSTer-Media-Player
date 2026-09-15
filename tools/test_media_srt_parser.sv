@@ -33,6 +33,8 @@ initial begin
  restart();send("1\n00:00:00,000 --> 00:00:01,000\nIt's already ASCII.\n\n");check(0,360000,"It's already ASCII.","");
  restart();send("1\n00:00:00,000 --> 00:00:01,000\nIt");smart(8'h99);send("s ");smart(8'h98);send("quoted");smart(8'h99);send(".\n\n");check(0,360000,"It's 'quoted'.","");
  restart();send("1\n00:00:00,000 --> 00:00:01,000\n");byte_in(9'h91);send("It's legacy");byte_in(9'h92);send("\n\n");check(0,360000,"'It's legacy'","");
+ restart();send("1\n00:00:00,000 --> 00:00:01,000\n");smart(8'h93);send(" ");smart(8'h9c);send("Hello");smart(8'h9d);smart(8'h94);send("\n\n");check(0,360000,"- \"Hello\"-","");
+ restart();send("1\n00:00:00,000 --> 00:00:01,000\n");byte_in(9'h96);byte_in(9'h93);send("Hello");byte_in(9'h94);byte_in(9'h97);send("\n\n");check(0,360000,"-\"Hello\"-","");
  // Unsupported three-byte characters still occupy exactly one fallback cell.
  restart();send("1\n00:00:00,000 --> 00:00:01,000\nA");smart(8'h9a);send("B");byte_in(9'he2);byte_in(9'h81);byte_in(9'h99);send("C\n\n");check(0,360000,"A?B?C","");
  // A truncated character cannot consume or rewrite the next line.

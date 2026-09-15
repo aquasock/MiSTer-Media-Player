@@ -29,8 +29,9 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Fixed
 
-- Normalize UTF-8 curly apostrophes and Windows-1252 single quotation marks
-  to the existing straight-apostrophe subtitle glyph instead of a question mark.
+- Normalize UTF-8 curly apostrophes, double quotes and en/em dialogue dashes
+  (plus Windows-1252 equivalents) to existing ASCII subtitle glyphs instead
+  of question marks.
   Truncated UTF-8 sequences no longer consume characters from the following line.
 
 - Scope native audio power-up reset timing exceptions to the asynchronous
